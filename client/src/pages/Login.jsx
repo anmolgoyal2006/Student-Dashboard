@@ -104,10 +104,22 @@ export default function Login() {
             </button>
           </form>
 
-          <p className="login-footer">
+       <p className="login-footer">
             No account?{' '}
             <Link to="/signup" className="login-anchor">Create one free</Link>
           </p>
+
+          {/* Credit */}
+          <p style={{
+            textAlign: 'center',
+            marginTop: 24,
+            fontSize: 12,
+            color: 'var(--muted)',
+            letterSpacing: '0.03em',
+          }}>
+            Made with ❤️ by <span style={{ color: 'var(--primary)', fontWeight: 600 }}>Anmol Goyal</span>
+          </p>
+
         </div>
       </div>
     </div>
