@@ -1,15 +1,24 @@
-const cors = require("cors");
+const express = require('express');
+const cors = require('cors');
+const dotenv = require('dotenv');
+const connectDB = require('./config/db');
 
+dotenv.config();
+connectDB();
+
+const app = express();  // ✅ MUST come before app.use
+
+// ✅ CORS
 app.use(cors({
-  origin: ["https://student-dashboard-ashy-rho.vercel.app"],
+  origin: ["http://localhost:3000"],
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"]
 }));
 
 app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", "https://student-dashboard-ashy-rho.vercel.app");
+  res.header("Access-Control-Allow-Origin", "*");
   res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.header("Access-Control-Allow-Headers", "*");
 
   if (req.method === "OPTIONS") {
     return res.sendStatus(200);
@@ -18,6 +27,7 @@ app.use((req, res, next) => {
   next();
 });
 
+// ✅ Body parser
 app.use(express.json());
 
 // Routes
