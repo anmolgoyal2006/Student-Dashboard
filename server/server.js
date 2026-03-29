@@ -8,22 +8,30 @@ connectDB();
 
 const app = express();
 
-app.use(cors());
+app.use(cors({
+  origin: "https://student-dashboard-ashy-rho.vercel.app",
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: true
+}));
+
+app.options("*", (req, res) => res.sendStatus(200));
+
 app.use(express.json());
 
 // Routes
-app.use('/api/auth',            require('./routes/authRoutes'));
-app.use('/api/subjects',        require('./routes/timetableRoutes'));
-app.use('/api/attendance',      require('./routes/attendanceRoutes'));
-app.use('/api/marks',           require('./routes/marksRoutes'));
-app.use('/api/career',          require('./routes/careerRoutes'));
+app.use('/api/auth', require('./routes/authRoutes'));
+app.use('/api/subjects', require('./routes/timetableRoutes'));
+app.use('/api/attendance', require('./routes/attendanceRoutes'));
+app.use('/api/marks', require('./routes/marksRoutes'));
+app.use('/api/career', require('./routes/careerRoutes'));
 app.use('/api/recommendations', require('./routes/recommendationRoutes'));
-app.use('/api/notifications',   require('./routes/notificationRoutes'));
+app.use('/api/notifications', require('./routes/notificationRoutes'));
 
 // Health check
 app.get('/api/ping', (req, res) => res.json({ message: 'Server is running!' }));
 
-// Global error handler
+// Error handler
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({ message: 'Something went wrong', error: err.message });
