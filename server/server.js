@@ -46,6 +46,7 @@ app.get('/api/health', (_req, res) => res.json({               // ← Fix 4
 }));
 
 // ─── Routes ───────────────────────────────────────────────────────────────
+app.use('/api/tasks', require('./routes/taskRoutes'));
 app.use('/api/auth',            require('./routes/authRoutes'));
 app.use('/api/timetable',       require('./routes/timetableRoutes'));
 app.use('/api/subjects',        require('./routes/timetableRoutes')); // ← Fix 2 alias
