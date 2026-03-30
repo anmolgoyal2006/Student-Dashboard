@@ -8,6 +8,7 @@ const links = [
   { to: '/attendance', label: 'Attendance', icon: '✅' },
   { to: '/marks',      label: 'Marks',      icon: '📝' },
   { to: '/career',     label: 'Career',     icon: '🚀' },
+  { to: '/scheduler',  label: 'Scheduler',  icon: '🗓️' },  // ← ONLY CHANGE
 ];
 
 export default function Sidebar() {
@@ -18,19 +19,16 @@ export default function Sidebar() {
     ? user.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
     : '?';
 
-  // Close sidebar when route changes on mobile
   const handleLinkClick = () => {
     if (window.innerWidth <= 768) setOpen(false);
   };
 
-  // Close on resize to desktop
   useEffect(() => {
     const onResize = () => { if (window.innerWidth > 768) setOpen(false); };
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
-  // Prevent body scroll when sidebar open on mobile
   useEffect(() => {
     document.body.style.overflow = open ? 'hidden' : '';
     return () => { document.body.style.overflow = ''; };
@@ -50,7 +48,7 @@ export default function Sidebar() {
         </button>
       </nav>
 
-      {/* Overlay — closes sidebar when tapped outside */}
+      {/* Overlay */}
       {open && (
         <div
           className="sidebar-overlay"

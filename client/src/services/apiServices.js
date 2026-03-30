@@ -48,3 +48,13 @@ export const aiService = {
 export const notificationService = {
   getAll: () => apiRequest('get', '/notifications'),
 };
+
+// ─── Tasks / Scheduler ───────────────────────────────────────────────────
+export const taskService = {
+  getAll:  (params) => apiRequest('get',    '/tasks', null, { params }),
+  getOne:  (id)     => apiRequest('get',    `/tasks/${id}`),
+  create:  (data)   => apiRequest('post',   '/tasks', data),
+  update:  (id, d)  => apiRequest('put',    `/tasks/${id}`, d),
+  remove:  (id)     => apiRequest('delete', `/tasks/${id}`),
+  toggle:  (id)     => apiRequest('patch',  `/tasks/${id}/toggle`),
+};
