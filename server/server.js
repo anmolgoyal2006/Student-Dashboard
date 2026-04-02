@@ -55,6 +55,7 @@ app.use('/api/marks',           require('./routes/marksRoutes'));
 app.use('/api/career',          require('./routes/careerRoutes'));
 app.use('/api/recommendations', require('./routes/recommendationRoutes'));
 app.use('/api/notifications',   require('./routes/notificationRoutes'));
+app.use('/api/user', require('./routes/userRoutes'));
 
 // ─── 404 handler ──────────────────────────────────────────────────────────
 app.use((_req, res) => {

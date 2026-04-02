@@ -19,8 +19,26 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
   }, []);
 
+  // ── NEW: called after a successful profile update ────────
+  // Merges updated fields (name, email) into the existing
+  // user object so the sidebar/topbar reflect changes
+  // immediately without requiring a re-login.
+  // If the backend returned a new JWT (email changed),
+  // it gets stored here too.
+  const updateUser = useCallback((userData, newToken) => {
+    setUser(prev => {
+      const merged = { ...prev, ...userData };
+      localStorage.setItem('user', JSON.stringify(merged));
+      return merged;
+    });
+    if (newToken) {
+      localStorage.setItem('token', newToken);
+    }
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ user, login, logout, isLoggedIn: !!user }}>
+    // ── CHANGED: added updateUser to the context value ───
+    <AuthContext.Provider value={{ user, login, logout, updateUser, isLoggedIn: !!user }}>
       {children}
     </AuthContext.Provider>
   );

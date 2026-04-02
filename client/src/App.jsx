@@ -10,6 +10,7 @@ import Marks      from './pages/Marks';
 import Timetable  from './pages/Timetable';
 import Career     from './pages/Career';
 import Scheduler  from './pages/Scheduler';
+import ProfileSettings from './pages/ProfileSettings';
 
 const ProtectedRoute = ({ children }) => {
   const { isLoggedIn } = useAuth();
@@ -49,7 +50,11 @@ export default function App() {
         <Route path="/scheduler" element={
           <ProtectedRoute><AppLayout><Scheduler /></AppLayout></ProtectedRoute>
         } />
-
+         <Route path="/profile" element={
+  <ProtectedRoute>
+    <AppLayout><ProfileSettings /></AppLayout>
+  </ProtectedRoute>
+} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
