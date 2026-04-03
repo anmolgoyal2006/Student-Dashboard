@@ -70,12 +70,8 @@ exports.changePassword = async (req, res) => {
   } catch (err) { res.status(500).json({ message: err.message }); }
 };
 
-// POST /api/user/forgot-password
 exports.forgotPassword = async (req, res) => {
-    console.log('BREVO_USER:', process.env.BREVO_USER); // ← add this
-  console.log('BREVO_PASS length:', process.env.BREVO_PASS?.length); // ← add this
   const { email } = req.body;
-
   const GENERIC = { message: 'If that email is registered, a reset link has been sent.' };
 
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))
@@ -92,10 +88,22 @@ exports.forgotPassword = async (req, res) => {
     user.resetPasswordExpires = Date.now() + 15 * 60 * 1000;
     await user.save();
 
-    const resetURL    = `${process.env.FRONTEND_URL}/reset-password/${rawToken}`;
-    const transporter = createTransporter();
+    // ── Respond immediately ──────────────────────────────
+    res.json(GENERIC);
 
-    await transporter.sendMail({
+    // ── Send email after response using port 465 ─────────
+    const resetURL    = `${process.env.FRONTEND_URL}/reset-password/${rawToken}`;
+    const transporter = nodemailer.createTransport({
+      host:   'smtp-relay.brevo.com',
+      port:   465,        // ← changed from 587 to 465
+      secure: true,       // ← changed from false to true
+      auth: {
+        user: process.env.BREVO_USER,
+        pass: process.env.BREVO_PASS,
+      },
+    });
+
+    transporter.sendMail({
       from:    '"StudentAI" <anmolgoyal1974@gmail.com>',
       to:      user.email,
       subject: 'StudentAI — Reset Your Password',
@@ -125,19 +133,24 @@ exports.forgotPassword = async (req, res) => {
           </p>
         </div>
       `,
+    })
+    .then(() => {
+      console.log('[forgotPassword] Email sent to:', user.email);
+    })
+    .catch((emailErr) => {
+      console.error('[forgotPassword] Email failed:', emailErr.message);
+      User.findByIdAndUpdate(user._id, {
+        $unset: { resetPasswordToken: '', resetPasswordExpires: '' }
+      }).catch(() => {});
     });
 
-    res.json(GENERIC);
   } catch (err) {
-    console.error('[forgotPassword]', err.message);
-    await User.findOneAndUpdate(
-      { email: email.trim().toLowerCase() },
-      { $unset: { resetPasswordToken: '', resetPasswordExpires: '' } }
-    ).catch(() => {});
-    res.status(500).json({ message: 'Failed to send reset email. Please try again.' });
+    console.error('[forgotPassword] DB error:', err.message);
+    if (!res.headersSent) {
+      res.status(500).json({ message: 'Something went wrong. Please try again.' });
+    }
   }
 };
-
 // POST /api/user/reset-password/:token  (unchanged)
 exports.resetPassword = async (req, res) => {
   const { token }       = req.params;
