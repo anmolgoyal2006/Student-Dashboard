@@ -72,7 +72,10 @@ exports.changePassword = async (req, res) => {
 
 // POST /api/user/forgot-password
 exports.forgotPassword = async (req, res) => {
+    console.log('BREVO_USER:', process.env.BREVO_USER); // ← add this
+  console.log('BREVO_PASS length:', process.env.BREVO_PASS?.length); // ← add this
   const { email } = req.body;
+
   const GENERIC = { message: 'If that email is registered, a reset link has been sent.' };
 
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))
@@ -93,7 +96,7 @@ exports.forgotPassword = async (req, res) => {
     const transporter = createTransporter();
 
     await transporter.sendMail({
-      from:    '"StudentAI" <anmolgoyal1974@studentai.com>',
+      from:    '"StudentAI" <anmolgoyal1974@gmail.com>',
       to:      user.email,
       subject: 'StudentAI — Reset Your Password',
       html: `
