@@ -96,6 +96,18 @@ export default function Login() {
               </div>
             ))}
 
+    {/* Forgot password link */}
+<div style={{ textAlign: 'right', marginTop: -8, marginBottom: 16 }}>
+  <Link
+    to="/forgot-password"
+    style={{
+      fontSize: 13, color: '#818cf8', fontWeight: 600,
+      textDecoration: 'none', transition: 'color 0.2s',
+    }}
+  >
+    Forgot password?
+  </Link>
+</div>
             <button className={`login-btn ${loading ? 'loading' : ''}`} type="submit" disabled={loading}>
               {loading
                 ? <span className="btn-spinner" />

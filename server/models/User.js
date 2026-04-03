@@ -7,6 +7,8 @@ const userSchema = new mongoose.Schema({
   college:  { type: String, default: '' },
   semester: { type: Number, default: 1, min: 1, max: 8 },
   branch:   { type: String, default: '' },
+  resetPasswordToken:   { type: String, default: undefined },
+  resetPasswordExpires: { type: Date,   default: undefined },
 }, { timestamps: true });
 
 module.exports = mongoose.model('User', userSchema);

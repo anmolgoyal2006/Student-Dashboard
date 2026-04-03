@@ -58,9 +58,18 @@ export const taskService = {
   remove:  (id)     => apiRequest('delete', `/tasks/${id}`),
   toggle:  (id)     => apiRequest('patch',  `/tasks/${id}/toggle`),
 };
-
   // Add this block at the bottom of the file
+
 export const userService = {
-  updateProfile:  (data) => apiRequest('put', '/user/update-profile',  data),
-  changePassword: (data) => apiRequest('put', '/user/change-password', data),
+  updateProfile:  (data) =>
+    apiRequest('put', '/user/update-profile', data),
+
+  changePassword: (data) =>
+    apiRequest('put', '/user/change-password', data),
+
+  forgotPassword: (data) =>
+    apiRequest('post', '/user/forgot-password', data),
+
+  resetPassword:  (token, newPassword) =>
+    apiRequest('post', `/user/reset-password/${token}`, { newPassword }),
 };

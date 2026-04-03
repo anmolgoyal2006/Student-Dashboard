@@ -11,6 +11,9 @@ import Timetable  from './pages/Timetable';
 import Career     from './pages/Career';
 import Scheduler  from './pages/Scheduler';
 import ProfileSettings from './pages/ProfileSettings';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword  from './pages/ResetPassword';
+
 
 const ProtectedRoute = ({ children }) => {
   const { isLoggedIn } = useAuth();
@@ -31,6 +34,10 @@ export default function App() {
       <Routes>
         <Route path="/login"  element={<Login />} />
         <Route path="/signup" element={<Signup />} />
+
+         <Route path="/forgot-password"       element={<ForgotPassword />} />
+         
+<Route path="/reset-password/:token" element={<ResetPassword />}  />
 
         <Route path="/" element={
           <ProtectedRoute><AppLayout><Dashboard /></AppLayout></ProtectedRoute>
