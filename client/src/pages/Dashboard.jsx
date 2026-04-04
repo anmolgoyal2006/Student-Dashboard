@@ -28,7 +28,7 @@ export default function Dashboard() {
   useEffect(() => {
     Promise.all([
       attendanceService.getSummary(),
-      marksService.getCGPA(),
+      marksService.getCGPAbySemester(),
       aiService.getRecommendations(),
       notificationService.getAll(),
     ]).then(([a, m, r, n]) => {
