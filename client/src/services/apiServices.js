@@ -1,4 +1,4 @@
-import { apiRequest } from '../api/axios';  // ← Fix 1: use apiRequest not raw API
+import API, { apiRequest } from '../api/axios';
 
 // ─── Auth ──────────────────────────────────────────────────────────────────
 export const authService = {
@@ -18,10 +18,10 @@ export const subjectService = {
 
 // ─── Attendance ───────────────────────────────────────────────────────────
 export const attendanceService = {
-  mark:        (data) => apiRequest('post', '/attendance',         data),
-  getSummary:  ()     => apiRequest('get',  '/attendance/summary'),
-  getTrends:   ()     => apiRequest('get',  '/attendance/trends'),
-  getBySubject:(id)   => apiRequest('get',  `/attendance/${id}`),
+  mark:         (data) => apiRequest('post', '/attendance',         data),
+  getSummary:   ()     => apiRequest('get',  '/attendance/summary'),
+  getTrends:    ()     => apiRequest('get',  '/attendance/trends'),
+  getBySubject: (id)   => apiRequest('get',  `/attendance/${id}`),
 };
 
 // ─── Marks ────────────────────────────────────────────────────────────────
@@ -30,12 +30,23 @@ export const marksService = {
   getAll: ()     => apiRequest('get',    '/marks'),
   getCGPA:()     => apiRequest('get',    '/marks/cgpa'),
   remove: (id)   => apiRequest('delete', `/marks/${id}`),
-};
 
+  // ── SGPA / semester ──
+  getSemesters:      ()     => apiRequest('get',    '/marks/semesters'),
+  getGradeOptions:   ()     => apiRequest('get',    '/marks/grade-options'),
+  getCGPAbySemester: ()     => apiRequest('get',    '/marks/cgpa-semester'),
+
+  addSemester:       (data) => apiRequest('post',   '/marks/semester', data),
+
+  // 🔥 ADD THIS LINE
+  updateSemester:    (id, data) => apiRequest('put', `/marks/semester/${id}`, data),
+
+  deleteSemester:    (id)   => apiRequest('delete', `/marks/semester/${id}`),
+};
 // ─── Career ───────────────────────────────────────────────────────────────
 export const careerService = {
   get:         ()        => apiRequest('get',   '/career'),
-  update:      (data)    => apiRequest('put',   '/career',              data),
+  update:      (data)    => apiRequest('put',   '/career',               data),
   updateTopic: (name, d) => apiRequest('patch', `/career/topic/${name}`, d),
 };
 
@@ -58,28 +69,16 @@ export const taskService = {
   remove:  (id)     => apiRequest('delete', `/tasks/${id}`),
   toggle:  (id)     => apiRequest('patch',  `/tasks/${id}/toggle`),
 };
-  // Add this block at the bottom of the file
 
-
+// ─── User ─────────────────────────────────────────────────────────────────
 export const userService = {
-  updateProfile:  (data) =>
-    apiRequest('put', '/user/update-profile', data),
-
-  changePassword: (data) =>
-    apiRequest('put', '/user/change-password', data),
-
-  forgotPassword: (data) =>
-    apiRequest('post', '/user/forgot-password', data),
-
-  resetPassword:  (token, newPassword) =>
-    apiRequest('post', `/user/reset-password/${token}`, { newPassword }),
+  updateProfile:  (data)              => apiRequest('put',  '/user/update-profile',          data),
+  changePassword: (data)              => apiRequest('put',  '/user/change-password',         data),
+  forgotPassword: (data)              => apiRequest('post', '/user/forgot-password',         data),
+  resetPassword:  (token, newPassword)=> apiRequest('post', `/user/reset-password/${token}`, { newPassword }),
 };
 
-
 // ─── AI Chat / Study Assistant ────────────────────────────────────────────
-// ─── AI Chat / Study Assistant ────────────────────────────────────────────
-import API from '../api/axios'; // make sure this import exists at top
-
 export const aiChatService = {
   chat: (message, mode) =>
     apiRequest('post', '/ai/chat', { message, mode }),
@@ -92,14 +91,14 @@ export const aiChatService = {
     });
   },
 
-  // Add cache-busting timestamp to prevent 304
   getNotes: () =>
     apiRequest('get', `/ai/notes?t=${Date.now()}`),
 
   deleteNote: (filename) =>
     apiRequest('delete', `/ai/notes/${encodeURIComponent(filename)}`),
 };
- 
+
+// ─── Decision / Smart Plan ────────────────────────────────────────────────
 export const decisionService = {
   getTodayPlan: () => API.get('/decision/today-plan'),
 };

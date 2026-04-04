@@ -70,3 +70,84 @@ exports.deleteMarks = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
+
+
+const { GRADE_OPTIONS } = require('../config/gradeConfig');
+const Semester = require('../models/Semester.model');
+const { calculateCGPA } = require('../utils/gradeUtils');
+
+// GET /api/marks/grade-options
+exports.getGradeOptions = (req, res) => {
+  res.json({ gradeOptions: GRADE_OPTIONS });
+};
+
+// GET /api/marks/semesters
+exports.getSemesters = async (req, res) => {
+  try {
+    const semesters = await Semester.find({ student: req.user.id }).sort({ semesterNumber: 1 });
+    res.json({ semesters });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// GET /api/marks/cgpa-semester
+exports.getCGPAbySemester = async (req, res) => {
+  try {
+    const semesters = await Semester.find({ student: req.user.id }).sort({ semesterNumber: 1 });
+    const sgpaList  = semesters.map(s => s.sgpa);
+    const cgpa      = calculateCGPA(sgpaList);
+    res.json({ cgpa, sgpaList, totalSemesters: semesters.length });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// POST /api/marks/semester
+exports.addSemester = async (req, res) => {
+  try {
+    const { semesterNumber, semesterName, subjects } = req.body;
+    if (!subjects || !Array.isArray(subjects) || subjects.length === 0)
+      return res.status(400).json({ message: 'subjects array is required' });
+    for (const s of subjects)
+      if (!s.credits || s.credits <= 0)
+        return res.status(400).json({ message: `Credits for "${s.name}" must be > 0` });
+
+    const semester = new Semester({ student: req.user.id, semesterNumber, semesterName, subjects });
+    await semester.save();
+    res.status(201).json({ semester });
+  } catch (err) {
+    if (err.name === 'ValidationError')
+      return res.status(400).json({ message: Object.values(err.errors).map(e => e.message).join('; ') });
+    if (err.message.startsWith('Invalid grade'))
+      return res.status(400).json({ message: err.message });
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// PUT /api/marks/semester/:id
+exports.updateSemester = async (req, res) => {
+  try {
+    const semester = await Semester.findOne({ _id: req.params.id, student: req.user.id });
+    if (!semester) return res.status(404).json({ message: 'Semester not found' });
+    const { semesterNumber, semesterName, subjects } = req.body;
+    if (semesterNumber !== undefined) semester.semesterNumber = semesterNumber;
+    if (semesterName   !== undefined) semester.semesterName   = semesterName;
+    if (subjects       !== undefined) semester.subjects       = subjects;
+    await semester.save();
+    res.json({ semester });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// DELETE /api/marks/semester/:id
+exports.deleteSemester = async (req, res) => {
+  try {
+    const deleted = await Semester.findOneAndDelete({ _id: req.params.id, student: req.user.id });
+    if (!deleted) return res.status(404).json({ message: 'Semester not found' });
+    res.json({ message: 'Semester deleted' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
