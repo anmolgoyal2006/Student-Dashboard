@@ -13,7 +13,7 @@ import Scheduler  from './pages/Scheduler';
 import ProfileSettings from './pages/ProfileSettings';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword  from './pages/ResetPassword';
-
+import AIAssistant from './pages/AIAssistant'; 
 
 const ProtectedRoute = ({ children }) => {
   const { isLoggedIn } = useAuth();
@@ -57,6 +57,10 @@ export default function App() {
         <Route path="/scheduler" element={
           <ProtectedRoute><AppLayout><Scheduler /></AppLayout></ProtectedRoute>
         } />
+
+         <Route path="/ai-assistant" element={
+  <ProtectedRoute><AppLayout><AIAssistant /></AppLayout></ProtectedRoute>
+} />
          <Route path="/profile" element={
   <ProtectedRoute>
     <AppLayout><ProfileSettings /></AppLayout>

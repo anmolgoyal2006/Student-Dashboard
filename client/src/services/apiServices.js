@@ -74,3 +74,25 @@ export const userService = {
   resetPassword:  (token, newPassword) =>
     apiRequest('post', `/user/reset-password/${token}`, { newPassword }),
 };
+
+
+// ─── AI Chat / Study Assistant ────────────────────────────────────────────
+// ─── AI Chat / Study Assistant ────────────────────────────────────────────
+import API from '../api/axios'; // make sure this import exists at top
+
+export const aiChatService = {
+  chat: (message, mode) =>
+    apiRequest('post', '/ai/chat', { message, mode }),
+
+  uploadNotes: (file) => {
+    const form = new FormData();
+    form.append('file', file);
+    // Use raw API instance — token is attached via interceptor
+    return API.post('/ai/upload', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+
+  getNotes:   ()         => apiRequest('get',    '/ai/notes'),
+  deleteNote: (filename) => apiRequest('delete', `/ai/notes/${encodeURIComponent(filename)}`),
+};

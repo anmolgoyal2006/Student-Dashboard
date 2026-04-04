@@ -37,6 +37,7 @@ const links = [
   { to: '/career',     label: 'Career',     icon: '🚀' },
   { to: '/scheduler',  label: 'Scheduler',  icon: '🗓️' },
   { to: '/profile',    label: 'Profile',    icon: '⚙️' },  // ← fixed
+  { to: '/ai-assistant', label: 'AI Assistant', icon: '🤖' },
 ];
 
 export default function Sidebar() {

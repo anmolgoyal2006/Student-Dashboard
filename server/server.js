@@ -56,7 +56,7 @@ app.use('/api/career',          require('./routes/careerRoutes'));
 app.use('/api/recommendations', require('./routes/recommendationRoutes'));
 app.use('/api/notifications',   require('./routes/notificationRoutes'));
 app.use('/api/user', require('./routes/userRoutes'));
-
+app.use('/api/ai', require('./routes/aiRoutes'));   // ← ADD THIS
 // ─── 404 handler ──────────────────────────────────────────────────────────
 app.use((_req, res) => {
   res.status(404).json({ message: 'Route not found' });
