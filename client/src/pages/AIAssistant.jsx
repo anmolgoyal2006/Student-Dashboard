@@ -3,9 +3,9 @@ import { aiChatService } from '../services/apiServices';
 import toast from 'react-hot-toast';
 
 const MODE_LABELS = {
-  chat:      { icon: '💬', label: 'Chat'     },
-  summarize: { icon: '📝', label: 'Summarize'},
-  quiz:      { icon: '🧠', label: 'Quiz'     },
+  chat:      { icon: '💬', label: 'Chat'      },
+  summarize: { icon: '📝', label: 'Summarize' },
+  quiz:      { icon: '🧠', label: 'Quiz'      },
 };
 
 const MODE_PLACEHOLDERS = {
@@ -18,11 +18,11 @@ function MessageBubble({ msg }) {
   const isUser = msg.role === 'user';
   return (
     <div style={{
-      display:       'flex',
+      display:        'flex',
       justifyContent: isUser ? 'flex-end' : 'flex-start',
-      marginBottom:  16,
-      gap:           10,
-      alignItems:    'flex-start',
+      marginBottom:   16,
+      gap:            10,
+      alignItems:     'flex-start',
     }}>
       {!isUser && (
         <div style={{
@@ -32,10 +32,11 @@ function MessageBubble({ msg }) {
           fontSize: 16,
         }}>🤖</div>
       )}
-
       <div style={{ maxWidth: '75%' }}>
         <div style={{
-          background:   isUser ? 'linear-gradient(135deg, #6366f1, #818cf8)' : 'rgba(255,255,255,0.05)',
+          background:   isUser
+            ? 'linear-gradient(135deg, #6366f1, #818cf8)'
+            : 'rgba(255,255,255,0.05)',
           border:       isUser ? 'none' : '1px solid rgba(255,255,255,0.08)',
           borderRadius: isUser ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
           padding:      '12px 16px',
@@ -47,8 +48,6 @@ function MessageBubble({ msg }) {
         }}>
           {msg.content}
         </div>
-
-        {/* Sources */}
         {msg.sources?.length > 0 && (
           <div style={{ marginTop: 8 }}>
             {msg.sources.map((s, i) => (
@@ -63,21 +62,18 @@ function MessageBubble({ msg }) {
               }}>
                 <span style={{ color: 'var(--primary)', fontWeight: 600 }}>
                   📄 {s.filename}
-                </span>
-                <br />
+                </span><br />
                 {s.preview}
               </div>
             ))}
           </div>
         )}
-
         {msg.error && (
           <div style={{ fontSize: 12, color: 'var(--danger)', marginTop: 4 }}>
             ⚠️ {msg.error}
           </div>
         )}
       </div>
-
       {isUser && (
         <div style={{
           width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
@@ -91,22 +87,20 @@ function MessageBubble({ msg }) {
 }
 
 export default function AIAssistant() {
-  const [messages,   setMessages]   = useState([
-    {
-      role:    'assistant',
-      content: "Hi! I'm your AI Study Assistant 🎓\n\nUpload your notes (PDF or text) and I can:\n• Answer questions from your notes\n• Summarize topics\n• Generate practice quizzes\n\nUpload a file to get started, or just ask me anything!",
-    }
-  ]);
-  const [input,      setInput]      = useState('');
-  const [loading,    setLoading]    = useState(false);
-  const [mode,       setMode]       = useState('chat');
-  const [notes,      setNotes]      = useState([]);
-  const [uploading,  setUploading]  = useState(false);
-  const [showNotes,  setShowNotes]  = useState(false);
+  const [messages,  setMessages]  = useState([{
+    role:    'assistant',
+    content: "Hi! I'm your AI Study Assistant 🎓\n\nUpload your notes (PDF or text) and I can:\n• Answer questions from your notes\n• Summarize topics\n• Generate practice quizzes\n\nUpload a file to get started, or just ask me anything!",
+  }]);
+  const [input,     setInput]     = useState('');
+  const [loading,   setLoading]   = useState(false);
+  const [mode,      setMode]      = useState('chat');
+  const [notes,     setNotes]     = useState([]);
+  const [uploading, setUploading] = useState(false);
+  const [showNotes, setShowNotes] = useState(false);
 
-  const bottomRef  = useRef(null);
-  const fileRef    = useRef(null);
-  const inputRef   = useRef(null);
+  const bottomRef = useRef(null);
+  const fileRef   = useRef(null);
+  const inputRef  = useRef(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -119,22 +113,36 @@ export default function AIAssistant() {
   const loadNotes = async () => {
     try {
       const { data } = await aiChatService.getNotes();
+      console.log('[Frontend] notes loaded:', data.notes);
       setNotes(data.notes || []);
-    } catch { /* silent */ }
+    } catch (err) {
+      console.error('[Frontend] loadNotes error:', err.message);
+    }
   };
 
   const handleUpload = async e => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    // Warn user about OCR delay for images
+    if (file.type.startsWith('image/')) {
+      toast('🔍 Reading text from image (may take 10-15s)…', {
+        duration: 15000,
+        icon: '⏳',
+      });
+    }
+
     setUploading(true);
     try {
       const { data } = await aiChatService.uploadNotes(file);
       toast.success(data.message);
       setMessages(p => [...p, {
         role:    'assistant',
-        content: `✅ **${data.filename}** uploaded successfully!\nCreated ${data.chunks} knowledge chunks. You can now ask questions about this file.`,
+        content: `✅ **${data.filename}** uploaded!\nCreated ${data.chunks} knowledge chunks. Ask me anything about it!`,
       }]);
-      loadNotes();
+      // Reload notes after upload
+      await loadNotes();
+      setShowNotes(true); // auto-open notes panel
     } catch (err) {
       toast.error(err.response?.data?.message || 'Upload failed');
     } finally {
@@ -147,7 +155,7 @@ export default function AIAssistant() {
     try {
       await aiChatService.deleteNote(filename);
       toast.success('Note deleted');
-      loadNotes();
+      await loadNotes();
     } catch {
       toast.error('Failed to delete');
     }
@@ -157,8 +165,7 @@ export default function AIAssistant() {
     const text = (overrideMessage || input).trim();
     if (!text || loading) return;
 
-    const userMsg = { role: 'user', content: text };
-    setMessages(p => [...p, userMsg]);
+    setMessages(p => [...p, { role: 'user', content: text }]);
     setInput('');
     setLoading(true);
 
@@ -171,9 +178,9 @@ export default function AIAssistant() {
       }]);
     } catch (err) {
       setMessages(p => [...p, {
-        role:  'assistant',
+        role:    'assistant',
         content: 'Sorry, I encountered an error. Please try again.',
-        error: err.response?.data?.message || err.message,
+        error:   err.response?.data?.message || err.message,
       }]);
     } finally {
       setLoading(false);
@@ -189,15 +196,15 @@ export default function AIAssistant() {
   };
 
   const quickActions = [
-    { label: '📝 Summarize my notes', mode: 'summarize', msg: 'Summarize all my uploaded notes'      },
-    { label: '🧠 Generate quiz',       mode: 'quiz',      msg: 'Generate a quiz from my notes'        },
+    { label: '📝 Summarize my notes', mode: 'summarize', msg: 'Summarize all my uploaded notes'       },
+    { label: '🧠 Generate quiz',       mode: 'quiz',      msg: 'Generate a quiz from my notes'         },
     { label: '🔑 Key concepts',        mode: 'chat',      msg: 'What are the key concepts in my notes?'},
   ];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 80px)', gap: 16 }}>
 
-      {/* ── Header ── */}
+      {/* Header */}
       <div className="page-header">
         <div>
           <h1 className="page-title">🤖 AI Study Assistant</h1>
@@ -206,7 +213,7 @@ export default function AIAssistant() {
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button
             className="btn btn-outline btn-sm"
-            onClick={() => setShowNotes(n => !n)}
+            onClick={() => { setShowNotes(n => !n); loadNotes(); }}
           >
             📚 Notes ({notes.length})
           </button>
@@ -220,17 +227,22 @@ export default function AIAssistant() {
           <input
             ref={fileRef}
             type="file"
-            accept=".pdf,.txt,.md"
+accept=".pdf,.txt,.md,.jpg,.jpeg,.png,.webp"
             style={{ display: 'none' }}
             onChange={handleUpload}
           />
         </div>
       </div>
 
-      {/* ── Uploaded notes panel ── */}
+      {/* Notes panel */}
       {showNotes && (
         <div className="card" style={{ padding: 16 }}>
-          <div className="card-title">📚 Uploaded Notes</div>
+          <div className="card-title">
+            📚 Uploaded Notes
+            <span style={{ fontSize: 12, color: 'var(--muted)', marginLeft: 8 }}>
+              ({notes.length} file{notes.length !== 1 ? 's' : ''})
+            </span>
+          </div>
           {notes.length === 0 ? (
             <p className="text-muted">No notes uploaded yet.</p>
           ) : (
@@ -247,12 +259,15 @@ export default function AIAssistant() {
                   fontSize:     13,
                 }}>
                   <span>📄 {n._id}</span>
-                  <span style={{ color: 'var(--muted)', fontSize: 11 }}>({n.chunks} chunks)</span>
+                  <span style={{ color: 'var(--muted)', fontSize: 11 }}>
+                    ({n.chunks} chunks)
+                  </span>
                   <button
                     onClick={() => handleDeleteNote(n._id)}
                     style={{
-                      background: 'none', border: 'none', cursor: 'pointer',
-                      color: 'var(--danger)', fontSize: 14, padding: '0 2px',
+                      background: 'none', border: 'none',
+                      cursor: 'pointer', color: 'var(--danger)',
+                      fontSize: 14, padding: '0 2px',
                     }}
                   >✕</button>
                 </div>
@@ -262,7 +277,7 @@ export default function AIAssistant() {
         </div>
       )}
 
-      {/* ── Mode selector ── */}
+      {/* Mode selector */}
       <div style={{ display: 'flex', gap: 8 }}>
         {Object.entries(MODE_LABELS).map(([key, val]) => (
           <button
@@ -275,27 +290,28 @@ export default function AIAssistant() {
         ))}
       </div>
 
-      {/* ── Chat window ── */}
-      <div className="card" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: 0 }}>
-
+      {/* Chat window */}
+      <div className="card" style={{
+        flex: 1, display: 'flex', flexDirection: 'column',
+        overflow: 'hidden', padding: 0,
+      }}>
         {/* Messages */}
         <div style={{
-          flex:       1,
-          overflowY:  'auto',
-          padding:    '20px 16px',
+          flex: 1, overflowY: 'auto',
+          padding: '20px 16px',
           scrollbarWidth: 'thin',
         }}>
           {messages.map((msg, i) => (
             <MessageBubble key={i} msg={msg} />
           ))}
 
-          {/* Loading indicator */}
           {loading && (
             <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 16 }}>
               <div style={{
                 width: 32, height: 32, borderRadius: '50%',
                 background: 'linear-gradient(135deg, #6366f1, #818cf8)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 16,
               }}>🤖</div>
               <div style={{
                 background: 'rgba(255,255,255,0.05)',
@@ -309,7 +325,7 @@ export default function AIAssistant() {
                     width: 8, height: 8, borderRadius: '50%',
                     background: 'var(--primary)',
                     animation: `bounce 1.2s ease-in-out ${i * 0.2}s infinite`,
-                  }} />
+                  }}/>
                 ))}
               </div>
             </div>
@@ -317,7 +333,7 @@ export default function AIAssistant() {
           <div ref={bottomRef} />
         </div>
 
-        {/* Quick actions */}
+        {/* Quick actions — show only at start */}
         {messages.length <= 1 && (
           <div style={{ padding: '0 16px 12px', display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {quickActions.map((a, i) => (
@@ -350,23 +366,23 @@ export default function AIAssistant() {
             disabled={loading}
             rows={1}
             style={{
-              flex:        1,
-              background:  'rgba(255,255,255,0.04)',
-              border:      '1px solid var(--border)',
+              flex:         1,
+              background:   'rgba(255,255,255,0.04)',
+              border:       '1px solid var(--border)',
               borderRadius: 10,
-              padding:     '10px 14px',
-              color:       'var(--text)',
-              fontSize:    14,
-              resize:      'none',
-              fontFamily:  'inherit',
-              lineHeight:  1.5,
-              maxHeight:   120,
-              overflowY:   'auto',
-              outline:     'none',
+              padding:      '10px 14px',
+              color:        'var(--text)',
+              fontSize:     14,
+              resize:       'none',
+              fontFamily:   'inherit',
+              lineHeight:   1.5,
+              maxHeight:    120,
+              overflowY:    'auto',
+              outline:      'none',
             }}
-            onFocus={e  => e.target.style.borderColor = 'var(--primary)'}
-            onBlur={e   => e.target.style.borderColor = 'var(--border)'}
-            onInput={e  => {
+            onFocus={e => e.target.style.borderColor = 'var(--primary)'}
+            onBlur={e  => e.target.style.borderColor = 'var(--border)'}
+            onInput={e => {
               e.target.style.height = 'auto';
               e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
             }}
@@ -382,7 +398,6 @@ export default function AIAssistant() {
         </div>
       </div>
 
-      {/* Bounce animation */}
       <style>{`
         @keyframes bounce {
           0%, 60%, 100% { transform: translateY(0); }

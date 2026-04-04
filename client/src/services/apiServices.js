@@ -87,12 +87,15 @@ export const aiChatService = {
   uploadNotes: (file) => {
     const form = new FormData();
     form.append('file', file);
-    // Use raw API instance — token is attached via interceptor
     return API.post('/ai/upload', form, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
   },
 
-  getNotes:   ()         => apiRequest('get',    '/ai/notes'),
-  deleteNote: (filename) => apiRequest('delete', `/ai/notes/${encodeURIComponent(filename)}`),
+  // Add cache-busting timestamp to prevent 304
+  getNotes: () =>
+    apiRequest('get', `/ai/notes?t=${Date.now()}`),
+
+  deleteNote: (filename) =>
+    apiRequest('delete', `/ai/notes/${encodeURIComponent(filename)}`),
 };

@@ -19,7 +19,9 @@
     "multer": "^2.1.1",
     "nodemailer": "^8.0.4",
     "openai": "^6.33.0",
-    "pdfreader": "^3.0.8"
+    "pdf-parse": "^1.1.1",
+    "pdfreader": "^3.0.8",
+    "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
