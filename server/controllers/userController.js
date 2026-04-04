@@ -2,7 +2,7 @@ const crypto = require('crypto');
 const User   = require('../models/User');
 const bcrypt = require('bcryptjs');
 const jwt    = require('jsonwebtoken');
-const axios  = require('axios');  // already installed — no new package needed
+const axios  = require('axios');
 
 const generateToken = (user) =>
   jwt.sign(
@@ -11,7 +11,7 @@ const generateToken = (user) =>
     { expiresIn: '7d' }
   );
 
-// ── Brevo REST API — works on Render (no SMTP ports needed) ──
+// ── Brevo REST API ────────────────────────────────────────
 const sendEmail = async (toEmail, toName, resetURL) => {
   await axios.post(
     'https://api.brevo.com/v3/smtp/email',
@@ -55,6 +55,34 @@ const sendEmail = async (toEmail, toName, resetURL) => {
     }
   );
 };
+
+// PUT /api/user/update-profile  ← THIS WAS MISSING
+exports.updateProfile = async (req, res) => {
+  const { name, email } = req.body;
+  if (!name?.trim() && !email?.trim())
+    return res.status(400).json({ message: 'Provide at least a name or email to update.' });
+  try {
+    if (email && email.toLowerCase() !== req.user.email.toLowerCase()) {
+      const exists = await User.findOne({ email: email.toLowerCase() });
+      if (exists)
+        return res.status(400).json({ message: 'This email is already registered to another account.' });
+    }
+    const updateFields = {};
+    if (name?.trim())  updateFields.name  = name.trim();
+    if (email?.trim()) updateFields.email = email.trim().toLowerCase();
+    const updated = await User.findByIdAndUpdate(
+      req.user.id, { $set: updateFields }, { new: true, runValidators: true }
+    ).select('-password');
+    if (!updated) return res.status(404).json({ message: 'User not found.' });
+    const newToken = generateToken(updated);
+    res.json({
+      message: 'Profile updated successfully.',
+      user:  { id: updated._id, name: updated.name, email: updated.email, college: updated.college, semester: updated.semester },
+      token: newToken,
+    });
+  } catch (err) { res.status(500).json({ message: err.message }); }
+};
+
 // PUT /api/user/change-password
 exports.changePassword = async (req, res) => {
   const { oldPassword, newPassword } = req.body;
@@ -94,10 +122,8 @@ exports.forgotPassword = async (req, res) => {
     user.resetPasswordExpires = Date.now() + 15 * 60 * 1000;
     await user.save();
 
-    // ── Respond immediately ──────────────────────────────
     res.json(GENERIC);
 
-    // ── Send email via HTTP API (not SMTP) ───────────────
     const resetURL = `${process.env.FRONTEND_URL}/reset-password/${rawToken}`;
     sendEmail(user.email, user.name, resetURL)
       .then(() => console.log('[forgotPassword] Email sent to:', user.email))
