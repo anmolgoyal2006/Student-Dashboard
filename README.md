@@ -1,22 +1,150 @@
 # 🎓 AI-Powered Student Dashboard with Career Assistant
 
-A full-stack MERN application for college students to manage academics, track performance, and get AI-based career guidance.
+## 👨‍💻 Developed by
+
+**Anmol Goyal**
+
+A full-stack **MERN application** designed to help students track academic performance, manage tasks, and receive intelligent insights using a rule-based AI system.
 
 ---
 
-## 🚀 Quick Start
+## 🌐 Live Demo
 
-### Prerequisites
-- Node.js v18+
-- MongoDB Atlas account (free tier works)
-- npm or yarn
+🔗 https://student-dashboard-ashy-rho.vercel.app/
+
+## 💻 GitHub Repository
+
+🔗 https://github.com/anmolgoyal2006/Student-Dashboard
 
 ---
 
-### 1. Clone / Extract the project
+## 🚀 Features
+
+### 📊 Academic Performance
+
+* SGPA calculation based on grades & credits
+* CGPA calculation using semester-wise SGPA
+* Real-time CGPA updates
+
+### 📚 Marks Management
+
+* Add & track marks (midterm, final, quizzes, assignments)
+* Automatic percentage → grade → grade point conversion
+* Subject-wise performance breakdown
+
+### 📈 Analytics & Visualization
+
+* Attendance tracking with subject-wise insights
+* Interactive charts using Chart.js
+* CGPA gauge visualization
+
+### 🎯 Semester System
+
+* Add multiple semesters with subjects, credits & grades
+* Automatic SGPA calculation per semester
+* CGPA derived from SGPA trend
+
+### 🤖 AI-Based Recommendations
+
+* Smart suggestions based on attendance, CGPA & progress
+* Study improvement insights
+* Career readiness tracking
+
+### 🧠 Productivity & Management
+
+* Task scheduler for daily planning
+* Timetable & subject management
+* Notification system
+
+### 🔐 Authentication
+
+* Secure JWT-based login & signup
+* Protected routes for user-specific data
+
+---
+
+## 🛠️ Tech Stack
+
+| Layer     | Technology           |
+| --------- | -------------------- |
+| Frontend  | React.js             |
+| Backend   | Node.js + Express.js |
+| Database  | MongoDB + Mongoose   |
+| Charts    | Chart.js             |
+| Auth      | JWT (jsonwebtoken)   |
+| HTTP      | Axios                |
+| Dev Tools | Nodemon              |
+
+---
+
+## 📁 Project Structure
+
+```
+student-dashboard/
+├── server/                    # Backend (Node.js + Express)
+│   ├── config/               # DB + configs
+│   ├── controllers/          # Business logic
+│   ├── middleware/           # Auth middleware
+│   ├── models/               # Mongoose schemas
+│   ├── routes/               # API routes
+│   ├── utils/                # Utility functions (SGPA/CGPA)
+│   └── server.js             # Entry point
+│
+└── client/                   # Frontend (React)
+    └── src/
+        ├── api/              # Axios setup
+        ├── context/          # Global state
+        ├── pages/            # Screens
+        ├── components/       # UI components
+        └── services/         # API services
+```
+
+---
+
+## 🔌 Key API Endpoints
+
+| Method | Endpoint                 | Description         |
+| ------ | ------------------------ | ------------------- |
+| POST   | /api/auth/signup         | Register user       |
+| POST   | /api/auth/login          | Login (JWT)         |
+| GET    | /api/marks               | Get marks           |
+| GET    | /api/marks/cgpa-semester | CGPA from SGPA      |
+| POST   | /api/marks/semester      | Add semester        |
+| GET    | /api/attendance/summary  | Attendance analysis |
+| GET    | /api/recommendations     | AI suggestions      |
+
+---
+
+## 🧠 AI Recommendation Logic
+
+The system uses a **rule-based AI engine**:
+
+* Low attendance → Warning + required classes
+* Low CGPA → Study improvement suggestions
+* Low DSA progress → Practice roadmap
+* Career goals → Target-based preparation plan
+
+No external API is used — fully explainable system.
+
+---
+
+## 🧮 CGPA Calculation
+
+```
+SGPA = Σ(credit × gradePoint) / Σ(credits)
+
+CGPA = Average of all semester SGPAs
+```
+
+---
+
+## ⚙️ Setup Instructions
+
+### 1. Clone Repository
 
 ```bash
-cd student-dashboard
+git clone https://github.com/anmolgoyal2006/Student-Dashboard.git
+cd Student-Dashboard
 ```
 
 ---
@@ -28,143 +156,58 @@ cd server
 npm install
 ```
 
-Create your `.env` file:
-```bash
-cp .env.example .env
-```
+Create `.env` file:
 
-Edit `.env` and fill in:
 ```
 PORT=5000
-MONGO_URI=mongodb+srv://<username>:<password>@cluster.mongodb.net/student_dashboard
-JWT_SECRET=any_long_random_string_here
+MONGO_URI=your_mongodb_uri
+JWT_SECRET=your_secret
 ```
 
-Start the backend:
+Run server:
+
 ```bash
-npm run dev      # with nodemon (auto-reload)
-# or
-npm start        # without nodemon
+npm run dev
 ```
-
-Backend runs on: **http://localhost:5000**
-
-Test it: open http://localhost:5000/api/ping — you should see `{"message":"Server is running!"}`
 
 ---
 
 ### 3. Frontend Setup
 
 ```bash
-cd ../client
+cd client
 npm install
 npm start
 ```
 
-Frontend runs on: **http://localhost:3000**
+---
+
+## 📌 Interview Explanation
+
+> This is a MERN stack application with JWT authentication. The backend is built using RESTful APIs with MongoDB, where SGPA and CGPA are calculated using weighted averages. The AI system is rule-based and generates recommendations from academic data. The frontend uses React with Context API and Axios interceptors for secure communication, along with Chart.js for data visualization.
 
 ---
 
-## 📁 Project Structure
+## ⚠️ Note
 
-```
-student-dashboard/
-├── server/                    ← Node.js + Express backend
-│   ├── config/db.js           ← MongoDB connection
-│   ├── controllers/           ← Business logic
-│   ├── middleware/            ← JWT auth middleware
-│   ├── models/                ← Mongoose schemas
-│   ├── routes/                ← API route definitions
-│   ├── services/              ← AI recommendation engine
-│   └── server.js              ← App entry point
-│
-└── client/                    ← React frontend
-    └── src/
-        ├── api/axios.js       ← Axios base instance + interceptors
-        ├── context/           ← Auth context (global state)
-        ├── pages/             ← Full page components
-        ├── components/        ← Reusable UI components
-        └── services/          ← API call wrappers
-```
+This project is publicly available for learning purposes.
+If you are using this project, please ensure you understand the implementation details.
+
+I can explain every part of this system including:
+
+* Backend architecture
+* SGPA/CGPA logic
+* API design
+* AI recommendation engine
 
 ---
 
-## 🔌 API Endpoints
+## 📄 License
 
-| Method | Endpoint                      | Description                  | Auth |
-|--------|-------------------------------|------------------------------|------|
-| POST   | /api/auth/signup              | Register new user            | ❌   |
-| POST   | /api/auth/login               | Login → JWT token            | ❌   |
-| GET    | /api/auth/me                  | Get current user             | ✅   |
-| GET    | /api/subjects                 | Get all subjects             | ✅   |
-| POST   | /api/subjects                 | Add subject                  | ✅   |
-| PUT    | /api/subjects/:id             | Update subject               | ✅   |
-| DELETE | /api/subjects/:id             | Delete subject               | ✅   |
-| POST   | /api/attendance               | Mark attendance              | ✅   |
-| GET    | /api/attendance/summary       | Attendance % per subject     | ✅   |
-| GET    | /api/attendance/trends        | Monthly attendance trends    | ✅   |
-| POST   | /api/marks                    | Add exam marks               | ✅   |
-| GET    | /api/marks                    | Get all marks                | ✅   |
-| GET    | /api/marks/cgpa               | Calculate CGPA               | ✅   |
-| GET    | /api/career                   | Get career progress          | ✅   |
-| PUT    | /api/career                   | Update career progress       | ✅   |
-| PATCH  | /api/career/topic/:name       | Toggle DSA topic             | ✅   |
-| GET    | /api/recommendations          | AI suggestions               | ✅   |
-| GET    | /api/notifications            | Smart notifications          | ✅   |
+This project is licensed under the **MIT License**.
+
+You are free to use and modify the code, but proper credit must be given to the original author.
+
+© Anmol Goyal
 
 ---
-
-## 🧠 How the AI Works
-
-The recommendation engine (`server/services/aiRecommendationService.js`) uses **rule-based logic** — no external AI API needed:
-
-```
-If attendance < 75%  → Warning alert with classes needed
-If CGPA < 6.0        → Study plan suggestion
-If problems < 50     → DSA practice roadmap
-If company selected  → Company-specific preparation roadmap
-Always               → Readiness badge (Beginner / Intermediate / Ready)
-```
-
----
-
-## 🧮 CGPA Formula
-
-```
-CGPA = Σ(gradePoint × credits) / Σ(credits)
-
-Grade scale (auto-calculated from marks %):
-90%+ → 10  |  80%+ → 9  |  70%+ → 8  |  60%+ → 7
-50%+ → 6   |  40%+ → 5  |  <40% → 4
-```
-
----
-
-## 🛠️ Tech Stack
-
-| Layer      | Technology              |
-|------------|-------------------------|
-| Frontend   | React 18, React Router 6|
-| Charts     | Chart.js + react-chartjs-2 |
-| HTTP       | Axios with interceptors |
-| Backend    | Node.js + Express.js    |
-| Database   | MongoDB + Mongoose      |
-| Auth       | JWT (jsonwebtoken)      |
-| Password   | bcryptjs                |
-| Dev tool   | nodemon                 |
-
----
-
-## 📌 Interview Explanation (1 paragraph)
-
-> "This is a MERN stack student dashboard with JWT auth. The backend is a RESTful Express API with 5 Mongoose collections — Users, Subjects, Attendance, Marks, and CareerProgress — all linked via userId. CGPA is calculated using a weighted grade point average. The AI recommendation system is a rule-based service that reads attendance, marks, and DSA progress to return prioritized suggestions — no external API needed, which keeps it fully explainable. The React frontend uses Context API for auth state, a centralized Axios instance with request interceptors for automatic JWT attachment, and Chart.js for visualizations."
-
----
-
-## 📝 Next Steps to Extend
-
-- Add email notifications (Nodemailer)
-- Add exam countdown timer
-- Connect to a real AI API (OpenAI) for smarter suggestions
-- Add PDF report export
-- Deploy: Render (backend) + Vercel (frontend) + MongoDB Atlas
