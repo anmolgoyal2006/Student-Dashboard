@@ -99,3 +99,7 @@ export const aiChatService = {
   deleteNote: (filename) =>
     apiRequest('delete', `/ai/notes/${encodeURIComponent(filename)}`),
 };
+ 
+export const decisionService = {
+  getTodayPlan: () => API.get('/decision/today-plan'),
+};

@@ -6,6 +6,7 @@ import {
 } from 'chart.js';
 import { attendanceService, marksService, aiService, notificationService } from '../services/apiServices';
 import { useAuth } from '../context/AuthContext';
+import SmartPlanCard from '../components/SmartPlanCard';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Tooltip, Legend);
 
@@ -209,6 +210,8 @@ export default function Dashboard() {
           }
         </div>
       </div>
+       {/* ── Smart Study Plan ────────────────────────────── */}
+      <SmartPlanCard />
     </div>
   );
 }
