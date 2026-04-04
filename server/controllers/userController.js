@@ -1,8 +1,8 @@
-const crypto  = require('crypto');
-const User    = require('../models/User');
-const bcrypt  = require('bcryptjs');
-const jwt     = require('jsonwebtoken');
-const SibApiV3Sdk = require('@getbrevo/brevo');
+const crypto = require('crypto');
+const User   = require('../models/User');
+const bcrypt = require('bcryptjs');
+const jwt    = require('jsonwebtoken');
+const axios  = require('axios');  // already installed — no new package needed
 
 const generateToken = (user) =>
   jwt.sign(
@@ -11,71 +11,50 @@ const generateToken = (user) =>
     { expiresIn: '7d' }
   );
 
-// ── Brevo HTTP API email sender ───────────────────────────
+// ── Brevo REST API — works on Render (no SMTP ports needed) ──
 const sendEmail = async (toEmail, toName, resetURL) => {
-  const apiInstance = new SibApiV3Sdk.TransactionalEmailsApi();
-  apiInstance.authentications['api-key'].apiKey = process.env.BREVO_API_KEY;
-
-  const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
-  sendSmtpEmail.sender      = { name: 'StudentAI', email: 'anmolgoyal1974@gmail.com' };
-  sendSmtpEmail.to          = [{ email: toEmail, name: toName }];
-  sendSmtpEmail.subject     = 'StudentAI — Reset Your Password';
-  sendSmtpEmail.htmlContent = `
-    <div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:32px;
-                background:#0f0f23;color:#f1f5f9;border-radius:12px;">
-      <h2 style="color:#818cf8;margin-bottom:8px;">🎓 StudentAI</h2>
-      <h3 style="margin-bottom:16px;">Password Reset Request</h3>
-      <p style="color:#94a3b8;line-height:1.6;">
-        Hi <strong style="color:#f1f5f9;">${toName}</strong>,<br/><br/>
-        Click the button below to reset your password.
-        This link expires in <strong>15 minutes</strong>.
-      </p>
-      <a href="${resetURL}"
-         style="display:inline-block;margin:24px 0;padding:14px 28px;
-                background:linear-gradient(135deg,#4f46e5,#6366f1);
-                color:#fff;border-radius:8px;text-decoration:none;font-weight:600;">
-        Reset My Password
-      </a>
-      <p style="color:#475569;font-size:13px;line-height:1.6;">
-        Or copy this link:<br/>
-        <a href="${resetURL}" style="color:#818cf8;word-break:break-all;">${resetURL}</a>
-      </p>
-      <hr style="border:1px solid #1d1d4a;margin:24px 0;"/>
-      <p style="color:#475569;font-size:12px;">
-        If you didn't request this, ignore this email.
-      </p>
-    </div>
-  `;
-
-  await apiInstance.sendTransacEmail(sendSmtpEmail);
-};
-// PUT /api/user/update-profile
-exports.updateProfile = async (req, res) => {
-  const { name, email } = req.body;
-  if (!name?.trim() && !email?.trim())
-    return res.status(400).json({ message: 'Provide at least a name or email to update.' });
-  try {
-    if (email && email.toLowerCase() !== req.user.email.toLowerCase()) {
-      const exists = await User.findOne({ email: email.toLowerCase() });
-      if (exists)
-        return res.status(400).json({ message: 'This email is already registered to another account.' });
+  await axios.post(
+    'https://api.brevo.com/v3/smtp/email',
+    {
+      sender:      { name: 'StudentAI', email: 'anmolgoyal1974@gmail.com' },
+      to:          [{ email: toEmail, name: toName }],
+      subject:     'StudentAI — Reset Your Password',
+      htmlContent: `
+        <div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:32px;
+                    background:#0f0f23;color:#f1f5f9;border-radius:12px;">
+          <h2 style="color:#818cf8;margin-bottom:8px;">🎓 StudentAI</h2>
+          <h3 style="margin-bottom:16px;">Password Reset Request</h3>
+          <p style="color:#94a3b8;line-height:1.6;">
+            Hi <strong style="color:#f1f5f9;">${toName}</strong>,<br/><br/>
+            Click the button below to reset your password.
+            This link expires in <strong>15 minutes</strong>.
+          </p>
+          <a href="${resetURL}"
+             style="display:inline-block;margin:24px 0;padding:14px 28px;
+                    background:linear-gradient(135deg,#4f46e5,#6366f1);
+                    color:#fff;border-radius:8px;text-decoration:none;font-weight:600;">
+            Reset My Password
+          </a>
+          <p style="color:#475569;font-size:13px;line-height:1.6;">
+            Or copy this link:<br/>
+            <a href="${resetURL}" style="color:#818cf8;word-break:break-all;">${resetURL}</a>
+          </p>
+          <hr style="border:1px solid #1d1d4a;margin:24px 0;"/>
+          <p style="color:#475569;font-size:12px;">
+            If you didn't request this, ignore this email.
+          </p>
+        </div>
+      `,
+    },
+    {
+      headers: {
+        'accept':       'application/json',
+        'content-type': 'application/json',
+        'api-key':      process.env.BREVO_API_KEY,
+      },
     }
-    const updateFields = {};
-    if (name?.trim())  updateFields.name  = name.trim();
-    if (email?.trim()) updateFields.email = email.trim().toLowerCase();
-    const updated = await User.findByIdAndUpdate(
-      req.user.id, { $set: updateFields }, { new: true, runValidators: true }
-    ).select('-password');
-    if (!updated) return res.status(404).json({ message: 'User not found.' });
-    const newToken = generateToken(updated);
-    res.json({
-      message: 'Profile updated successfully.',
-      user:  { id: updated._id, name: updated.name, email: updated.email, college: updated.college, semester: updated.semester },
-      token: newToken,
-    });
-  } catch (err) { res.status(500).json({ message: err.message }); }
+  );
 };
-
 // PUT /api/user/change-password
 exports.changePassword = async (req, res) => {
   const { oldPassword, newPassword } = req.body;
