@@ -1,8 +1,8 @@
-const crypto     = require('crypto');
-const User       = require('../models/User');
-const bcrypt     = require('bcryptjs');
-const jwt        = require('jsonwebtoken');
-const nodemailer = require('nodemailer');
+const crypto  = require('crypto');
+const User    = require('../models/User');
+const bcrypt  = require('bcryptjs');
+const jwt     = require('jsonwebtoken');
+const Brevo   = require('@getbrevo/brevo'); // ← replaces nodemailer
 
 const generateToken = (user) =>
   jwt.sign(
@@ -11,19 +11,46 @@ const generateToken = (user) =>
     { expiresIn: '7d' }
   );
 
-// ── Brevo SMTP transporter ────────────────────────────────
-const createTransporter = () =>
-  nodemailer.createTransport({
-    host:   'smtp-relay.brevo.com',
-    port:   587,
-    secure: false,
-    auth: {
-      user: process.env.BREVO_USER,
-      pass: process.env.BREVO_PASS,
-    },
-  });
+// ── Brevo HTTP API email sender ───────────────────────────
+const sendEmail = async (toEmail, toName, resetURL) => {
+  const client = Brevo.ApiClient.instance;
+  client.authentications['api-key'].apiKey = process.env.BREVO_API_KEY;
 
-// PUT /api/user/update-profile  (unchanged)
+  const api = new Brevo.TransactionalEmailsApi();
+  await api.sendTransacEmail({
+    sender:      { name: 'StudentAI', email: 'anmolgoyal1974@gmail.com' },
+    to:          [{ email: toEmail, name: toName }],
+    subject:     'StudentAI — Reset Your Password',
+    htmlContent: `
+      <div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:32px;
+                  background:#0f0f23;color:#f1f5f9;border-radius:12px;">
+        <h2 style="color:#818cf8;margin-bottom:8px;">🎓 StudentAI</h2>
+        <h3 style="margin-bottom:16px;">Password Reset Request</h3>
+        <p style="color:#94a3b8;line-height:1.6;">
+          Hi <strong style="color:#f1f5f9;">${toName}</strong>,<br/><br/>
+          Click the button below to reset your password.
+          This link expires in <strong>15 minutes</strong>.
+        </p>
+        <a href="${resetURL}"
+           style="display:inline-block;margin:24px 0;padding:14px 28px;
+                  background:linear-gradient(135deg,#4f46e5,#6366f1);
+                  color:#fff;border-radius:8px;text-decoration:none;font-weight:600;">
+          Reset My Password
+        </a>
+        <p style="color:#475569;font-size:13px;line-height:1.6;">
+          Or copy this link:<br/>
+          <a href="${resetURL}" style="color:#818cf8;word-break:break-all;">${resetURL}</a>
+        </p>
+        <hr style="border:1px solid #1d1d4a;margin:24px 0;"/>
+        <p style="color:#475569;font-size:12px;">
+          If you didn't request this, ignore this email.
+        </p>
+      </div>
+    `,
+  });
+};
+
+// PUT /api/user/update-profile
 exports.updateProfile = async (req, res) => {
   const { name, email } = req.body;
   if (!name?.trim() && !email?.trim())
@@ -50,7 +77,7 @@ exports.updateProfile = async (req, res) => {
   } catch (err) { res.status(500).json({ message: err.message }); }
 };
 
-// PUT /api/user/change-password  (unchanged)
+// PUT /api/user/change-password
 exports.changePassword = async (req, res) => {
   const { oldPassword, newPassword } = req.body;
   if (!oldPassword || !newPassword)
@@ -70,6 +97,7 @@ exports.changePassword = async (req, res) => {
   } catch (err) { res.status(500).json({ message: err.message }); }
 };
 
+// POST /api/user/forgot-password
 exports.forgotPassword = async (req, res) => {
   const { email } = req.body;
   const GENERIC = { message: 'If that email is registered, a reset link has been sent.' };
@@ -91,67 +119,25 @@ exports.forgotPassword = async (req, res) => {
     // ── Respond immediately ──────────────────────────────
     res.json(GENERIC);
 
-    // ── Send email after response using port 465 ─────────
-    const resetURL    = `${process.env.FRONTEND_URL}/reset-password/${rawToken}`;
-    const transporter = nodemailer.createTransport({
-      host:   'smtp-relay.brevo.com',
-      port:   465,        // ← changed from 587 to 465
-      secure: true,       // ← changed from false to true
-      auth: {
-        user: process.env.BREVO_USER,
-        pass: process.env.BREVO_PASS,
-      },
-    });
-
-    transporter.sendMail({
-      from:    '"StudentAI" <anmolgoyal1974@gmail.com>',
-      to:      user.email,
-      subject: 'StudentAI — Reset Your Password',
-      html: `
-        <div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:32px;
-                    background:#0f0f23;color:#f1f5f9;border-radius:12px;">
-          <h2 style="color:#818cf8;margin-bottom:8px;">🎓 StudentAI</h2>
-          <h3 style="margin-bottom:16px;">Password Reset Request</h3>
-          <p style="color:#94a3b8;line-height:1.6;">
-            Hi <strong style="color:#f1f5f9;">${user.name}</strong>,<br/><br/>
-            Click the button below to reset your password.
-            This link expires in <strong>15 minutes</strong>.
-          </p>
-          <a href="${resetURL}"
-             style="display:inline-block;margin:24px 0;padding:14px 28px;
-                    background:linear-gradient(135deg,#4f46e5,#6366f1);
-                    color:#fff;border-radius:8px;text-decoration:none;font-weight:600;">
-            Reset My Password
-          </a>
-          <p style="color:#475569;font-size:13px;line-height:1.6;">
-            Or copy this link:<br/>
-            <a href="${resetURL}" style="color:#818cf8;word-break:break-all;">${resetURL}</a>
-          </p>
-          <hr style="border:1px solid #1d1d4a;margin:24px 0;"/>
-          <p style="color:#475569;font-size:12px;">
-            If you didn't request this, ignore this email.
-          </p>
-        </div>
-      `,
-    })
-    .then(() => {
-      console.log('[forgotPassword] Email sent to:', user.email);
-    })
-    .catch((emailErr) => {
-      console.error('[forgotPassword] Email failed:', emailErr.message);
-      User.findByIdAndUpdate(user._id, {
-        $unset: { resetPasswordToken: '', resetPasswordExpires: '' }
-      }).catch(() => {});
-    });
+    // ── Send email via HTTP API (not SMTP) ───────────────
+    const resetURL = `${process.env.FRONTEND_URL}/reset-password/${rawToken}`;
+    sendEmail(user.email, user.name, resetURL)
+      .then(() => console.log('[forgotPassword] Email sent to:', user.email))
+      .catch((err) => {
+        console.error('[forgotPassword] Email failed:', err.message);
+        User.findByIdAndUpdate(user._id, {
+          $unset: { resetPasswordToken: '', resetPasswordExpires: '' }
+        }).catch(() => {});
+      });
 
   } catch (err) {
     console.error('[forgotPassword] DB error:', err.message);
-    if (!res.headersSent) {
+    if (!res.headersSent)
       res.status(500).json({ message: 'Something went wrong. Please try again.' });
-    }
   }
 };
-// POST /api/user/reset-password/:token  (unchanged)
+
+// POST /api/user/reset-password/:token
 exports.resetPassword = async (req, res) => {
   const { token }       = req.params;
   const { newPassword } = req.body;
