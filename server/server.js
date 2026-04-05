@@ -59,6 +59,9 @@ app.use('/api/user', require('./routes/userRoutes'));
 app.use('/api/ai', require('./routes/aiRoutes'));   // ← ADD THIS
 // Add after line: app.use('/api/user', require('./routes/userRoutes'));
 app.use('/api/decision', require('./routes/decisionRoutes'));
+app.use('/api/predict', require('./routes/predictionRoutes'));
+
+
 // ─── 404 handler ──────────────────────────────────────────────────────────
 app.use((_req, res) => {
   res.status(404).json({ message: 'Route not found' });

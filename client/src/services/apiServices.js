@@ -102,3 +102,7 @@ export const aiChatService = {
 export const decisionService = {
   getTodayPlan: () => API.get('/decision/today-plan'),
 };
+
+export const predictionService = {
+  getPredict: (params) => apiRequest('get', '/predict', null, { params }),
+};
