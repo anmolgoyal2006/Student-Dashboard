@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
-import { aiChatService } from '../services/apiServices';
+import { aiChatService, aiCommandService } from '../services/apiServices';
+import { useGlobalData } from '../context/GlobalDataContext';
 import toast from 'react-hot-toast';
 
 const MODE_LABELS = {
@@ -91,6 +92,7 @@ export default function AIAssistant() {
     role:    'assistant',
     content: "Hi! I'm your AI Study Assistant 🎓\n\nUpload your notes (PDF or text) and I can:\n• Answer questions from your notes\n• Summarize topics\n• Generate practice quizzes\n\nUpload a file to get started, or just ask me anything!",
   }]);
+    const { refreshByEntity } = useGlobalData();
   const [input,     setInput]     = useState('');
   const [loading,   setLoading]   = useState(false);
   const [mode,      setMode]      = useState('chat');
@@ -161,32 +163,45 @@ export default function AIAssistant() {
   };
 
   const handleSend = async (overrideMessage) => {
-    const text = (overrideMessage || input).trim();
-    if (!text || loading) return;
+  const text = (overrideMessage || input).trim();
+  if (!text || loading) return;
 
-    setMessages(p => [...p, { role: 'user', content: text }]);
-    setInput('');
-    setLoading(true);
+  setMessages(p => [...p, { role: 'user', content: text }]);
+  setInput('');
+  setLoading(true);
 
-    try {
+  try {
+    // First try AI command (dashboard actions)
+    const cmdRes = await aiCommandService.send(text);
+    const cmd    = cmdRes.data;
+
+    if (cmd.success && cmd.entity !== 'unknown') {
+      // It was a dashboard action — show confirmation + refresh relevant module
+      setMessages(p => [...p, {
+        role:    'assistant',
+        content: `✅ ${cmd.message}`,
+      }]);
+      refreshByEntity(cmd.entity);
+    } else {
+      // Fall back to notes/study chat via Groq
       const { data } = await aiChatService.chat(text, mode);
       setMessages(p => [...p, {
         role:    'assistant',
         content: data.answer,
         sources: data.sources,
       }]);
-    } catch (err) {
-      setMessages(p => [...p, {
-        role:    'assistant',
-        content: 'Sorry, I encountered an error. Please try again.',
-        error:   err.response?.data?.message || err.message,
-      }]);
-    } finally {
-      setLoading(false);
-      inputRef.current?.focus();
     }
-  };
-
+  } catch (err) {
+    setMessages(p => [...p, {
+      role:    'assistant',
+      content: 'Sorry, I encountered an error. Please try again.',
+      error:   err.response?.data?.message || err.message,
+    }]);
+  } finally {
+    setLoading(false);
+    inputRef.current?.focus();
+  }
+};
   const handleKeyDown = e => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();

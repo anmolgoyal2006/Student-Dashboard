@@ -1,8 +1,9 @@
-const express     = require('express');
-const router      = express.Router();
-const { protect } = require('../middleware/authMiddleware');
-const { processCommand } = require('../controllers/aiCommandController');
+const express = require('express');
+const router  = express.Router();
+const { handleCommand } = require('../controllers/aiCommandController');
+const { protect }       = require('../middleware/authMiddleware');
 
-router.post('/', protect, processCommand);
+router.use(protect);
+router.post('/', handleCommand);
 
 module.exports = router;

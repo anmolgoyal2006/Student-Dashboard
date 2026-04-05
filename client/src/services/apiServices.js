@@ -10,12 +10,11 @@ export const authService = {
 
 // ─── Subjects (Timetable) ──────────────────────────────────────────────────
 export const subjectService = {
-  getAll: ()      => apiRequest('get',    '/subjects'),
-  add:    (data)  => apiRequest('post',   '/subjects', data),
-  update: (id, d) => apiRequest('put',    `/subjects/${id}`, d),
-  remove: (id)    => apiRequest('delete', `/subjects/${id}`),
+  getAll: ()      => apiRequest('get',    '/timetable'),
+  add:    (data)  => apiRequest('post',   '/timetable', data),
+  update: (id, d) => apiRequest('put',    `/timetable/${id}`, d),
+  remove: (id)    => apiRequest('delete', `/timetable/${id}`),
 };
-
 // ─── Attendance ───────────────────────────────────────────────────────────
 export const attendanceService = {
   mark:       (data) => apiRequest('post', '/attendance', data),
@@ -120,4 +119,8 @@ export const decisionService = {
 // ─── Prediction ───────────────────────────────────────────────────────────
 export const predictionService = {
   getPredict: (params) => apiRequest('get', '/predict', null, { params }),
+};
+
+export const aiCommandService = {
+  send: (message) => apiRequest('post', '/ai-command', { message }),
 };

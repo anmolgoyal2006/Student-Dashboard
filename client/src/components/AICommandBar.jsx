@@ -65,7 +65,6 @@ export default function AICommandBar({ onRefresh }) {
   // Call your existing AI explain function here
 }
       setInput('');
-
       // Refresh subject list in parent
       if (onRefresh) onRefresh();
 
