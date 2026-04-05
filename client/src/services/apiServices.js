@@ -46,6 +46,7 @@ export const marksService = {
 // ─── Career ───────────────────────────────────────────────────────────────
 export const careerService = {
   get:         ()        => apiRequest('get',   '/career'),
+   getPlan:     ()        => apiRequest('get',   '/career/plan'),  
   update:      (data)    => apiRequest('put',   '/career',               data),
   updateTopic: (name, d) => apiRequest('patch', `/career/topic/${name}`, d),
 };
