@@ -97,10 +97,12 @@ export default function AIAssistant() {
   const [notes,     setNotes]     = useState([]);
   const [uploading, setUploading] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
+  const [listening, setListening] = useState(false);
 
-  const bottomRef = useRef(null);
-  const fileRef   = useRef(null);
-  const inputRef  = useRef(null);
+  const bottomRef      = useRef(null);
+  const fileRef        = useRef(null);
+  const inputRef       = useRef(null);
+  const recognitionRef = useRef(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -113,7 +115,6 @@ export default function AIAssistant() {
   const loadNotes = async () => {
     try {
       const { data } = await aiChatService.getNotes();
-      console.log('[Frontend] notes loaded:', data.notes);
       setNotes(data.notes || []);
     } catch (err) {
       console.error('[Frontend] loadNotes error:', err.message);
@@ -124,7 +125,6 @@ export default function AIAssistant() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Warn user about OCR delay for images
     if (file.type.startsWith('image/')) {
       toast('🔍 Reading text from image (may take 10-15s)…', {
         duration: 15000,
@@ -140,9 +140,8 @@ export default function AIAssistant() {
         role:    'assistant',
         content: `✅ **${data.filename}** uploaded!\nCreated ${data.chunks} knowledge chunks. Ask me anything about it!`,
       }]);
-      // Reload notes after upload
       await loadNotes();
-      setShowNotes(true); // auto-open notes panel
+      setShowNotes(true);
     } catch (err) {
       toast.error(err.response?.data?.message || 'Upload failed');
     } finally {
@@ -195,10 +194,41 @@ export default function AIAssistant() {
     }
   };
 
+  const handleVoice = () => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) return toast.error('Voice not supported in this browser. Use Chrome or Edge.');
+
+    if (listening) {
+      recognitionRef.current?.stop();
+      setListening(false);
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognitionRef.current = recognition;
+    recognition.lang             = 'en-US';
+    recognition.interimResults   = false;
+    recognition.continuous       = false;
+
+    recognition.onstart  = () => setListening(true);
+    recognition.onend    = () => setListening(false);
+    recognition.onerror  = () => {
+      setListening(false);
+      toast.error('Voice error. Please try again.');
+    };
+    recognition.onresult = (e) => {
+      const transcript = e.results[0][0].transcript;
+      setInput(transcript);
+      setTimeout(() => handleSend(transcript), 300);
+    };
+
+    recognition.start();
+  };
+
   const quickActions = [
-    { label: '📝 Summarize my notes', mode: 'summarize', msg: 'Summarize all my uploaded notes'       },
-    { label: '🧠 Generate quiz',       mode: 'quiz',      msg: 'Generate a quiz from my notes'         },
-    { label: '🔑 Key concepts',        mode: 'chat',      msg: 'What are the key concepts in my notes?'},
+    { label: '📝 Summarize my notes', mode: 'summarize', msg: 'Summarize all my uploaded notes'        },
+    { label: '🧠 Generate quiz',       mode: 'quiz',      msg: 'Generate a quiz from my notes'          },
+    { label: '🔑 Key concepts',        mode: 'chat',      msg: 'What are the key concepts in my notes?' },
   ];
 
   return (
@@ -227,7 +257,7 @@ export default function AIAssistant() {
           <input
             ref={fileRef}
             type="file"
-accept=".pdf,.txt,.md,.jpg,.jpeg,.png,.webp"
+            accept=".pdf,.txt,.md,.jpg,.jpeg,.png,.webp"
             style={{ display: 'none' }}
             onChange={handleUpload}
           />
@@ -320,12 +350,12 @@ accept=".pdf,.txt,.md,.jpg,.jpeg,.png,.webp"
                 padding: '12px 18px',
                 display: 'flex', gap: 5, alignItems: 'center',
               }}>
-                {[0,1,2].map(i => (
+                {[0, 1, 2].map(i => (
                   <div key={i} style={{
                     width: 8, height: 8, borderRadius: '50%',
                     background: 'var(--primary)',
                     animation: `bounce 1.2s ease-in-out ${i * 0.2}s infinite`,
-                  }}/>
+                  }} />
                 ))}
               </div>
             </div>
@@ -349,12 +379,12 @@ accept=".pdf,.txt,.md,.jpg,.jpeg,.png,.webp"
           </div>
         )}
 
-        {/* Input */}
+        {/* Input row */}
         <div style={{
           padding:    '12px 16px',
           borderTop:  '1px solid var(--border)',
           display:    'flex',
-          gap:        10,
+          gap:        8,
           alignItems: 'flex-end',
         }}>
           <textarea
@@ -362,7 +392,7 @@ accept=".pdf,.txt,.md,.jpg,.jpeg,.png,.webp"
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={MODE_PLACEHOLDERS[mode]}
+            placeholder={listening ? '🎤 Listening…' : MODE_PLACEHOLDERS[mode]}
             disabled={loading}
             rows={1}
             style={{
@@ -387,6 +417,31 @@ accept=".pdf,.txt,.md,.jpg,.jpeg,.png,.webp"
               e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
             }}
           />
+
+          {/* Mic button */}
+          <button
+            onClick={handleVoice}
+            disabled={loading}
+            title={listening ? 'Stop listening' : 'Voice input'}
+            style={{
+              minWidth:   44,
+              minHeight:  44,
+              borderRadius: 10,
+              background: listening ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.05)',
+              border:     `1px solid ${listening ? '#ef4444' : 'var(--border)'}`,
+              cursor:     loading ? 'not-allowed' : 'pointer',
+              fontSize:   18,
+              transition: 'all 0.2s',
+              animation:  listening ? 'pulse 1s ease-in-out infinite' : 'none',
+              display:    'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            🎤
+          </button>
+
+          {/* Send button */}
           <button
             className="btn btn-primary"
             onClick={() => handleSend()}
@@ -400,8 +455,12 @@ accept=".pdf,.txt,.md,.jpg,.jpeg,.png,.webp"
 
       <style>{`
         @keyframes bounce {
-          0%, 60%, 100% { transform: translateY(0); }
+          0%, 60%, 100% { transform: translateY(0);   }
           30%            { transform: translateY(-6px); }
+        }
+        @keyframes pulse {
+          0%, 100% { box-shadow: 0 0 0 0   rgba(239,68,68,0.4); }
+          50%       { box-shadow: 0 0 0 8px rgba(239,68,68,0);   }
         }
       `}</style>
     </div>
