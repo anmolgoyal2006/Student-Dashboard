@@ -1,9 +1,12 @@
 const express  = require('express');
 const cors     = require('cors');
-const mongoose = require('mongoose');
+const mongoose = require('mongoose');                 // ← ADD
 require('dotenv').config();
 
 const app = express();
+
+const passport = require('./config/passport');   // ← ADD
+app.use(passport.initialize()); 
 
 // ─── CORS ─────────────────────────────────────────────────────────────────
 const allowedOrigins = [
@@ -47,7 +50,7 @@ app.get('/api/health', (_req, res) => res.json({               // ← Fix 4
 
 // ─── Routes ───────────────────────────────────────────────────────────────
 app.use('/api/tasks', require('./routes/taskRoutes'));
-app.use('/api/auth',            require('./routes/authRoutes'));
+app.use('/auth', require('./routes/authRoutes'));
 app.use('/api/timetable',       require('./routes/timetableRoutes'));
 app.use('/api/attendance',      require('./routes/attendanceRoutes'));
 app.use('/api/marks',           require('./routes/marksRoutes'));

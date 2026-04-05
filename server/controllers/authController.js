@@ -75,3 +75,16 @@ exports.updateProfile = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
+
+
+exports.changePassword = async (req, res) => {
+  res.json({ message: "changePassword working" });
+};
+
+exports.forgotPassword = async (req, res) => {
+  res.json({ message: "forgotPassword working" });
+};
+
+exports.resetPassword = async (req, res) => {
+  res.json({ message: "resetPassword working" });
+};

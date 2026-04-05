@@ -9,6 +9,8 @@ const userSchema = new mongoose.Schema({
   branch:   { type: String, default: '' },
   resetPasswordToken:   { type: String, default: undefined },
   resetPasswordExpires: { type: Date,   default: undefined },
+   googleId: { type: String, default: null },   // ← ADD
+  avatar:   { type: String, default: '' },      // ← ADD
 }, { timestamps: true });
 
 module.exports = mongoose.model('User', userSchema);

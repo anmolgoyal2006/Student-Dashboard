@@ -15,7 +15,7 @@ import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword  from './pages/ResetPassword';
 import AIAssistant from './pages/AIAssistant'; 
 import Prediction from './pages/Prediction';
-
+import LoginSuccess from './pages/LoginSuccess'; 
 
 const ProtectedRoute = ({ children }) => {
   const { isLoggedIn } = useAuth();
@@ -44,6 +44,8 @@ export default function App() {
         <Route path="/" element={
           <ProtectedRoute><AppLayout><Dashboard /></AppLayout></ProtectedRoute>
         } />
+        <Route path="/login-success" element={<LoginSuccess />} />
+
 
 <Route path="/prediction" element={
   <ProtectedRoute><AppLayout><Prediction /></AppLayout></ProtectedRoute>
