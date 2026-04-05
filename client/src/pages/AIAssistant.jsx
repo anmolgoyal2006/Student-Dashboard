@@ -1,158 +1,247 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from "react";
 import { aiChatService, aiCommandService } from '../services/apiServices';
 import { useGlobalData } from '../context/GlobalDataContext';
 import toast from 'react-hot-toast';
 
-const MODE_LABELS = {
-  chat:      { icon: '💬', label: 'Chat'      },
-  summarize: { icon: '📝', label: 'Summarize' },
-  quiz:      { icon: '🧠', label: 'Quiz'      },
-};
+// ─── Icons ────────────────────────────────────────────────────────────────────
+const BookIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+  </svg>
+);
+const BotIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/>
+  </svg>
+);
+const SendIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+  </svg>
+);
+const UploadIcon = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
+  </svg>
+);
+const SummarizeIcon = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="21" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="17" y1="18" x2="3" y2="18"/>
+  </svg>
+);
+const QuizIcon = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+  </svg>
+);
+const SparkleIcon = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+    <path d="M12 2L9.5 9.5 2 12l7.5 2.5L12 22l2.5-7.5L22 12l-7.5-2.5z"/>
+  </svg>
+);
+const ClipIcon = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+  </svg>
+);
+const CheckIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="20 6 9 17 4 12"/>
+  </svg>
+);
+const CalendarIcon = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+  </svg>
+);
+const BarChartIcon = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
+  </svg>
+);
+const TaskIcon = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+  </svg>
+);
+const SubjectIcon = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
+  </svg>
+);
 
-const MODE_PLACEHOLDERS = {
-  chat:      'Ask anything about your notes…',
-  summarize: 'Type "summarize my notes" or ask for a specific topic…',
-  quiz:      'Type "generate quiz" or specify a topic…',
-};
+// ─── Intent detection ─────────────────────────────────────────────────────────
+const ASSISTANT_PATTERNS = [
+  /\b(add|mark|update|delete|remove|log|record|set|schedule)\b/i,
+  /\b(attended|skipped|missed|bunked|absent|present)\b/i,
+  /\b(scored|got|obtained|marks|exam|midterm|quiz|final)\b/i,
+  /\b(task|assignment|deadline|due|priority|todo)\b/i,
+  /\b(subject|course|class|lecture|credit)\b/i,
+];
 
-function MessageBubble({ msg }) {
-  const isUser = msg.role === 'user';
+function detectIntent(text) {
+  const hits = ASSISTANT_PATTERNS.filter(p => p.test(text)).length;
+  return hits >= 2 ? "assistant" : hits === 1 ? "likely-assistant" : "notes";
+}
+
+// ─── API calls ────────────────────────────────────────────────────────────────
+async function callNotesAI(action, payload) {
+  if (action === 'summarize') {
+    const { data } = await aiChatService.chat('Summarize all my uploaded notes', 'summarize');
+    return { text: data.answer, sources: data.sources };
+  }
+  if (action === 'quiz') {
+    const { data } = await aiChatService.chat('Generate a quiz from my notes', 'quiz');
+    return { text: data.answer, sources: data.sources };
+  }
+  const { data } = await aiChatService.chat(payload.message, 'chat');
+  return { text: data.answer, sources: data.sources };
+}
+
+async function callSmartAssistant(message) {
+  const { data } = await aiCommandService.send(message);
+  return data;
+}
+
+// ─── Message bubble ───────────────────────────────────────────────────────────
+function MessageBubble({ msg, mode }) {
+  const isUser = msg.role === "user";
+  const accent = mode === "notes" ? "#10b981" : "var(--primary)";
+
   return (
     <div style={{
-      display:        'flex',
-      justifyContent: isUser ? 'flex-end' : 'flex-start',
-      marginBottom:   16,
-      gap:            10,
-      alignItems:     'flex-start',
+      display: "flex",
+      flexDirection: isUser ? "row-reverse" : "row",
+      alignItems: "flex-end",
+      gap: "10px",
+      marginBottom: "16px",
+      animation: "aiBubbleIn 0.25s cubic-bezier(.34,1.56,.64,1) both",
     }}>
       {!isUser && (
         <div style={{
-          width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
-          background: 'linear-gradient(135deg, #6366f1, #818cf8)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 16,
-        }}>🤖</div>
-      )}
-      <div style={{ maxWidth: '75%' }}>
-        <div style={{
-          background:   isUser
-            ? 'linear-gradient(135deg, #6366f1, #818cf8)'
-            : 'rgba(255,255,255,0.05)',
-          border:       isUser ? 'none' : '1px solid rgba(255,255,255,0.08)',
-          borderRadius: isUser ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
-          padding:      '12px 16px',
-          color:        'var(--text)',
-          fontSize:     13.5,
-          lineHeight:   1.6,
-          whiteSpace:   'pre-wrap',
-          wordBreak:    'break-word',
+          width: 32, height: 32, borderRadius: "50%", flexShrink: 0,
+          background: mode === "notes"
+            ? "linear-gradient(135deg,#064e3b,#10b981)"
+            : "linear-gradient(135deg,var(--primary-dark),var(--primary))",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          color: "#fff",
         }}>
-          {msg.content}
+          {mode === "notes" ? <BookIcon /> : <BotIcon />}
         </div>
+      )}
+      <div style={{
+        maxWidth: "75%",
+        padding: "11px 15px",
+        borderRadius: isUser ? "18px 18px 4px 18px" : "4px 18px 18px 18px",
+        background: isUser
+          ? (mode === "notes"
+              ? "linear-gradient(135deg,#064e3b,#10b981)"
+              : "linear-gradient(135deg,var(--primary-dark),var(--primary))")
+          : "var(--bg-3)",
+        border: isUser ? "none" : "1px solid var(--card-border)",
+        color: "var(--text)",
+        fontSize: "14px",
+        lineHeight: "1.6",
+        whiteSpace: "pre-wrap",
+        wordBreak: "break-word",
+      }}>
+        {msg.text}
+
         {msg.sources?.length > 0 && (
-          <div style={{ marginTop: 8 }}>
+          <div style={{ marginTop: 8, borderTop: "1px solid var(--border)", paddingTop: 8 }}>
             {msg.sources.map((s, i) => (
               <div key={i} style={{
-                background:   'rgba(129,140,248,0.08)',
-                border:       '1px solid rgba(129,140,248,0.2)',
-                borderRadius: 8,
-                padding:      '6px 10px',
-                marginBottom: 4,
-                fontSize:     11.5,
-                color:        'var(--muted)',
+                fontSize: 11.5, color: "var(--muted)", marginTop: 4,
+                background: "rgba(255,255,255,0.03)", borderRadius: 6, padding: "4px 8px",
               }}>
-                <span style={{ color: 'var(--primary)', fontWeight: 600 }}>
-                  📄 {s.filename}
-                </span><br />
-                {s.preview}
+                📄 <span style={{ color: "var(--primary)" }}>{s.filename}</span> — {s.preview}
               </div>
             ))}
           </div>
         )}
-        {msg.error && (
-          <div style={{ fontSize: 12, color: 'var(--danger)', marginTop: 4 }}>
-            ⚠️ {msg.error}
+
+        {msg.entity && (
+          <div style={{
+            marginTop: 8, paddingTop: 8, borderTop: "1px solid var(--border)",
+            fontSize: 11, color: accent, display: "flex", alignItems: "center", gap: 4,
+          }}>
+            <CheckIcon /> Dashboard updated · {msg.entity}
           </div>
         )}
       </div>
-      {isUser && (
-        <div style={{
-          width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
-          background: 'linear-gradient(135deg, #334155, #475569)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 14, fontWeight: 700, color: '#fff',
-        }}>👤</div>
-      )}
     </div>
   );
 }
 
+// ─── Command chip ─────────────────────────────────────────────────────────────
+function CommandChip({ icon, label, example, onClick }) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <button
+      onClick={() => onClick(example)}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        background: hovered ? "rgba(129,140,248,0.1)" : "var(--bg-3)",
+        border: "1px solid var(--card-border)",
+        borderRadius: 10, padding: "10px 13px", cursor: "pointer",
+        textAlign: "left", transition: "all 0.18s ease", color: "var(--text)",
+        transform: hovered ? "translateY(-2px)" : "none",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+        <span style={{ color: "var(--primary)" }}>{icon}</span>
+        <span style={{ fontSize: 11, fontWeight: 600, color: "var(--primary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>{label}</span>
+      </div>
+      <div style={{ fontSize: 12.5, color: "var(--muted)", fontStyle: "italic" }}>"{example}"</div>
+    </button>
+  );
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
 export default function AIAssistant() {
-  const [messages,  setMessages]  = useState([{
-    role:    'assistant',
-    content: "Hi! I'm your AI Study Assistant 🎓\n\nUpload your notes (PDF or text) and I can:\n• Answer questions from your notes\n• Summarize topics\n• Generate practice quizzes\n\nUpload a file to get started, or just ask me anything!",
-  }]);
-    const { refreshByEntity } = useGlobalData();
-  const [input,     setInput]     = useState('');
-  const [loading,   setLoading]   = useState(false);
-  const [mode,      setMode]      = useState('chat');
-  const [notes,     setNotes]     = useState([]);
-  const [uploading, setUploading] = useState(false);
-  const [showNotes, setShowNotes] = useState(false);
+  const [mode, setMode] = useState("notes");
   const [listening, setListening] = useState(false);
+  const [voiceEnabled, setVoiceEnabled] = useState(false);
+const recognitionRef = useRef(null);
+  const [messages, setMessages] = useState({ notes: [], assistant: [] });
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [uploadedFile, setUploadedFile] = useState(null);
+  const [intentHint, setIntentHint] = useState(null);
+  const [switchAnim, setSwitchAnim] = useState(false);
+  const [notes, setNotes] = useState([]);
+  const [showNotes, setShowNotes] = useState(false);
 
-  const bottomRef      = useRef(null);
-  const fileRef        = useRef(null);
-  const inputRef       = useRef(null);
-  const recognitionRef = useRef(null);
+  const fileInputRef = useRef();
+  const chatEndRef = useRef();
+  const inputRef = useRef();
+  const { refreshByEntity } = useGlobalData();
+
+  const currentMessages = messages[mode];
+
+  useEffect(() => { loadNotes(); }, []);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, loading]);
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [currentMessages, loading]);
 
   useEffect(() => {
-    loadNotes();
-  }, []);
+    if (!input.trim() || mode === "assistant") { setIntentHint(null); return; }
+    const intent = detectIntent(input);
+    setIntentHint(intent === "likely-assistant" ? "likely-assistant" : null);
+  }, [input, mode]);
 
   const loadNotes = async () => {
     try {
       const { data } = await aiChatService.getNotes();
       setNotes(data.notes || []);
     } catch (err) {
-      console.error('[Frontend] loadNotes error:', err.message);
+      console.error('loadNotes error:', err.message);
     }
   };
 
-  const handleUpload = async e => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (file.type.startsWith('image/')) {
-      toast('🔍 Reading text from image (may take 10-15s)…', {
-        duration: 15000,
-        icon: '⏳',
-      });
-    }
-
-    setUploading(true);
-    try {
-      const { data } = await aiChatService.uploadNotes(file);
-      toast.success(data.message);
-      setMessages(p => [...p, {
-        role:    'assistant',
-        content: `✅ **${data.filename}** uploaded!\nCreated ${data.chunks} knowledge chunks. Ask me anything about it!`,
-      }]);
-      await loadNotes();
-      setShowNotes(true);
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Upload failed');
-    } finally {
-      setUploading(false);
-      e.target.value = '';
-    }
-  };
-
-  const handleDeleteNote = async filename => {
+  const handleDeleteNote = async (filename) => {
     try {
       await aiChatService.deleteNote(filename);
       toast.success('Note deleted');
@@ -162,322 +251,559 @@ export default function AIAssistant() {
     }
   };
 
-  const handleSend = async (overrideMessage) => {
-  const text = (overrideMessage || input).trim();
-  if (!text || loading) return;
+  const switchMode = useCallback((newMode) => {
+    if (newMode === mode) return;
+    setSwitchAnim(true);
+    setTimeout(() => { setMode(newMode); setSwitchAnim(false); }, 180);
+    setIntentHint(null);
+  }, [mode]);
 
-  setMessages(p => [...p, { role: 'user', content: text }]);
-  setInput('');
-  setLoading(true);
+  const addMessage = (modeKey, msg) => {
+    setMessages(prev => ({ ...prev, [modeKey]: [...prev[modeKey], msg] }));
+  };
 
-  try {
-    // First try AI command (dashboard actions)
-    const cmdRes = await aiCommandService.send(text);
-    const cmd    = cmdRes.data;
+  const handleSend = async (overrideText) => {
+    const text = (overrideText ?? input).trim();
+    if (!text || loading) return;
+    setInput("");
+    setIntentHint(null);
+    addMessage(mode, { role: "user", text, id: Date.now() });
+    setLoading(true);
+    try {
+      if (mode === "notes") {
+        const res = await callNotesAI("chat", { message: text });
 
-    if (cmd.success && cmd.entity !== 'unknown') {
-      // It was a dashboard action — show confirmation + refresh relevant module
-      setMessages(p => [...p, {
-        role:    'assistant',
-        content: `✅ ${cmd.message}`,
-      }]);
-      refreshByEntity(cmd.entity);
-    } else {
-      // Fall back to notes/study chat via Groq
-      const { data } = await aiChatService.chat(text, mode);
-      setMessages(p => [...p, {
-        role:    'assistant',
-        content: data.answer,
-        sources: data.sources,
-      }]);
+addMessage("notes", {
+  role: "ai",
+  text: res.text,
+  sources: res.sources,
+  id: Date.now() + 1
+});
+
+// 🔥 SPEAK RESPONSE
+speak(res.text);
+      } else {
+        const res = await callSmartAssistant(text);
+
+addMessage("assistant", {
+  role: "ai",
+  text: res.message,
+  entity: res.entity,
+  id: Date.now() + 1
+});
+
+// 🔥 SPEAK RESPONSE
+speak(res.message);
+        if (res.success && res.entity) refreshByEntity(res.entity);
+      }
+    } catch {
+      addMessage(mode, { role: "ai", text: "Sorry, something went wrong. Please try again.", id: Date.now() + 1 });
+    } finally {
+      setLoading(false);
     }
-  } catch (err) {
-    setMessages(p => [...p, {
-      role:    'assistant',
-      content: 'Sorry, I encountered an error. Please try again.',
-      error:   err.response?.data?.message || err.message,
-    }]);
-  } finally {
-    setLoading(false);
-    inputRef.current?.focus();
-  }
+  };
+const speak = (text) => {
+  if (!voiceEnabled) return;
+
+  if (!window.speechSynthesis) return;
+
+  window.speechSynthesis.cancel();
+
+  const utter = new SpeechSynthesisUtterance(text);
+  utter.lang = "en-IN";
+  utter.rate = mode === "notes" ? 1 : 1.05;
+
+  window.speechSynthesis.speak(utter);
 };
-  const handleKeyDown = e => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
-  };
-
   const handleVoice = () => {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) return toast.error('Voice not supported in this browser. Use Chrome or Edge.');
+  const SpeechRecognition =
+    window.SpeechRecognition || window.webkitSpeechRecognition;
 
-    if (listening) {
-      recognitionRef.current?.stop();
-      setListening(false);
-      return;
-    }
+  if (!SpeechRecognition) {
+    toast.error("Voice not supported. Use Chrome.");
+    return;
+  }
 
-    const recognition = new SpeechRecognition();
-    recognitionRef.current = recognition;
-    recognition.lang             = 'en-US';
-    recognition.interimResults   = false;
-    recognition.continuous       = false;
+  if (listening) {
+    recognitionRef.current?.stop();
+    setListening(false);
+    return;
+  }
 
-    recognition.onstart  = () => setListening(true);
-    recognition.onend    = () => setListening(false);
-    recognition.onerror  = () => {
-      setListening(false);
-      toast.error('Voice error. Please try again.');
-    };
-    recognition.onresult = (e) => {
-      const transcript = e.results[0][0].transcript;
-      setInput(transcript);
-      setTimeout(() => handleSend(transcript), 300);
-    };
+  const recognition = new SpeechRecognition();
+  recognitionRef.current = recognition;
 
-    recognition.start();
+  recognition.lang = "en-IN";
+  recognition.interimResults = false;
+  recognition.continuous = false;
+
+  recognition.onstart = () => setListening(true);
+  recognition.onend = () => setListening(false);
+
+  recognition.onerror = () => {
+    setListening(false);
+    toast.error("Voice error");
   };
 
-  const quickActions = [
-    { label: '📝 Summarize my notes', mode: 'summarize', msg: 'Summarize all my uploaded notes'        },
-    { label: '🧠 Generate quiz',       mode: 'quiz',      msg: 'Generate a quiz from my notes'          },
-    { label: '🔑 Key concepts',        mode: 'chat',      msg: 'What are the key concepts in my notes?' },
+  recognition.onresult = (e) => {
+  const transcript = e.results[0][0].transcript;
+
+  // 🔥 detect intent
+  const intent = detectIntent(transcript);
+
+  if (intent === "assistant") {
+    switchMode("assistant");
+  }
+
+  handleSend(transcript);
+};
+
+  recognition.start();
+};
+  const handleAction = async (action) => {
+    if (loading) return;
+    const label = action === "summarize" ? "Summarize my notes" : "Generate a quiz from my notes";
+    addMessage("notes", { role: "user", text: label, id: Date.now() });
+    setLoading(true);
+    try {
+      const res = await callNotesAI(action, {});
+      addMessage("notes", { role: "ai", text: res.text, sources: res.sources, id: Date.now() + 1 });
+    } catch {
+      addMessage("notes", { role: "ai", text: "Sorry, something went wrong.", id: Date.now() + 1 });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleFileUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setLoading(true);
+    try {
+      const { data } = await aiChatService.uploadNotes(file);
+      setUploadedFile(file);
+      addMessage("notes", {
+        role: "ai",
+        text: `📎 **${data.filename}** uploaded! Created ${data.chunks} knowledge chunks. Ask me anything about it!`,
+        id: Date.now(),
+      });
+      toast.success(data.message);
+      await loadNotes();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Upload failed');
+    } finally {
+      setLoading(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleChipClick = (example) => {
+    setInput(example);
+    inputRef.current?.focus();
+  };
+
+  const notesIntro = [{
+    role: "ai",
+    text: "👋 Hi! I'm your **Notes AI**. Upload your study material and I'll help you:\n\n• 📝 Summarize key concepts\n• 🎯 Quiz you on the content\n• 💬 Answer questions about your notes\n\nStart by uploading a file or just ask me anything!",
+    id: 0,
+  }];
+
+  const assistantIntro = [{
+    role: "ai",
+    text: "🤖 Hey! I'm your **Dashboard Assistant**. I can update your dashboard directly using natural language.\n\nTry commands like the ones below ↓",
+    id: 0,
+  }];
+
+  const displayMessages = currentMessages.length === 0
+    ? (mode === "notes" ? notesIntro : assistantIntro)
+    : currentMessages;
+
+  const ASSISTANT_COMMANDS = [
+    { icon: <CalendarIcon />, label: "Attendance", example: "I attended Data Structures today" },
+    { icon: <BarChartIcon />, label: "Marks",      example: "I scored 42 out of 50 in Physics midterm" },
+    { icon: <TaskIcon />,     label: "Task",       example: "Add high priority task to submit project by Friday" },
+    { icon: <SubjectIcon />,  label: "Subject",    example: "Add Operating Systems subject on Monday at 10am" },
   ];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 80px)', gap: 16 }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 80px)" }}>
 
-      {/* Header */}
+      <style>{`
+        @keyframes aiBubbleIn {
+          from { opacity: 0; transform: translateY(10px) scale(0.96); }
+          to   { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes aiFadeIn {
+          from { opacity: 0; transform: translateY(10px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes aiPulse {
+          0%   { box-shadow: 0 0 0 0 rgba(129,140,248,0.5); }
+          70%  { box-shadow: 0 0 0 6px rgba(129,140,248,0); }
+          100% { box-shadow: 0 0 0 0 rgba(129,140,248,0); }
+        }
+        @keyframes aiDotBounce {
+          0%, 80%, 100% { transform: translateY(0); }
+          40%           { transform: translateY(-6px); }
+        }
+        .ai-dot-loader span {
+          display: inline-block;
+          width: 6px; height: 6px; border-radius: 50%;
+          background: var(--muted); margin: 0 2px;
+          animation: aiDotBounce 1.2s ease-in-out infinite;
+        }
+        .ai-dot-loader span:nth-child(2) { animation-delay: 0.2s; }
+        .ai-dot-loader span:nth-child(3) { animation-delay: 0.4s; }
+        .ai-fade-in { animation: aiFadeIn 0.22s ease both; }
+        .ai-pulse { animation: aiPulse 2s ease-in-out infinite; }
+      `}</style>
+
+      {/* ── Page header ── */}
       <div className="page-header">
         <div>
           <h1 className="page-title">🤖 AI Study Assistant</h1>
-          <p className="page-subtitle">Ask questions, summarize notes, generate quizzes</p>
-        </div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button
-            className="btn btn-outline btn-sm"
-            onClick={() => { setShowNotes(n => !n); loadNotes(); }}
-          >
-            📚 Notes ({notes.length})
-          </button>
-          <button
-            className="btn btn-primary btn-sm"
-            onClick={() => fileRef.current?.click()}
-            disabled={uploading}
-          >
-            {uploading ? '⏳ Uploading…' : '📤 Upload Notes'}
-          </button>
-          <input
-            ref={fileRef}
-            type="file"
-            accept=".pdf,.txt,.md,.jpg,.jpeg,.png,.webp"
-            style={{ display: 'none' }}
-            onChange={handleUpload}
-          />
+          <p className="page-subtitle">
+            {mode === "notes"
+              ? "Ask questions, summarize notes, generate quizzes"
+              : "Update your dashboard with natural language"}
+          </p>
         </div>
       </div>
 
-      {/* Notes panel */}
-      {showNotes && (
-        <div className="card" style={{ padding: 16 }}>
-          <div className="card-title">
-            📚 Uploaded Notes
-            <span style={{ fontSize: 12, color: 'var(--muted)', marginLeft: 8 }}>
-              ({notes.length} file{notes.length !== 1 ? 's' : ''})
-            </span>
-          </div>
-          {notes.length === 0 ? (
-            <p className="text-muted">No notes uploaded yet.</p>
-          ) : (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              {notes.map(n => (
-                <div key={n._id} style={{
-                  display:      'flex',
-                  alignItems:   'center',
-                  gap:          8,
-                  background:   'rgba(129,140,248,0.08)',
-                  border:       '1px solid rgba(129,140,248,0.2)',
-                  borderRadius: 8,
-                  padding:      '6px 12px',
-                  fontSize:     13,
-                }}>
-                  <span>📄 {n._id}</span>
-                  <span style={{ color: 'var(--muted)', fontSize: 11 }}>
-                    ({n.chunks} chunks)
-                  </span>
-                  <button
-                    onClick={() => handleDeleteNote(n._id)}
-                    style={{
-                      background: 'none', border: 'none',
-                      cursor: 'pointer', color: 'var(--danger)',
-                      fontSize: 14, padding: '0 2px',
-                    }}
-                  >✕</button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Mode selector */}
-      <div style={{ display: 'flex', gap: 8 }}>
-        {Object.entries(MODE_LABELS).map(([key, val]) => (
-          <button
-            key={key}
-            className={`btn btn-sm ${mode === key ? 'btn-primary' : 'btn-outline'}`}
-            onClick={() => setMode(key)}
-          >
-            {val.icon} {val.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Chat window */}
+      {/* ── Main card ── */}
       <div className="card" style={{
-        flex: 1, display: 'flex', flexDirection: 'column',
-        overflow: 'hidden', padding: 0,
+        flex: 1, display: "flex", flexDirection: "column",
+        overflow: "hidden", padding: 0,
       }}>
-        {/* Messages */}
-        <div style={{
-          flex: 1, overflowY: 'auto',
-          padding: '20px 16px',
-          scrollbarWidth: 'thin',
-        }}>
-          {messages.map((msg, i) => (
-            <MessageBubble key={i} msg={msg} />
-          ))}
 
-          {loading && (
-            <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 16 }}>
-              <div style={{
-                width: 32, height: 32, borderRadius: '50%',
-                background: 'linear-gradient(135deg, #6366f1, #818cf8)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 16,
-              }}>🤖</div>
-              <div style={{
-                background: 'rgba(255,255,255,0.05)',
-                border: '1px solid rgba(255,255,255,0.08)',
-                borderRadius: '18px 18px 18px 4px',
-                padding: '12px 18px',
-                display: 'flex', gap: 5, alignItems: 'center',
-              }}>
-                {[0, 1, 2].map(i => (
-                  <div key={i} style={{
-                    width: 8, height: 8, borderRadius: '50%',
-                    background: 'var(--primary)',
-                    animation: `bounce 1.2s ease-in-out ${i * 0.2}s infinite`,
+        {/* ── Tabs ── */}
+        <div style={{
+          display: "flex",
+          background: "var(--bg-2)",
+          borderBottom: "1px solid var(--border)",
+          padding: "6px 6px 0",
+          gap: 4,
+        }}>
+          {[
+            { key: "notes",     label: "Notes AI",       icon: <BookIcon />, color: "#10b981" },
+            { key: "assistant", label: "Dashboard AI", icon: <BotIcon />,  color: "var(--primary)" },
+          ].map(tab => {
+            const active = mode === tab.key;
+            return (
+              <button
+                key={tab.key}
+                onClick={() => switchMode(tab.key)}
+                style={{
+                  flex: 1, display: "flex", alignItems: "center", justifyContent: "center",
+                  gap: 8, padding: "9px 16px",
+                  background: active ? "var(--bg-3)" : "transparent",
+                  color: active ? tab.color : "var(--muted)",
+                  borderRadius: "8px 8px 0 0",
+                  border: "none", cursor: "pointer", fontFamily: "inherit",
+                  fontSize: 13.5, fontWeight: active ? 600 : 400,
+                  transition: "all 0.2s ease",
+                  borderBottom: active ? `2px solid ${tab.color}` : "2px solid transparent",
+                  position: "relative",
+                }}
+              >
+                {tab.icon}
+                {tab.label}
+                {tab.key === "assistant" && (
+                  <span className="ai-pulse" style={{
+                    width: 6, height: 6, borderRadius: "50%",
+                    background: "var(--primary)",
+                    position: "absolute", top: 8, right: 10,
+                    display: "inline-block",
                   }} />
-                ))}
-              </div>
-            </div>
-          )}
-          <div ref={bottomRef} />
+                )}
+              </button>
+            );
+          })}
         </div>
 
-        {/* Quick actions — show only at start */}
-        {messages.length <= 1 && (
-          <div style={{ padding: '0 16px 12px', display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-            {quickActions.map((a, i) => (
-              <button
-                key={i}
-                className="btn btn-outline btn-sm"
-                onClick={() => { setMode(a.mode); handleSend(a.msg); }}
-                disabled={loading}
-              >
-                {a.label}
-              </button>
-            ))}
+        {/* ── Notes toolbar ── */}
+        {mode === "notes" && (
+          <div className="ai-fade-in" style={{
+            display: "flex", gap: 8, padding: "10px 16px",
+            borderBottom: "1px solid var(--border)", flexWrap: "wrap",
+            alignItems: "center",
+          }}>
+            <button
+              className="btn btn-sm btn-outline"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={loading}
+              style={{ color: "#10b981", borderColor: "rgba(16,185,129,0.35)", display: "flex", alignItems: "center", gap: 6 }}
+            >
+              <UploadIcon /> Upload Notes
+            </button>
+            <input
+              ref={fileInputRef} type="file"
+              accept=".pdf,.txt,.md,.docx,.jpg,.jpeg,.png,.webp"
+              hidden onChange={handleFileUpload}
+            />
+
+            <button
+              className="btn btn-sm btn-outline"
+              onClick={() => { setShowNotes(n => !n); loadNotes(); }}
+              style={{ display: "flex", alignItems: "center", gap: 6 }}
+            >
+              📚 Notes ({notes.length})
+            </button>
+
+            <button
+              className="btn btn-sm btn-outline"
+              onClick={() => handleAction("summarize")}
+              disabled={loading}
+              style={{ display: "flex", alignItems: "center", gap: 6 }}
+            >
+              <SummarizeIcon /> Summarize
+            </button>
+
+            <button
+              className="btn btn-sm btn-outline"
+              onClick={() => handleAction("quiz")}
+              disabled={loading}
+              style={{ display: "flex", alignItems: "center", gap: 6 }}
+            >
+              <QuizIcon /> Quiz Me
+            </button>
+
+            {uploadedFile && (
+              <div style={{
+                display: "flex", alignItems: "center", gap: 6,
+                background: "rgba(16,185,129,0.08)",
+                border: "1px solid rgba(16,185,129,0.25)",
+                borderRadius: 8, padding: "4px 10px",
+                fontSize: 12, color: "#10b981",
+              }}>
+                <ClipIcon />
+                {uploadedFile.name.slice(0, 22)}{uploadedFile.name.length > 22 ? "…" : ""}
+              </div>
+            )}
           </div>
         )}
 
-        {/* Input row */}
+        {/* ── Notes panel ── */}
+        {mode === "notes" && showNotes && (
+          <div className="ai-fade-in" style={{
+            padding: "12px 16px",
+            borderBottom: "1px solid var(--border)",
+            background: "var(--bg-2)",
+          }}>
+            <p style={{
+              fontSize: 11, color: "var(--muted)", marginBottom: 8,
+              textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 600,
+            }}>
+              Uploaded Notes ({notes.length})
+            </p>
+            {notes.length === 0 ? (
+              <p style={{ fontSize: 13, color: "var(--muted)" }}>No notes uploaded yet.</p>
+            ) : (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                {notes.map(n => (
+                  <div key={n._id} style={{
+                    display: "flex", alignItems: "center", gap: 8,
+                    background: "var(--bg-3)", border: "1px solid var(--card-border)",
+                    borderRadius: 8, padding: "6px 12px",
+                    fontSize: 13, color: "var(--text-2)",
+                  }}>
+                    <span>📄 {n._id}</span>
+                    <span style={{ color: "var(--muted)", fontSize: 11 }}>({n.chunks} chunks)</span>
+                    <button
+                      onClick={() => handleDeleteNote(n._id)}
+                      style={{
+                        background: "none", border: "none", cursor: "pointer",
+                        color: "var(--danger)", fontSize: 14, padding: "0 2px",
+                      }}
+                    >✕</button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Assistant chips ── */}
+        {mode === "assistant" && currentMessages.length === 0 && (
+          <div className="ai-fade-in" style={{
+            padding: "14px 16px",
+            borderBottom: "1px solid var(--border)",
+            background: "var(--bg-2)",
+          }}>
+            <p style={{
+              fontSize: 11, color: "var(--muted)", marginBottom: 8,
+              textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 600,
+            }}>
+              Example Commands
+            </p>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              {ASSISTANT_COMMANDS.map(cmd => (
+                <CommandChip key={cmd.label} {...cmd} onClick={handleChipClick} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── Chat messages ── */}
         <div style={{
-          padding:    '12px 16px',
-          borderTop:  '1px solid var(--border)',
-          display:    'flex',
-          gap:        8,
-          alignItems: 'flex-end',
+          flex: 1, overflowY: "auto",
+          padding: "20px 16px",
+          display: "flex", flexDirection: "column",
+          opacity: switchAnim ? 0 : 1,
+          transform: switchAnim ? "translateY(8px)" : "none",
+          transition: "opacity 0.18s ease, transform 0.18s ease",
+          scrollbarWidth: "thin",
         }}>
-          <textarea
-            ref={inputRef}
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={listening ? '🎤 Listening…' : MODE_PLACEHOLDERS[mode]}
-            disabled={loading}
-            rows={1}
-            style={{
-              flex:         1,
-              background:   'rgba(255,255,255,0.04)',
-              border:       '1px solid var(--border)',
-              borderRadius: 10,
-              padding:      '10px 14px',
-              color:        'var(--text)',
-              fontSize:     14,
-              resize:       'none',
-              fontFamily:   'inherit',
-              lineHeight:   1.5,
-              maxHeight:    120,
-              overflowY:    'auto',
-              outline:      'none',
-            }}
-            onFocus={e => e.target.style.borderColor = 'var(--primary)'}
-            onBlur={e  => e.target.style.borderColor = 'var(--border)'}
-            onInput={e => {
-              e.target.style.height = 'auto';
-              e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
-            }}
-          />
+          {displayMessages.map(msg => (
+            <MessageBubble key={msg.id} msg={msg} mode={mode} />
+          ))}
 
-          {/* Mic button */}
-          <button
-            onClick={handleVoice}
-            disabled={loading}
-            title={listening ? 'Stop listening' : 'Voice input'}
-            style={{
-              minWidth:   44,
-              minHeight:  44,
-              borderRadius: 10,
-              background: listening ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.05)',
-              border:     `1px solid ${listening ? '#ef4444' : 'var(--border)'}`,
-              cursor:     loading ? 'not-allowed' : 'pointer',
-              fontSize:   18,
-              transition: 'all 0.2s',
-              animation:  listening ? 'pulse 1s ease-in-out infinite' : 'none',
-              display:    'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            🎤
-          </button>
+          {loading && (
+            <div style={{ display: "flex", alignItems: "flex-end", gap: 10, marginBottom: 16 }}>
+              <div style={{
+                width: 32, height: 32, borderRadius: "50%", flexShrink: 0,
+                background: mode === "notes"
+                  ? "linear-gradient(135deg,#064e3b,#10b981)"
+                  : "linear-gradient(135deg,var(--primary-dark),var(--primary))",
+                display: "flex", alignItems: "center", justifyContent: "center", color: "#fff",
+              }}>
+                {mode === "notes" ? <BookIcon /> : <BotIcon />}
+              </div>
+              <div style={{
+                padding: "12px 16px",
+                background: "var(--bg-3)",
+                border: "1px solid var(--card-border)",
+                borderRadius: "4px 18px 18px 18px",
+              }}>
+                <div className="ai-dot-loader">
+                  <span /><span /><span />
+                </div>
+              </div>
+            </div>
+          )}
+          <div ref={chatEndRef} />
+        </div>
 
-          {/* Send button */}
-          <button
-            className="btn btn-primary"
-            onClick={() => handleSend()}
-            disabled={loading || !input.trim()}
-            style={{ minWidth: 44, minHeight: 44, borderRadius: 10 }}
-          >
-            {loading ? '⏳' : '➤'}
-          </button>
+        {/* ── Intent nudge ── */}
+        {intentHint === "likely-assistant" && (
+          <div style={{
+            margin: "0 16px 8px",
+            padding: "8px 14px",
+            background: "rgba(129,140,248,0.08)",
+            border: "1px solid rgba(129,140,248,0.2)",
+            borderRadius: 10,
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            fontSize: 12.5,
+            animation: "aiFadeIn 0.2s ease both",
+          }}>
+            <span style={{ color: "var(--primary)", display: "flex", alignItems: "center", gap: 5 }}>
+              <SparkleIcon /> Looks like a dashboard command — try Smart Assistant
+            </span>
+            <button
+              onClick={() => switchMode("assistant")}
+              className="btn btn-sm btn-outline"
+              style={{ fontSize: 12, color: "var(--primary)", borderColor: "rgba(129,140,248,0.3)" }}
+            >
+              Switch →
+            </button>
+          </div>
+        )}
+
+        {/* ── Input ── */}
+        <div style={{ padding: "12px 16px 16px", borderTop: "1px solid var(--border)" }}>
+          <div style={{
+            display: "flex", alignItems: "flex-end", gap: 8,
+            background: "var(--bg-2)",
+            border: `1.5px solid ${input
+              ? (mode === "notes" ? "rgba(16,185,129,0.4)" : "rgba(129,140,248,0.4)")
+              : "var(--border)"}`,
+            borderRadius: 12, padding: "8px 10px 8px 14px",
+            transition: "border-color 0.2s ease",
+          }}>
+            <textarea
+              ref={inputRef}
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
+              }}
+              placeholder={
+  listening
+    ? "🎤 Listening..."
+    : mode === "notes"
+      ? "Ask anything about your notes…"
+      : "Give a command…"
+}
+              rows={1}
+              style={{
+                flex: 1, background: "transparent", color: "var(--text)",
+                fontSize: 14, fontFamily: "inherit", lineHeight: 1.6,
+                border: "none", outline: "none", resize: "none", maxHeight: 120,
+              }}
+              onInput={e => {
+                e.target.style.height = "auto";
+                e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px";
+              }}
+            />
+<button
+  onClick={() => setVoiceEnabled(v => !v)}
+  style={{
+    minWidth: 36,
+    height: 36,
+    borderRadius: 8,
+    border: "none",
+    cursor: "pointer",
+    background: voiceEnabled ? "#22c55e" : "var(--bg-3)",
+    color: voiceEnabled ? "#fff" : "var(--text)",
+  }}
+>
+  {voiceEnabled ? "🔊" : "🔇"}
+</button>
+            <button
+  onClick={handleVoice}
+  disabled={loading}
+  style={{
+    minWidth: 36,
+    height: 36,
+    borderRadius: 8,
+    border: "none",
+    cursor: "pointer",
+    background: listening
+      ? "#ef4444"
+      : mode === "notes"
+        ? "rgba(16,185,129,0.2)"
+        : "rgba(129,140,248,0.2)",
+    color: listening ? "#fff" : "var(--text)",
+  }}
+>
+  {listening ? "🔴" : "🎤"}
+</button>
+            <button
+              onClick={() => handleSend()}
+              disabled={!input.trim() || loading}
+              style={{
+                minWidth: 36, height: 36, borderRadius: 8,
+                border: "none", cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                background: !input.trim() || loading
+                  ? "var(--bg-3)"
+                  : mode === "notes"
+                    ? "linear-gradient(135deg,#064e3b,#10b981)"
+                    : "linear-gradient(135deg,var(--primary-dark),var(--primary))",
+                color: !input.trim() || loading ? "var(--muted)" : "#fff",
+                transition: "all 0.2s ease",
+              }}
+            >
+              <SendIcon />
+            </button>
+          </div>
+          <p style={{ fontSize: 11, color: "var(--muted)", marginTop: 6, textAlign: "center" }}>
+            {mode === "notes"
+              ? "Notes AI · Shift+Enter for new line"
+              : "Smart Assistant · Updates your dashboard in real-time"}
+          </p>
         </div>
       </div>
-
-      <style>{`
-        @keyframes bounce {
-          0%, 60%, 100% { transform: translateY(0);   }
-          30%            { transform: translateY(-6px); }
-        }
-        @keyframes pulse {
-          0%, 100% { box-shadow: 0 0 0 0   rgba(239,68,68,0.4); }
-          50%       { box-shadow: 0 0 0 8px rgba(239,68,68,0);   }
-        }
-      `}</style>
     </div>
   );
 }
