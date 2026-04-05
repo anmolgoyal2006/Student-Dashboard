@@ -19,6 +19,7 @@ export default function Career() {
   const [plan,      setPlan]      = useState(null);
   const [planLoad,  setPlanLoad]  = useState(true);
   const [activeDay, setActiveDay] = useState(0);
+  const [todayProgress, setTodayProgress] = useState({ done: 0, remaining: 0 });
 
   const load = async () => {
     try {
@@ -36,6 +37,15 @@ export default function Career() {
   };
 
   useEffect(() => { load(); loadPlan(); }, []);
+
+  useEffect(() => {
+  if (!plan) return;
+
+  const done = plan.dailyTasks.filter(t => t.done >= t.count).length;
+  const remaining = plan.dailyTasks.length - done;
+
+  setTodayProgress({ done, remaining });
+}, [plan]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -91,18 +101,77 @@ export default function Career() {
       </div>
 
       {/* ── Readiness banner ── */}
-      <div className="card mb-4" style={{ background: rc.bg, borderColor: rc.color }}>
-        <div className="flex justify-between items-center">
+      {/* ── Readiness + Overall Goal ── */}
+<div className="grid-2 mb-4">
+  <div className="card" style={{
+    background:   rc.bg,
+    borderColor:  rc.color,
+  }}>
+    <div className="flex justify-between items-center">
+      <div>
+        <div style={{ fontSize: 20, fontWeight: 700, color: rc.color }}>{rc.label}</div>
+        <div className="text-muted" style={{ marginTop: 4 }}>{rc.desc}</div>
+      </div>
+      <div style={{ textAlign: 'right' }}>
+        <div style={{ fontSize: 28, fontWeight: 700, color: rc.color }}>{career.problemsSolved}</div>
+        <div className="text-muted" style={{ fontSize: 13 }}>problems solved</div>
+      </div>
+    </div>
+  </div>
+
+  {/* Overall Goal Tracker */}
+  {plan && (
+    <div className="card">
+      <div className="card-title">🏁 Overall Goal</div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+        <span style={{ fontSize: 13, color: 'var(--muted)' }}>Goal: {plan.progressStats.totalTarget} problems</span>
+        <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--primary)' }}>
+          {plan.progressStats.problemsSolved}/{plan.progressStats.totalTarget}
+        </span>
+      </div>
+      <CareerProgressBar
+        label=""
+        done={plan.progressStats.problemsSolved}
+        target={plan.progressStats.totalTarget}
+        showCount={false}
+      />
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 10 }}>
+        <span style={{ fontSize: 12, color: 'var(--muted)' }}>
+          {plan.progressStats.pct}% complete
+        </span>
+        <span style={{ fontSize: 12, color: 'var(--muted)' }}>
+          {plan.progressStats.totalTarget - plan.progressStats.problemsSolved} remaining
+        </span>
+      </div>
+
+      {/* Today's Progress — improvement 4 */}
+      <div style={{
+        marginTop: 14, paddingTop: 12,
+        borderTop: '1px solid var(--border)',
+        display: 'flex', gap: 16,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: 16 }}>✅</span>
           <div>
-            <div style={{ fontSize: 20, fontWeight: 700, color: rc.color }}>{rc.label}</div>
-            <div className="text-muted" style={{ marginTop: 4 }}>{rc.desc}</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: '#34d399' }}>
+              {todayProgress.done}
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--muted)' }}>done today</div>
           </div>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: 28, fontWeight: 700, color: rc.color }}>{career.problemsSolved}</div>
-            <div className="text-muted" style={{ fontSize: 13 }}>problems solved</div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: 16 }}>⏳</span>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: '#fbbf24' }}>
+              {todayProgress.remaining}
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--muted)' }}>remaining</div>
           </div>
         </div>
       </div>
+    </div>
+  )}
+</div>
 
       {/* ── Target settings + DSA overview ── */}
       <div className="grid-2 mb-4">
@@ -286,42 +355,69 @@ export default function Career() {
         </div>
       )}
 
-      {/* ── Weekly Plan ── */}
-      {plan && (
-        <div className="card mb-4">
-          <div className="card-title">📆 Weekly Plan</div>
-          <div style={{ display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap' }}>
-            {plan.weeklyPlan.map((d, i) => (
-              <button
-                key={i}
-                onClick={() => setActiveDay(i)}
-                className={`btn btn-sm ${activeDay === i ? 'btn-primary' : 'btn-outline'}`}
-              >
-                {d.day}
-              </button>
-            ))}
-          </div>
-          {plan.weeklyPlan[activeDay] && (
-            <div style={{
-              background: 'rgba(129,140,248,0.07)',
-              border: '1px solid rgba(129,140,248,0.2)',
-              borderRadius: 10, padding: 16,
-            }}>
-              <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 8 }}>
-                {plan.weeklyPlan[activeDay].day} — {plan.weeklyPlan[activeDay].topic}
-              </div>
-              <div style={{ fontSize: 13.5, color: 'var(--text-2)', marginBottom: 12 }}>
-                📝 {plan.weeklyPlan[activeDay].task}
-              </div>
-              <CareerProgressBar
-                label="Topic Progress"
-                done={plan.weeklyPlan[activeDay].done}
-                target={plan.weeklyPlan[activeDay].target}
-              />
+     {/* ── Weekly Plan ── */}
+{plan && (
+  <div className="card mb-4">
+    <div className="card-title">📆 Weekly Plan</div>
+    <div style={{ display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap' }}>
+      {plan.weeklyPlan.map((d, i) => (
+        <button
+          key={i}
+          onClick={() => setActiveDay(i)}
+          className={`btn btn-sm ${activeDay === i ? 'btn-primary' : 'btn-outline'}`}
+        >
+          {d.day}
+        </button>
+      ))}
+    </div>
+    {plan.weeklyPlan[activeDay] && (() => {
+      const day    = plan.weeklyPlan[activeDay];
+      const target = day.count || 5;
+      const done   = Math.min(day.done, target);
+      const pct    = Math.min(100, Math.round((done / target) * 100));
+      return (
+        <div style={{
+          background: 'rgba(129,140,248,0.07)',
+          border: '1px solid rgba(129,140,248,0.2)',
+          borderRadius: 10, padding: 16,
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>
+              {day.day} — {day.topic}
             </div>
-          )}
+            <span className={`badge ${pct >= 100 ? 'badge-success' : pct >= 50 ? 'badge-warning' : 'badge-danger'}`}>
+              {pct >= 100 ? '✔ Done' : `${pct}%`}
+            </span>
+          </div>
+          <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 12 }}>
+            📝 {day.task}
+          </div>
+          {/* Progress */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
+            <span style={{ fontSize: 12, color: 'var(--muted)' }}>Progress</span>
+            <span style={{ fontSize: 12, color: 'var(--muted)' }}>{day.done}/{day.target} solved</span>
+          </div>
+          <div style={{
+            background: 'rgba(255,255,255,0.07)',
+            borderRadius: 99, height: 6, overflow: 'hidden',
+          }}>
+            <div style={{
+              width:      `${pct}%`,
+              height:     '100%',
+              borderRadius: 99,
+              background: pct >= 100
+                ? 'linear-gradient(90deg,#34d399,#10b981)'
+                : pct >= 50
+                  ? 'linear-gradient(90deg,#fbbf24,#f59e0b)'
+                  : 'linear-gradient(90deg,#f87171,#ef4444)',
+              transition: 'width 0.5s ease',
+            }} />
+          </div>
         </div>
-      )}
+      );
+    })()}
+  </div>
+)}
 
     </div>
   );
