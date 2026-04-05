@@ -18,10 +18,25 @@ export const subjectService = {
 
 // ─── Attendance ───────────────────────────────────────────────────────────
 export const attendanceService = {
-  mark:         (data) => apiRequest('post', '/attendance',         data),
-  getSummary:   ()     => apiRequest('get',  '/attendance/summary'),
-  getTrends:    ()     => apiRequest('get',  '/attendance/trends'),
-  getBySubject: (id)   => apiRequest('get',  `/attendance/${id}`),
+  mark:       (data) => apiRequest('post', '/attendance', data),
+
+  // [UNCHANGED] summary now returns { summary, overview } — overview used for insight cards
+  getSummary: () => apiRequest('get', '/attendance/summary'),
+
+  // [CHANGED] accepts optional months param (default 6, max 12)
+  // Usage: attendanceService.getTrends()        → last 6 months
+  //        attendanceService.getTrends(12)       → last 12 months
+  getTrends: (months = 6) => apiRequest('get', '/attendance/trends', null, {
+    params: { months },
+  }),
+
+  // [CHANGED] accepts optional pagination + date range params
+  // Usage: attendanceService.getBySubject(id)
+  //        attendanceService.getBySubject(id, { page: 2, limit: 20 })
+  //        attendanceService.getBySubject(id, { from: '2025-01-01', to: '2025-06-30' })
+  getBySubject: (id, params = {}) => apiRequest('get', `/attendance/${id}`, null, {
+    params,
+  }),
 };
 
 // ─── Marks ────────────────────────────────────────────────────────────────
@@ -37,16 +52,14 @@ export const marksService = {
   getCGPAbySemester: ()     => apiRequest('get',    '/marks/cgpa-semester'),
 
   addSemester:       (data) => apiRequest('post',   '/marks/semester', data),
-
-  // 🔥 ADD THIS LINE
   updateSemester:    (id, data) => apiRequest('put', `/marks/semester/${id}`, data),
-
   deleteSemester:    (id)   => apiRequest('delete', `/marks/semester/${id}`),
 };
+
 // ─── Career ───────────────────────────────────────────────────────────────
 export const careerService = {
   get:         ()        => apiRequest('get',   '/career'),
-   getPlan:     ()        => apiRequest('get',   '/career/plan'),  
+  getPlan:     ()        => apiRequest('get',   '/career/plan'),
   update:      (data)    => apiRequest('put',   '/career',               data),
   updateTopic: (name, d) => apiRequest('patch', `/career/topic/${name}`, d),
 };
@@ -73,10 +86,10 @@ export const taskService = {
 
 // ─── User ─────────────────────────────────────────────────────────────────
 export const userService = {
-  updateProfile:  (data)              => apiRequest('put',  '/user/update-profile',          data),
-  changePassword: (data)              => apiRequest('put',  '/user/change-password',         data),
-  forgotPassword: (data)              => apiRequest('post', '/user/forgot-password',         data),
-  resetPassword:  (token, newPassword)=> apiRequest('post', `/user/reset-password/${token}`, { newPassword }),
+  updateProfile:  (data)               => apiRequest('put',  '/user/update-profile',          data),
+  changePassword: (data)               => apiRequest('put',  '/user/change-password',         data),
+  forgotPassword: (data)               => apiRequest('post', '/user/forgot-password',         data),
+  resetPassword:  (token, newPassword) => apiRequest('post', `/user/reset-password/${token}`, { newPassword }),
 };
 
 // ─── AI Chat / Study Assistant ────────────────────────────────────────────
@@ -104,6 +117,7 @@ export const decisionService = {
   getTodayPlan: () => API.get('/decision/today-plan'),
 };
 
+// ─── Prediction ───────────────────────────────────────────────────────────
 export const predictionService = {
   getPredict: (params) => apiRequest('get', '/predict', null, { params }),
 };
