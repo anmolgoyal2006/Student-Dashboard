@@ -315,7 +315,7 @@ export default function AIAssistant() {
 
     const recognition          = new SpeechRecognition();
     recognitionRef.current     = recognition;
-    recognition.lang           = 'en-IN';
+    recognition.lang           = 'en-US';
     recognition.interimResults = false;
     recognition.continuous     = false;
 
@@ -328,7 +328,9 @@ export default function AIAssistant() {
     };
 
     // [CHANGED] 300ms warmup delay — prevents microphone cutting the first syllable
-    setTimeout(() => recognition.start(), 300);
+    // Show mic is warming up, then start
+toast('🎤 Listening in 1 second…', { duration: 900, icon: '🎙️' });
+setTimeout(() => recognition.start(), 900);
   };
 
   const handleAction = async (action) => {

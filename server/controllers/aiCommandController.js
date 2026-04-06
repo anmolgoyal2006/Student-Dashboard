@@ -89,7 +89,10 @@ User: "I scored 45 out of 50 in Physics midterm"
 → {"action":"add","entity":"marks","data":{"subjectName":"Physics","examType":"midterm","marksObtained":45,"maxMarks":50},"message":"Midterm marks added for Physics."}
 
 User: "What will my CGPA be if I score 7.5 next semester"
-→ {"action":"answer","entity":"none","data":{"hypotheticalSGPA":7.5},"message":"I'll calculate your predicted CGPA with a 7.5 SGPA next semester."}
+→ {"action":"answer","entity":"semester","data":{"hypotheticalSGPA":7.5,"query":"cgpa_predict"},"message":"Calculating your predicted CGPA."}
+
+User: "What will my cgpa if I score 6 GPA next semester"
+→ {"action":"answer","entity":"semester","data":{"hypotheticalSGPA":6,"query":"cgpa_predict"},"message":"Calculating your predicted CGPA."}
 
 User: "How many classes do I need to reach 75% in Maths"
 → {"action":"answer","entity":"none","data":{"subjectName":"Maths","query":"attendance_needed"},"message":"Let me check your Maths attendance and calculate what you need."}
@@ -208,7 +211,7 @@ exports.handleCommand = async (req, res) => {
     // ── Step 3: action === "answer" — direct conversational response ───────
     if (parsed.action === 'answer') {
       // If it's a CGPA prediction query, enrich the answer with real data
-      if (parsed.data?.hypotheticalSGPA) {
+      if (parsed.data?.hypotheticalSGPA  || parsed.data?.query === 'cgpa_predict') {
         const userId   = req.user._id;
         const semesters = await Semester.find({ student: userId }).sort({ semesterNumber: 1 });
         const sgpas     = semesters.map(s => s.sgpa).filter(Boolean);
