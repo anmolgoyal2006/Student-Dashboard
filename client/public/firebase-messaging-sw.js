@@ -1,8 +1,7 @@
 // firebase-messaging-sw.js
 // Uses compat version — required for service workers
-
-importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/12.11.0/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/12.11.0/firebase-messaging-compat.js');
 
 // Config must be duplicated here — service workers have no access to env vars
 // Replace these values with your actual Firebase config

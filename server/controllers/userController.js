@@ -164,3 +164,15 @@ exports.resetPassword = async (req, res) => {
     res.json({ message: 'Password reset successfully. You can now log in.' });
   } catch (err) { res.status(500).json({ message: err.message }); }
 };
+
+exports.saveToken = async (req, res) => {
+  try {
+    const { token } = req.body;
+    if (!token) return res.status(400).json({ message: 'Token required' });
+
+    await User.findByIdAndUpdate(req.user._id, { fcmToken: token });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to save token' });
+  }
+};

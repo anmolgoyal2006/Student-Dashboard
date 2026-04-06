@@ -34,35 +34,43 @@ const AppLayout = ({ children }) => (
 );
 
 export default function App() {
+  const { isLoggedIn } = useAuth();
 
-  useEffect(() => {
-    const initFCM = async () => {
-      try {
-        const token = await getFCMToken();
-        if (token) {
-          await axios.post('/api/notifications/token', { token }, { withCredentials: true });
-        }
-      } catch (err) {
-        console.error('[FCM Init]', err.message);
+  // AFTER
+useEffect(() => {
+  if (!isLoggedIn) return;                          // ← wait for auth
+
+  const initFCM = async () => {
+    try {
+      const token = await getFCMToken();
+      if (token) {
+        await axios.post(
+         `${process.env.REACT_APP_API_URL}/api/user/save-token`,// ← fixed URL
+          { token },
+          { withCredentials: true }
+        );
+        console.log('[FCM] Token saved');
       }
-    };
+    } catch (err) {
+      console.error('[FCM Init]', err.message);
+    }
+  };
 
-    const listenForMessages = async () => {
-      try {
-        const payload = await onMessageListener();
-        const { title, body } = payload?.notification || {};
-        if (title || body) {
-          toast(`🔔 ${title}: ${body}`, { duration: 5000 });
-        }
-      } catch (err) {
-        console.error('[FCM Listener]', err.message);
+  const listenForMessages = async () => {
+    try {
+      const payload = await onMessageListener();
+      const { title, body } = payload?.notification || {};
+      if (title || body) {
+        toast(`🔔 ${title}: ${body}`, { duration: 5000 });
       }
-    };
+    } catch (err) {
+      console.error('[FCM Listener]', err.message);
+    }
+  };
 
-    initFCM();
-    listenForMessages();
-  }, []);
-
+  initFCM();
+  listenForMessages();
+}, [isLoggedIn]);                                   // ← re-runs on login
   return (
     <BrowserRouter>
       <Toaster position="top-right" />
