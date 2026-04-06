@@ -23,7 +23,7 @@ export async function getFCMToken() {
     }
 
     const token = await getToken(messaging, {
-      vapidKey: process.env.REACT_APP_FIREBASE_VAPID_KEY,
+      vapidKey: process.env.REACT_APP_VAPID_KEY,
     });
 
     if (token) {
