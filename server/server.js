@@ -22,7 +22,7 @@ app.use(cors({
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: false,
+  credentials: true,
 }));
 
 // Handle ALL preflight requests explicitly  ← Fix 1

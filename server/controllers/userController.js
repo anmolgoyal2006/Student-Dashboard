@@ -167,6 +167,9 @@ exports.resetPassword = async (req, res) => {
 
 exports.saveToken = async (req, res) => {
   try {
+    console.log("👉 BODY:", req.body);     // ✅ ADD THIS
+  console.log("👉 USER:", req.user);     // ✅ ADD THIS
+
     const { token } = req.body;
     if (!token) return res.status(400).json({ message: 'Token required' });
 

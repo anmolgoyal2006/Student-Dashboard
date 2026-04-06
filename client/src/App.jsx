@@ -44,11 +44,17 @@ useEffect(() => {
     try {
       const token = await getFCMToken();
       if (token) {
-        await axios.post(
-         `${process.env.REACT_APP_API_URL}/api/user/save-token`,// ← fixed URL
-          { token },
-          { withCredentials: true }
-        );
+        const jwt = localStorage.getItem("token");
+
+await axios.post(
+  `${process.env.REACT_APP_API_URL}/user/save-token`,
+  { token },
+  {
+    headers: {
+      Authorization: `Bearer ${jwt}`
+    }
+  }
+);
         console.log('[FCM] Token saved');
       }
     } catch (err) {

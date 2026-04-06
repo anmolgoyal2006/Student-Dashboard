@@ -16,21 +16,19 @@ const messaging = getMessaging(app);
 // ─── Get FCM token ────────────────────────────────────────────────────────────
 export async function getFCMToken() {
   try {
-    const permission = await Notification.requestPermission();
-    if (permission !== 'granted') {
-      console.warn('[FCM] Notification permission denied.');
-      return null;
-    }
+    // Register service worker explicitly — required for getToken to work
+    const swRegistration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
 
     const token = await getToken(messaging, {
-      vapidKey: process.env.REACT_APP_VAPID_KEY,
+      vapidKey             : process.env.REACT_APP_VAPID_KEY,  // must be set in .env
+      serviceWorkerRegistration: swRegistration,
     });
 
     if (token) {
       console.log('[FCM] Token:', token);
       return token;
     } else {
-      console.warn('[FCM] No token received.');
+      console.warn('[FCM] No token received — check VAPID key and SW registration.');
       return null;
     }
   } catch (err) {

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import NotificationBell from './NotificationBell';
 
 // ── Define SettingsIcon before using it ──────────────────
 function SettingsIcon() {
@@ -90,23 +91,24 @@ export default function Sidebar() {
       <aside className={`sidebar${open ? ' open' : ''}`}>
         <div className="sidebar-logo">StudentAI</div>
 
-        <div className="sidebar-user">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{
-              width: 34, height: 34, borderRadius: '50%',
-              background: 'linear-gradient(135deg, #6366f1, #818cf8)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 13, fontWeight: 700, color: '#fff',
-              flexShrink: 0, boxShadow: '0 0 12px rgba(129,140,248,0.3)',
-            }}>
-              {initials}
-            </div>
-            <div style={{ minWidth: 0 }}>
-              <div className="sidebar-user-name">{user?.name}</div>
-              <div className="sidebar-user-email">{user?.email}</div>
-            </div>
-          </div>
-        </div>
+ <div className="sidebar-user">
+<div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+  <div style={{
+    width: 34, height: 34, borderRadius: '50%',
+    background: 'linear-gradient(135deg, #6366f1, #818cf8)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    fontSize: 13, fontWeight: 700, color: '#fff',
+    flexShrink: 0, boxShadow: '0 0 12px rgba(129,140,248,0.3)',
+  }}>
+    {initials}
+  </div>
+  <div style={{ minWidth: 0, flex: 1 }}>
+    <div className="sidebar-user-name">{user?.name}</div>
+    <div className="sidebar-user-email">{user?.email}</div>
+  </div>
+  <NotificationBell />
+</div>
+</div>
 
         <div className="sidebar-section-label">Navigation</div>
 

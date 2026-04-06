@@ -4,6 +4,8 @@ const Attendance = require('../models/Attendance');
 const Marks      = require('../models/Marks');
 const Task       = require('../models/Task');
 const Semester   = require('../models/Semester.model');
+const { sendNotification } = require('../utils/sendNotification');
+const User = require('../models/User');
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
@@ -524,11 +526,15 @@ else if (parsed.entity === 'attendance') {
           { status },
           { upsert: true, new: true, setDefaultsOnInsert: true }
         );
-
+     const userForNotif = await User.findById(userId);
+if (userForNotif?.fcmToken) {
+  await sendNotification(userForNotif.fcmToken, '📋 Attendance Marked', parsed.message);
+}
       } else if (parsed.action === 'get') {
         result = await Attendance.find({ userId }).populate('subjectId', 'name');
       }
     }
+      
 
     // ── MARKS ─────────────────────────────────────────────────────────────
     else if (parsed.entity === 'marks') {
@@ -540,6 +546,10 @@ else if (parsed.entity === 'attendance') {
           delete parsed.data.subjectName;
         }
         result = await Marks.create({ ...parsed.data, userId });
+        const userForNotif = await User.findById(userId);
+if (userForNotif?.fcmToken) {
+  await sendNotification(userForNotif.fcmToken, '📊 Marks Added', parsed.message);
+}
 
       } else if (parsed.action === 'get') {
         const marksFound = await Marks.find({ userId }).populate('subjectId', 'name');
@@ -574,6 +584,10 @@ else if (parsed.entity === 'attendance') {
           return res.json({ success: true, action: 'add', entity: 'task', message: parsed.message, data: results });
         }
         result = await Task.create({ ...parsed.data, user: userId });
+        const userForNotif = await User.findById(userId);
+if (userForNotif?.fcmToken) {
+  await sendNotification(userForNotif.fcmToken, '✅ Task Added', parsed.message);
+}
 
       } else if (parsed.action === 'delete') {
         if (!parsed.data.title) return res.json({ success: false, message: 'Please specify which task to delete.' });
