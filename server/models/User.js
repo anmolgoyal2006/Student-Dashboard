@@ -11,6 +11,7 @@ const userSchema = new mongoose.Schema({
   resetPasswordExpires: { type: Date,   default: undefined },
    googleId: { type: String, default: null },   // ← ADD
   avatar:   { type: String, default: '' },      // ← ADD
+  fcmToken: { type: String, default: null },  
 }, { timestamps: true });
 
 module.exports = mongoose.model('User', userSchema);

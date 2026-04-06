@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
+import { useEffect } from 'react';
 import { useAuth } from './context/AuthContext';
 import Sidebar    from './components/Sidebar';
 import Login      from './pages/Login';
@@ -13,9 +14,12 @@ import Scheduler  from './pages/Scheduler';
 import ProfileSettings from './pages/ProfileSettings';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword  from './pages/ResetPassword';
-import AIAssistant from './pages/AIAssistant'; 
+import AIAssistant from './pages/AIAssistant';
 import Prediction from './pages/Prediction';
-import LoginSuccess from './pages/LoginSuccess'; 
+import LoginSuccess from './pages/LoginSuccess';
+import { getFCMToken, onMessageListener } from './firebase';
+import toast from 'react-hot-toast';
+import axios from 'axios';
 
 const ProtectedRoute = ({ children }) => {
   const { isLoggedIn } = useAuth();
@@ -30,26 +34,50 @@ const AppLayout = ({ children }) => (
 );
 
 export default function App() {
+
+  useEffect(() => {
+    const initFCM = async () => {
+      try {
+        const token = await getFCMToken();
+        if (token) {
+          await axios.post('/api/notifications/token', { token }, { withCredentials: true });
+        }
+      } catch (err) {
+        console.error('[FCM Init]', err.message);
+      }
+    };
+
+    const listenForMessages = async () => {
+      try {
+        const payload = await onMessageListener();
+        const { title, body } = payload?.notification || {};
+        if (title || body) {
+          toast(`🔔 ${title}: ${body}`, { duration: 5000 });
+        }
+      } catch (err) {
+        console.error('[FCM Listener]', err.message);
+      }
+    };
+
+    initFCM();
+    listenForMessages();
+  }, []);
+
   return (
     <BrowserRouter>
       <Toaster position="top-right" />
       <Routes>
         <Route path="/login"  element={<Login />} />
         <Route path="/signup" element={<Signup />} />
-
-         <Route path="/forgot-password"       element={<ForgotPassword />} />
-         
-<Route path="/reset-password/:token" element={<ResetPassword />}  />
-
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password/:token" element={<ResetPassword />} />
         <Route path="/" element={
           <ProtectedRoute><AppLayout><Dashboard /></AppLayout></ProtectedRoute>
         } />
         <Route path="/login-success" element={<LoginSuccess />} />
-
-
-<Route path="/prediction" element={
-  <ProtectedRoute><AppLayout><Prediction /></AppLayout></ProtectedRoute>
-} />
+        <Route path="/prediction" element={
+          <ProtectedRoute><AppLayout><Prediction /></AppLayout></ProtectedRoute>
+        } />
         <Route path="/timetable" element={
           <ProtectedRoute><AppLayout><Timetable /></AppLayout></ProtectedRoute>
         } />
@@ -65,15 +93,12 @@ export default function App() {
         <Route path="/scheduler" element={
           <ProtectedRoute><AppLayout><Scheduler /></AppLayout></ProtectedRoute>
         } />
-
-         <Route path="/ai-assistant" element={
-  <ProtectedRoute><AppLayout><AIAssistant /></AppLayout></ProtectedRoute>
-} />
-         <Route path="/profile" element={
-  <ProtectedRoute>
-    <AppLayout><ProfileSettings /></AppLayout>
-  </ProtectedRoute>
-} />
+        <Route path="/ai-assistant" element={
+          <ProtectedRoute><AppLayout><AIAssistant /></AppLayout></ProtectedRoute>
+        } />
+        <Route path="/profile" element={
+          <ProtectedRoute><AppLayout><ProfileSettings /></AppLayout></ProtectedRoute>
+        } />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

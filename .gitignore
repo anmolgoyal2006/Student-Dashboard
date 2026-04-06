@@ -4,3 +4,4 @@ node_modules/
 build/
 dist/
 *.log
+server/config/serviceAccountKey.json
