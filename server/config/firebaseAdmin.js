@@ -1,20 +1,11 @@
 const admin = require('firebase-admin');
 
-let serviceAccount;
-
-if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-  // ✅ Production (Render)
-  serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-} else {
-  // ✅ Local fallback (optional)
-  serviceAccount = require('./serviceAccountKey.json');
-}
-
 if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.cert({
-      ...serviceAccount,
-      private_key: serviceAccount.private_key.replace(/\\n/g, '\n'),
+      projectId: process.env.FIREBASE_PROJECT_ID,
+      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
     }),
   });
 }
