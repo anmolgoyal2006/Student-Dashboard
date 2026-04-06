@@ -230,7 +230,8 @@ exports.handleCommand = async (req, res) => {
     }
 
     // ── Step 3: action === "answer" — direct conversational response ───────
-   const userId = req.user._id;
+ const userId = req.user._id;
+let result   = null;
 
     if (parsed.action === 'answer') {
 
@@ -385,11 +386,46 @@ if (parsed.data?.query === 'marks_status' || parsed.entity === 'marks') {
           return res.json({ success: true, action: 'add', entity: 'subject', message: msg, data: added });
         }
         // Single insert
-        const r = await createSubject(parsed.data, userId);
-        if (r.skipped) return res.json({ success: false, message: `Subject "${parsed.data.name}" already exists.` });
-        result = r;
+       const r = await createSubject(parsed.data, userId);
+    if (r.skipped) {
+      // Subject exists — if new schedule slots provided, merge them in
+      if (parsed.data.schedule && Array.isArray(parsed.data.schedule)) {
+        const existing   = await Subject.findOne({ userId, name: new RegExp(parsed.data.name, 'i') });
+        const newDays    = parsed.data.schedule.map(sc => sc.day);
+        const keptSlots  = existing.schedule.filter(sc => !newDays.includes(sc.day));
+        existing.schedule = [...keptSlots, ...parsed.data.schedule];
+        result = await existing.save();
+        return res.json({
+          success: true, action: 'add', entity: 'subject',
+          message: `Added ${parsed.data.name} schedule on ${newDays.join(', ')}.`,
+          data: result,
+        });
+      }
+      return res.json({ success: false, message: `Subject "${parsed.data.name}" already exists.` });
+    }
+    result = r;
 
-      } else if (parsed.action === 'delete') {
+      } else if (parsed.action === 'update') {
+  if (!parsed.data.name) return res.json({ success: false, message: 'Please specify which subject to update.' });
+
+  const s = await Subject.findOne({ userId, name: new RegExp(parsed.data.name, 'i') });
+  if (!s) return res.json({ success: false, message: `Subject "${parsed.data.name}" not found.` });
+
+  // If schedule update — replace entire schedule or merge by day
+  if (parsed.data.schedule && Array.isArray(parsed.data.schedule)) {
+    // Remove old slots for the days being updated, add new ones
+    const updatedDays = parsed.data.schedule.map(sc => sc.day);
+    const keptSlots   = s.schedule.filter(sc => !updatedDays.includes(sc.day));
+    s.schedule        = [...keptSlots, ...parsed.data.schedule];
+  }
+
+  // Update other fields if provided
+  if (parsed.data.credits)    s.credits    = parsed.data.credits;
+  if (parsed.data.instructor) s.instructor = parsed.data.instructor;
+  if (parsed.data.code)       s.code       = parsed.data.code;
+
+  result = await s.save();
+}else if (parsed.action === 'delete') {
         if (!parsed.data.name) return res.json({ success: false, message: 'Please specify which subject to delete.' });
         const s = await Subject.findOne({ userId, name: new RegExp(parsed.data.name, 'i') });
         if (s) await Subject.findByIdAndDelete(s._id);
