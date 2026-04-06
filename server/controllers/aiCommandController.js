@@ -191,7 +191,7 @@ exports.handleCommand = async (req, res) => {
   try {
     // ── Step 1: Call Groq ──────────────────────────────────────────────────
     const completion = await groq.chat.completions.create({
-      model      : 'llama-3.3-70b-versatile',
+      model     : 'llama-3.1-8b-instant',
       messages   : [
         { role: 'system', content: buildPrompt() },
         { role: 'user',   content: userInput },
@@ -302,8 +302,12 @@ exports.handleCommand = async (req, res) => {
             schedule: s.schedule.filter(sc => sc.day === dayAbbr),
           }));
           const msg = todayClasses.length
-            ? `You have ${todayClasses.length} class${todayClasses.length > 1 ? 'es' : ''} today.`
-            : 'No classes scheduled for today.';
+  ? `You have ${todayClasses.length} class${todayClasses.length > 1 ? 'es' : ''} today:\n${
+      todayClasses.map(c =>
+        `• ${c.name} — ${c.schedule.map(s => `${s.startTime}–${s.endTime}`).join(', ')}`
+      ).join('\n')
+    }`
+  : 'No classes scheduled for today.';
           return res.json({ success: true, action: 'get', entity: 'subject', message: msg, data: todayClasses });
         }
         result = await Subject.find({ userId });
