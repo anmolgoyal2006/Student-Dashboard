@@ -197,7 +197,7 @@ exports.handleCommand = async (req, res) => {
         { role: 'user',   content: userInput },
       ],
       temperature: 0.1,
-      max_tokens : 700,
+      max_tokens : 400,
     });
 
     const raw = completion.choices[0]?.message?.content?.trim() ?? '';
@@ -430,8 +430,14 @@ else if (parsed.entity === 'attendance') {
       data   : result,
     });
 
-  } catch (err) {
-    console.error('[AI Command Error]', err.message);
-    return res.status(500).json({ ...FALLBACK, message: 'Server error. Please try again.' });
+  }catch (err) {
+  console.error('[AI Command Error]', err.message);
+  if (err.status === 429 || err.message?.includes('rate_limit')) {
+    return res.status(429).json({
+      ...FALLBACK,
+      message: 'Daily AI limit reached. Please try again in a few minutes.',
+    });
   }
+  return res.status(500).json({ ...FALLBACK, message: 'Server error. Please try again.' });
+}
 };
