@@ -104,10 +104,24 @@ User: "Add high priority task to submit project by Friday"
 User: "What's my attendance for DAA"
 → {"action":"answer","entity":"attendance","data":{"subjectName":"DAA","query":"attendance_status"},"message":"Fetching DAA attendance."}
 
+// Add to EXAMPLES in buildPrompt():
+User: "tell my marks in Discrete Mathematics in mid sem"
+→ {"action":"answer","entity":"marks","data":{"subjectName":"Discrete Mathematics","examType":"midterm","query":"marks_status"},"message":"Fetching Discrete Mathematics midterm marks."}
+
+User: "what are my marks"
+→ {"action":"answer","entity":"marks","data":{"query":"marks_status"},"message":"Fetching all your marks."}
+
+User: "show me my final exam marks for Physics"
+→ {"action":"answer","entity":"marks","data":{"subjectName":"Physics","examType":"final","query":"marks_status"},"message":"Fetching Physics final marks."}
+
 User: "How many classes did I miss in Maths"
 → {"action":"answer","entity":"attendance","data":{"subjectName":"Maths","query":"attendance_status"},"message":"Checking Maths attendance."}
-`;   // ← single backtick here, closing the template literal
+`;  
+
+// ← single backtick here, closing the template literal
 }    // ← closing the buildPrompt function
+
+
 
 function getNextFriday() {
   const d = new Date();
@@ -216,8 +230,9 @@ exports.handleCommand = async (req, res) => {
     }
 
     // ── Step 3: action === "answer" — direct conversational response ───────
-     if (parsed.action === 'answer') {
-  const userId = req.user._id;
+   const userId = req.user._id;
+
+    if (parsed.action === 'answer') {
 
   // 1. CGPA prediction
   if (parsed.data?.hypotheticalSGPA || parsed.data?.query === 'cgpa_predict') {
@@ -251,6 +266,50 @@ exports.handleCommand = async (req, res) => {
     }
   }
 
+    // Add this INSIDE the answer block, after the attendance_status handler:
+
+// 3. Marks query for specific subject
+if (parsed.data?.query === 'marks_status' || parsed.entity === 'marks') {
+  const subjectName = parsed.data?.subjectName;
+  const examType    = parsed.data?.examType;
+
+  let marksQuery = { userId };
+
+  if (subjectName) {
+    const subject = await Subject.findOne({ userId, name: new RegExp(subjectName, 'i') });
+    if (!subject) {
+      return res.json({
+        success: true, action: 'answer', entity: 'none',
+        message: `No subject found matching "${subjectName}".`,
+        data: {},
+      });
+    }
+    marksQuery.subjectId = subject._id;
+  }
+
+  if (examType) marksQuery.examType = examType;
+
+  const marksList = await Marks.find(marksQuery).populate('subjectId', 'name');
+
+  if (!marksList.length) {
+    return res.json({
+      success: true, action: 'answer', entity: 'none',
+      message: `No marks found${subjectName ? ` for ${subjectName}` : ''}${examType ? ` (${examType})` : ''}.`,
+      data: {},
+    });
+  }
+
+  const lines = marksList.map(m => {
+    const pct = ((m.marksObtained / m.maxMarks) * 100).toFixed(1);
+    return `• ${m.subjectId?.name || 'Unknown'} — ${m.examType}: ${m.marksObtained}/${m.maxMarks} (${pct}%) | Grade Point: ${m.gradePoint}`;
+  });
+
+  return res.json({
+    success: true, action: 'answer', entity: 'none',
+    message: `📊 Your marks:\n${lines.join('\n')}`,
+    data: { marks: marksList },
+  });
+}
   // 3. Study suggestion
   if (parsed.data?.query === 'study_suggestion' || userInput.toLowerCase().match(/study|focus|prepare|prioritize/)) {
     const [subjects, tasks, marks, attendance] = await Promise.all([
@@ -422,7 +481,18 @@ else if (parsed.entity === 'attendance') {
         result = await Marks.create({ ...parsed.data, userId });
 
       } else if (parsed.action === 'get') {
-        result = await Marks.find({ userId }).populate('subjectId', 'name');
+        const marksFound = await Marks.find({ userId }).populate('subjectId', 'name');
+        if (!marksFound.length) {
+          return res.json({ success: true, action: 'answer', entity: 'none', message: 'No marks added yet.', data: {} });
+        }
+        const lines = marksFound.map(m =>
+          `• ${m.subjectId?.name} — ${m.examType}: ${m.marksObtained}/${m.maxMarks} (${((m.marksObtained/m.maxMarks)*100).toFixed(1)}%)`
+        );
+        return res.json({
+          success: true, action: 'answer', entity: 'none',
+          message: `📊 Your marks:\n${lines.join('\n')}`,
+          data: { marks: marksFound },
+        });
       }
     }
 
