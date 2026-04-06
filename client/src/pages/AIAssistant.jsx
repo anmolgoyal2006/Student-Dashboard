@@ -142,7 +142,7 @@ function MessageBubble({ msg, mode }) {
         )}
 
         {/* Show "dashboard updated" only for real data mutations */}
-        {msg.entity && msg.entity !== 'none' && msg.action !== 'answer' && (
+       {msg.entity && msg.entity !== 'none' && msg.action === 'add' && (
           <div style={{
             marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border)',
             fontSize: 11, color: accent, display: 'flex', alignItems: 'center', gap: 4,

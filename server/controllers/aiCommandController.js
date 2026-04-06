@@ -99,8 +99,14 @@ User: "How many classes do I need to reach 75% in Maths"
 
 User: "Add high priority task to submit project by Friday"
 → {"action":"add","entity":"task","data":{"title":"Submit project","priority":"high","dueDate":"${getNextFriday()}"},"message":"Task added: Submit project by Friday."}
-`;
-}
+
+User: "What's my attendance for DAA"
+→ {"action":"answer","entity":"attendance","data":{"subjectName":"DAA","query":"attendance_status"},"message":"Fetching DAA attendance."}
+
+User: "How many classes did I miss in Maths"
+→ {"action":"answer","entity":"attendance","data":{"subjectName":"Maths","query":"attendance_status"},"message":"Checking Maths attendance."}
+`;   // ← single backtick here, closing the template literal
+}    // ← closing the buildPrompt function
 
 function getNextFriday() {
   const d = new Date();
@@ -229,7 +235,7 @@ exports.handleCommand = async (req, res) => {
       }
 
       // Attendance needed query
-      if (parsed.data?.query === 'attendance_needed' && parsed.data?.subjectName) {
+      if ((parsed.data?.query === 'attendance_status' || parsed.data?.query === 'attendance_needed') && parsed.data?.subjectName) {
         const userId  = req.user._id;
         const subject = await Subject.findOne({ userId, name: new RegExp(parsed.data.subjectName, 'i') });
         if (subject) {
@@ -305,8 +311,35 @@ exports.handleCommand = async (req, res) => {
     }
 
     // ── ATTENDANCE ────────────────────────────────────────────────────────
-    else if (parsed.entity === 'attendance') {
-      if (parsed.action === 'add') {
+else if (parsed.entity === 'attendance') {
+
+  // [ADDED] Subject-specific attendance query
+  if (parsed.action === 'get' && parsed.data?.subjectName) {
+    const subject = await Subject.findOne({ userId, name: new RegExp(parsed.data.subjectName, 'i') });
+    if (!subject) {
+      return res.json({ success: false, message: `Subject "${parsed.data.subjectName}" not found.` });
+    }
+    const records = await Attendance.find({ userId, subjectId: subject._id, status: { $ne: 'cancelled' } });
+    const total   = records.length;
+    const present = records.filter(r => r.status === 'present').length;
+    const absent  = total - present;
+    const pct     = total ? ((present / total) * 100).toFixed(1) : 0;
+    const needed  = present / total < 0.75 && total > 0
+      ? Math.ceil((0.75 * total - present) / 0.25) : 0;
+    const status  = pct >= 75 ? '✅ Safe' : pct >= 60 ? '⚠️ At Risk' : '🚨 Critical';
+
+    const msg = total === 0
+      ? `No attendance records found for ${subject.name}.`
+      : `${subject.name} attendance: ${present}/${total} classes (${pct}%) — ${status}.${needed > 0 ? ` Attend ${needed} more to reach 75%.` : ''}`;
+
+    return res.json({
+      success: true, action: 'answer', entity: 'none',
+      message: msg,
+      data   : { total, present, absent, percentage: pct, needed },
+    });
+  }
+
+  if (parsed.action === 'add') {
         if (parsed.data.subjectName && !parsed.data.subjectId) {
           const s = await Subject.findOne({ userId, name: new RegExp(parsed.data.subjectName, 'i') });
           if (!s) return res.json({ success: false, message: `Subject "${parsed.data.subjectName}" not found. Add it first.` });
