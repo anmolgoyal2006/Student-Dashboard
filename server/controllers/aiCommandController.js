@@ -71,6 +71,7 @@ FIELD RULES:
 - priority: urgent/asap/important→"high" | normal→"medium" | later/someday→"low"
 - grade: "A plus"→"A+", "B plus"→"B+", "O"/"outstanding"→"O", etc.
 - Always use "subjectName" (string) for attendance and marks — never subjectId
+-Study/focus/prepare questions→{action:"answer",entity:"none",data:{query:"study_suggestion"},"message":"Let me check your data."}
 
 UNKNOWN INTENT:
 { "action":"unknown","entity":"none","data":{},"message":"I couldn't understand that. Can you rephrase?" }
@@ -215,57 +216,101 @@ exports.handleCommand = async (req, res) => {
     }
 
     // ── Step 3: action === "answer" — direct conversational response ───────
-    if (parsed.action === 'answer') {
-      // If it's a CGPA prediction query, enrich the answer with real data
-      if (parsed.data?.hypotheticalSGPA  || parsed.data?.query === 'cgpa_predict') {
-        const userId   = req.user._id;
-        const semesters = await Semester.find({ student: userId }).sort({ semesterNumber: 1 });
-        const sgpas     = semesters.map(s => s.sgpa).filter(Boolean);
-        const hypo      = parseFloat(parsed.data.hypotheticalSGPA);
+     if (parsed.action === 'answer') {
+  const userId = req.user._id;
 
-        if (sgpas.length && !isNaN(hypo)) {
-          const allSGPAs      = [...sgpas, hypo];
-          const predictedCGPA = (allSGPAs.reduce((a, b) => a + b, 0) / allSGPAs.length).toFixed(2);
-          return res.json({
-            success: true, action: 'answer', entity: 'none',
-            message: `If you score ${hypo} SGPA next semester, your CGPA will be ${predictedCGPA} (over ${allSGPAs.length} semesters).`,
-            data   : { predictedCGPA, currentSemesters: sgpas.length, hypotheticalSGPA: hypo },
-          });
-        }
-      }
-
-      // Attendance needed query
-      if ((parsed.data?.query === 'attendance_status' || parsed.data?.query === 'attendance_needed') && parsed.data?.subjectName) {
-        const userId  = req.user._id;
-        const subject = await Subject.findOne({ userId, name: new RegExp(parsed.data.subjectName, 'i') });
-        if (subject) {
-          const records = await Attendance.find({ userId, subjectId: subject._id, status: { $ne: 'cancelled' } });
-          const total   = records.length;
-          const present = records.filter(r => r.status === 'present').length;
-          const pct     = total ? (present / total * 100).toFixed(1) : 0;
-          const needed  = total && present / total < 0.75
-            ? Math.ceil((0.75 * total - present) / 0.25)
-            : 0;
-          const msg = needed > 0
-            ? `You have ${pct}% attendance in ${parsed.data.subjectName}. Attend ${needed} more consecutive classes to reach 75%.`
-            : `You're safe! ${parsed.data.subjectName} attendance is ${pct}%.`;
-          return res.json({ success: true, action: 'answer', entity: 'none', message: msg, data: { total, present, pct, needed } });
-        }
-      }
-
-      // Generic answer — return as-is
+  // 1. CGPA prediction
+  if (parsed.data?.hypotheticalSGPA || parsed.data?.query === 'cgpa_predict') {
+    const semesters = await Semester.find({ student: userId }).sort({ semesterNumber: 1 });
+    const sgpas     = semesters.map(s => s.sgpa).filter(Boolean);
+    const hypo      = parseFloat(parsed.data.hypotheticalSGPA);
+    if (sgpas.length && !isNaN(hypo)) {
+      const allSGPAs      = [...sgpas, hypo];
+      const predictedCGPA = (allSGPAs.reduce((a, b) => a + b, 0) / allSGPAs.length).toFixed(2);
       return res.json({
-        success: true,
-        action : 'answer',
-        entity : 'none',
-        message: parsed.message,
-        data   : parsed.data || null,
+        success: true, action: 'answer', entity: 'none',
+        message: `If you score ${hypo} SGPA next semester, your CGPA will be ${predictedCGPA} (over ${allSGPAs.length} semesters).`,
+        data   : { predictedCGPA, currentSemesters: sgpas.length, hypotheticalSGPA: hypo },
       });
     }
+  }
 
-    // ── Step 4: DB actions ────────────────────────────────────────────────
-    const userId = req.user._id;
-    let result   = null;
+  // 2. Attendance status/needed
+  if ((parsed.data?.query === 'attendance_status' || parsed.data?.query === 'attendance_needed') && parsed.data?.subjectName) {
+    const subject = await Subject.findOne({ userId, name: new RegExp(parsed.data.subjectName, 'i') });
+    if (subject) {
+      const records = await Attendance.find({ userId, subjectId: subject._id, status: { $ne: 'cancelled' } });
+      const total   = records.length;
+      const present = records.filter(r => r.status === 'present').length;
+      const pct     = total ? (present / total * 100).toFixed(1) : 0;
+      const needed  = total && present / total < 0.75 ? Math.ceil((0.75 * total - present) / 0.25) : 0;
+      const msg     = needed > 0
+        ? `You have ${pct}% attendance in ${parsed.data.subjectName}. Attend ${needed} more consecutive classes to reach 75%.`
+        : `You're safe! ${parsed.data.subjectName} attendance is ${pct}%.`;
+      return res.json({ success: true, action: 'answer', entity: 'none', message: msg, data: { total, present, pct, needed } });
+    }
+  }
+
+  // 3. Study suggestion
+  if (parsed.data?.query === 'study_suggestion' || userInput.toLowerCase().match(/study|focus|prepare|prioritize/)) {
+    const [subjects, tasks, marks, attendance] = await Promise.all([
+      Subject.find({ userId }),
+      Task.find({ user: userId, status: { $ne: 'completed' } }).sort({ dueDate: 1 }).limit(3),
+      Marks.find({ userId }).populate('subjectId', 'name'),
+      Attendance.find({ userId, status: { $ne: 'cancelled' } }),
+    ]);
+
+    const attMap = {};
+    attendance.forEach(r => {
+      const id = r.subjectId?.toString();
+      if (!id) return;
+      if (!attMap[id]) attMap[id] = { total: 0, present: 0 };
+      attMap[id].total++;
+      if (r.status === 'present') attMap[id].present++;
+    });
+
+    let lowestAttSubject = null, lowestPct = 100;
+    subjects.forEach(s => {
+      const a = attMap[s._id.toString()];
+      if (a && a.total > 0) {
+        const pct = (a.present / a.total) * 100;
+        if (pct < lowestPct) { lowestPct = pct; lowestAttSubject = s.name; }
+      }
+    });
+
+    const marksMap = {};
+    marks.forEach(m => {
+      const name = m.subjectId?.name;
+      if (!name) return;
+      if (!marksMap[name]) marksMap[name] = { total: 0, max: 0 };
+      marksMap[name].total += m.marksObtained;
+      marksMap[name].max   += m.maxMarks;
+    });
+    let lowestMarksSubject = null, lowestPctMarks = 100;
+    Object.entries(marksMap).forEach(([name, v]) => {
+      const pct = v.max ? (v.total / v.max) * 100 : 100;
+      if (pct < lowestPctMarks) { lowestPctMarks = pct; lowestMarksSubject = name; }
+    });
+
+    const lines = ['📚 Here\'s what you should focus on today:\n'];
+    if (lowestAttSubject) lines.push(`• ⚠️ Attend ${lowestAttSubject} — attendance is ${lowestPct.toFixed(1)}%`);
+    if (lowestMarksSubject) lines.push(`• 📖 Study ${lowestMarksSubject} — scoring ${lowestPctMarks.toFixed(1)}% in marks`);
+    if (tasks.length) lines.push(`• ✅ Pending: "${tasks[0].title}"${tasks[0].dueDate ? ` (due ${new Date(tasks[0].dueDate).toLocaleDateString()})` : ''}`);
+    if (lines.length === 1) lines.push('• You\'re all caught up! Great work. 🎉');
+
+    return res.json({
+      success: true, action: 'answer', entity: 'none',
+      message: lines.join('\n'),
+      data: { lowestAttSubject, lowestMarksSubject, upcomingTask: tasks[0]?.title },
+    });
+  }
+
+  // 4. Generic answer fallback
+  return res.json({
+    success: true, action: 'answer', entity: 'none',
+    message: parsed.message, data: parsed.data || null,
+  });
+}
 
     // ── SUBJECT ──────────────────────────────────────────────────────────
     if (parsed.entity === 'subject') {
