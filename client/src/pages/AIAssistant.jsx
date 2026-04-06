@@ -3,6 +3,7 @@ import { aiChatService, aiCommandService } from '../services/apiServices';
 import { useGlobalData } from '../context/GlobalDataContext';
 import toast from 'react-hot-toast';
 
+// ─── Icons ────────────────────────────────────────────────────────────────────
 const BookIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
@@ -31,11 +32,6 @@ const SummarizeIcon = () => (
 const QuizIcon = () => (
   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-  </svg>
-);
-const SparkleIcon = () => (
-  <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
-    <path d="M12 2L9.5 9.5 2 12l7.5 2.5L12 22l2.5-7.5L22 12l-7.5-2.5z"/>
   </svg>
 );
 const ClipIcon = () => (
@@ -69,33 +65,12 @@ const SubjectIcon = () => (
   </svg>
 );
 
-// ─── Intent detection ─────────────────────────────────────────────────────────
-const ASSISTANT_PATTERNS = [
-  /\b(add|mark|update|delete|remove|log|record|set|schedule)\b/i,
-  /\b(attended|skipped|missed|bunked|absent|present)\b/i,
-  /\b(scored|got|obtained|marks|exam|midterm|quiz|final)\b/i,
-  /\b(task|assignment|deadline|due|priority|todo)\b/i,
-  /\b(subject|course|class|lecture|credit)\b/i,
-];
-
-function detectIntent(text) {
-  const hits = ASSISTANT_PATTERNS.filter(p => p.test(text)).length;
-  return hits >= 2 ? "assistant" : hits === 1 ? "likely-assistant" : "notes";
-}
-
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 function cleanTextForSpeech(text) {
   return text
-    .replace(/\*+/g, '')
-    .replace(/#/g, '')
-    .replace(/•/g, '')
-    .replace(/-{2,}/g, '')
-    .replace(/\n+/g, '. ')
-    .replace(/\s{2,}/g, ' ')
+    .replace(/\*+/g, '').replace(/#/g, '').replace(/•/g, '')
+    .replace(/-{2,}/g, '').replace(/\n+/g, '. ').replace(/\s{2,}/g, ' ')
     .trim();
-}
-
-function detectHypothetical(text) {
-  return /\bwhat if\b|\bif i\b|\bsuppose\b|\blet'?s say\b/i.test(text);
 }
 
 // ─── API calls ────────────────────────────────────────────────────────────────
@@ -119,67 +94,70 @@ async function callSmartAssistant(message) {
 
 // ─── Message bubble ───────────────────────────────────────────────────────────
 function MessageBubble({ msg, mode }) {
-  const isUser = msg.role === "user";
-  const accent = mode === "notes" ? "#10b981" : "var(--primary)";
+  const isUser = msg.role === 'user';
+  const accent = mode === 'notes' ? '#10b981' : 'var(--primary)';
 
   return (
     <div style={{
-      display: "flex",
-      flexDirection: isUser ? "row-reverse" : "row",
-      alignItems: "flex-end",
-      gap: "10px",
-      marginBottom: "16px",
-      animation: "aiBubbleIn 0.25s cubic-bezier(.34,1.56,.64,1) both",
+      display: 'flex', flexDirection: isUser ? 'row-reverse' : 'row',
+      alignItems: 'flex-end', gap: 10, marginBottom: 16,
+      animation: 'aiBubbleIn 0.25s cubic-bezier(.34,1.56,.64,1) both',
     }}>
       {!isUser && (
         <div style={{
-          width: 32, height: 32, borderRadius: "50%", flexShrink: 0,
-          background: mode === "notes"
-            ? "linear-gradient(135deg,#064e3b,#10b981)"
-            : "linear-gradient(135deg,var(--primary-dark),var(--primary))",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          color: "#fff",
+          width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
+          background: mode === 'notes'
+            ? 'linear-gradient(135deg,#064e3b,#10b981)'
+            : 'linear-gradient(135deg,var(--primary-dark),var(--primary))',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff',
         }}>
-          {mode === "notes" ? <BookIcon /> : <BotIcon />}
+          {mode === 'notes' ? <BookIcon /> : <BotIcon />}
         </div>
       )}
       <div style={{
-        maxWidth: "75%",
-        padding: "11px 15px",
-        borderRadius: isUser ? "18px 18px 4px 18px" : "4px 18px 18px 18px",
+        maxWidth: '75%', padding: '11px 15px',
+        borderRadius: isUser ? '18px 18px 4px 18px' : '4px 18px 18px 18px',
         background: isUser
-          ? (mode === "notes"
-              ? "linear-gradient(135deg,#064e3b,#10b981)"
-              : "linear-gradient(135deg,var(--primary-dark),var(--primary))")
-          : "var(--bg-3)",
-        border: isUser ? "none" : "1px solid var(--card-border)",
-        color: "var(--text)",
-        fontSize: "14px",
-        lineHeight: "1.6",
-        whiteSpace: "pre-wrap",
-        wordBreak: "break-word",
+          ? (mode === 'notes'
+              ? 'linear-gradient(135deg,#064e3b,#10b981)'
+              : 'linear-gradient(135deg,var(--primary-dark),var(--primary))')
+          : 'var(--bg-3)',
+        border: isUser ? 'none' : '1px solid var(--card-border)',
+        color: 'var(--text)', fontSize: 14, lineHeight: 1.6,
+        whiteSpace: 'pre-wrap', wordBreak: 'break-word',
       }}>
         {msg.text}
 
         {msg.sources?.length > 0 && (
-          <div style={{ marginTop: 8, borderTop: "1px solid var(--border)", paddingTop: 8 }}>
+          <div style={{ marginTop: 8, borderTop: '1px solid var(--border)', paddingTop: 8 }}>
             {msg.sources.map((s, i) => (
               <div key={i} style={{
-                fontSize: 11.5, color: "var(--muted)", marginTop: 4,
-                background: "rgba(255,255,255,0.03)", borderRadius: 6, padding: "4px 8px",
+                fontSize: 11.5, color: 'var(--muted)', marginTop: 4,
+                background: 'rgba(255,255,255,0.03)', borderRadius: 6, padding: '4px 8px',
               }}>
-                📄 <span style={{ color: "var(--primary)" }}>{s.filename}</span> — {s.preview}
+                📄 <span style={{ color: 'var(--primary)' }}>{s.filename}</span> — {s.preview}
               </div>
             ))}
           </div>
         )}
 
-        {msg.entity && (
+        {/* Show "dashboard updated" only for real data mutations */}
+        {msg.entity && msg.entity !== 'none' && msg.action !== 'answer' && (
           <div style={{
-            marginTop: 8, paddingTop: 8, borderTop: "1px solid var(--border)",
-            fontSize: 11, color: accent, display: "flex", alignItems: "center", gap: 4,
+            marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border)',
+            fontSize: 11, color: accent, display: 'flex', alignItems: 'center', gap: 4,
           }}>
             <CheckIcon /> Dashboard updated · {msg.entity}
+          </div>
+        )}
+
+        {/* For analytical answers, show a subtle info tag */}
+        {msg.action === 'answer' && (
+          <div style={{
+            marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border)',
+            fontSize: 11, color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: 4,
+          }}>
+            🧠 Calculated from your data
           </div>
         )}
       </div>
@@ -196,33 +174,32 @@ function CommandChip({ icon, label, example, onClick }) {
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
-        background: hovered ? "rgba(129,140,248,0.1)" : "var(--bg-3)",
-        border: "1px solid var(--card-border)",
-        borderRadius: 10, padding: "10px 13px", cursor: "pointer",
-        textAlign: "left", transition: "all 0.18s ease", color: "var(--text)",
-        transform: hovered ? "translateY(-2px)" : "none",
+        background: hovered ? 'rgba(129,140,248,0.1)' : 'var(--bg-3)',
+        border: '1px solid var(--card-border)', borderRadius: 10,
+        padding: '10px 13px', cursor: 'pointer', textAlign: 'left',
+        transition: 'all 0.18s ease', color: 'var(--text)',
+        transform: hovered ? 'translateY(-2px)' : 'none',
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-        <span style={{ color: "var(--primary)" }}>{icon}</span>
-        <span style={{ fontSize: 11, fontWeight: 600, color: "var(--primary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>{label}</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+        <span style={{ color: 'var(--primary)' }}>{icon}</span>
+        <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</span>
       </div>
-      <div style={{ fontSize: 12.5, color: "var(--muted)", fontStyle: "italic" }}>"{example}"</div>
+      <div style={{ fontSize: 12.5, color: 'var(--muted)', fontStyle: 'italic' }}>"{example}"</div>
     </button>
   );
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function AIAssistant() {
-  const [mode, setMode]               = useState("notes");
+  const [mode, setMode]               = useState('notes');
   const [listening, setListening]     = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(false);
   const recognitionRef                = useRef(null);
   const [messages, setMessages]       = useState({ notes: [], assistant: [] });
-  const [input, setInput]             = useState("");
+  const [input, setInput]             = useState('');
   const [loading, setLoading]         = useState(false);
   const [uploadedFile, setUploadedFile] = useState(null);
-  const [intentHint, setIntentHint]   = useState(null);
   const [switchAnim, setSwitchAnim]   = useState(false);
   const [notes, setNotes]             = useState([]);
   const [showNotes, setShowNotes]     = useState(false);
@@ -237,14 +214,8 @@ export default function AIAssistant() {
   useEffect(() => { loadNotes(); }, []);
 
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [currentMessages, loading]);
-
-  useEffect(() => {
-    if (!input.trim() || mode === "assistant") { setIntentHint(null); return; }
-    const intent = detectIntent(input);
-    setIntentHint(intent === "likely-assistant" ? "likely-assistant" : null);
-  }, [input, mode]);
 
   const loadNotes = async () => {
     try {
@@ -269,7 +240,6 @@ export default function AIAssistant() {
     if (newMode === mode) return;
     setSwitchAnim(true);
     setTimeout(() => { setMode(newMode); setSwitchAnim(false); }, 180);
-    setIntentHint(null);
   }, [mode]);
 
   const addMessage = (modeKey, msg) => {
@@ -278,71 +248,64 @@ export default function AIAssistant() {
 
   // ─── Speech ───────────────────────────────────────────────────────────────
   const speak = (text) => {
-    if (!voiceEnabled) return;
-    if (!window.speechSynthesis) return;
+    if (!voiceEnabled || !window.speechSynthesis) return;
     window.speechSynthesis.cancel();
-    const utter = new SpeechSynthesisUtterance(cleanTextForSpeech(text));
-    utter.lang  = "en-IN";
-    utter.rate  = mode === "notes" ? 1 : 1.05;
+    const utter    = new SpeechSynthesisUtterance(cleanTextForSpeech(text));
+    utter.lang     = 'en-IN';
+    utter.rate     = 1.05;
     window.speechSynthesis.speak(utter);
   };
 
-  const stopSpeaking = () => {
-    window.speechSynthesis?.cancel();
-  };
+  const stopSpeaking = () => window.speechSynthesis?.cancel();
 
   // ─── Send ─────────────────────────────────────────────────────────────────
- const handleSend = async (overrideText) => {
-  const text = (overrideText ?? input).trim();
-  if (!text || loading) return;
+  const handleSend = async (overrideText) => {
+    const text = (overrideText ?? input).trim();
+    if (!text || loading) return;
 
-  setInput('');
-  setIntentHint(null);
-  addMessage(mode, { role: 'user', text, id: Date.now() });
-  setLoading(true);
+    setInput('');
+    addMessage(mode, { role: 'user', text, id: Date.now() });
+    setLoading(true);
 
-  try {
-    if (mode === 'notes') {
-      const res = await callNotesAI('chat', { message: text });
-      addMessage('notes', {
-        role: 'ai', text: res.text, sources: res.sources, id: Date.now() + 1,
-      });
-      speak(res.text);
-
-    } else {
-      const isHypothetical = detectHypothetical(text);
-
-      if (isHypothetical) {
+    try {
+      if (mode === 'notes') {
+        // Notes mode — always goes to RAG/chat AI
         const res = await callNotesAI('chat', { message: text });
-        addMessage('assistant', {
-          role: 'ai', text: res.text, id: Date.now() + 1,
-        });
+        addMessage('notes', { role: 'ai', text: res.text, sources: res.sources, id: Date.now() + 1 });
         speak(res.text);
 
       } else {
+        // Assistant mode — Groq decides if it's a command, query, or analytical answer
+        // No frontend pattern matching — let the backend handle routing entirely
         const res = await callSmartAssistant(text);
+
         addMessage('assistant', {
-          role: 'ai', text: res.message, entity: res.entity, id: Date.now() + 1,
+          role  : 'ai',
+          text  : res.message,
+          entity: res.entity,
+          action: res.action,
+          id    : Date.now() + 1,
         });
         speak(res.message);
-        if (res.success && res.entity) refreshByEntity(res.entity);
+
+        // Refresh dashboard data only for real mutations (not answers or gets)
+        if (res.success && res.entity && res.entity !== 'none' && res.action === 'add') {
+          refreshByEntity(res.entity);
+        }
       }
+
+    } catch (err) {
+      const errText = err.response?.data?.message || 'Something went wrong. Please try again.';
+      addMessage(mode, { role: 'ai', text: `❌ ${errText}`, id: Date.now() + 1 });
+    } finally {
+      setLoading(false);
     }
+  };
 
-  } catch (err) {
-    const errText = err.response?.data?.message || 'Something went wrong. Please try again.';
-    addMessage(mode, {
-      role: 'ai', text: `❌ ${errText}`, id: Date.now() + 1,
-    });
-
-  } finally {
-    setLoading(false);
-  }
-};
   // ─── Voice ───────────────────────────────────────────────────────────────
   const handleVoice = () => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) { toast.error("Voice not supported. Use Chrome."); return; }
+    if (!SpeechRecognition) { toast.error('Voice not supported. Use Chrome.'); return; }
 
     if (listening) {
       recognitionRef.current?.stop();
@@ -352,33 +315,32 @@ export default function AIAssistant() {
 
     const recognition          = new SpeechRecognition();
     recognitionRef.current     = recognition;
-    recognition.lang           = "en-IN";
+    recognition.lang           = 'en-IN';
     recognition.interimResults = false;
     recognition.continuous     = false;
 
     recognition.onstart  = () => setListening(true);
     recognition.onend    = () => setListening(false);
-    recognition.onerror  = () => { setListening(false); toast.error("Voice error"); };
+    recognition.onerror  = () => { setListening(false); toast.error('Voice error'); };
     recognition.onresult = (e) => {
       const transcript = e.results[0][0].transcript;
-      const intent     = detectIntent(transcript);
-      if (intent === "assistant") switchMode("assistant");
       handleSend(transcript);
     };
 
-    recognition.start();
+    // [CHANGED] 300ms warmup delay — prevents microphone cutting the first syllable
+    setTimeout(() => recognition.start(), 300);
   };
 
   const handleAction = async (action) => {
     if (loading) return;
-    const label = action === "summarize" ? "Summarize my notes" : "Generate a quiz from my notes";
-    addMessage("notes", { role: "user", text: label, id: Date.now() });
+    const label = action === 'summarize' ? 'Summarize my notes' : 'Generate a quiz from my notes';
+    addMessage('notes', { role: 'user', text: label, id: Date.now() });
     setLoading(true);
     try {
       const res = await callNotesAI(action, {});
-      addMessage("notes", { role: "ai", text: res.text, sources: res.sources, id: Date.now() + 1 });
+      addMessage('notes', { role: 'ai', text: res.text, sources: res.sources, id: Date.now() + 1 });
     } catch {
-      addMessage("notes", { role: "ai", text: "Sorry, something went wrong.", id: Date.now() + 1 });
+      addMessage('notes', { role: 'ai', text: 'Sorry, something went wrong.', id: Date.now() + 1 });
     } finally {
       setLoading(false);
     }
@@ -391,10 +353,10 @@ export default function AIAssistant() {
     try {
       const { data } = await aiChatService.uploadNotes(file);
       setUploadedFile(file);
-      addMessage("notes", {
-        role: "ai",
+      addMessage('notes', {
+        role: 'ai',
         text: `📎 **${data.filename}** uploaded! Created ${data.chunks} knowledge chunks. Ask me anything about it!`,
-        id: Date.now(),
+        id  : Date.now(),
       });
       toast.success(data.message);
       await loadNotes();
@@ -411,31 +373,33 @@ export default function AIAssistant() {
     inputRef.current?.focus();
   };
 
+  // ─── Intro messages ───────────────────────────────────────────────────────
   const notesIntro = [{
-    role: "ai",
+    role: 'ai',
     text: "Hi! I'm your Notes AI. Upload your study material and I'll help you:\n\n- Summarize key concepts\n- Quiz you on the content\n- Answer questions about your notes\n\nStart by uploading a file or just ask me anything!",
-    id: 0,
+    id  : 0,
   }];
 
   const assistantIntro = [{
-    role: "ai",
-    text: "Hey! I'm your Dashboard Assistant. I can update your dashboard directly using natural language.\n\nTry commands like the ones below.",
-    id: 0,
+    role: 'ai',
+    text: "Hey! I'm your Dashboard Assistant powered by Groq AI.\n\nI understand natural language — just tell me what you want:\n- Add subjects, attendance, marks, tasks\n- Ask questions about your data\n- Add multiple subjects at once\n- Query today's schedule, CGPA predictions, attendance status\n\nNo rigid commands needed — just talk naturally!",
+    id  : 0,
   }];
 
   const displayMessages = currentMessages.length === 0
-    ? (mode === "notes" ? notesIntro : assistantIntro)
+    ? (mode === 'notes' ? notesIntro : assistantIntro)
     : currentMessages;
 
+  // Example commands — these are illustrative, not hardcoded routing
   const ASSISTANT_COMMANDS = [
-    { icon: <CalendarIcon />, label: "Attendance", example: "I attended Data Structures today" },
-    { icon: <BarChartIcon />, label: "Marks",      example: "I scored 42 out of 50 in Physics midterm" },
-    { icon: <TaskIcon />,     label: "Task",       example: "Add high priority task to submit project by Friday" },
-    { icon: <SubjectIcon />,  label: "Subject",    example: "Add Operating Systems subject on Monday at 10am" },
+    { icon: <CalendarIcon />, label: 'Attendance', example: 'I attended Data Structures today'              },
+    { icon: <BarChartIcon />, label: 'Marks',      example: 'I scored 42 out of 50 in Physics midterm'     },
+    { icon: <TaskIcon />,     label: 'Task',       example: 'Add high priority task to submit project by Friday' },
+    { icon: <SubjectIcon />,  label: 'Subject',    example: 'Add Maths and Physics on Monday and Tuesday'  },
   ];
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 80px)" }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 80px)' }}>
 
       <style>{`
         @keyframes aiBubbleIn {
@@ -456,8 +420,7 @@ export default function AIAssistant() {
           40%           { transform: translateY(-6px); }
         }
         .ai-dot-loader span {
-          display: inline-block;
-          width: 6px; height: 6px; border-radius: 50%;
+          display: inline-block; width: 6px; height: 6px; border-radius: 50%;
           background: var(--muted); margin: 0 2px;
           animation: aiDotBounce 1.2s ease-in-out infinite;
         }
@@ -472,24 +435,24 @@ export default function AIAssistant() {
         <div>
           <h1 className="page-title">🤖 AI Study Assistant</h1>
           <p className="page-subtitle">
-            {mode === "notes"
-              ? "Ask questions, summarize notes, generate quizzes"
-              : "Update your dashboard with natural language"}
+            {mode === 'notes'
+              ? 'Ask questions, summarize notes, generate quizzes'
+              : 'Natural language dashboard control — powered by Groq'}
           </p>
         </div>
       </div>
 
       {/* ── Main card ── */}
-      <div className="card" style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", padding: 0 }}>
+      <div className="card" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: 0 }}>
 
         {/* ── Tabs ── */}
         <div style={{
-          display: "flex", background: "var(--bg-2)",
-          borderBottom: "1px solid var(--border)", padding: "6px 6px 0", gap: 4,
+          display: 'flex', background: 'var(--bg-2)',
+          borderBottom: '1px solid var(--border)', padding: '6px 6px 0', gap: 4,
         }}>
           {[
-            { key: "notes",     label: "Notes AI",      icon: <BookIcon />, color: "#10b981"        },
-            { key: "assistant", label: "Dashboard AI",  icon: <BotIcon />,  color: "var(--primary)" },
+            { key: 'notes',     label: 'Notes AI',     icon: <BookIcon />, color: '#10b981'        },
+            { key: 'assistant', label: 'Dashboard AI', icon: <BotIcon />,  color: 'var(--primary)' },
           ].map(tab => {
             const active = mode === tab.key;
             return (
@@ -497,23 +460,23 @@ export default function AIAssistant() {
                 key={tab.key}
                 onClick={() => switchMode(tab.key)}
                 style={{
-                  flex: 1, display: "flex", alignItems: "center", justifyContent: "center",
-                  gap: 8, padding: "9px 16px",
-                  background: active ? "var(--bg-3)" : "transparent",
-                  color: active ? tab.color : "var(--muted)",
-                  borderRadius: "8px 8px 0 0", border: "none", cursor: "pointer",
-                  fontFamily: "inherit", fontSize: 13.5, fontWeight: active ? 600 : 400,
-                  transition: "all 0.2s ease",
-                  borderBottom: active ? `2px solid ${tab.color}` : "2px solid transparent",
-                  position: "relative",
+                  flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  gap: 8, padding: '9px 16px',
+                  background: active ? 'var(--bg-3)' : 'transparent',
+                  color: active ? tab.color : 'var(--muted)',
+                  borderRadius: '8px 8px 0 0', border: 'none', cursor: 'pointer',
+                  fontFamily: 'inherit', fontSize: 13.5, fontWeight: active ? 600 : 400,
+                  transition: 'all 0.2s ease',
+                  borderBottom: active ? `2px solid ${tab.color}` : '2px solid transparent',
+                  position: 'relative',
                 }}
               >
                 {tab.icon}
                 {tab.label}
-                {tab.key === "assistant" && (
+                {tab.key === 'assistant' && (
                   <span className="ai-pulse" style={{
-                    width: 6, height: 6, borderRadius: "50%", background: "var(--primary)",
-                    position: "absolute", top: 8, right: 10, display: "inline-block",
+                    width: 6, height: 6, borderRadius: '50%', background: 'var(--primary)',
+                    position: 'absolute', top: 8, right: 10, display: 'inline-block',
                   }} />
                 )}
               </button>
@@ -522,16 +485,16 @@ export default function AIAssistant() {
         </div>
 
         {/* ── Notes toolbar ── */}
-        {mode === "notes" && (
+        {mode === 'notes' && (
           <div className="ai-fade-in" style={{
-            display: "flex", gap: 8, padding: "10px 16px",
-            borderBottom: "1px solid var(--border)", flexWrap: "wrap", alignItems: "center",
+            display: 'flex', gap: 8, padding: '10px 16px',
+            borderBottom: '1px solid var(--border)', flexWrap: 'wrap', alignItems: 'center',
           }}>
             <button
               className="btn btn-sm btn-outline"
               onClick={() => fileInputRef.current?.click()}
               disabled={loading}
-              style={{ color: "#10b981", borderColor: "rgba(16,185,129,0.35)", display: "flex", alignItems: "center", gap: 6 }}
+              style={{ color: '#10b981', borderColor: 'rgba(16,185,129,0.35)', display: 'flex', alignItems: 'center', gap: 6 }}
             >
               <UploadIcon /> Upload Notes
             </button>
@@ -543,62 +506,62 @@ export default function AIAssistant() {
             <button
               className="btn btn-sm btn-outline"
               onClick={() => { setShowNotes(n => !n); loadNotes(); }}
-              style={{ display: "flex", alignItems: "center", gap: 6 }}
+              style={{ display: 'flex', alignItems: 'center', gap: 6 }}
             >
               📚 Notes ({notes.length})
             </button>
             <button
               className="btn btn-sm btn-outline"
-              onClick={() => handleAction("summarize")}
+              onClick={() => handleAction('summarize')}
               disabled={loading}
-              style={{ display: "flex", alignItems: "center", gap: 6 }}
+              style={{ display: 'flex', alignItems: 'center', gap: 6 }}
             >
               <SummarizeIcon /> Summarize
             </button>
             <button
               className="btn btn-sm btn-outline"
-              onClick={() => handleAction("quiz")}
+              onClick={() => handleAction('quiz')}
               disabled={loading}
-              style={{ display: "flex", alignItems: "center", gap: 6 }}
+              style={{ display: 'flex', alignItems: 'center', gap: 6 }}
             >
               <QuizIcon /> Quiz Me
             </button>
             {uploadedFile && (
               <div style={{
-                display: "flex", alignItems: "center", gap: 6,
-                background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.25)",
-                borderRadius: 8, padding: "4px 10px", fontSize: 12, color: "#10b981",
+                display: 'flex', alignItems: 'center', gap: 6,
+                background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.25)',
+                borderRadius: 8, padding: '4px 10px', fontSize: 12, color: '#10b981',
               }}>
                 <ClipIcon />
-                {uploadedFile.name.slice(0, 22)}{uploadedFile.name.length > 22 ? "…" : ""}
+                {uploadedFile.name.slice(0, 22)}{uploadedFile.name.length > 22 ? '…' : ''}
               </div>
             )}
           </div>
         )}
 
         {/* ── Notes panel ── */}
-        {mode === "notes" && showNotes && (
+        {mode === 'notes' && showNotes && (
           <div className="ai-fade-in" style={{
-            padding: "12px 16px", borderBottom: "1px solid var(--border)", background: "var(--bg-2)",
+            padding: '12px 16px', borderBottom: '1px solid var(--border)', background: 'var(--bg-2)',
           }}>
-            <p style={{ fontSize: 11, color: "var(--muted)", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 600 }}>
+            <p style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600 }}>
               Uploaded Notes ({notes.length})
             </p>
             {notes.length === 0 ? (
-              <p style={{ fontSize: 13, color: "var(--muted)" }}>No notes uploaded yet.</p>
+              <p style={{ fontSize: 13, color: 'var(--muted)' }}>No notes uploaded yet.</p>
             ) : (
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                 {notes.map(n => (
                   <div key={n._id} style={{
-                    display: "flex", alignItems: "center", gap: 8,
-                    background: "var(--bg-3)", border: "1px solid var(--card-border)",
-                    borderRadius: 8, padding: "6px 12px", fontSize: 13, color: "var(--text-2)",
+                    display: 'flex', alignItems: 'center', gap: 8,
+                    background: 'var(--bg-3)', border: '1px solid var(--card-border)',
+                    borderRadius: 8, padding: '6px 12px', fontSize: 13, color: 'var(--text-2)',
                   }}>
                     <span>📄 {n._id}</span>
-                    <span style={{ color: "var(--muted)", fontSize: 11 }}>({n.chunks} chunks)</span>
+                    <span style={{ color: 'var(--muted)', fontSize: 11 }}>({n.chunks} chunks)</span>
                     <button
                       onClick={() => handleDeleteNote(n._id)}
-                      style={{ background: "none", border: "none", cursor: "pointer", color: "var(--danger)", fontSize: 14, padding: "0 2px" }}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', fontSize: 14, padding: '0 2px' }}
                     >✕</button>
                   </div>
                 ))}
@@ -607,15 +570,15 @@ export default function AIAssistant() {
           </div>
         )}
 
-        {/* ── Assistant chips ── */}
-        {mode === "assistant" && currentMessages.length === 0 && (
+        {/* ── Assistant example chips — illustrative only, not routing logic ── */}
+        {mode === 'assistant' && currentMessages.length === 0 && (
           <div className="ai-fade-in" style={{
-            padding: "14px 16px", borderBottom: "1px solid var(--border)", background: "var(--bg-2)",
+            padding: '14px 16px', borderBottom: '1px solid var(--border)', background: 'var(--bg-2)',
           }}>
-            <p style={{ fontSize: 11, color: "var(--muted)", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 600 }}>
-              Example Commands
+            <p style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600 }}>
+              Example Commands — or type anything naturally
             </p>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
               {ASSISTANT_COMMANDS.map(cmd => (
                 <CommandChip key={cmd.label} {...cmd} onClick={handleChipClick} />
               ))}
@@ -625,31 +588,31 @@ export default function AIAssistant() {
 
         {/* ── Chat messages ── */}
         <div style={{
-          flex: 1, overflowY: "auto", padding: "20px 16px",
-          display: "flex", flexDirection: "column",
+          flex: 1, overflowY: 'auto', padding: '20px 16px',
+          display: 'flex', flexDirection: 'column',
           opacity: switchAnim ? 0 : 1,
-          transform: switchAnim ? "translateY(8px)" : "none",
-          transition: "opacity 0.18s ease, transform 0.18s ease",
-          scrollbarWidth: "thin",
+          transform: switchAnim ? 'translateY(8px)' : 'none',
+          transition: 'opacity 0.18s ease, transform 0.18s ease',
+          scrollbarWidth: 'thin',
         }}>
           {displayMessages.map(msg => (
             <MessageBubble key={msg.id} msg={msg} mode={mode} />
           ))}
 
           {loading && (
-            <div style={{ display: "flex", alignItems: "flex-end", gap: 10, marginBottom: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, marginBottom: 16 }}>
               <div style={{
-                width: 32, height: 32, borderRadius: "50%", flexShrink: 0,
-                background: mode === "notes"
-                  ? "linear-gradient(135deg,#064e3b,#10b981)"
-                  : "linear-gradient(135deg,var(--primary-dark),var(--primary))",
-                display: "flex", alignItems: "center", justifyContent: "center", color: "#fff",
+                width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
+                background: mode === 'notes'
+                  ? 'linear-gradient(135deg,#064e3b,#10b981)'
+                  : 'linear-gradient(135deg,var(--primary-dark),var(--primary))',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff',
               }}>
-                {mode === "notes" ? <BookIcon /> : <BotIcon />}
+                {mode === 'notes' ? <BookIcon /> : <BotIcon />}
               </div>
               <div style={{
-                padding: "12px 16px", background: "var(--bg-3)",
-                border: "1px solid var(--card-border)", borderRadius: "4px 18px 18px 18px",
+                padding: '12px 16px', background: 'var(--bg-3)',
+                border: '1px solid var(--card-border)', borderRadius: '4px 18px 18px 18px',
               }}>
                 <div className="ai-dot-loader"><span /><span /><span /></div>
               </div>
@@ -658,73 +621,52 @@ export default function AIAssistant() {
           <div ref={chatEndRef} />
         </div>
 
-        {/* ── Intent nudge ── */}
-        {intentHint === "likely-assistant" && (
-          <div style={{
-            margin: "0 16px 8px", padding: "8px 14px",
-            background: "rgba(129,140,248,0.08)", border: "1px solid rgba(129,140,248,0.2)",
-            borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "space-between",
-            fontSize: 12.5, animation: "aiFadeIn 0.2s ease both",
-          }}>
-            <span style={{ color: "var(--primary)", display: "flex", alignItems: "center", gap: 5 }}>
-              <SparkleIcon /> Looks like a dashboard command — try Smart Assistant
-            </span>
-            <button
-              onClick={() => switchMode("assistant")}
-              className="btn btn-sm btn-outline"
-              style={{ fontSize: 12, color: "var(--primary)", borderColor: "rgba(129,140,248,0.3)" }}
-            >
-              Switch →
-            </button>
-          </div>
-        )}
-
         {/* ── Input ── */}
-        <div style={{ padding: "12px 16px 16px", borderTop: "1px solid var(--border)" }}>
+        <div style={{ padding: '12px 16px 16px', borderTop: '1px solid var(--border)' }}>
           <div style={{
-            display: "flex", alignItems: "flex-end", gap: 8,
-            background: "var(--bg-2)",
+            display: 'flex', alignItems: 'flex-end', gap: 8,
+            background: 'var(--bg-2)',
             border: `1.5px solid ${input
-              ? (mode === "notes" ? "rgba(16,185,129,0.4)" : "rgba(129,140,248,0.4)")
-              : "var(--border)"}`,
-            borderRadius: 12, padding: "8px 10px 8px 14px",
-            transition: "border-color 0.2s ease",
+              ? (mode === 'notes' ? 'rgba(16,185,129,0.4)' : 'rgba(129,140,248,0.4)')
+              : 'var(--border)'}`,
+            borderRadius: 12, padding: '8px 10px 8px 14px',
+            transition: 'border-color 0.2s ease',
           }}>
             <textarea
               ref={inputRef}
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={e => {
-                if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
+                if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
               }}
               placeholder={
-                listening ? "🎤 Listening..."
-                : mode === "notes" ? "Ask anything about your notes…"
-                : "Give a command…"
+                listening ? '🎤 Listening…'
+                : mode === 'notes' ? 'Ask anything about your notes…'
+                : 'Say anything — add subject, mark attendance, ask about CGPA…'
               }
               rows={1}
               style={{
-                flex: 1, background: "transparent", color: "var(--text)",
-                fontSize: 14, fontFamily: "inherit", lineHeight: 1.6,
-                border: "none", outline: "none", resize: "none", maxHeight: 120,
+                flex: 1, background: 'transparent', color: 'var(--text)',
+                fontSize: 14, fontFamily: 'inherit', lineHeight: 1.6,
+                border: 'none', outline: 'none', resize: 'none', maxHeight: 120,
               }}
               onInput={e => {
-                e.target.style.height = "auto";
-                e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px";
+                e.target.style.height = 'auto';
+                e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
               }}
             />
 
-            {/* Voice toggle */}
+            {/* Voice output toggle */}
             <button
               onClick={() => setVoiceEnabled(v => !v)}
-              title={voiceEnabled ? "Voice output on" : "Voice output off"}
+              title={voiceEnabled ? 'Voice output on' : 'Voice output off'}
               style={{
-                minWidth: 36, height: 36, borderRadius: 8, border: "none", cursor: "pointer",
-                background: voiceEnabled ? "#22c55e" : "var(--bg-3)",
-                color: voiceEnabled ? "#fff" : "var(--text)",
+                minWidth: 36, height: 36, borderRadius: 8, border: 'none', cursor: 'pointer',
+                background: voiceEnabled ? '#22c55e' : 'var(--bg-3)',
+                color: voiceEnabled ? '#fff' : 'var(--text)',
               }}
             >
-              {voiceEnabled ? "🔊" : "🔇"}
+              {voiceEnabled ? '🔊' : '🔇'}
             </button>
 
             {/* Stop speaking */}
@@ -732,26 +674,26 @@ export default function AIAssistant() {
               onClick={stopSpeaking}
               title="Stop speaking"
               style={{
-                minWidth: 36, height: 36, borderRadius: 8, border: "none",
-                cursor: "pointer", background: "var(--bg-3)", color: "var(--text)",
+                minWidth: 36, height: 36, borderRadius: 8, border: 'none',
+                cursor: 'pointer', background: 'var(--bg-3)', color: 'var(--text)',
               }}
             >
               ⛔
             </button>
 
-            {/* Mic */}
+            {/* Mic — 300ms warmup prevents word cutoff */}
             <button
               onClick={handleVoice}
               disabled={loading}
               style={{
-                minWidth: 36, height: 36, borderRadius: 8, border: "none", cursor: "pointer",
+                minWidth: 36, height: 36, borderRadius: 8, border: 'none', cursor: 'pointer',
                 background: listening
-                  ? "#ef4444"
-                  : mode === "notes" ? "rgba(16,185,129,0.2)" : "rgba(129,140,248,0.2)",
-                color: listening ? "#fff" : "var(--text)",
+                  ? '#ef4444'
+                  : mode === 'notes' ? 'rgba(16,185,129,0.2)' : 'rgba(129,140,248,0.2)',
+                color: listening ? '#fff' : 'var(--text)',
               }}
             >
-              {listening ? "🔴" : "🎤"}
+              {listening ? '🔴' : '🎤'}
             </button>
 
             {/* Send */}
@@ -759,25 +701,25 @@ export default function AIAssistant() {
               onClick={() => handleSend()}
               disabled={!input.trim() || loading}
               style={{
-                minWidth: 36, height: 36, borderRadius: 8, border: "none", cursor: "pointer",
-                display: "flex", alignItems: "center", justifyContent: "center",
+                minWidth: 36, height: 36, borderRadius: 8, border: 'none', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
                 background: !input.trim() || loading
-                  ? "var(--bg-3)"
-                  : mode === "notes"
-                    ? "linear-gradient(135deg,#064e3b,#10b981)"
-                    : "linear-gradient(135deg,var(--primary-dark),var(--primary))",
-                color: !input.trim() || loading ? "var(--muted)" : "#fff",
-                transition: "all 0.2s ease",
+                  ? 'var(--bg-3)'
+                  : mode === 'notes'
+                    ? 'linear-gradient(135deg,#064e3b,#10b981)'
+                    : 'linear-gradient(135deg,var(--primary-dark),var(--primary))',
+                color: !input.trim() || loading ? 'var(--muted)' : '#fff',
+                transition: 'all 0.2s ease',
               }}
             >
               <SendIcon />
             </button>
           </div>
 
-          <p style={{ fontSize: 11, color: "var(--muted)", marginTop: 6, textAlign: "center" }}>
-            {mode === "notes"
-              ? "Notes AI · Shift+Enter for new line"
-              : "Smart Assistant · Updates your dashboard in real-time"}
+          <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6, textAlign: 'center' }}>
+            {mode === 'notes'
+              ? 'Notes AI · Shift+Enter for new line'
+              : 'Groq AI · Understands natural language · Updates dashboard in real-time'}
           </p>
         </div>
       </div>

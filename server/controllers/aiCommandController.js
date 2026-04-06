@@ -8,77 +8,107 @@ const Semester   = require('../models/Semester.model');
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SYSTEM_PROMPT
-// [CHANGED] Added schedule to subject entity + duplicate-prevention example
-//           Updated Friday example to use real ISO date
+// SYSTEM_PROMPT — Groq handles ALL routing: commands, queries, conversation
+// No hardcoded patterns. Date/day injected so "today", "Friday" etc. work.
 // ─────────────────────────────────────────────────────────────────────────────
-const SYSTEM_PROMPT = `
-You are a JSON-only command parser for a Student Dashboard app.
+function buildPrompt() {
+  const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const today = new Date();
+  return `
+You are a JSON-only intelligent assistant for a Student Dashboard app.
+Today's date : ${today.toISOString().slice(0, 10)}
+Today's day  : ${days[today.getDay()]}
 
 YOUR ONLY OUTPUT IS RAW JSON — no explanation, no markdown, no code fences, no extra text.
-If you add anything outside the JSON object, the system will break.
 
-ENTITIES AND THEIR FIELDS:
-- subject    : { name (string), code (string), credits (number 1-6), instructor (string), schedule: [{ day ("Mon"|"Tue"|"Wed"|"Thu"|"Fri"|"Sat"), startTime ("HH:MM"), endTime ("HH:MM"), room (string) }] }
-- attendance : { subjectName (string), status ("present"|"absent"), date (ISO YYYY-MM-DD) }
-- marks      : { subjectName (string), examType ("midterm"|"final"|"quiz"|"assignment"|"practical"), marksObtained (number), maxMarks (number), examDate (ISO YYYY-MM-DD) }
-- task       : { title (string), description (string), dueDate (ISO YYYY-MM-DD), priority ("low"|"medium"|"high"), category (string) }
-- semester   : { semesterNumber (number), semesterName (string), sgpa (number), subjects: [{ name, credits, grade }] }
+YOU HANDLE THREE REQUEST TYPES:
+
+TYPE 1 — ACTIONS (user wants to create/modify/delete data)
+  → use action: "add" | "update" | "delete"
+
+TYPE 2 — DATA QUERIES (user wants to see/fetch data)
+  → use action: "get"
+
+TYPE 3 — CONVERSATIONAL / ANALYTICAL (user asks a question you can answer directly)
+  Examples: "What will my CGPA be if I score 7.5?", "How many classes do I need to reach 75%?",
+            "Which subject has lowest marks?", "Am I safe in attendance?"
+  → use action: "answer", entity: "none"
+  → compute or reason about the answer in the "message" field
+  → "data" can carry any computed values you want to surface
+
+ENTITIES AND FIELDS:
+- subject    : { name (string), code (string), credits (number 1–6), instructor (string),
+                 schedule: [{ day ("Mon"|"Tue"|"Wed"|"Thu"|"Fri"|"Sat"), startTime ("HH:MM"), endTime ("HH:MM"), room (string) }] }
+- attendance : { subjectName (string), status ("present"|"absent"|"cancelled"), date (ISO YYYY-MM-DD) }
+- marks      : { subjectName (string), examType ("midterm"|"final"|"quiz"|"assignment"|"practical"),
+                 marksObtained (number), maxMarks (number), examDate (ISO YYYY-MM-DD) }
+- task       : { title (string), description (string), dueDate (ISO YYYY-MM-DD),
+                 priority ("low"|"medium"|"high"), category (string) }
+- semester   : { semesterNumber (number), semesterName (string), sgpa (number),
+                 subjects: [{ name, credits, grade }] }
 
 OUTPUT FORMAT (always exactly this shape):
 {
-  "action"  : "add" | "update" | "delete" | "get",
-  "entity"  : "subject" | "attendance" | "marks" | "task" | "semester",
-  "data"    : { ...only the fields that were mentioned or can be safely inferred },
-  "message" : "short human-friendly confirmation (max 12 words)"
+  "action"  : "add" | "update" | "delete" | "get" | "answer",
+  "entity"  : "subject" | "attendance" | "marks" | "task" | "semester" | "none",
+  "data"    : { ...fields or computed values },
+  "message" : "short human-friendly response (max 20 words)"
 }
+
+BULK OPERATIONS:
+If user mentions multiple subjects/tasks in one command, use "items" array inside data:
+{ "action":"add","entity":"subject","data":{"items":[{"name":"Maths","schedule":[{"day":"Mon","startTime":"09:00","endTime":"10:00"}]},{"name":"Physics","schedule":[{"day":"Tue","startTime":"11:00","endTime":"12:00"}]}]},"message":"Added Maths and Physics." }
 
 FIELD RULES:
-- Omit any field that was NOT mentioned — never fabricate values
-- credits: if not mentioned, omit entirely (do not default to any number)
-- date / dueDate / examDate: if not mentioned use today's date in ISO format
-- For schedule days: "monday"→"Mon", "tuesday"→"Tue", "wednesday"→"Wed", "thursday"→"Thu", "friday"→"Fri", "saturday"→"Sat"
-- If time not mentioned but day is mentioned, default startTime to "09:00" and endTime to "10:00"
-- status synonyms: "attended"/"went"/"present" → "present" | "missed"/"skipped"/"absent"/"bunked" → "absent"
-- grade synonyms: "A plus"→"A+", "B plus"→"B+", "O"→"O", "ex"→"Ex", etc.
-- examType synonyms: "mid"/"mids"/"midterm" → "midterm" | "finals"/"end term" → "final" | "test"/"quiz" → "quiz"
-- priority synonyms: "urgent"/"asap"/"important" → "high" | "normal" → "medium" | "later"/"someday" → "low"
-- For attendance and marks, always use "subjectName" (string) — NOT subjectId
+- Omit fields that were NOT mentioned — never fabricate
+- credits: omit if not mentioned
+- date/dueDate/examDate: use today's ISO date if not mentioned
+- For "today's classes" → action: "get", entity: "subject", data: { query: "today" }
+- Day synonyms: monday→"Mon", tuesday→"Tue", wednesday→"Wed", thursday→"Thu", friday→"Fri", saturday→"Sat"
+- If day mentioned but no time → startTime: "09:00", endTime: "10:00"
+- status: attended/went/present→"present" | missed/bunked/skipped/absent→"absent"
+- examType: mid/mids→"midterm" | finals/end-term→"final" | test→"quiz"
+- priority: urgent/asap/important→"high" | normal→"medium" | later/someday→"low"
+- grade: "A plus"→"A+", "B plus"→"B+", "O"/"outstanding"→"O", etc.
+- Always use "subjectName" (string) for attendance and marks — never subjectId
 
 UNKNOWN INTENT:
-If you genuinely cannot determine action or entity, return:
-{
-  "action"  : "unknown",
-  "entity"  : "unknown",
-  "data"    : {},
-  "message" : "I couldn't understand that. Can you rephrase?"
-}
+{ "action":"unknown","entity":"none","data":{},"message":"I couldn't understand that. Can you rephrase?" }
 
-EXAMPLES (study these patterns):
-User: "Add Maths subject"
-→ { "action":"add","entity":"subject","data":{"name":"Maths","code":"MATHS"},"message":"Maths subject added." }
+EXAMPLES:
+User: "Add Maths on Monday and Physics on Tuesday"
+→ {"action":"add","entity":"subject","data":{"items":[{"name":"Maths","code":"MATHS","schedule":[{"day":"Mon","startTime":"09:00","endTime":"10:00"}]},{"name":"Physics","code":"PHYSIC","schedule":[{"day":"Tue","startTime":"09:00","endTime":"10:00"}]}]},"message":"Added Maths and Physics."}
 
-User: "Add Maths subject on Friday"
-→ { "action":"add","entity":"subject","data":{"name":"Maths","code":"MATHS","schedule":[{"day":"Fri","startTime":"09:00","endTime":"10:00"}]},"message":"Maths added on Friday 9-10 AM." }
-
-User: "Add Physics on Monday at 11am"
-→ { "action":"add","entity":"subject","data":{"name":"Physics","code":"PHYSIC","schedule":[{"day":"Mon","startTime":"11:00","endTime":"12:00"}]},"message":"Physics added on Monday 11 AM." }
+User: "What classes do I have today"
+→ {"action":"get","entity":"subject","data":{"query":"today"},"message":"Fetching today's classes."}
 
 User: "I attended Data Structures today"
-→ { "action":"add","entity":"attendance","data":{"subjectName":"Data Structures","status":"present","date":"2026-04-05"},"message":"Attendance marked present for Data Structures." }
+→ {"action":"add","entity":"attendance","data":{"subjectName":"Data Structures","status":"present","date":"${today.toISOString().slice(0,10)}"},"message":"Attendance marked present for Data Structures."}
 
 User: "I scored 45 out of 50 in Physics midterm"
-→ { "action":"add","entity":"marks","data":{"subjectName":"Physics","examType":"midterm","marksObtained":45,"maxMarks":50},"message":"Midterm marks added for Physics." }
+→ {"action":"add","entity":"marks","data":{"subjectName":"Physics","examType":"midterm","marksObtained":45,"maxMarks":50},"message":"Midterm marks added for Physics."}
 
-User: "Add a high priority task to submit assignment by Friday"
-→ { "action":"add","entity":"task","data":{"title":"Submit assignment","priority":"high","dueDate":"2026-04-10"},"message":"Task added: Submit assignment." }
+User: "What will my CGPA be if I score 7.5 next semester"
+→ {"action":"answer","entity":"none","data":{"hypotheticalSGPA":7.5},"message":"I'll calculate your predicted CGPA with a 7.5 SGPA next semester."}
 
-User: "Delete the Maths subject"
-→ { "action":"delete","entity":"subject","data":{"name":"Maths"},"message":"Maths subject deleted." }
+User: "How many classes do I need to reach 75% in Maths"
+→ {"action":"answer","entity":"none","data":{"subjectName":"Maths","query":"attendance_needed"},"message":"Let me check your Maths attendance and calculate what you need."}
+
+User: "Add high priority task to submit project by Friday"
+→ {"action":"add","entity":"task","data":{"title":"Submit project","priority":"high","dueDate":"${getNextFriday()}"},"message":"Task added: Submit project by Friday."}
 `;
+}
+
+function getNextFriday() {
+  const d = new Date();
+  const day = d.getDay();
+  const diff = (5 - day + 7) % 7 || 7;
+  d.setDate(d.getDate() + diff);
+  return d.toISOString().slice(0, 10);
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
-// extractJSON — safely pulls the first {...} block from any string
+// extractJSON — 3-layer safe extraction from any Groq response
 // ─────────────────────────────────────────────────────────────────────────────
 function extractJSON(raw) {
   if (!raw) return null;
@@ -105,12 +135,12 @@ function extractJSON(raw) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// validateParsed — checks required top-level shape before any DB access
+// validateParsed — ensures shape is correct before any DB access
 // ─────────────────────────────────────────────────────────────────────────────
 function validateParsed(parsed) {
   if (!parsed || typeof parsed !== 'object') return false;
-  const validActions  = ['add', 'update', 'delete', 'get', 'unknown'];
-  const validEntities = ['subject', 'attendance', 'marks', 'task', 'semester', 'unknown'];
+  const validActions  = ['add', 'update', 'delete', 'get', 'answer', 'unknown'];
+  const validEntities = ['subject', 'attendance', 'marks', 'task', 'semester', 'none', 'unknown'];
   return (
     validActions.includes(parsed.action) &&
     validEntities.includes(parsed.entity) &&
@@ -121,11 +151,23 @@ function validateParsed(parsed) {
 
 const FALLBACK = {
   success: false,
-  entity : 'unknown',
+  entity : 'none',
   action : 'unknown',
   message: "I couldn't understand that. Please try rephrasing.",
   data   : null,
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// createSubject helper — used for both single and bulk
+// ─────────────────────────────────────────────────────────────────────────────
+async function createSubject(data, userId) {
+  if (!data.code && data.name) {
+    data.code = data.name.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+  }
+  const exists = await Subject.findOne({ userId, name: new RegExp(`^${data.name}$`, 'i') });
+  if (exists) return { skipped: true, name: data.name };
+  return Subject.create({ ...data, userId });
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Main handler
@@ -142,66 +184,119 @@ exports.handleCommand = async (req, res) => {
     const completion = await groq.chat.completions.create({
       model      : 'llama-3.3-70b-versatile',
       messages   : [
-        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'system', content: buildPrompt() },
         { role: 'user',   content: userInput },
       ],
       temperature: 0.1,
-      max_tokens : 512,
+      max_tokens : 700,
     });
 
     const raw = completion.choices[0]?.message?.content?.trim() ?? '';
 
-    // ── Step 2: Robust JSON extraction ────────────────────────────────────
+    // ── Step 2: Extract + validate ────────────────────────────────────────
     const parsed = extractJSON(raw);
 
     if (!parsed || !validateParsed(parsed)) {
-      console.warn('[AI Command] Unparseable response:', raw);
+      console.warn('[AI Command] Unparseable:', raw);
       return res.json({ ...FALLBACK, raw });
     }
 
-    if (parsed.action === 'unknown' || parsed.entity === 'unknown') {
+    if (parsed.action === 'unknown') {
       return res.json({ success: false, message: parsed.message || FALLBACK.message });
     }
 
-    // ── Step 3: Execute MongoDB action ────────────────────────────────────
+    // ── Step 3: action === "answer" — direct conversational response ───────
+    if (parsed.action === 'answer') {
+      // If it's a CGPA prediction query, enrich the answer with real data
+      if (parsed.data?.hypotheticalSGPA) {
+        const userId   = req.user._id;
+        const semesters = await Semester.find({ student: userId }).sort({ semesterNumber: 1 });
+        const sgpas     = semesters.map(s => s.sgpa).filter(Boolean);
+        const hypo      = parseFloat(parsed.data.hypotheticalSGPA);
+
+        if (sgpas.length && !isNaN(hypo)) {
+          const allSGPAs      = [...sgpas, hypo];
+          const predictedCGPA = (allSGPAs.reduce((a, b) => a + b, 0) / allSGPAs.length).toFixed(2);
+          return res.json({
+            success: true, action: 'answer', entity: 'none',
+            message: `If you score ${hypo} SGPA next semester, your CGPA will be ${predictedCGPA} (over ${allSGPAs.length} semesters).`,
+            data   : { predictedCGPA, currentSemesters: sgpas.length, hypotheticalSGPA: hypo },
+          });
+        }
+      }
+
+      // Attendance needed query
+      if (parsed.data?.query === 'attendance_needed' && parsed.data?.subjectName) {
+        const userId  = req.user._id;
+        const subject = await Subject.findOne({ userId, name: new RegExp(parsed.data.subjectName, 'i') });
+        if (subject) {
+          const records = await Attendance.find({ userId, subjectId: subject._id, status: { $ne: 'cancelled' } });
+          const total   = records.length;
+          const present = records.filter(r => r.status === 'present').length;
+          const pct     = total ? (present / total * 100).toFixed(1) : 0;
+          const needed  = total && present / total < 0.75
+            ? Math.ceil((0.75 * total - present) / 0.25)
+            : 0;
+          const msg = needed > 0
+            ? `You have ${pct}% attendance in ${parsed.data.subjectName}. Attend ${needed} more consecutive classes to reach 75%.`
+            : `You're safe! ${parsed.data.subjectName} attendance is ${pct}%.`;
+          return res.json({ success: true, action: 'answer', entity: 'none', message: msg, data: { total, present, pct, needed } });
+        }
+      }
+
+      // Generic answer — return as-is
+      return res.json({
+        success: true,
+        action : 'answer',
+        entity : 'none',
+        message: parsed.message,
+        data   : parsed.data || null,
+      });
+    }
+
+    // ── Step 4: DB actions ────────────────────────────────────────────────
     const userId = req.user._id;
     let result   = null;
 
     // ── SUBJECT ──────────────────────────────────────────────────────────
     if (parsed.entity === 'subject') {
+
       if (parsed.action === 'add') {
-
-        // Auto-generate code if missing
-        if (!parsed.data.code && parsed.data.name) {
-          parsed.data.code = parsed.data.name
-            .toUpperCase()
-            .replace(/[^A-Z0-9]/g, '')
-            .slice(0, 6);
+        // Bulk insert
+        if (parsed.data.items && Array.isArray(parsed.data.items)) {
+          const results = await Promise.all(parsed.data.items.map(item => createSubject(item, userId)));
+          const added   = results.filter(r => !r.skipped);
+          const skipped = results.filter(r => r.skipped).map(r => r.name);
+          let msg = parsed.message;
+          if (skipped.length) msg += ` (${skipped.join(', ')} already existed)`;
+          return res.json({ success: true, action: 'add', entity: 'subject', message: msg, data: added });
         }
-
-        // [CHANGED] Prevent duplicate subject names for same user
-        const existing = await Subject.findOne({
-          userId,
-          name: new RegExp(`^${parsed.data.name}$`, 'i'),
-        });
-        if (existing) {
-          return res.json({
-            success: false,
-            message: `Subject "${parsed.data.name}" already exists.`,
-          });
-        }
-
-        result = await Subject.create({ ...parsed.data, userId });
+        // Single insert
+        const r = await createSubject(parsed.data, userId);
+        if (r.skipped) return res.json({ success: false, message: `Subject "${parsed.data.name}" already exists.` });
+        result = r;
 
       } else if (parsed.action === 'delete') {
-        if (!parsed.data.name) {
-          return res.json({ success: false, message: 'Please specify which subject to delete.' });
-        }
+        if (!parsed.data.name) return res.json({ success: false, message: 'Please specify which subject to delete.' });
         const s = await Subject.findOne({ userId, name: new RegExp(parsed.data.name, 'i') });
         if (s) await Subject.findByIdAndDelete(s._id);
         else   return res.json({ success: false, message: `Subject "${parsed.data.name}" not found.` });
 
       } else if (parsed.action === 'get') {
+        // Today's schedule
+        if (parsed.data?.query === 'today') {
+          const dayAbbr = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date().getDay()];
+          const subjects = await Subject.find({ userId, 'schedule.day': dayAbbr });
+          const todayClasses = subjects.map(s => ({
+            name    : s.name,
+            code    : s.code,
+            schedule: s.schedule.filter(sc => sc.day === dayAbbr),
+          }));
+          const msg = todayClasses.length
+            ? `You have ${todayClasses.length} class${todayClasses.length > 1 ? 'es' : ''} today.`
+            : 'No classes scheduled for today.';
+          return res.json({ success: true, action: 'get', entity: 'subject', message: msg, data: todayClasses });
+        }
         result = await Subject.find({ userId });
       }
     }
@@ -254,20 +349,24 @@ exports.handleCommand = async (req, res) => {
           const d = new Date(parsed.data.dueDate);
           parsed.data.dueDate = isNaN(d.getTime()) ? undefined : d;
         }
+        // Bulk tasks
+        if (parsed.data.items && Array.isArray(parsed.data.items)) {
+          const results = await Promise.all(parsed.data.items.map(item => {
+            if (!item.priority) item.priority = 'medium';
+            return Task.create({ ...item, user: userId });
+          }));
+          return res.json({ success: true, action: 'add', entity: 'task', message: parsed.message, data: results });
+        }
         result = await Task.create({ ...parsed.data, user: userId });
 
       } else if (parsed.action === 'delete') {
-        if (!parsed.data.title) {
-          return res.json({ success: false, message: 'Please specify which task to delete.' });
-        }
+        if (!parsed.data.title) return res.json({ success: false, message: 'Please specify which task to delete.' });
         const t = await Task.findOne({ user: userId, title: new RegExp(parsed.data.title, 'i') });
         if (t) await Task.findByIdAndDelete(t._id);
         else   return res.json({ success: false, message: `Task "${parsed.data.title}" not found.` });
 
       } else if (parsed.action === 'update') {
-        if (!parsed.data.title) {
-          return res.json({ success: false, message: 'Please specify which task to update.' });
-        }
+        if (!parsed.data.title) return res.json({ success: false, message: 'Please specify which task to update.' });
         const t = await Task.findOne({ user: userId, title: new RegExp(parsed.data.title, 'i') });
         if (t) result = await Task.findByIdAndUpdate(t._id, parsed.data, { new: true });
         else   return res.json({ success: false, message: `Task "${parsed.data.title}" not found.` });
@@ -286,7 +385,7 @@ exports.handleCommand = async (req, res) => {
       }
     }
 
-    // ── Success response ──────────────────────────────────────────────────
+    // ── Success ───────────────────────────────────────────────────────────
     return res.json({
       success: true,
       message: parsed.message,
