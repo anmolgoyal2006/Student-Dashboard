@@ -292,33 +292,53 @@ export default function AIAssistant() {
   };
 
   // ─── Send ─────────────────────────────────────────────────────────────────
-  const handleSend = async (overrideText) => {
-    const text = (overrideText ?? input).trim();
-    if (!text || loading) return;
-    setInput("");
-    setIntentHint(null);
-    addMessage(mode, { role: "user", text, id: Date.now() });
-    setLoading(true);
-    try {
-      if (mode === "notes") {
-        const res = await callNotesAI("chat", { message: text });
-        addMessage("notes", { role: "ai", text: res.text, sources: res.sources, id: Date.now() + 1 });
+ const handleSend = async (overrideText) => {
+  const text = (overrideText ?? input).trim();
+  if (!text || loading) return;
+
+  setInput('');
+  setIntentHint(null);
+  addMessage(mode, { role: 'user', text, id: Date.now() });
+  setLoading(true);
+
+  try {
+    if (mode === 'notes') {
+      const res = await callNotesAI('chat', { message: text });
+      addMessage('notes', {
+        role: 'ai', text: res.text, sources: res.sources, id: Date.now() + 1,
+      });
+      speak(res.text);
+
+    } else {
+      const isHypothetical = detectHypothetical(text);
+
+      if (isHypothetical) {
+        const res = await callNotesAI('chat', { message: text });
+        addMessage('assistant', {
+          role: 'ai', text: res.text, id: Date.now() + 1,
+        });
         speak(res.text);
+
       } else {
-        const isHypothetical = detectHypothetical(text);
-        const finalMessage   = isHypothetical ? `HYPOTHETICAL: ${text}` : text;
-        const res            = await callSmartAssistant(finalMessage);
-        addMessage("assistant", { role: "ai", text: res.message, entity: res.entity, id: Date.now() + 1 });
+        const res = await callSmartAssistant(text);
+        addMessage('assistant', {
+          role: 'ai', text: res.message, entity: res.entity, id: Date.now() + 1,
+        });
         speak(res.message);
         if (res.success && res.entity) refreshByEntity(res.entity);
       }
-    } catch {
-      addMessage(mode, { role: "ai", text: "Sorry, something went wrong. Please try again.", id: Date.now() + 1 });
-    } finally {
-      setLoading(false);
     }
-  };
 
+  } catch (err) {
+    const errText = err.response?.data?.message || 'Something went wrong. Please try again.';
+    addMessage(mode, {
+      role: 'ai', text: `❌ ${errText}`, id: Date.now() + 1,
+    });
+
+  } finally {
+    setLoading(false);
+  }
+};
   // ─── Voice ───────────────────────────────────────────────────────────────
   const handleVoice = () => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;

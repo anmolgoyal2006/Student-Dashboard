@@ -50,7 +50,8 @@ app.get('/api/health', (_req, res) => res.json({               // ← Fix 4
 
 // ─── Routes ───────────────────────────────────────────────────────────────
 app.use('/api/tasks', require('./routes/taskRoutes'));
-app.use('/auth', require('./routes/authRoutes'));
+app.use('/api/auth', require('./routes/authRoutes'));
+app.use('/api/subjects', require('./routes/timetableRoutes'));
 app.use('/api/timetable',       require('./routes/timetableRoutes'));
 app.use('/api/attendance',      require('./routes/attendanceRoutes'));
 app.use('/api/marks',           require('./routes/marksRoutes'));
