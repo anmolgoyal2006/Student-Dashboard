@@ -1,13 +1,21 @@
 const admin = require('firebase-admin');
-const path  = require('path');
 
-// Place your Firebase service account JSON at: server/config/serviceAccountKey.json
-// Download it from: Firebase Console → Project Settings → Service Accounts → Generate new private key
-const serviceAccount = require('./serviceAccountKey.json');
+let serviceAccount;
+
+if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+  // ✅ Production (Render)
+  serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+} else {
+  // ✅ Local fallback (optional)
+  serviceAccount = require('./serviceAccountKey.json');
+}
 
 if (!admin.apps.length) {
   admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
+    credential: admin.credential.cert({
+      ...serviceAccount,
+      private_key: serviceAccount.private_key.replace(/\\n/g, '\n'),
+    }),
   });
 }
 
