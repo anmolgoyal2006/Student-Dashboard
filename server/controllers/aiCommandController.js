@@ -71,6 +71,7 @@ FIELD RULES:
 - priority: urgent/asap/important→"high" | normal→"medium" | later/someday→"low"
 - grade: "A plus"→"A+", "B plus"→"B+", "O"/"outstanding"→"O", etc.
 - Always use "subjectName" (string) for attendance and marks — never subjectId
+- If time is mentioned but no day, default day to today's abbreviation: ${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][today.getDay()]}
 -Study/focus/prepare questions→{action:"answer",entity:"none",data:{query:"study_suggestion"},"message":"Let me check your data."}
 
 UNKNOWN INTENT:
@@ -216,6 +217,7 @@ exports.handleCommand = async (req, res) => {
     });
 
     const raw = completion.choices[0]?.message?.content?.trim() ?? '';
+    console.log('[Groq Raw]', raw);
 
     // ── Step 2: Extract + validate ────────────────────────────────────────
     const parsed = extractJSON(raw);
@@ -377,27 +379,50 @@ if (parsed.data?.query === 'marks_status' || parsed.entity === 'marks') {
 
       if (parsed.action === 'add') {
         // Bulk insert
-        if (parsed.data.items && Array.isArray(parsed.data.items)) {
-          const results = await Promise.all(parsed.data.items.map(item => createSubject(item, userId)));
-          const added   = results.filter(r => !r.skipped);
-          const skipped = results.filter(r => r.skipped).map(r => r.name);
-          let msg = parsed.message;
-          if (skipped.length) msg += ` (${skipped.join(', ')} already existed)`;
-          return res.json({ success: true, action: 'add', entity: 'subject', message: msg, data: added });
-        }
+      // Bulk insert
+if (parsed.data.items && Array.isArray(parsed.data.items)) {
+  const results = await Promise.all(parsed.data.items.map(async (item) => {
+    const r = await createSubject(item, userId);
+
+    // If subject exists but has new schedule slots — merge them in
+    if (r.skipped && item.schedule && Array.isArray(item.schedule)) {
+      const existing = await Subject.findOne({ userId, name: new RegExp(item.name, 'i') });
+      if (existing) {
+        const newDays   = item.schedule.map(sc => sc.day);
+        const keptSlots = (existing.schedule || []).filter(sc => !newDays.includes(sc.day));
+        existing.schedule = [...keptSlots, ...item.schedule];
+        const saved = await existing.save();
+        return { merged: true, name: item.name, doc: saved };
+      }
+    }
+    return r;
+  }));
+
+  const added   = results.filter(r => !r.skipped && !r.merged);
+  const merged  = results.filter(r => r.merged).map(r => r.name);
+  const skipped = results.filter(r => r.skipped).map(r => r.name);
+
+  let msg = parsed.message;
+  if (merged.length)  msg = `✅ Updated schedule for ${merged.join(', ')}.`;
+  if (skipped.length) msg += ` (${skipped.join(', ')} already existed)`;
+
+  return res.json({ success: true, action: 'add', entity: 'subject', message: msg, data: added });
+}
         // Single insert
        const r = await createSubject(parsed.data, userId);
-    if (r.skipped) {
-      // Subject exists — if new schedule slots provided, merge them in
-      if (parsed.data.schedule && Array.isArray(parsed.data.schedule)) {
-        const existing   = await Subject.findOne({ userId, name: new RegExp(parsed.data.name, 'i') });
-        const newDays    = parsed.data.schedule.map(sc => sc.day);
-        const keptSlots  = existing.schedule.filter(sc => !newDays.includes(sc.day));
+if (r.skipped) {
+  if (parsed.data.schedule && Array.isArray(parsed.data.schedule)) {
+    const existing = await Subject.findOne({ userId, name: new RegExp(parsed.data.name, 'i') });
+    if (!existing) {
+      return res.json({ success: false, message: `Subject "${parsed.data.name}" not found.` });
+    }
+const newDays    = parsed.data.schedule.map(sc => sc.day);
+const keptSlots  = (existing.schedule || []).filter(sc => !newDays.includes(sc.day));
         existing.schedule = [...keptSlots, ...parsed.data.schedule];
         result = await existing.save();
         return res.json({
           success: true, action: 'add', entity: 'subject',
-          message: `Added ${parsed.data.name} schedule on ${newDays.join(', ')}.`,
+            message: `✅ Added ${parsed.data.name} class on ${newDays.join(', ')} (${parsed.data.schedule.map(s => `${s.startTime}–${s.endTime}`).join(', ')}).`,
           data: result,
         });
       }
