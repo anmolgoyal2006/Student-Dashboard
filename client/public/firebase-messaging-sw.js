@@ -1,10 +1,12 @@
-// firebase-messaging-sw.js
-// Uses compat version — required for service workers
+// public/firebase-messaging-sw.js
+
 importScripts('https://www.gstatic.com/firebasejs/12.11.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/12.11.0/firebase-messaging-compat.js');
 
-// Config must be duplicated here — service workers have no access to env vars
-// Replace these values with your actual Firebase config
+// 🔗 Your backend URL
+const BACKEND_URL = 'https://student-dashboard-irm9.onrender.com';
+
+// 🔥 Firebase config (must be here)
 firebase.initializeApp({
   apiKey: "AIzaSyAdWBjiEgbAZxAaIdDwcSioQW1zo4ztZzA",
   authDomain: "student-dashboard-1aab5.firebaseapp.com",
@@ -16,15 +18,126 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
+
+// ─────────────────────────────────────────────────────────────
+// 🔔 BACKGROUND MESSAGE (SHOW NOTIFICATION WITH BUTTONS)
+// ─────────────────────────────────────────────────────────────
 messaging.onBackgroundMessage((payload) => {
   console.log('[SW] Background message received:', payload);
 
   const { title, body, icon } = payload.notification || {};
+  const data = payload.data || {};
 
   self.registration.showNotification(title || 'StudentAI', {
-    body : body  || 'You have a new notification.',
-    icon : icon  || '/logo192.png',
+    body: body || 'Mark your attendance',
+    icon: icon || '/logo192.png',
     badge: '/logo192.png',
-    data : payload.data || {},
+
+    // 👇 IMPORTANT: pass data for click handling
+    data: {
+      subjectId: data.subjectId,
+      date: data.date
+    },
+
+    // 🔥 ACTION BUTTONS
+    actions: [
+      { action: 'attended',     title: '✅ Attended' },
+      { action: 'not_attended', title: '❌ Not Attended' },
+      { action: 'not_held',     title: '⏸ Not Held' }
+    ]
   });
 });
+
+
+// ─────────────────────────────────────────────────────────────
+// 🖱 HANDLE NOTIFICATION CLICK (BUTTON ACTIONS)
+// ─────────────────────────────────────────────────────────────
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+
+  const action = event.action;
+  const data = event.notification.data || {};
+
+  const subjectId = data.subjectId;
+  const date = data.date;
+
+  // 👉 If user just clicks notification (not button)
+  if (!action || !subjectId) {
+    event.waitUntil(clients.openWindow('/'));
+    return;
+  }
+
+  // 🔥 Handle attendance marking
+  event.waitUntil(
+    (async () => {
+      try {
+        const token = await getTokenFromIDB();
+
+        if (!token) {
+          console.error('[SW] No JWT token found');
+          return;
+        }
+
+        const res = await fetch(`${BACKEND_URL}/api/attendance/mark-from-notification`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            subjectId,
+            status: action,
+            date
+          })
+        });
+
+        if (res.ok) {
+          console.log(`[SW] Attendance marked: ${subjectId} → ${action}`);
+
+          // ✅ Show confirmation
+          self.registration.showNotification('✅ Attendance Marked', {
+            body: `Marked as "${action.replace('_', ' ')}"`,
+            icon: '/logo192.png',
+            badge: '/logo192.png'
+          });
+
+        } else {
+          console.error('[SW] Failed:', res.status);
+        }
+
+      } catch (err) {
+        console.error('[SW ERROR]', err.message);
+      }
+    })()
+  );
+});
+
+
+// ─────────────────────────────────────────────────────────────
+// 💾 GET JWT TOKEN FROM INDEXEDDB
+// ─────────────────────────────────────────────────────────────
+function getTokenFromIDB() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open('authDB', 1);
+
+    request.onupgradeneeded = (e) => {
+      e.target.result.createObjectStore('auth', { keyPath: 'key' });
+    };
+
+    request.onsuccess = (e) => {
+      const db = e.target.result;
+      const tx = db.transaction('auth', 'readonly');
+      const store = tx.objectStore('auth');
+
+      const getReq = store.get('token');
+
+      getReq.onsuccess = () => {
+        resolve(getReq.result?.value || null);
+      };
+
+      getReq.onerror = () => reject(getReq.error);
+    };
+
+    request.onerror = () => reject(request.error);
+  });
+}

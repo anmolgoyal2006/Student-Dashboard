@@ -1,12 +1,16 @@
 const express  = require('express');
 const cors     = require('cors');
-const mongoose = require('mongoose');                 // ← ADD
+const mongoose = require('mongoose');
 require('dotenv').config();
+const { sendTodayNotifications } = require('./services/notificationService');
 
 const app = express();
 
-const passport = require('./config/passport');   // ← ADD
-app.use(passport.initialize()); 
+const passport = require('./config/passport');
+app.use(passport.initialize());
+
+// ─── Jobs ─────────────────────────────────────────────────────────────────
+const { startDailyNotificationJob } = require('./jobs/dailyNotificationJob'); // ← ADDED
 
 // ─── CORS ─────────────────────────────────────────────────────────────────
 const allowedOrigins = [
@@ -16,7 +20,6 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: (origin, cb) => {
-    // allow Postman/curl (no origin header) + listed origins
     if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
     cb(new Error(`CORS blocked for origin: ${origin}`));
   },
@@ -25,7 +28,6 @@ app.use(cors({
   credentials: true,
 }));
 
-// Handle ALL preflight requests explicitly  ← Fix 1
 app.options('*', cors());
 
 // ─── Body parsing ─────────────────────────────────────────────────────────
@@ -42,30 +44,40 @@ app.use((req, res, next) => {
 
 // ─── Health endpoints ─────────────────────────────────────────────────────
 app.get('/api/ping',   (_req, res) => res.json({ status: 'ok', ts: Date.now() }));
-app.get('/api/health', (_req, res) => res.json({               // ← Fix 4
+app.get('/api/health', (_req, res) => res.json({
   status: 'ok',
-  db: mongoose.connection.readyState, // 0=disconnected 1=connected 2=connecting
+  db: mongoose.connection.readyState,
   uptime: process.uptime(),
 }));
 
 // ─── Routes ───────────────────────────────────────────────────────────────
-app.use('/api/tasks', require('./routes/taskRoutes'));
-app.use('/api/auth', require('./routes/authRoutes'));
-app.use('/auth', require('./routes/authRoutes'));
-app.use('/api/subjects', require('./routes/timetableRoutes'));
+app.use('/api/tasks',           require('./routes/taskRoutes'));
+app.use('/api/auth',            require('./routes/authRoutes'));
+app.use('/auth',                require('./routes/authRoutes'));
+app.use('/api/subjects',        require('./routes/timetableRoutes'));
 app.use('/api/timetable',       require('./routes/timetableRoutes'));
 app.use('/api/attendance',      require('./routes/attendanceRoutes'));
 app.use('/api/marks',           require('./routes/marksRoutes'));
 app.use('/api/career',          require('./routes/careerRoutes'));
 app.use('/api/recommendations', require('./routes/recommendationRoutes'));
 app.use('/api/notifications',   require('./routes/notificationRoutes'));
-app.use('/api/user', require('./routes/userRoutes'));
-app.use('/api/ai', require('./routes/aiRoutes'));   // ← ADD THIS
-// Add after line: app.use('/api/user', require('./routes/userRoutes'));
-app.use('/api/decision', require('./routes/decisionRoutes'));
-app.use('/api/predict', require('./routes/predictionRoutes'));
-app.use('/api/ai-command', require('./routes/aiCommandRoutes'));
+app.use('/api/user',            require('./routes/userRoutes'));
+app.use('/api/ai',              require('./routes/aiRoutes'));
+app.use('/api/decision',        require('./routes/decisionRoutes'));
+app.use('/api/predict',         require('./routes/predictionRoutes'));
+app.use('/api/ai-command',      require('./routes/aiCommandRoutes'));
 
+
+// 🔥 ADD HERE
+app.get('/api/test-notification', async (req, res) => {
+  try {
+    await sendTodayNotifications();
+    res.json({ message: 'Test notification triggered' });
+  } catch (err) {
+    console.error('[TEST NOTIFICATION ERROR]', err.message);
+    res.status(500).json({ message: 'Failed to send test notification' });
+  }
+});
 // ─── 404 handler ──────────────────────────────────────────────────────────
 app.use((_req, res) => {
   res.status(404).json({ message: 'Route not found' });
@@ -81,11 +93,12 @@ app.use((err, _req, res, _next) => {
 const PORT = process.env.PORT || 5000;
 
 mongoose.connect(process.env.MONGO_URI, {
-  serverSelectionTimeoutMS: 10000,  // ← Fix 3: fail fast if Atlas unreachable
-  socketTimeoutMS: 45000,           // ← Fix 5: match request timeout
+  serverSelectionTimeoutMS: 10000,
+  socketTimeoutMS: 45000,
 })
   .then(() => {
     console.log('MongoDB connected');
+    startDailyNotificationJob(); // ← ADDED: starts only after DB is ready
     app.listen(PORT, '0.0.0.0', () => {
       console.log(`Server running on port ${PORT}`);
     });

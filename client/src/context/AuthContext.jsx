@@ -1,4 +1,7 @@
+// src/context/AuthContext.js
+
 import { createContext, useContext, useState, useCallback } from 'react';
+import { saveTokenToIDB, clearTokenFromIDB } from '../utils/authIDB';
 
 const AuthContext = createContext();
 
@@ -11,20 +14,16 @@ export const AuthProvider = ({ children }) => {
   const login = useCallback((userData, token) => {
     localStorage.setItem('token', token);
     localStorage.setItem('user', JSON.stringify(userData));
+    if (token) saveTokenToIDB(token);
     setUser(userData);
   }, []);
 
   const logout = useCallback(() => {
     localStorage.clear();
+    clearTokenFromIDB();
     setUser(null);
   }, []);
 
-  // ── NEW: called after a successful profile update ────────
-  // Merges updated fields (name, email) into the existing
-  // user object so the sidebar/topbar reflect changes
-  // immediately without requiring a re-login.
-  // If the backend returned a new JWT (email changed),
-  // it gets stored here too.
   const updateUser = useCallback((userData, newToken) => {
     setUser(prev => {
       const merged = { ...prev, ...userData };
@@ -33,11 +32,11 @@ export const AuthProvider = ({ children }) => {
     });
     if (newToken) {
       localStorage.setItem('token', newToken);
+      saveTokenToIDB(newToken);
     }
   }, []);
 
   return (
-    // ── CHANGED: added updateUser to the context value ───
     <AuthContext.Provider value={{ user, login, logout, updateUser, isLoggedIn: !!user }}>
       {children}
     </AuthContext.Provider>

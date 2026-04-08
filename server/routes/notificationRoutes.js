@@ -1,66 +1,63 @@
-const express    = require('express');
-const router     = express.Router();
-const { protect } = require('../middleware/authMiddleware');
-const Attendance = require('../models/Attendance');
-const Marks      = require('../models/Marks');
+const express      = require('express');
+const router       = express.Router();
+const {protect}      = require('../middleware/authMiddleware');   // your existing JWT middleware
+const Notification = require('../models/Notification');
 
+// ── GET /api/notifications ────────────────────────────────────────────────────
+// Returns the latest 20 notifications for the logged-in user.
 router.get('/', protect, async (req, res) => {
-  const userId = req.user.id;
-  const notifications = [];
-
   try {
-    // Low attendance alerts
-    const records = await Attendance.find({ userId }).populate('subjectId', 'name');
-    const map = {};
-    for (const r of records) {
-      if (!r.subjectId) continue;
-      const key = r.subjectId._id.toString();
-      if (!map[key]) map[key] = { name: r.subjectId.name, total: 0, present: 0 };
-      if (r.status !== 'cancelled') {
-        map[key].total++;
-        if (r.status === 'present') map[key].present++;
-      }
-    }
-    for (const s of Object.values(map)) {
-      if (!s.total) continue;
-      const pct = (s.present / s.total) * 100;
-      if (pct < 75) {
-        notifications.push({
-          type:    'danger',
-          title:   'Low Attendance Alert',
-          message: `${s.name}: ${pct.toFixed(1)}% — attend more classes!`,
-          time:    new Date(),
-        });
-      }
-    }
+    const notifications = await Notification.find({ userId: req.user._id })
+      .sort({ createdAt: -1 })   // newest first
+      .limit(20)
+      .lean();
 
-    // Upcoming exams (marks with examDate in next 7 days)
-    const soon = new Date();
-    soon.setDate(soon.getDate() + 7);
-    const upcoming = await Marks.find({
-      userId,
-      examDate: { $gte: new Date(), $lte: soon },
-    }).populate('subjectId', 'name');
-    for (const m of upcoming) {
-      notifications.push({
-        type:    'info',
-        title:   'Upcoming Exam',
-        message: `${m.subjectId?.name} ${m.examType} on ${new Date(m.examDate).toDateString()}`,
-        time:    m.examDate,
-      });
-    }
-
-    // Daily summary
-    notifications.push({
-      type:    'success',
-      title:   'Daily Summary',
-      message: `You have ${records.length} attendance records. Keep up the good work!`,
-      time:    new Date(),
+    // Also return unread count so the bell badge can update without extra call
+    const unreadCount = await Notification.countDocuments({
+      userId: req.user._id,
+      read:   false,
     });
 
-    res.json({ notifications });
+    res.json({ notifications, unreadCount });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    console.error('[Notifications] GET error:', err.message);
+    res.status(500).json({ message: 'Server error fetching notifications' });
+  }
+});
+
+// ── PATCH /api/notifications/:id/read ────────────────────────────────────────
+// Mark a single notification as read.
+router.patch('/:id/read', protect, async (req, res) => {
+  try {
+    const notification = await Notification.findOneAndUpdate(
+      { _id: req.params.id, userId: req.user._id },   // ownership check
+      { read: true },
+      { new: true }
+    );
+
+    if (!notification) {
+      return res.status(404).json({ message: 'Notification not found' });
+    }
+
+    res.json(notification);
+  } catch (err) {
+    console.error('[Notifications] PATCH read error:', err.message);
+    res.status(500).json({ message: 'Server error marking notification read' });
+  }
+});
+
+// ── PATCH /api/notifications/read-all ────────────────────────────────────────
+// Mark ALL notifications as read in one click.
+router.patch('/read-all', protect, async (req, res) => {
+  try {
+    await Notification.updateMany(
+      { userId: req.user._id, read: false },
+      { read: true }
+    );
+    res.json({ message: 'All notifications marked as read' });
+  } catch (err) {
+    console.error('[Notifications] PATCH read-all error:', err.message);
+    res.status(500).json({ message: 'Server error marking all read' });
   }
 });
 

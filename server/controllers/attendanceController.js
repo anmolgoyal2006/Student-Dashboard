@@ -309,3 +309,53 @@ exports.getMonthlyTrends = async (req, res) => {
     res.status(500).json({ message: 'Failed to fetch monthly trends.' });
   }
 };
+ 
+ // 🔔 Mark attendance from notification
+exports.markFromNotification = async (req, res) => {
+  try {
+    const { subjectId, status, date } = req.body;
+    const userId = req.user._id;
+
+    // Map notification status → your system status
+    const statusMap = {
+      attended: 'present',
+      not_attended: 'absent',
+      not_held: 'cancelled'
+    };
+
+    const mappedStatus = statusMap[status];
+
+    if (!subjectId || !mappedStatus) {
+      return res.status(400).json({ message: 'Invalid subjectId or status' });
+    }
+
+    const attendanceDate = date ? new Date(date) : new Date();
+    attendanceDate.setHours(0, 0, 0, 0);
+
+    // 🔒 Ensure subject belongs to user (same as your existing logic)
+    const subject = await Subject.findOne({ _id: subjectId, userId });
+    if (!subject) {
+      return res.status(404).json({ message: 'Subject not found' });
+    }
+
+    const record = await Attendance.findOneAndUpdate(
+      { userId, subjectId, date: attendanceDate },
+      {
+        userId,
+        subjectId,
+        status: mappedStatus,
+        date: attendanceDate,
+        markedAt: new Date()
+      },
+      { upsert: true, new: true }
+    );
+
+    console.log(`🔔 Attendance marked via notification: ${mappedStatus}`);
+
+    res.json({ success: true, record });
+
+  } catch (err) {
+    console.error('[markFromNotification]', err);
+    res.status(500).json({ message: 'Failed to mark attendance from notification' });
+  }
+};
