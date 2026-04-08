@@ -25,7 +25,7 @@ router.get('/', protect, async (req, res) => {
   }
 });
 
-// ── PATCH /api/notifications/:id/read ────────────────────────────────────────
+// ── PATCH/notifications/:id/read ────────────────────────────────────────
 // Mark a single notification as read.
 router.patch('/:id/read', protect, async (req, res) => {
   try {
@@ -46,7 +46,7 @@ router.patch('/:id/read', protect, async (req, res) => {
   }
 });
 
-// ── PATCH /api/notifications/read-all ────────────────────────────────────────
+// ── PATCH /notifications/read-all ────────────────────────────────────────
 // Mark ALL notifications as read in one click.
 router.patch('/read-all', protect, async (req, res) => {
   try {

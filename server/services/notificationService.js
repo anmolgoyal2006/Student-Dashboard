@@ -81,10 +81,18 @@ async function sendNotification(fcmToken, payload) {
 // ─── NEW: saves one Notification doc to MongoDB ───────────────────────────────
 async function saveNotificationToDB(userId, subjectId, title, body) {
   try {
-    await Notification.create({ userId, subjectId, title, body });
+    console.log("💾 Saving notification:", { userId, subjectId, title });
+
+    const saved = await Notification.create({
+      userId,
+      subjectId,
+      title,
+      body
+    });
+
+    console.log("✅ Saved to DB:", saved._id);
   } catch (err) {
-    // Never let a DB write failure break the FCM flow
-    console.error('[FCM] Failed to save notification to DB:', err.message);
+    console.error("❌ DB SAVE ERROR:", err.message);
   }
 }
 // ─────────────────────────────────────────────────────────────────────────────

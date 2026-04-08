@@ -46,18 +46,18 @@ export default function NotificationBell() {
   const fetchNotifications = async () => {
     setLoading(true);
     try {
-      const { data } = await axios.get(`${API}/api/notifications`, {
+      const { data } = await axios.get(`${API}/notifications`, {
         headers: authHeader(),
       });
-      setNotifications(data.notifications);
-      setUnreadCount(data.unreadCount);
+      console.log('[Notif data]', data); // remove after confirming it works
+      setNotifications(data.notifications ?? []);
+      setUnreadCount(data.unreadCount ?? 0);
     } catch (err) {
       console.error('[Notifications] fetch error:', err.message);
     } finally {
       setLoading(false);
     }
   };
-
   // Fetch on mount so badge count is correct immediately
   useEffect(() => {
     if (permissionGranted) fetchNotifications();
@@ -120,7 +120,7 @@ export default function NotificationBell() {
   // ── mark single as read ──────────────────────────────────────────────────
   const markAsRead = async (id) => {
     try {
-      await axios.patch(`${API}/api/notifications/${id}/read`, {}, {
+      await axios.patch(`${API}/notifications/${id}/read`, {}, {
         headers: authHeader(),
       });
       setNotifications((prev) =>
@@ -135,7 +135,7 @@ export default function NotificationBell() {
   // ── mark all as read ─────────────────────────────────────────────────────
   const markAllAsRead = async () => {
     try {
-      await axios.patch(`${API}/api/notifications/read-all`, {}, {
+      await axios.patch(`${API}/notifications/read-all`, {}, {
         headers: authHeader(),
       });
       setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
