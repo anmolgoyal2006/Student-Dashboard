@@ -59,7 +59,7 @@ useEffect(() => {
       if (fcmToken) {
         const jwt = localStorage.getItem('token');
         await axios.post(
-          `${process.env.REACT_APP_API_URL}/api/user/save-token`,
+          `${process.env.REACT_APP_API_URL}/user/save-token`,
           { token: fcmToken },
           { headers: { Authorization: `Bearer ${jwt}` } }
         );
