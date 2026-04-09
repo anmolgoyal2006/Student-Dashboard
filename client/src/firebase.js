@@ -12,6 +12,7 @@ const firebaseConfig = {
 
 const app       = initializeApp(firebaseConfig);
 const messaging = getMessaging(app);
+export const getMessagingInstance = () => messaging;
 
 // ─── Get FCM token ────────────────────────────────────────────────────────────
 export async function getFCMToken() {

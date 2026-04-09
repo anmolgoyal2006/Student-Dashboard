@@ -17,7 +17,8 @@ import ResetPassword  from './pages/ResetPassword';
 import AIAssistant from './pages/AIAssistant';
 import Prediction from './pages/Prediction';
 import LoginSuccess from './pages/LoginSuccess';
-import { getFCMToken, onMessageListener } from './firebase';
+import { getFCMToken, getMessagingInstance } from './firebase';
+import { onMessage } from 'firebase/messaging';
 import toast from 'react-hot-toast';
 import axios from 'axios';
 
@@ -70,22 +71,20 @@ useEffect(() => {
     }
   };
 
-  const listenForMessages = async () => {
-    try {
-      const payload = await onMessageListener();
-      const { title, body } = payload?.notification || {};
-      if (title || body) {
-        toast(`🔔 ${title}: ${body}`, { duration: 5000 });
-      }
-    } catch (err) {
-      console.error('[FCM Listener]', err.message);
-    }
-  };
 
-  saveJwtToCache();
+ saveJwtToCache();
   initFCM();
-  listenForMessages();
-}, [isLoggedIn]);                                  // ← re-runs on login
+
+  const messaging = getMessagingInstance();
+  const unsubscribe = onMessage(messaging, (payload) => {
+    const { title, body } = payload?.notification || {};
+    if (title || body) {
+      toast(`🔔 ${title}: ${body}`, { duration: 5000 });
+    }
+  });
+
+  return () => unsubscribe();
+}, [isLoggedIn]);                                 // ← re-runs on login
   return (
     <BrowserRouter>
       <Toaster position="top-right" />
