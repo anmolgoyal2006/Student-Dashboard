@@ -42,6 +42,16 @@ export async function getFCMToken() {
 export function onMessageListener() {
   return new Promise((resolve) => {
     onMessage(messaging, (payload) => {
+      console.log("[FCM] Foreground message:", payload);
+
+      // 🔥 SHOW notification (THIS FIXES YOUR ISSUE)
+      if (Notification.permission === "granted") {
+        new Notification(payload.notification?.title || "Notification", {
+          body: payload.notification?.body || "",
+          icon: "/logo192.png",
+        });
+      }
+
       resolve(payload);
     });
   });
