@@ -38,23 +38,31 @@ export default function App() {
 
   // AFTER
 useEffect(() => {
-  if (!isLoggedIn) return;                          // ← wait for auth
+  if (!isLoggedIn) return;
+
+  const saveJwtToCache = async () => {
+    try {
+      const jwt = localStorage.getItem('token');
+      if (jwt) {
+        const cache = await caches.open('auth-cache');
+        await cache.put('auth-token', new Response(JSON.stringify({ token: jwt })));
+        console.log('[Cache] JWT saved for SW');
+      }
+    } catch (err) {
+      console.error('[Cache] Failed:', err);
+    }
+  };
 
   const initFCM = async () => {
     try {
-      const token = await getFCMToken();
-      if (token) {
-        const jwt = localStorage.getItem("token");
-
-await axios.post(
-  `${process.env.REACT_APP_API_URL}/user/save-token`,
-  { token },
-  {
-    headers: {
-      Authorization: `Bearer ${jwt}`
-    }
-  }
-);
+      const fcmToken = await getFCMToken();
+      if (fcmToken) {
+        const jwt = localStorage.getItem('token');
+        await axios.post(
+          `${process.env.REACT_APP_API_URL}/api/user/save-token`,
+          { token: fcmToken },
+          { headers: { Authorization: `Bearer ${jwt}` } }
+        );
         console.log('[FCM] Token saved');
       }
     } catch (err) {
@@ -74,9 +82,10 @@ await axios.post(
     }
   };
 
+  saveJwtToCache();
   initFCM();
   listenForMessages();
-}, [isLoggedIn]);                                   // ← re-runs on login
+}, [isLoggedIn]);                                  // ← re-runs on login
   return (
     <BrowserRouter>
       <Toaster position="top-right" />

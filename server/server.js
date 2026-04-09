@@ -92,6 +92,11 @@ app.use((err, _req, res, _next) => {
 // ─── MongoDB + Server start ───────────────────────────────────────────────
 const PORT = process.env.PORT || 5000;
 
+ // Keep-alive ping every 10 minutes (prevents Render free tier sleep)
+setInterval(() => {
+  const http = require('http');
+  http.get(`http://localhost:${process.env.PORT || 5000}/api/ping`, () => {});
+}, 10 * 60 * 1000);
 mongoose.connect(process.env.MONGO_URI, {
   serverSelectionTimeoutMS: 10000,
   socketTimeoutMS: 45000,

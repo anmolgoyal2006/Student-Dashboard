@@ -1,7 +1,7 @@
 // public/firebase-messaging-sw.js
 
-importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/12.11.0/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/12.11.0/firebase-messaging-compat.js');
 
 // 🔗 Your backend URL
 const BACKEND_URL = 'https://student-dashboard-irm9.onrender.com';
