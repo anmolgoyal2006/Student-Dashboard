@@ -105,7 +105,16 @@ export default function Dashboard() {
 
   return (
     <div>
-      {/* Header */}
+  {/* FCM Debug Button */}
+  <button onClick={async () => {
+    const { getFCMToken } = await import('../firebase');
+    const token = await getFCMToken();
+    alert(token ? `Token: ${token.slice(-20)}` : 'No token generated');
+  }} style={{ marginBottom: 10, padding: '6px 12px', background: '#818cf8', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}>
+    📱 Get My FCM Token
+  </button>
+
+  {/* Header */}
       <div className="page-header">
         <div>
           <h1 className="page-title">
