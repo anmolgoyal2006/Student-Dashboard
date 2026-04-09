@@ -333,10 +333,14 @@ exports.markFromNotification = async (req, res) => {
     attendanceDate.setHours(0, 0, 0, 0);
 
     // 🔒 Ensure subject belongs to user (same as your existing logic)
-    const subject = await Subject.findOne({ _id: subjectId, userId });
-    if (!subject) {
-      return res.status(404).json({ message: 'Subject not found' });
-    }
+   const mongoose = require('mongoose');
+const isValidId = mongoose.Types.ObjectId.isValid(subjectId);
+const subject = isValidId
+  ? await Subject.findOne({ $or: [{ _id: subjectId }, { name: subjectId }], userId })
+  : await Subject.findOne({ name: subjectId, userId });
+if (!subject) {
+  return res.status(404).json({ message: 'Subject not found' });
+}
 
     const record = await Attendance.findOneAndUpdate(
       { userId, subjectId, date: attendanceDate },

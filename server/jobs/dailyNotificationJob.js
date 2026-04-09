@@ -1,23 +1,17 @@
-// jobs/dailyNotificationJob.js
-const cron        = require('node-cron');
-const { sendTodayNotifications } = require('../services/notificationService');
+const cron = require('node-cron');
+const { sendEndOfClassNotifications } = require('../services/notificationService');
 
-/**
- * Runs every day at 8:00 AM server time.
- * Fetches today's timetable for ALL users and sends class notifications.
- */
 function startDailyNotificationJob() {
-  cron.schedule('0 8 * * *', async () => {
-    console.log('[CRON] Running daily notification job:', new Date().toISOString());
+  // Runs every minute — fires notification when a class endTime matches now
+  cron.schedule('* * * * *', async () => {
     try {
-      await sendTodayNotifications();
-      console.log('[CRON] Daily notifications sent successfully.');
+      await sendEndOfClassNotifications();
     } catch (err) {
-      console.error('[CRON] Error sending notifications:', err.message);
+      console.error('[CRON] Error:', err.message);
     }
   });
 
-  console.log('[CRON] Daily notification job scheduled at 8:00 AM.');
+  console.log('[CRON] End-of-class notification job started (checks every minute).');
 }
 
 module.exports = { startDailyNotificationJob };

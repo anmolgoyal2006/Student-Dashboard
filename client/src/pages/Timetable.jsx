@@ -4,9 +4,10 @@ import toast from 'react-hot-toast';
 import WeeklyGrid from '../components/WeeklyGrid';
 
 const DAYS  = ['Mon','Tue','Wed','Thu','Fri','Sat'];
-const EMPTY = { name: '', code: '', instructor: '', credits: 3, schedule: [] };
+const EMPTY = { name: '', code: '', instructor: '', credits: 4, schedule: [] };
 
 const EMPTY_SLOT = { day: 'Mon', startTime: '09:00', endTime: '10:00', room: '' };
+
 
 const fmt12 = (t) => {
   if (!t) return '';
@@ -95,10 +96,20 @@ export default function Timetable() {
   };
 
   const handleEdit = s => {
-    setForm({ name: s.name, code: s.code, instructor: s.instructor, credits: s.credits, schedule: s.schedule || [] });
-    setEditing(s._id);
-    setShowForm(true);
-  };
+  setForm({
+    name      : s.name,
+    code      : s.code,
+    instructor: s.instructor || '',
+    credits   : String(s.credits || 4),
+    schedule  : (s.schedule || []).map(sl => ({
+      ...sl,
+      startTime: sl.startTime || '09:00',
+      endTime  : sl.endTime   || '10:00',
+    })),
+  });
+  setEditing(s._id);
+  setShowForm(true);
+};
 
   const handleDelete = async id => {
     if (!window.confirm('Delete this subject?')) return;
@@ -208,10 +219,7 @@ export default function Timetable() {
 
             {/* Schedule slots */}
             <div style={{ marginBottom: 16 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                <label className="form-label" style={{ margin: 0 }}>Schedule Slots</label>
-                <button type="button" className="btn btn-outline btn-sm" onClick={addSlot}>+ Add Slot</button>
-              </div>
+             <label className="form-label" style={{ marginBottom: 10, display: 'block' }}>Schedule Slots</label>
               {(form.schedule || []).map((slot, i) => (
                 <div key={i} style={{
                   display: 'grid',
@@ -226,11 +234,11 @@ export default function Timetable() {
                   </div>
                   <div className="form-group" style={{ margin: 0 }}>
                     {i === 0 && <label className="form-label">Start</label>}
-                    <input className="form-input" type="time" value={slot.startTime} onChange={e => handleSlotChange(i, 'startTime', e.target.value)} />
+<input className="form-input" type="time" value={slot.startTime} onChange={e => handleSlotChange(i, 'startTime', e.target.value)} />
                   </div>
                   <div className="form-group" style={{ margin: 0 }}>
                     {i === 0 && <label className="form-label">End</label>}
-                    <input className="form-input" type="time" value={slot.endTime} onChange={e => handleSlotChange(i, 'endTime', e.target.value)} />
+<input className="form-input" type="time" value={slot.endTime} onChange={e => handleSlotChange(i, 'endTime', e.target.value)} />
                   </div>
                   <div className="form-group" style={{ margin: 0 }}>
                     {i === 0 && <label className="form-label">Room</label>}
@@ -246,9 +254,9 @@ export default function Timetable() {
                 <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>No slots added. Click "+ Add Slot" to schedule this subject.</p>
               )}
             </div>
-
-            <div className="flex gap-2">
+<div className="flex gap-2">
               <button className="btn btn-primary" type="submit">{editing ? 'Update Subject' : 'Add Subject'}</button>
+              <button type="button" className="btn btn-primary" onClick={addSlot} style={{ background: 'rgba(99,102,241,0.25)', border: '1px solid rgba(99,102,241,0.5)' }}>+ Add Slot</button>
               <button className="btn btn-outline" type="button" onClick={() => { setShowForm(false); setForm(EMPTY); setEditing(null); }}>Cancel</button>
             </div>
           </form>
