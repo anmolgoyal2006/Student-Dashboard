@@ -1,7 +1,7 @@
 // src/context/AuthContext.js
 
 import { createContext, useContext, useState, useCallback } from 'react';
-import { saveTokenToIDB, clearTokenFromIDB } from '../utils/authIDB';
+import { saveTokenToIDB, clearTokenFromIDB, saveTokenToCache } from '../utils/authIDB';
 
 const AuthContext = createContext();
 
@@ -14,7 +14,7 @@ export const AuthProvider = ({ children }) => {
   const login = useCallback((userData, token) => {
     localStorage.setItem('token', token);
     localStorage.setItem('user', JSON.stringify(userData));
-    if (token) saveTokenToIDB(token);
+    if (token) { saveTokenToIDB(token); saveTokenToCache(token); }
     setUser(userData);
   }, []);
 

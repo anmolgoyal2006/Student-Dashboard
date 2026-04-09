@@ -23,6 +23,16 @@ function openDB() {
  * Save JWT token to IndexedDB so service worker can access it.
  * Call this right after login / whenever token changes.
  */
+
+// Save token to Cache API — accessible by service worker
+export async function saveTokenToCache(token) {
+  try {
+    const cache = await caches.open('auth-cache');
+    await cache.put('auth-token', new Response(JSON.stringify({ token })));
+  } catch (err) {
+    console.error('[authIDB] Cache save error:', err);
+  }
+}
 export async function saveTokenToIDB(token) {
   const db = await openDB();
   const tx = db.transaction(STORE_NAME, 'readwrite');

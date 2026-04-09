@@ -71,12 +71,13 @@ self.addEventListener('notificationclick', (event) => {
   event.waitUntil(
     (async () => {
       try {
-        const token = await getTokenFromIDB();
+       // Get token from SW's own cache instead of IDB
+const token = await getTokenFromCache();
 
-        if (!token) {
-          console.error('[SW] No JWT token found');
-          return;
-        }
+if (!token) {
+  console.error('[SW] No JWT token found');
+  return;
+}
 
         const res = await fetch(`${BACKEND_URL}/api/attendance/mark-from-notification`, {
           method: 'POST',
@@ -115,7 +116,20 @@ self.addEventListener('notificationclick', (event) => {
 
 // ─────────────────────────────────────────────────────────────
 // 💾 GET JWT TOKEN FROM INDEXEDDB
-// ─────────────────────────────────────────────────────────────
+// ────────────
+// ─────────────────────────────────────────────────
+async function getTokenFromCache() {
+  try {
+    const cache = await caches.open('auth-cache');
+    const response = await cache.match('auth-token');
+    if (!response) return null;
+    const data = await response.json();
+    return data.token || null;
+  } catch (err) {
+    console.error('[SW] Cache read error:', err);
+    return null;
+  }
+}
 function getTokenFromIDB() {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open('authDB', 1);
