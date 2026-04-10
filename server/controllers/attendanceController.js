@@ -314,7 +314,7 @@ exports.getMonthlyTrends = async (req, res) => {
 exports.markFromNotification = async (req, res) => {
   try {
     const { subjectId, status, date } = req.body;
-    const userId = req.user._id;
+    const userId = req.user.id || req.user._id;
 
     // Map notification status → your system status
     const statusMap = {

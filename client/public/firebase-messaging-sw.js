@@ -4,7 +4,9 @@ importScripts('https://www.gstatic.com/firebasejs/12.11.0/firebase-app-compat.js
 importScripts('https://www.gstatic.com/firebasejs/12.11.0/firebase-messaging-compat.js');
 
 // 🔗 Your backend URL
-const BACKEND_URL = 'https://student-dashboard-irm9.onrender.com';
+const BACKEND_URL = self.location.hostname === 'localhost'
+  ? 'http://localhost:5000'
+  : 'https://student-dashboard-irm9.onrender.com';
 
 // 🔥 Firebase config (must be here)
 firebase.initializeApp({
