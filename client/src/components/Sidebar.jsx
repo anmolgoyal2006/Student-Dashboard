@@ -88,7 +88,7 @@ export default function Sidebar() {
       )}
 
       {/* Sidebar */}
-      <aside className={`sidebar${open ? ' open' : ''}`}>
+      <aside className={`sidebar${open ? ' open' : ''}`} style={{ display: 'flex', flexDirection: 'column' }}>
         <div className="sidebar-logo">StudentAI</div>
 
  <div className="sidebar-user">
@@ -124,7 +124,13 @@ export default function Sidebar() {
           </NavLink>
         ))}
 
-        <button className="sidebar-logout" onClick={logout}>
+        <div style={{ flex: 1 }} />
+        <button className="sidebar-logout" onClick={logout} style={{
+          position: 'sticky',
+          bottom: 0,
+          borderTop: '1px solid var(--border)',
+          marginTop: 8,
+        }}>
           <span className="sidebar-link-icon">🚪</span>
           Logout
         </button>
