@@ -9,7 +9,7 @@ router.get('/', protect, async (req, res) => {
   try {
     const notifications = await Notification.find({ userId: req.user._id })
       .sort({ createdAt: -1 })   // newest first
-      .limit(20)
+      .limit(6)
       .lean();
 
     // Also return unread count so the bell badge can update without extra call

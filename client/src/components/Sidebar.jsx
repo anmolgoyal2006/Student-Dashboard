@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import NotificationBell from './NotificationBell';
+
 
 // ── Define SettingsIcon before using it ──────────────────
 function SettingsIcon() {
@@ -106,7 +106,6 @@ export default function Sidebar() {
     <div className="sidebar-user-name">{user?.name}</div>
     <div className="sidebar-user-email">{user?.email}</div>
   </div>
-  <NotificationBell />
 </div>
 </div>
 
