@@ -30,21 +30,25 @@ function SettingsIcon() {
 // Changed: Profile entry now uses '⚙️' emoji to stay
 // consistent with the rest of the links array format.
 // This avoids JSX-in-object-literal issues.
-const links = [
-  { to: '/',           label: 'Dashboard',  icon: '🏠' },
-  { to: '/timetable',  label: 'Timetable',  icon: '📅' },
-  { to: '/attendance', label: 'Attendance', icon: '✅' },
-  { to: '/marks',      label: 'Marks',      icon: '📝' },
-  { to: '/career',     label: 'Career',     icon: '🚀' },
-  { to: '/scheduler',  label: 'Scheduler',  icon: '🗓️' },
-  { to: '/profile',    label: 'Profile',    icon: '⚙️' },  // ← fixed
+const baseLinks = [
+  { to: '/',             label: 'Dashboard',    icon: '🏠' },
+  { to: '/timetable',    label: 'Timetable',    icon: '📅' },
+  { to: '/attendance',   label: 'Attendance',   icon: '✅' },
+  { to: '/marks',        label: 'Marks',        icon: '📝' },
+  { to: '/career',       label: 'Career',       icon: '🚀' },
+  { to: '/scheduler',    label: 'Scheduler',    icon: '🗓️' },
+  { to: '/profile',      label: 'Profile',      icon: '⚙️' },
   { to: '/ai-assistant', label: 'AI Assistant', icon: '🤖' },
-  { to: '/prediction', label: 'Predictor', icon: '🎯' }
+  { to: '/prediction',   label: 'Predictor',    icon: '🎯' },
 ];
 
 export default function Sidebar() {
   const { user, logout } = useAuth();
   const [open, setOpen] = useState(false);
+
+  const links = user?.role === 'teacher'
+    ? [...baseLinks, { to: '/admin', label: 'User Management', icon: '👥' }]
+    : baseLinks;
 
   const initials = user?.name
     ? user.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()

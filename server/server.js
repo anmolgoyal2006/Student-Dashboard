@@ -72,6 +72,7 @@ app.use('/api/ai',              require('./routes/aiRoutes'));
 app.use('/api/decision',        require('./routes/decisionRoutes'));
 app.use('/api/predict',         require('./routes/predictionRoutes'));
 app.use('/api/ai-command',      require('./routes/aiCommandRoutes'));
+app.use('/api/admin',           require('./routes/adminRoutes'));
 
 
 // 🔥 ADD HERE

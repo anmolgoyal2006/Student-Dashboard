@@ -16,6 +16,7 @@ import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword  from './pages/ResetPassword';
 import AIAssistant from './pages/AIAssistant';
 import Prediction from './pages/Prediction';
+import AdminPanel from './pages/AdminPanel';
 import LoginSuccess from './pages/LoginSuccess';
 import { getFCMToken, getMessagingInstance } from './firebase';
 import { onMessage } from 'firebase/messaging';
@@ -124,6 +125,9 @@ useEffect(() => {
         } />
         <Route path="/profile" element={
           <ProtectedRoute><AppLayout><ProfileSettings /></AppLayout></ProtectedRoute>
+        } />
+       <Route path="/admin" element={
+          <ProtectedRoute><AppLayout><AdminPanel /></AppLayout></ProtectedRoute>
         } />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
