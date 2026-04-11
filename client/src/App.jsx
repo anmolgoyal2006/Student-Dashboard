@@ -104,8 +104,12 @@ useEffect(() => {
           <ProtectedRoute><AppLayout><Timetable /></AppLayout></ProtectedRoute>
         } />
         <Route path="/attendance" element={
-          <ProtectedRoute><AppLayout><Attendance /></AppLayout></ProtectedRoute>
-        } />
+  <ProtectedRoute><AppLayout><Attendance /></AppLayout></ProtectedRoute>
+} />
+
+<Route path="/attendance/upload" element={
+  <ProtectedRoute><AppLayout><Attendance /></AppLayout></ProtectedRoute>
+} />
         <Route path="/marks" element={
           <ProtectedRoute><AppLayout><Marks /></AppLayout></ProtectedRoute>
         } />

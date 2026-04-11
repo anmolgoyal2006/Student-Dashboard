@@ -10,6 +10,7 @@
 
 const Attendance = require('../models/Attendance');
 const Subject    = require('../models/Subject');
+const User       = require('../models/User');
 
 // ── Shared pure helpers ───────────────────────────────────────────────────────
 
@@ -361,5 +362,59 @@ if (!subject) {
   } catch (err) {
     console.error('[markFromNotification]', err);
     res.status(500).json({ message: 'Failed to mark attendance from notification' });
+  }
+};
+
+// GET /api/attendance/student/:sid  (teacher views a student's attendance)
+exports.getStudentBySid = async (req, res) => {
+  try {
+    const student = await User.findOne({ sid: req.params.sid });
+    if (!student)
+      return res.status(404).json({ message: `No student found with SID: ${req.params.sid}` });
+
+    const rawRecords = await Attendance.find({ userId: student._id })
+      .populate('subjectId', 'name code')
+      .sort({ date: -1 });
+
+    // Flatten records for the table
+    const records = rawRecords.map(r => ({
+      date:    r.date,
+      status:  r.status,
+      subject: r.subjectId?.name || 'Unknown',
+      code:    r.subjectId?.code || '—',
+    }));
+
+    // Per-subject summary for the breakdown bars
+    const subjectMap = {};
+    for (const r of rawRecords) {
+      if (r.status === 'cancelled') continue;
+      const key  = r.subjectId?._id?.toString() || 'unknown';
+      const name = r.subjectId?.name || 'Unknown';
+      const code = r.subjectId?.code || '—';
+      if (!subjectMap[key]) subjectMap[key] = { subject: name, code, present: 0, total: 0 };
+      subjectMap[key].total++;
+      if (r.status === 'present') subjectMap[key].present++;
+    }
+
+    const summary = Object.values(subjectMap).map(s => ({
+      ...s,
+      percentage: s.total ? +((s.present / s.total) * 100).toFixed(1) : 0,
+    }));
+
+    const present = records.filter(r => r.status === 'present').length;
+    const absent  = records.filter(r => r.status === 'absent').length;
+    const total   = present + absent;
+
+    res.json({
+      student: { name: student.name, email: student.email, sid: student.sid },
+      records,
+      summary,
+      total,
+      present,
+      absent,
+    });
+  } catch (err) {
+    console.error('[getStudentBySid]', err);
+    res.status(500).json({ message: 'Failed to fetch student attendance.' });
   }
 };

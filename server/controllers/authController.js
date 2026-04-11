@@ -5,14 +5,13 @@ const jwt    = require('jsonwebtoken');
 
 const generateToken = (user) =>
   jwt.sign(
-    { id: user._id, email: user.email, name: user.name },
+    { id: user._id, email: user.email, name: user.name, role: user.role },
     process.env.JWT_SECRET,
     { expiresIn: '7d' }
   );
-
 // POST /api/auth/signup
 exports.signup = async (req, res) => {
-  const { name, email, password, college, semester, branch } = req.body;
+ const { name, email, password, college, semester, branch, sid } = req.body;
   try {
     if (!name || !email || !password)
       return res.status(400).json({ message: 'Name, email and password are required.' });
@@ -21,11 +20,11 @@ exports.signup = async (req, res) => {
       return res.status(400).json({ message: 'Email already registered.' });
 
     const hashed = await bcrypt.hash(password, 12);
-    const user   = await User.create({ name, email, password: hashed, college, semester, branch });
+const user   = await User.create({ name, email, password: hashed, college, semester, branch, sid, role: 'student' });
 
     res.status(201).json({
       token: generateToken(user),
-      user:  { id: user._id, name: user.name, email: user.email, college: user.college, semester: user.semester },
+           user:  { id: user._id, name: user.name, email: user.email, college: user.college, semester: user.semester, role: user.role, sid: user.sid },
     });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -42,10 +41,9 @@ exports.login = async (req, res) => {
     const user = await User.findOne({ email });
     if (!user || !(await bcrypt.compare(password, user.password)))
       return res.status(401).json({ message: 'Invalid email or password.' });
-
-    res.json({
+res.json({
       token: generateToken(user),
-      user:  { id: user._id, name: user.name, email: user.email, college: user.college, semester: user.semester },
+      user:  { id: user._id, name: user.name, email: user.email, college: user.college, semester: user.semester, role: user.role, sid: user.sid },
     });
   } catch (err) {
     res.status(500).json({ message: err.message });

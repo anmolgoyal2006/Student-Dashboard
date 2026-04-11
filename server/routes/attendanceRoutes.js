@@ -5,7 +5,8 @@ const {
   getAttendanceSummary,
   getBySubject,
   getMonthlyTrends,
-  markFromNotification
+  markFromNotification,
+  getStudentBySid
 } = require('../controllers/attendanceController');
 
 const { protect } = require('../middleware/authMiddleware');
@@ -18,6 +19,9 @@ router.get('/trends', getMonthlyTrends);
 
 // ✅ PUT THIS BEFORE :subjectId
 router.post('/mark-from-notification', markFromNotification);
+
+// Student attendance view by SID (teacher feature)
+router.get('/student/:sid', getStudentBySid);
 
 // ❗ KEEP THIS LAST
 router.get('/:subjectId', getBySubject);

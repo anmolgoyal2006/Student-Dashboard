@@ -179,3 +179,32 @@ exports.saveToken = async (req, res) => {
     res.status(500).json({ message: 'Failed to save token' });
   }
 };
+
+// PUT /api/user/update-sid
+exports.updateSID = async (req, res) => {
+  const { sid } = req.body;
+
+  if (!sid || !sid.trim())
+    return res.status(400).json({ message: 'SID cannot be empty.' });
+
+  try {
+    const trimmedSid = sid.trim();
+
+    const existing = await User.findOne({ sid: trimmedSid, _id: { $ne: req.user._id } });
+    if (existing)
+      return res.status(409).json({ message: 'This SID is already taken by another user.' });
+
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ message: 'User not found.' });
+
+    user.sid = trimmedSid;
+    await user.save();
+
+    res.json({
+      message: 'SID updated successfully',
+      user: { name: user.name, email: user.email, sid: user.sid, role: user.role },
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};

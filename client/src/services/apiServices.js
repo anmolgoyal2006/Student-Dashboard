@@ -17,7 +17,8 @@ export const subjectService = {
 };
 // ─── Attendance ───────────────────────────────────────────────────────────
 export const attendanceService = {
-  mark:       (data) => apiRequest('post', '/attendance', data),
+  mark:            (data) => apiRequest('post', '/attendance', data),
+  getClassSummary: ()     => apiRequest('get',  '/attendance/class-summary'),
 
   // [UNCHANGED] summary now returns { summary, overview } — overview used for insight cards
   getSummary: () => apiRequest('get', '/attendance/summary'),
@@ -89,8 +90,8 @@ export const userService = {
   changePassword: (data)               => apiRequest('put',  '/user/change-password',         data),
   forgotPassword: (data)               => apiRequest('post', '/user/forgot-password',         data),
   resetPassword:  (token, newPassword) => apiRequest('post', `/user/reset-password/${token}`, { newPassword }),
+  updateSID:      (data)               => apiRequest('put',  '/user/update-sid',              data),
 };
-
 // ─── AI Chat / Study Assistant ────────────────────────────────────────────
 export const aiChatService = {
   chat: (message, mode) =>

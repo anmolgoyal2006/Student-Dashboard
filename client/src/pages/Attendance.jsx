@@ -4,6 +4,9 @@
 // ============================================================
 
 import { useEffect, useState } from 'react';
+import { useAuth } from '../context/AuthContext';
+import BulkAttendanceUpload from '../components/BulkAttendanceUpload';
+import StudentAttendanceView from '../components/StudentAttendanceView';
 import { attendanceService, subjectService } from '../services/apiServices';
 import toast from 'react-hot-toast';
 import { Line } from 'react-chartjs-2';
@@ -38,8 +41,11 @@ const themeFor = pct =>
     : { badge: 'badge-danger',  bar: 'danger',  text: 'var(--danger)',  tag: 'CRITICAL' };
 
 // ─────────────────────────────────────────────────────────────────────────────
-
 export default function Attendance() {
+  const { user } = useAuth();
+  const isTeacher = user?.role === 'teacher';
+  const isStudent = user?.role === 'student';
+
   const [summary,  setSummary]  = useState([]);
   const [subjects, setSubjects] = useState([]);
   const [trends,   setTrends]   = useState([]);
@@ -48,9 +54,10 @@ export default function Attendance() {
     date     : new Date().toISOString().slice(0, 10),
     status   : 'present',
   });
-  const [loading, setLoading] = useState(true);
+ const [loading,      setLoading]      = useState(true);
+  const [classSummary, setClassSummary] = useState([]);
 
-  const load = async () => {
+const load = async () => {
     try {
       const [s, sub, t] = await Promise.all([
         attendanceService.getSummary(),
@@ -60,7 +67,13 @@ export default function Attendance() {
       setSummary(s.data.summary     || []);
       setSubjects(sub.data.subjects || []);
       setTrends(t.data.trends       || []);
-    } catch {
+
+      if (isTeacher) {
+        const cs = await attendanceService.getClassSummary();
+        setClassSummary(cs.data.students || []);
+      }
+   } catch (err) {
+  console.error(err);
       toast.error('Failed to load attendance data.');
     } finally {
       setLoading(false);
@@ -107,20 +120,33 @@ export default function Attendance() {
     },
   };
 
-  if (loading) return <div className="spinner" />;
+if (loading) return <div className="spinner" />;
+
+ if (isStudent || !isTeacher) {
+    return <StudentAttendanceView sid={user.sid} />;
+  }
 
   return (
     <div>
-
-      {/* Page header */}
+   {/* Bulk upload — teachers only */}
       <div className="page-header">
         <div>
           <h1 className="page-title">Attendance Tracker</h1>
           <p  className="page-subtitle">Mark and monitor your attendance per subject</p>
-        </div>
+       </div>
       </div>
 
-      {/* Insight cards — .grid-4 + .card + .stat-card */}
+      {isTeacher && (
+        <div className="card mb-4">
+          <div className="card-title">📤 Bulk Attendance Upload</div>
+          <p className="text-muted">
+            Upload an Excel file to mark attendance for multiple students at once.
+          </p>
+          <BulkAttendanceUpload />
+        </div>
+      )}
+
+      {/* Insight cards
       {summary.length > 0 && (
         <div className="grid-4 mb-4">
           <InsightCard emoji="✅" value={safeCount}      label="Subjects Safe"     color="var(--success)" />
@@ -130,8 +156,8 @@ export default function Attendance() {
         </div>
       )}
 
-      {/* Form + chart — .grid-2 */}
-      <div className="grid-2 mb-4">
+    {/* Form + chart — students only */}
+      {!isTeacher && <div className="grid-2 mb-4">
 
         <div className="card">
           <div className="card-title">Mark Today's Attendance</div>
@@ -198,10 +224,10 @@ export default function Attendance() {
             </div>
           )}
         </div>
-      </div>
+   </div>}
 
-      {/* Subject summary */}
-      <div className="card">
+      {/* Subject summary — only for non-teachers */}
+      {!isTeacher && <div className="card">
         <div className="card-title">Subject-wise Summary</div>
         {summary.length === 0 ? (
           <div className="empty-state">
@@ -212,7 +238,66 @@ export default function Attendance() {
         ) : (
           summary.map(s => <SubjectRow key={s.subject} data={s} />)
         )}
-      </div>
+      </div>}
+
+      {/* Class summary — teachers only */}
+      {isTeacher && (
+        <div className="card" style={{ marginTop: 16 }}>
+          <div className="card-title">👥 Student Attendance Summary</div>
+          {classSummary.length === 0 ? (
+            <div className="empty-state">
+              <div className="icon">📋</div>
+              <p style={{ fontWeight: 600, color: 'var(--text-2)', marginBottom: 4 }}>No data yet</p>
+              <p className="text-muted">Upload attendance Excel to see student summary.</p>
+            </div>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                <thead>
+                  <tr style={{ background: 'rgba(255,255,255,0.04)' }}>
+                    <th style={{ padding: '10px 12px', textAlign: 'left', color: 'var(--muted)', fontWeight: 600 }}>Student</th>
+                    <th style={{ padding: '10px 12px', textAlign: 'left', color: 'var(--muted)', fontWeight: 600 }}>SID</th>
+                    <th style={{ padding: '10px 12px', textAlign: 'left', color: 'var(--muted)', fontWeight: 600 }}>Overall %</th>
+                    <th style={{ padding: '10px 12px', textAlign: 'left', color: 'var(--muted)', fontWeight: 600 }}>Subjects</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {classSummary.map((s, i) => (
+                    <tr key={i} style={{ borderBottom: '1px solid var(--card-border)' }}>
+                      <td style={{ padding: '10px 12px', color: 'var(--text)' }}>
+                        <div style={{ fontWeight: 600 }}>{s.name}</div>
+                        <div style={{ fontSize: 11, color: 'var(--muted)' }}>{s.email}</div>
+                      </td>
+                      <td style={{ padding: '10px 12px', color: 'var(--muted)' }}>{s.sid}</td>
+                      <td style={{ padding: '10px 12px' }}>
+                        <span style={{
+                          fontWeight: 700,
+                          color: s.overall >= 75 ? 'var(--success)' : s.overall >= 60 ? 'var(--warning)' : 'var(--danger)'
+                        }}>
+                          {s.overall}%
+                        </span>
+                      </td>
+                      <td style={{ padding: '10px 12px' }}>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                          {s.subjects.map((sub, j) => (
+                            <span key={j} style={{
+                              padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600,
+                              background: sub.percentage >= 75 ? 'rgba(34,197,94,0.15)' : sub.percentage >= 60 ? 'rgba(251,191,36,0.15)' : 'rgba(239,68,68,0.15)',
+                              color: sub.percentage >= 75 ? '#4ade80' : sub.percentage >= 60 ? '#fbbf24' : '#f87171',
+                            }}>
+                              {sub.subject}: {sub.percentage}%
+                            </span>
+                          ))}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
 
     </div>
   );
@@ -229,23 +314,17 @@ function SubjectRow({ data }) {
   const showMissWarning = percentage >= 75 && miss2 < 75;
 
   return (
-    <div style={{
-      borderLeft  : `3px solid ${theme.text}`,
-      background  : 'var(--bg-2)',
-      borderRadius: 'var(--radius-sm)',
-      padding     : '14px 16px',
-      marginBottom: 10,
-    }}>
+   <div className={`subject-row subject-row--${theme.bar}`}>
       {/* Header row */}
       <div className="flex justify-between items-center" style={{ marginBottom: 8 }}>
         <div>
-          <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)', display: 'block' }}>
+<span className="subject-name">
             {subject}
           </span>
           <span className="text-muted">{present}/{total} classes attended</span>
         </div>
         <div className="flex items-center gap-2">
-          <span style={{ fontWeight: 800, fontSize: 16, color: theme.text }}>{percentage}%</span>
+         <span className={`subject-pct subject-pct--${theme.bar}`}>{percentage}%</span>
           <span className={`badge ${theme.badge}`}>{theme.tag}</span>
         </div>
       </div>
@@ -253,11 +332,7 @@ function SubjectRow({ data }) {
       {/* Progress — .progress / .progress-bar.success|warning|danger from index.css */}
       <div className="progress" style={{ marginBottom: 8, position: 'relative', overflow: 'visible' }}>
         <div className={`progress-bar ${theme.bar}`} style={{ width: `${Math.min(percentage, 100)}%` }} />
-        <div style={{
-          position: 'absolute', left: '75%', top: -3,
-          width: 2, height: 13,
-          background: 'var(--muted)', borderRadius: 2,
-        }} title="75% threshold" />
+     <div className="progress-marker" title="75% threshold" />
       </div>
 
       {/* Smart insights */}
@@ -298,7 +373,7 @@ function SubjectRow({ data }) {
 
 function InsightCard({ emoji, value, label, color }) {
   return (
-    <div className="card stat-card" style={{ borderTop: `2px solid ${color}` }}>
+    <div className={`card stat-card stat-card--${color === 'var(--success)' ? 'success' : color === 'var(--warning)' ? 'warning' : color === 'var(--danger)' ? 'danger' : 'primary'}`}>
       <span className="stat-icon">{emoji}</span>
       <div className="stat-value" style={{ color }}>{value}</div>
       <div className="stat-label">{label}</div>

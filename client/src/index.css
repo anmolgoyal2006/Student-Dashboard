@@ -433,7 +433,8 @@ body {
   background: rgba(255,255,255,0.07);
   border-radius: 99px;
   height: 7px;
-  overflow: hidden;
+  overflow: visible;
+  position: relative;
 }
 .progress-bar {
   height: 100%;
@@ -606,4 +607,44 @@ tr:hover td { background: rgba(255,255,255,0.025); }
   .grid-4 {
     grid-template-columns: repeat(2, 1fr);
   }
+}
+/* ───── Attendance: Subject Row ───── */
+.subject-row {
+  background: var(--bg-2);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  margin-bottom: 10px;
+  border-left: 3px solid transparent;
+}
+.subject-row--success { border-left-color: var(--success); }
+.subject-row--warning { border-left-color: var(--warning); }
+.subject-row--danger  { border-left-color: var(--danger);  }
+
+/* ───── Attendance: Subject Row internals ───── */
+.subject-name {
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--text);
+  display: block;
+}
+.subject-pct            { font-weight: 800; font-size: 16px; }
+.subject-pct--success   { color: var(--success); }
+.subject-pct--warning   { color: var(--warning); }
+.subject-pct--danger    { color: var(--danger);  }
+
+/* ───── Attendance: Insight Stat Cards ───── */
+.stat-card--success { border-top: 2px solid var(--success); }
+.stat-card--warning { border-top: 2px solid var(--warning); }
+.stat-card--danger  { border-top: 2px solid var(--danger);  }
+.stat-card--primary { border-top: 2px solid var(--primary); }
+
+/* ───── Attendance: Progress threshold marker ───── */
+.progress-marker {
+  position: absolute;
+  left: 75%;
+  top: -3px;
+  width: 2px;
+  height: 13px;
+  background: var(--muted);
+  border-radius: 2px;
 }

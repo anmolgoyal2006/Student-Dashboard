@@ -70,6 +70,10 @@ export default function ProfileSettings() {
   const [passwordLoading, setPwL]      = useState(false);
   const [strength,        setStrength] = useState(null);
 
+  const [sid,        setSid]  = useState(user?.sid || '');
+  const [sidStatus,  setSidS] = useState({ type: '', message: '' });
+  const [sidLoading, setSidL] = useState(false);
+
   const handleProfileSubmit = async e => {
     e.preventDefault();
     setPS({ type: '', message: '' });
@@ -151,6 +155,27 @@ export default function ProfileSettings() {
     setPwL(false);
   }
 };
+
+  const handleSidSubmit = async e => {
+    e.preventDefault();
+    setSidS({ type: '', message: '' });
+
+    const trimmed = sid.trim();
+    if (!trimmed) return setSidS({ type: 'error', message: 'SID cannot be empty.' });
+    if (trimmed === user?.sid) return setSidS({ type: 'error', message: 'No changes detected.' });
+
+    setSidL(true);
+    try {
+      const { data } = await userService.updateSID({ sid: trimmed });
+      updateUser(data.user);
+      setSidS({ type: 'success', message: data.message });
+      toast.success('SID updated!');
+    } catch (err) {
+      setSidS({ type: 'error', message: err.response?.data?.message || 'Failed to update SID.' });
+    } finally {
+      setSidL(false);
+    }
+  };
 
   const initials = user?.name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'ST';
 
@@ -292,6 +317,40 @@ export default function ProfileSettings() {
 
             <button type="submit" className="ps-btn ps-btn--teal" disabled={passwordLoading}>
               {passwordLoading ? <><span className="ps-spinner" />Updating…</> : <>🛡️ Change Password</>}
+            </button>
+          </form>
+        </div>
+
+  {/* Card 3 — Update SID */}
+        <div className="ps-card">
+          <div className="ps-card-hdr">
+            <div className="ps-card-icon ps-card-icon--amber">🎓</div>
+            <div>
+              <div className="ps-card-title">Student ID (SID)</div>
+              <div className="ps-card-sub">Update your unique student identifier</div>
+            </div>
+          </div>
+
+          <Alert type={sidStatus.type} message={sidStatus.message} />
+
+          <form onSubmit={handleSidSubmit} noValidate>
+            <div className="ps-field">
+              <label className="ps-label">Student ID</label>
+              <div className="ps-input-wrap">
+                <span className="ps-icon">🎓</span>
+                <input
+                  className="ps-input"
+                  type="text"
+                  value={sid}
+                  onChange={e => setSid(e.target.value)}
+                  placeholder="e.g. 2023CS001"
+                />
+              </div>
+              <p className="ps-hint">⚡ SID must be unique across all users.</p>
+            </div>
+
+            <button type="submit" className="ps-btn ps-btn--amber" disabled={sidLoading}>
+              {sidLoading ? <><span className="ps-spinner" />Saving…</> : <>🎓 Update SID</>}
             </button>
           </form>
         </div>

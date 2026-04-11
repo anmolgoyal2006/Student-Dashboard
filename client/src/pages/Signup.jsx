@@ -6,8 +6,8 @@ import toast from 'react-hot-toast';
 import './Signup.css';
 
 export default function Signup() {
-  const [form, setForm] = useState({
-    name: '', email: '', password: '', college: '', semester: 1, branch: '',
+ const [form, setForm] = useState({
+    name: '', email: '', password: '', college: '', semester: 1, branch: '', sid: '',
   });
   const [loading, setLoading] = useState(false);
   const [focused, setFocused] = useState('');
@@ -37,6 +37,7 @@ export default function Signup() {
     { label: 'Password',   name: 'password', type: 'password', placeholder: 'Min. 6 characters',  icon: '🔒' },
     { label: 'College',    name: 'college',  type: 'text',     placeholder: 'Your college name',  icon: '🏛️' },
     { label: 'Branch',     name: 'branch',   type: 'text',     placeholder: 'CSE / IT / ECE…',    icon: '📐' },
+{ label: 'Student ID', name: 'sid',      type: 'text',     placeholder: 'e.g. 2201234',        icon: '🪪' },
   ];
 
   return (

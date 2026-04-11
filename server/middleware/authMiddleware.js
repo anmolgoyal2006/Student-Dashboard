@@ -10,10 +10,10 @@ const protect = (req, res, next) => {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     // Normalize: always expose both .id and ._id
-    req.user = {
-      ...decoded,
-      _id: decoded.id,   // ← add _id alias so both work
-    };
+   req.user = {
+  ...decoded,
+  _id: decoded.id || decoded._id || decoded.userId,
+};
     next();
   } catch (err) {
     return res.status(401).json({ message: 'Invalid or expired token.' });
