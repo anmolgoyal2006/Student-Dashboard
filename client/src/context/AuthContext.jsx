@@ -1,6 +1,6 @@
 // src/context/AuthContext.js
 
-import { createContext, useContext, useState, useCallback } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { saveTokenToIDB, clearTokenFromIDB, saveTokenToCache } from '../utils/authIDB';
 
 const AuthContext = createContext();
@@ -10,6 +10,32 @@ export const AuthProvider = ({ children }) => {
     try { return JSON.parse(localStorage.getItem('user')) || null; }
     catch { return null; }
   });
+
+  // Refresh role from server on every app load
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    fetch(`${process.env.REACT_APP_API_URL}/auth/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (data?.user) {
+          const fresh = {
+            id      : data.user._id,
+            name    : data.user.name,
+            email   : data.user.email,
+            role    : data.user.role,
+            sid     : data.user.sid,
+            college : data.user.college,
+            semester: data.user.semester,
+          };
+          setUser(fresh);
+          localStorage.setItem('user', JSON.stringify(fresh));
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const login = useCallback((userData, token) => {
     localStorage.setItem('token', token);
