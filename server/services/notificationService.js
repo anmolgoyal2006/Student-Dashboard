@@ -145,7 +145,7 @@ async function sendEndOfClassNotifications() {
   const now      = new Date();
   const dayShort = DAYS[now.getDay()];
 
-  if (dayShort === 'Sun' || dayShort === 'Sat') return;
+  if (dayShort === 'Sat') return;
 
   // Current time as "HH:MM" 24h format — must match your DB format
   const currentTime = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
