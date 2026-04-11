@@ -10,7 +10,7 @@ const subjectSchema = new mongoose.Schema({
   instructor: { type: String, default: '' },
 
   schedule: [{
-    day:       { type: String, enum: ['Mon','Tue','Wed','Thu','Fri','Sat'] },
+    day: { type: String, enum: ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'] },
     startTime: { type: String },
     endTime:   { type: String },
     room:      { type: String, default: '' },
