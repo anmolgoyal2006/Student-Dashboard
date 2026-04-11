@@ -13,7 +13,7 @@ function getTodayName() {
 async function fetchTodaySubjects() {
   const today = getTodayName();
 
-  if (today === 'Sun' || today === 'Sat') {
+ if (today === 'Sat') {
     console.log('[FCM] Weekend — no notifications sent.');
     return [];
   }

@@ -3,7 +3,7 @@ import { subjectService } from '../services/apiServices';
 import toast from 'react-hot-toast';
 import WeeklyGrid from '../components/WeeklyGrid';
 
-const DAYS  = ['Mon','Tue','Wed','Thu','Fri','Sat'];
+const DAYS  = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 const EMPTY = { name: '', code: '', instructor: '', credits: 4, schedule: [] };
 
 const EMPTY_SLOT = { day: 'Mon', startTime: '09:00', endTime: '10:00', room: '' };
