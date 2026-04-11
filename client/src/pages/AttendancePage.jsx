@@ -42,7 +42,7 @@ export default function StudentAttendanceView({ sid }) {
       try {
         setLoading(true);
         const token = localStorage.getItem('token');
-        const res   = await axios.get(`/api/attendance/student/${sid}`, {
+        const res   = await axios.get(`${process.env.REACT_APP_API_URL}/attendance/student/${sid}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         setData(res.data);
