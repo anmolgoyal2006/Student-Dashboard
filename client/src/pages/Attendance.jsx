@@ -122,8 +122,8 @@ const load = async () => {
 
 if (loading) return <div className="spinner" />;
 
- if (isStudent || !isTeacher) {
-    return <StudentAttendanceView sid={user.sid} />;
+ if (isStudent) {
+    return <StudentAttendanceView sid={user?.sid} />;
   }
 
   return (
@@ -146,7 +146,7 @@ if (loading) return <div className="spinner" />;
         </div>
       )}
 
-      {/* Insight cards
+   {/* Insight cards */}
       {summary.length > 0 && (
         <div className="grid-4 mb-4">
           <InsightCard emoji="✅" value={safeCount}      label="Subjects Safe"     color="var(--success)" />
