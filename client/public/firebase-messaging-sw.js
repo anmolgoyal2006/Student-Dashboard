@@ -64,8 +64,23 @@ self.addEventListener('notificationclick', (event) => {
   const date = data.date;
 
   // 👉 If user just clicks notification (not button)
-  if (!action || !subjectId) {
-    event.waitUntil(clients.openWindow('/'));
+// 👉 No action = plain tap (mobile) → open in-app attendance page
+  if (!action) {
+    const url = subjectId
+      ? `/?markAttendance=1&subjectId=${subjectId}&date=${date}`
+      : '/';
+    event.waitUntil(
+      clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+        for (const c of list) {
+          if (c.url.includes(self.location.origin)) {
+            c.focus();
+            c.navigate(url);
+            return;
+          }
+        }
+        return clients.openWindow(url);
+      })
+    );
     return;
   }
 

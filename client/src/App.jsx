@@ -16,6 +16,7 @@ import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword  from './pages/ResetPassword';
 import AIAssistant from './pages/AIAssistant';
 import Prediction from './pages/Prediction';
+import AttendancePrompt from './components/AttendancePrompt';
 import AdminPanel from './pages/AdminPanel';
 import LoginSuccess from './pages/LoginSuccess';
 import { getFCMToken, getMessagingInstance } from './firebase';
@@ -32,9 +33,9 @@ const AppLayout = ({ children }) => (
   <div className="layout">
     <Sidebar />
     <main className="main-content">{children}</main>
+    <AttendancePrompt />
   </div>
 );
-
 export default function App() {
   const { isLoggedIn } = useAuth();
 
