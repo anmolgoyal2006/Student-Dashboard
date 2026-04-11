@@ -6,6 +6,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import BulkAttendanceUpload from '../components/BulkAttendanceUpload';
+import AttendanceRegisterScanner from '../components/AttendanceRegisterScanner';
 import StudentAttendanceView from '../components/StudentAttendanceView';
 import { attendanceService, subjectService } from '../services/apiServices';
 import toast from 'react-hot-toast';
@@ -142,10 +143,17 @@ if (loading) return <div className="spinner" />;
           <p className="text-muted">
             Upload an Excel file to mark attendance for multiple students at once.
           </p>
-          <BulkAttendanceUpload />
+       <BulkAttendanceUpload />
+
+          <div style={{ marginTop: 24, borderTop: '1px solid var(--card-border)', paddingTop: 20 }}>
+            <div className="card-title">📷 Scan Physical Register</div>
+            <p className="text-muted">
+              Upload a photo of a handwritten attendance register — OCR will extract the data for you to review before submitting.
+            </p>
+           <AttendanceRegisterScanner uploadUrl={`${process.env.REACT_APP_API_URL}/attendance/upload`} />
+          </div>
         </div>
       )}
-
 {/* Insight cards — students only */}
       {!isTeacher && summary.length > 0 && (
         <div className="grid-4 mb-4">
