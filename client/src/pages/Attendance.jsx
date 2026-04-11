@@ -146,8 +146,8 @@ if (loading) return <div className="spinner" />;
         </div>
       )}
 
-   {/* Insight cards */}
-      {summary.length > 0 && (
+{/* Insight cards — students only */}
+      {!isTeacher && summary.length > 0 && (
         <div className="grid-4 mb-4">
           <InsightCard emoji="✅" value={safeCount}      label="Subjects Safe"     color="var(--success)" />
           <InsightCard emoji="⚠️" value={atRiskCount}    label="Subjects At Risk"  color="var(--warning)" />
