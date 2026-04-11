@@ -57,7 +57,6 @@ app.use('/auth',                require('./routes/authRoutes'));
 app.use('/api/subjects',        require('./routes/timetableRoutes'));
 app.use('/api/timetable',       require('./routes/timetableRoutes'));
 app.use('/api/attendance', require('./routes/attendanceUploadRoutes'));
-app.use('/api/attendance', require('./routes/attendanceUploadRoutes'));
 app.use('/api/attendance', require('./routes/attendanceRoutes'));
 app.use('/api/marks',           require('./routes/marksRoutes'));
 app.use('/api/career',          require('./routes/careerRoutes'));
