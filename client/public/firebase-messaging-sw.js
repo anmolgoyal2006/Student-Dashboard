@@ -36,9 +36,10 @@ messaging.onBackgroundMessage((payload) => {
     badge: '/logo192.png',
 
     // 👇 IMPORTANT: pass data for click handling
-    data: {
-      subjectId: data.subjectId,
-      date: data.date
+   data: {
+      subjectId: data.subjectId || '',
+      date: data.date || new Date().toISOString().split('T')[0],
+      url: `/?markAttendance=1&subjectId=${data.subjectId}&date=${data.date}`,
     },
 
     // 🔥 ACTION BUTTONS
@@ -55,79 +56,63 @@ messaging.onBackgroundMessage((payload) => {
 // 🖱 HANDLE NOTIFICATION CLICK (BUTTON ACTIONS)
 // ─────────────────────────────────────────────────────────────
 self.addEventListener('notificationclick', (event) => {
-  event.notification.close();
-
+  event.waitUntil((async () => {
+    event.notification.close();
   const action = event.action;
   const data = event.notification.data || {};
 
   const subjectId = data.subjectId;
   const date = data.date;
-
-  // 👉 If user just clicks notification (not button)
-// 👉 No action = plain tap (mobile) → open in-app attendance page
+// 👉 No action = plain tap → open in-app prompt
   if (!action) {
-    const url = subjectId
-      ? `/?markAttendance=1&subjectId=${subjectId}&date=${date}`
-      : '/';
-    event.waitUntil(
-      clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
-        for (const c of list) {
-          if (c.url.includes(self.location.origin)) {
-            c.focus();
-            c.navigate(url);
-            return;
-          }
-        }
-        return clients.openWindow(url);
-      })
-    );
+    const allClients = await clients.matchAll({ type: 'window', includeUncontrolled: true });
+
+    // iOS PWA: send postMessage if app is already open
+    for (const client of allClients) {
+      client.postMessage({ type: 'MARK_ATTENDANCE', subjectId, date });
+      await client.focus();
+      return;
+    }
+
+    // App not open — open it with URL params
+    const url = data.url
+      || (subjectId ? `/?markAttendance=1&subjectId=${subjectId}&date=${date}` : '/');
+    await clients.openWindow(url);
     return;
   }
 
-  // 🔥 Handle attendance marking
-  event.waitUntil(
-    (async () => {
-      try {
-       // Get token from SW's own cache instead of IDB
-const token = await getTokenFromCache();
+  // 🔥 Action button clicked — mark attendance directly from SW
+  try {
+    const token = await getTokenFromCache();
+    if (!token) {
+      console.error('[SW] No JWT token found');
+      return;
+    }
 
-if (!token) {
-  console.error('[SW] No JWT token found');
-  return;
-}
+    const res = await fetch(`${BACKEND_URL}/api/attendance/mark-from-notification`, {
+      method: 'POST',
+      headers: {
+        'Content-Type':  'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ subjectId, status: action, date }),
+    });
 
-        const res = await fetch(`${BACKEND_URL}/api/attendance/mark-from-notification`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({
-            subjectId,
-            status: action,
-            date
-          })
-        });
+    if (res.ok) {
+      console.log(`[SW] Attendance marked: ${subjectId} → ${action}`);
+      await self.registration.showNotification('✅ Attendance Marked', {
+        body: `Marked as "${action.replace(/_/g, ' ')}"`,
+        icon: '/logo192.png',
+        badge: '/logo192.png',
+      });
+    } else {
+      console.error('[SW] Failed:', res.status);
+    }
+  } catch (err) {
+    console.error('[SW ERROR]', err.message);
+  }
 
-        if (res.ok) {
-          console.log(`[SW] Attendance marked: ${subjectId} → ${action}`);
-
-          // ✅ Show confirmation
-          self.registration.showNotification('✅ Attendance Marked', {
-            body: `Marked as "${action.replace('_', ' ')}"`,
-            icon: '/logo192.png',
-            badge: '/logo192.png'
-          });
-
-        } else {
-          console.error('[SW] Failed:', res.status);
-        }
-
-      } catch (err) {
-        console.error('[SW ERROR]', err.message);
-      }
-    })()
-  );
+  })()); // closes event.waitUntil async IIFE
 });
 
 

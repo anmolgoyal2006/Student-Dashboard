@@ -80,11 +80,32 @@ useEffect(() => {
   const messaging = getMessagingInstance();
   const unsubscribe = onMessage(messaging, (payload) => {
     const { title, body } = payload?.notification || {};
-    if (title || body) {
+    const data = payload?.data || {};
+
+    // Show system notification with action buttons (works in foreground too)
+    if (Notification.permission === 'granted' && data.subjectId) {
+      navigator.serviceWorker.ready.then(reg => {
+        reg.showNotification(title || '🔔 Attendance', {
+          body: body || 'Mark your attendance',
+          icon: '/logo192.png',
+          badge: '/logo192.png',
+          data: {
+            subjectId: data.subjectId,
+            date: data.date,
+            url: `/?markAttendance=1&subjectId=${data.subjectId}&date=${data.date}`,
+          },
+          actions: [
+            { action: 'attended',     title: '✅ Attended'    },
+            { action: 'not_attended', title: '❌ Not Attended' },
+            { action: 'not_held',     title: '⏸ Not Held'     },
+          ],
+        });
+      });
+    } else if (title || body) {
+      // Fallback toast for browsers that don't support SW notifications
       toast(`🔔 ${title}: ${body}`, { duration: 5000 });
     }
   });
-
   return () => unsubscribe();
 }, [isLoggedIn]);                                 // ← re-runs on login
   return (

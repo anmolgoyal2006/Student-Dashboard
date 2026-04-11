@@ -10,16 +10,38 @@ export default function AttendancePrompt() {
   const [marking, setMarking] = useState(null);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('markAttendance') === '1') {
-      setPrompt({
-        subjectId: params.get('subjectId'),
-        date:      params.get('date'),
-      });
-      // Clean URL without reload
-      window.history.replaceState({}, '', '/');
-    }
+ useEffect(() => {
+    const checkParams = () => {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('markAttendance') === '1') {
+        setPrompt({
+          subjectId: params.get('subjectId'),
+          date:      params.get('date'),
+        });
+        window.history.replaceState({}, '', '/');
+      }
+    };
+
+    checkParams(); // on mount
+
+ // Listen for SW navigation on mobile
+    window.addEventListener('popstate', checkParams);
+
+    // iOS PWA: SW can't navigate directly, sends message instead
+    const handleSWMessage = (event) => {
+      if (event.data?.type === 'MARK_ATTENDANCE') {
+        setPrompt({
+          subjectId: event.data.subjectId,
+          date:      event.data.date,
+        });
+      }
+    };
+    navigator.serviceWorker?.addEventListener('message', handleSWMessage);
+
+    return () => {
+      window.removeEventListener('popstate', checkParams);
+      navigator.serviceWorker?.removeEventListener('message', handleSWMessage);
+    };
   }, []);
 
   if (!prompt) return null;
@@ -28,7 +50,7 @@ export default function AttendancePrompt() {
     setMarking(status);
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`${API}/api/attendance/mark-from-notification`, {
+  const res = await fetch(`${API}/attendance/mark-from-notification`, {
         method: 'POST',
         headers: {
           'Content-Type':  'application/json',
