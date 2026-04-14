@@ -30,7 +30,7 @@ export default function Leaderboard({ data, onDownloadExcel, loading = false }) 
 
   // ── data shape from backend ──────────────────────────────────────────────
   // { leaderboard: [{ rank, name, roll, total, breakdown }] }
-  const { leaderboard } = data;
+  const leaderboard = data?.leaderboard?.[0]?.students || [];
 
   if (!leaderboard?.length) {
     return (
@@ -89,7 +89,7 @@ export default function Leaderboard({ data, onDownloadExcel, loading = false }) 
               {topper.name}
             </div>
             <div style={{ fontSize: 12, color: 'var(--muted)' }}>
-              Topper · {fmt(topper.total)} pts
+              Topper · {fmt(topper.totalScore)} pts
               {topper.roll ? ` · Roll: ${topper.roll}` : ''}
             </div>
           </div>
@@ -123,7 +123,7 @@ export default function Leaderboard({ data, onDownloadExcel, loading = false }) 
                 <td style={{ color: 'var(--muted)', fontSize: 13 }}>{s.roll || '—'}</td>
                 {breakdownCols.map(col => (
                   <td key={col} style={{ fontSize: 12, color: 'var(--muted)' }}>
-                    {fmt(s.breakdown?.[col]?.normalized ?? '')}
+                    {fmt(s.breakdown?.[col]?.score?? '')}
                     <span style={{ fontSize: 10, opacity: 0.6 }}>
                       {s.breakdown?.[col]?.raw ? ` (${s.breakdown[col].raw})` : ''}
                     </span>
@@ -137,7 +137,7 @@ export default function Leaderboard({ data, onDownloadExcel, loading = false }) 
                          : s.rank === 3 ? '#cd7c2f'
                          : 'var(--text)',
                   }}>
-                    {fmt(s.total)}
+                    {fmt(s.totalScore)}
                   </span>
                 </td>
               </tr>

@@ -104,4 +104,7 @@ function defaultWeights(columns) {
   return Object.fromEntries(columns.map(c => [c.name, c.max]));
 }
 
-module.exports = { calculateWeightedScores, defaultWeights };
+module.exports = { 
+  applyWeights: calculateWeightedScores,
+  defaultWeights 
+};

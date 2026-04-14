@@ -64,7 +64,6 @@ app.use('/api/timetable',       require('./routes/timetableRoutes'));
 app.use('/api/attendance', require('./routes/attendanceUploadRoutes'));
 app.use('/api/attendance', require('./routes/attendanceRoutes'));
 app.use('/api/marks',           require('./routes/marksRoutes'));
-app.use('/api/marks', require('./routes/marksUploadRoutes'));
 app.use('/api/career',          require('./routes/careerRoutes'));
 app.use('/api/recommendations', require('./routes/recommendationRoutes'));
 app.use('/api/notifications',   require('./routes/notificationRoutes'));

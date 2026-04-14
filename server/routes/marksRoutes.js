@@ -5,7 +5,6 @@ const {
   getAllMarks,
   getCGPA,
   deleteMarks,
-  // ── new SGPA/CGPA-by-semester ──
   getGradeOptions,
   getSemesters,
   getCGPAbySemester,
@@ -13,22 +12,23 @@ const {
   updateSemester,
   deleteSemester,
 } = require('../controllers/marksController');
+
 const { protect } = require('../middleware/authMiddleware');
 
-// ── PDF Marks Processing ──
-const { uploadPdf, rankMarks } = require('../controllers/marksUploadController');
+// 🔥 NEW (FIXED)
+const { uploadPdfHandler } = require('../controllers/marksUploadController');
 const multer = require('multer');
 const upload = multer({ storage: multer.memoryStorage() });
 
 router.use(protect);
 
-// ── existing routes (unchanged) ──
+// existing routes
 router.post('/',          addMarks);
 router.get('/',           getAllMarks);
 router.get('/cgpa',       getCGPA);
 router.delete('/:id',     deleteMarks);
 
-// ── new semester/SGPA routes ──
+// semester routes
 router.get('/grade-options',     getGradeOptions);
 router.get('/semesters',         getSemesters);
 router.get('/cgpa-semester',     getCGPAbySemester);
@@ -36,8 +36,7 @@ router.post('/semester',         addSemester);
 router.put('/semester/:id',      updateSemester);
 router.delete('/semester/:id',   deleteSemester);
 
-// ── PDF Marks Processing ──
-router.post('/upload-pdf', upload.single('file'), uploadPdf);
-router.post('/rank',       rankMarks);
+// 🔥 ONLY THIS
+router.post('/upload-pdf', upload.single('file'), uploadPdfHandler);
 
 module.exports = router;

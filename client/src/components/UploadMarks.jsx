@@ -35,7 +35,6 @@ export default function UploadMarks({ onResult }) {
   const [leaderboard,     setLeaderboard]     = useState(null);
 
   // Stored so Excel re-uses same payload
-  const [rankPayload,     setRankPayload]     = useState(null);
 
   // ── Step 1: Upload ──────────────────────────────────────────────────────
   const handleUpload = async () => {
@@ -88,25 +87,24 @@ export default function UploadMarks({ onResult }) {
     setLoading(true);
     setError('');
 
-    const payload = {
-      students       : parsedData.studentRows,
-      selectedColumns,
-      originalMax,
-      weights,
-      exportExcel    : false,
-    };
+try {
+  const token = localStorage.getItem('token');
 
-    try {
-      const token = localStorage.getItem('token');
-      const res   = await axios.post(`${API}/marks/rank`, payload, {
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
+  const form = new FormData();
+  form.append('file', file);
+  form.append('selectedColumns', JSON.stringify(selectedColumns));
+  form.append('weights', JSON.stringify(weights));
 
-      // Store payload so Excel download can reuse same params
-      setRankPayload(payload);
-      setLeaderboard(res.data);
-      onResult(res.data);
-      setStep(STEP_DONE);
+  const res = await axios.post(`${API}/marks/upload-pdf`, form, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+      'Authorization': `Bearer ${token}`,
+    },
+  });
+
+  setLeaderboard(res.data);
+  onResult(res.data);
+  setStep(STEP_DONE);
     } catch (err) {
       setError(err.response?.data?.message || 'Ranking failed.');
     } finally {
@@ -116,12 +114,16 @@ export default function UploadMarks({ onResult }) {
 
   // ── Excel download (separate request with exportExcel:true) ─────────────
   const handleDownloadExcel = async () => {
-    if (!rankPayload) return;
     try {
       const token = localStorage.getItem('token');
-      const res   = await axios.post(
-        `${API}/marks/rank`,
-        { ...rankPayload, exportExcel: true },
+      const form = new FormData();
+form.append('file', file);
+form.append('selectedColumns', JSON.stringify(selectedColumns));
+form.append('weights', JSON.stringify(weights));
+
+const res = await axios.post(
+  `${API}/marks/upload-pdf`,
+  form,
         {
           headers     : { 'Authorization': `Bearer ${token}` },
           responseType: 'blob',   // ← binary buffer from backend
@@ -149,7 +151,6 @@ export default function UploadMarks({ onResult }) {
     setSelectedColumns([]);
     setWeights({});
     setLeaderboard(null);
-    setRankPayload(null);
     onResult(null);
   };
 
