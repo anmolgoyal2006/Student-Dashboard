@@ -15,6 +15,11 @@ const {
 } = require('../controllers/marksController');
 const { protect } = require('../middleware/authMiddleware');
 
+// ── PDF Marks Processing ──
+const { uploadPdf, rankMarks } = require('../controllers/marksUploadController');
+const multer = require('multer');
+const upload = multer({ storage: multer.memoryStorage() });
+
 router.use(protect);
 
 // ── existing routes (unchanged) ──
@@ -30,5 +35,9 @@ router.get('/cgpa-semester',     getCGPAbySemester);
 router.post('/semester',         addSemester);
 router.put('/semester/:id',      updateSemester);
 router.delete('/semester/:id',   deleteSemester);
+
+// ── PDF Marks Processing ──
+router.post('/upload-pdf', upload.single('file'), uploadPdf);
+router.post('/rank',       rankMarks);
 
 module.exports = router;

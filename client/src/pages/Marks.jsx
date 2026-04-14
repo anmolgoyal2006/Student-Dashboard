@@ -1,4 +1,5 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
+import UploadMarks from '../components/UploadMarks';
 import { marksService, subjectService } from '../services/apiServices';
 import toast from 'react-hot-toast';
 import { Bar } from 'react-chartjs-2';
@@ -15,7 +16,6 @@ export default function Marks() {
   const [form,         setForm]         = useState(EMPTY);
   const [loading,      setLoading]      = useState(true);
 
-  // ── new state ──
   const [semesters,    setSemesters]    = useState([]);
   const [gradeOptions, setGradeOptions] = useState([]);
   const [semForm,      setSemForm]      = useState({
@@ -26,38 +26,28 @@ export default function Marks() {
   const [semLoading,   setSemLoading]   = useState(false);
   const [cgpaSem,      setCgpaSem]      = useState(null);
 
+  // ── No pdfResult here — UploadMarks renders Leaderboard internally now ──
+
   const load = async () => {
-  try {
-    const m = await marksService.getAll();
-    console.log("marks OK");
+    try {
+      const m     = await marksService.getAll();
+      const s     = await subjectService.getAll();
+      const c     = await marksService.getCGPA();
+      const sems  = await marksService.getSemesters();
+      const grades = await marksService.getGradeOptions();
+      const cgpas = await marksService.getCGPAbySemester();
 
-    const s = await subjectService.getAll();
-    console.log("subjects OK");
-
-    const c = await marksService.getCGPA();
-    console.log("cgpa OK");
-
-    const sems = await marksService.getSemesters();
-    console.log("semesters OK");
-
-    const grades = await marksService.getGradeOptions();
-    console.log("grades OK");
-
-    const cgpas = await marksService.getCGPAbySemester();
-    console.log("cgpa-sem OK");
-
-    setMarks(m.data.marks || []);
-    setSubjects(s.data.subjects || []);
-    setCgpaData(c.data);
-    setSemesters(sems.data.semesters || []);
-    setGradeOptions(grades.data.gradeOptions || []);
-    setCgpaSem(cgpas.data);
-    setLoading(false);
-  } catch (err) {
-    console.log("❌ FAILED API:", err.config?.url);
-    console.log(err);
-  }
-};
+      setMarks(m.data.marks || []);
+      setSubjects(s.data.subjects || []);
+      setCgpaData(c.data);
+      setSemesters(sems.data.semesters || []);
+      setGradeOptions(grades.data.gradeOptions || []);
+      setCgpaSem(cgpas.data);
+      setLoading(false);
+    } catch (err) {
+      console.error('❌ FAILED API:', err.config?.url, err);
+    }
+  };
 
   useEffect(() => { load(); }, []);
 
@@ -79,7 +69,6 @@ export default function Marks() {
     load();
   };
 
-  // ── semester helpers ──
   const updateSubjectRow = (i, field, value) =>
     setSemForm(p => ({
       ...p,
@@ -92,7 +81,7 @@ export default function Marks() {
       subjects: [...p.subjects, { name: '', credits: '', grade: gradeOptions[0]?.grade || '' }],
     }));
 
-  const removeSubjectRow = (i) =>
+  const removeSubjectRow = i =>
     setSemForm(p => ({ ...p, subjects: p.subjects.filter((_, idx) => idx !== i) }));
 
   const handleAddSemester = async () => {
@@ -111,7 +100,7 @@ export default function Marks() {
       setSemForm({
         semesterNumber: '',
         semesterName:   '',
-        subjects:       [{ name: '', credits: '', grade: gradeOptions[0]?.grade || '' }],
+        subjects: [{ name: '', credits: '', grade: gradeOptions[0]?.grade || '' }],
       });
       load();
     } catch (err) {
@@ -121,7 +110,7 @@ export default function Marks() {
     }
   };
 
-  const handleDeleteSemester = async (id) => {
+  const handleDeleteSemester = async id => {
     await marksService.deleteSemester(id);
     toast.success('Semester deleted');
     load();
@@ -141,6 +130,9 @@ export default function Marks() {
 
   return (
     <div>
+      {/* ── PDF Upload + Leaderboard (self-contained) ── */}
+      <UploadMarks onResult={() => {}} />
+
       {/* ── Page header ── */}
       <div className="page-header">
         <div>
@@ -241,23 +233,17 @@ export default function Marks() {
           flexWrap: 'wrap',
         }}>
           <div>
-            <p style={{ margin: 0, fontSize: 11, color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase' }}>
-              Semester CGPA
-            </p>
-            <p style={{ margin: 0, fontSize: 32, fontWeight: 800, color: '#818cf8' }}>
-              {cgpaSem.cgpa}
-            </p>
+            <p style={{ margin: 0, fontSize: 11, color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase' }}>Semester CGPA</p>
+            <p style={{ margin: 0, fontSize: 32, fontWeight: 800, color: '#818cf8' }}>{cgpaSem.cgpa}</p>
             <p style={{ margin: 0, fontSize: 11, color: 'var(--muted)' }}>
               {cgpaSem.totalSemesters} semester{cgpaSem.totalSemesters > 1 ? 's' : ''}
             </p>
           </div>
           <div style={{ flex: 1 }}>
-            <p style={{ margin: '0 0 6px', fontSize: 11, color: 'var(--muted)', fontWeight: 600 }}>
-              SGPA per Semester
-            </p>
+            <p style={{ margin: '0 0 6px', fontSize: 11, color: 'var(--muted)', fontWeight: 600 }}>SGPA per Semester</p>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               {cgpaSem.sgpaList.map((s, i) => (
-                <span key={i} style={{
+                <span key={`sgpa-${i}`} style={{
                   fontSize: 12, fontWeight: 600, padding: '3px 10px', borderRadius: 99,
                   background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
                   color: 'var(--text)',
@@ -272,22 +258,18 @@ export default function Marks() {
 
       {/* ── Add semester + semester list ── */}
       <div className="grid-2" style={{ marginTop: 16 }}>
-
-        {/* Add semester form */}
         <div className="card">
           <div className="card-title">➕ Add Semester (SGPA)</div>
           <div className="form-group">
             <label className="form-label">Semester No. *</label>
-            <input
-              className="form-input" type="number" min="1" placeholder="e.g. 1"
+            <input className="form-input" type="number" min="1" placeholder="e.g. 1"
               value={semForm.semesterNumber}
               onChange={e => setSemForm(p => ({ ...p, semesterNumber: e.target.value }))}
             />
           </div>
           <div className="form-group">
             <label className="form-label">Label (optional)</label>
-            <input
-              className="form-input" type="text" placeholder="e.g. Fall 2024"
+            <input className="form-input" type="text" placeholder="e.g. Fall 2024"
               value={semForm.semesterName}
               onChange={e => setSemForm(p => ({ ...p, semesterName: e.target.value }))}
             />
@@ -295,24 +277,13 @@ export default function Marks() {
 
           <label className="form-label" style={{ marginBottom: 8 }}>Subjects *</label>
           {semForm.subjects.map((s, i) => (
-            <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>
-              <input
-                className="form-input" style={{ flex: 2, minWidth: 120 }}
-                placeholder="Subject name"
-                value={s.name}
-                onChange={e => updateSubjectRow(i, 'name', e.target.value)}
-              />
-              <input
-                className="form-input" style={{ width: 80 }}
-                type="number" min="1" placeholder="Credits"
-                value={s.credits}
-                onChange={e => updateSubjectRow(i, 'credits', e.target.value)}
-              />
-              <select
-                className="form-select" style={{ width: 100 }}
-                value={s.grade}
-                onChange={e => updateSubjectRow(i, 'grade', e.target.value)}
-              >
+            <div key={`semform-subj-${i}`} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>
+              <input className="form-input" style={{ flex: 2, minWidth: 120 }} placeholder="Subject name"
+                value={s.name} onChange={e => updateSubjectRow(i, 'name', e.target.value)} />
+              <input className="form-input" style={{ width: 80 }} type="number" min="1" placeholder="Credits"
+                value={s.credits} onChange={e => updateSubjectRow(i, 'credits', e.target.value)} />
+              <select className="form-select" style={{ width: 100 }} value={s.grade}
+                onChange={e => updateSubjectRow(i, 'grade', e.target.value)}>
                 {gradeOptions.map(({ grade, point }) => (
                   <option key={grade} value={grade}>{grade} ({point})</option>
                 ))}
@@ -331,7 +302,6 @@ export default function Marks() {
           </div>
         </div>
 
-        {/* Semester list */}
         <div className="card">
           <div className="card-title">📚 Semesters</div>
           {semesters.length === 0
@@ -351,13 +321,11 @@ export default function Marks() {
                         SGPA {sem.sgpa}
                       </span>
                     </div>
-                    <button className="btn btn-danger btn-sm" onClick={() => handleDeleteSemester(sem._id)}>
-                      Delete
-                    </button>
+                    <button className="btn btn-danger btn-sm" onClick={() => handleDeleteSemester(sem._id)}>Delete</button>
                   </div>
                   <div style={{ marginTop: 6, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                     {sem.subjects.map((s, i) => (
-                      <span key={i} style={{
+                      <span key={`${sem._id}-subj-${i}`} style={{
                         fontSize: 11, padding: '2px 8px', borderRadius: 99,
                         background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
                         color: 'var(--muted)',
