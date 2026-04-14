@@ -12,12 +12,12 @@
 
 // Keys that are NEVER mark-columns regardless of what the PDF calls them
 const NON_MARK_KEYS = new Set([
-  's.no', 'sno', 'sr', 'sr.no', 'serial', 'sl', 'sl.no',
+  's.no', 'sno', 'sr', 'sr.no', 'sr. no', 'sr. no.', 'serial', 'sl', 'sl.no', 'no', 'no.',
   'name', 'student', 'student name', 'studentname',
   'roll', 'roll no', 'rollno', 'roll number', 'enrollment',
   'reg', 'reg no', 'regno', 'registration',
   'remark', 'remarks', 'grade', 'result', 'status', 'comment',
-  'total', 'grand total', 'grandtotal',
+ 'grand total', 'grandtotal',
   'sid', 'uid', 'sap', 'sap id', 'sapid', 'id',
   'section', 'batch', 'branch', 'dept', 'department',
   'father', 'email', 'phone', 'mobile', 'dob', 'gender',
@@ -37,8 +37,11 @@ const norm = s => String(s ?? '').trim().toLowerCase();
  * Returns null if not found.
  */
 function extractMax(header) {
-  const m = String(header).match(/[(\[]\s*(\d+(?:\.\d+)?)\s*[)\]]/);
-  return m ? parseFloat(m[1]) : null;
+  const bracketMatch = String(header).match(/[(\[]\s*(\d+(?:\.\d+)?)\s*[)\]]/);
+  if (bracketMatch) return parseFloat(bracketMatch[1]);
+  const slashMatch = String(header).match(/\/\s*(\d+(?:\.\d+)?)\s*$/);
+  if (slashMatch) return parseFloat(slashMatch[1]);
+  return null;
 }
 
 /**
@@ -48,6 +51,7 @@ function extractMax(header) {
 function cleanName(header) {
   return String(header)
     .replace(/[(\[]\s*\d+(?:\.\d+)?\s*[)\]]/g, '')
+    .replace(/\/\s*\d+(?:\.\d+)?\s*$/g, '')
     .trim();
 }
 
@@ -115,14 +119,19 @@ function detectColumns(rawRows) {
     if (!nameKey && (n === 'name' || n === 'student name' || n === 'studentname' || n === 'student')) {
       nameKey = h;
     }
-    if (!rollKey && (n === 'roll' || n === 'roll no' || n === 'rollno' || n === 'roll number' || n === 'enrollment' || n === 'reg no' || n === 'regno')) {
+    if (!rollKey && (n === 'roll' || n === 'roll no' || n === 'rollno' || n === 'roll number' ||
+        n === 'enrollment' || n === 'reg no' || n === 'regno' ||
+        n === 'sid' || n === 'uid' || n === 'sap' || n === 'sap id' || n === 'id')) {
       rollKey = h;
     }
   }
 
   // Fallback: if no explicit "Name" column, try the second column (index 1)
-  if (!nameKey) {
-    nameKey = allHeaders.find(h => !NON_MARK_KEYS.has(norm(h))) ?? allHeaders[0];
+ if (!nameKey) {
+    nameKey = allHeaders.find(h => {
+      const n = norm(h);
+      return !NON_MARK_KEYS.has(n) && !/^\d+$/.test(String(rawRows[0]?.[h] ?? ''));
+    }) ?? allHeaders[1] ?? allHeaders[0];
   }
 
   // ── 3. Identify mark-columns (everything that is NOT name/roll/serial) ─────
