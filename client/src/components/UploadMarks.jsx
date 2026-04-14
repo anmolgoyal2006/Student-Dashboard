@@ -8,6 +8,7 @@
  *  3. rankPayload is stored so Excel re-uses the same columns/weights
  */
 import { useState } from 'react';
+import * as XLSX from 'xlsx';
 import axios from 'axios';
 import MarksFilter from './MarksFilter';
 import Leaderboard from './Leaderboard';
@@ -113,31 +114,36 @@ try {
   };
 
   // ── Excel download (separate request with exportExcel:true) ─────────────
-  const handleDownloadExcel = async () => {
+const handleDownloadExcel = () => {
     try {
-      const token = localStorage.getItem('token');
-      const form = new FormData();
-form.append('file', file);
-form.append('selectedColumns', JSON.stringify(selectedColumns));
-form.append('weights', JSON.stringify(weights));
+      if (!leaderboard?.leaderboard) {
+        alert('No leaderboard data to export.');
+        return;
+      }
 
-const res = await axios.post(
-  `${API}/marks/upload-pdf`,
-  form,
-        {
-          headers     : { 'Authorization': `Bearer ${token}` },
-          responseType: 'blob',   // ← binary buffer from backend
+      // Build rows from leaderboard data
+      const rows = leaderboard.leaderboard.map(s => {
+        const row = {
+          Rank : s.rank,
+          Name : s.name,
+          Roll : s.roll || '',
+        };
+        // Add breakdown columns
+        if (s.breakdown) {
+          Object.entries(s.breakdown).forEach(([col, val]) => {
+            row[col] = val?.score ?? val ?? '';
+          });
         }
-      );
+        row['Total'] = s.totalScore ?? s.total ?? '';
+        return row;
+      });
 
-      const url  = URL.createObjectURL(new Blob([res.data]));
-      const link = document.createElement('a');
-      link.href  = url;
-      link.download = 'leaderboard.xlsx';
-      link.click();
-      URL.revokeObjectURL(url);
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Leaderboard');
+      XLSX.writeFile(wb, 'leaderboard.xlsx');
     } catch (err) {
-      alert('Excel download failed: ' + (err.response?.data?.message || err.message));
+      alert('Excel export failed: ' + err.message);
     }
   };
 
