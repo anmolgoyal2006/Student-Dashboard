@@ -51,10 +51,8 @@ function parsePdfWithPython(buffer) {
     let stdout = '';
     let stderr = '';
 
-   const proc = spawn(
-  'C:\\Users\\anmol\\AppData\\Local\\Programs\\Python\\Python313\\python.exe',
-  [PARSER_SCRIPT, tmpPath]
-);
+ const PYTHON_BIN = process.platform === 'win32' ? 'python' : 'python3';
+const proc = spawn(PYTHON_BIN, [PARSER_SCRIPT, tmpPath]);
 
     proc.stdout.on('data', chunk => { stdout += chunk.toString(); });
    proc.stderr.on('data', chunk => { 
