@@ -150,7 +150,38 @@ async function uploadPdfHandler(req, res) {
     // ── 6. Rank + Build Leaderboard ───────────────────────────────────────────
 const result = processLeaderboard(weightedRows, columns);
 
-// ── 7. Respond ────────────────────────────────────────────────────────────
+// 👉 EXCEL MODE
+if (req.query.exportExcel === 'true') {
+  const XLSX = require('xlsx');
+
+  const students = result.leaderboard?.[0]?.students || [];
+
+  const rows = students.map(s => ({
+    Rank: s.rank,
+    Name: s.name,
+    Roll: s.roll,
+    Total: s.totalScore
+  }));
+
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Leaderboard');
+
+  const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+  res.setHeader(
+    'Content-Disposition',
+    'attachment; filename=leaderboard.xlsx'
+  );
+  res.setHeader(
+    'Content-Type',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  );
+
+  return res.send(buffer);
+}
+
+// 👉 NORMAL JSON RESPONSE
 return res.json({
   columns,
   selectedColumns: active,

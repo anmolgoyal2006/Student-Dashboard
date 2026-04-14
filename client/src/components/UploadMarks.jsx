@@ -122,7 +122,9 @@ const handleDownloadExcel = () => {
       }
 
       // Build rows from leaderboard data
-      const rows = leaderboard.leaderboard.map(s => {
+      const students = leaderboard?.leaderboard?.[0]?.students || [];
+
+const rows = students.map(s => {
         const row = {
           Rank : s.rank,
           Name : s.name,
