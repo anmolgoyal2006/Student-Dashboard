@@ -12,23 +12,30 @@ app.use(passport.initialize());
 // ─── Jobs ─────────────────────────────────────────────────────────────────
 const { startDailyNotificationJob } = require('./jobs/dailyNotificationJob'); // ← ADDED
 
-// ─── CORS ─────────────────────────────────────────────────────────────────
+// REPLACE WITH:
 const allowedOrigins = [
   'https://student-dashboard-ashy-rho.vercel.app',
   'http://localhost:3000',
 ];
 
-app.use(cors({
+const corsOptions = {
   origin: (origin, cb) => {
-    if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
+    // allow requests with no origin (mobile apps, curl, Postman)
+    // and any Vercel preview deployments
+    if (
+      !origin ||
+      allowedOrigins.includes(origin) ||
+      /\.vercel\.app$/.test(origin)
+    ) return cb(null, true);
     cb(new Error(`CORS blocked for origin: ${origin}`));
   },
-  methods: ['GET', 'POST', 'PUT','PATCH','DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
-}));
+};
 
-app.options('*', cors());
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions)); // ← same config for preflight
 
 // ─── Body parsing ─────────────────────────────────────────────────────────
 app.use(express.json({ limit: '10mb' }));
