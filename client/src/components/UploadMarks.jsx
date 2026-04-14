@@ -11,6 +11,7 @@ import { useState } from 'react';
 import axios from 'axios';
 import MarksFilter from './MarksFilter';
 import Leaderboard from './Leaderboard';
+import WeightInput from './WeightInput';
 
 const API = process.env.REACT_APP_API_URL;
 
@@ -18,86 +19,6 @@ const STEP_UPLOAD    = 'upload';
 const STEP_CONFIGURE = 'configure';
 const STEP_DONE      = 'done';
 
-// ── Inline WeightInput (was missing as a separate file) ───────────────────
-function WeightInput({ columns, selectedColumns, weights, onChange }) {
-  if (!selectedColumns.length) return null;
-
-  const active = columns.filter(c => selectedColumns.includes(c.name));
-
-  const totalOut = selectedColumns.reduce((sum, name) => {
-    return sum + (parseFloat(weights[name]) || 0);
-  }, 0);
-
-  return (
-    <div style={{
-      background   : 'var(--card-bg, rgba(255,255,255,0.04))',
-      border       : '1px solid var(--card-border, rgba(255,255,255,0.08))',
-      borderRadius : 12,
-      padding      : '14px 18px',
-      marginBottom : 16,
-    }}>
-      <div style={{
-        display        : 'flex',
-        justifyContent : 'space-between',
-        alignItems     : 'center',
-        marginBottom   : 12,
-      }}>
-        <span style={{ fontWeight: 600, fontSize: 14, color: 'var(--text)' }}>
-          ⚖️ Custom Weights
-        </span>
-        <span style={{ fontSize: 11, color: 'var(--muted)' }}>
-          Total out-of{' '}
-          <strong style={{ color: 'var(--text)' }}>{totalOut.toFixed(1)}</strong>
-        </span>
-        <button
-          className="btn btn-outline btn-sm"
-          style={{ fontSize: 11, padding: '3px 10px' }}
-          onClick={() => {
-            const reset = {};
-            columns.forEach(c => { reset[c.name] = c.max; });
-            onChange(reset);
-          }}
-        >
-          Reset
-        </button>
-      </div>
-
-      {active.map(col => (
-        <div key={col.name} style={{
-          display       : 'flex',
-          alignItems    : 'center',
-          gap           : 10,
-          marginBottom  : 10,
-        }}>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>
-              {col.name}
-            </div>
-            <div style={{ fontSize: 11, color: 'var(--muted)' }}>
-              original max: {col.max}
-            </div>
-          </div>
-
-          <span style={{ fontSize: 12, color: 'var(--muted)', whiteSpace: 'nowrap' }}>
-            (x / {col.max}) ×
-          </span>
-
-          <input
-            type="number"
-            min="0"
-            step="1"
-            className="form-input"
-            style={{ width: 80, textAlign: 'center' }}
-            value={weights[col.name] ?? col.max}
-            onChange={e => onChange({ ...weights, [col.name]: parseFloat(e.target.value) || 0 })}
-          />
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 export default function UploadMarks({ onResult }) {
   const [file,            setFile]            = useState(null);
   const [loading,         setLoading]         = useState(false);

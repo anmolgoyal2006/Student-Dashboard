@@ -17,7 +17,10 @@ const NON_MARK_KEYS = new Set([
   'roll', 'roll no', 'rollno', 'roll number', 'enrollment',
   'reg', 'reg no', 'regno', 'registration',
   'remark', 'remarks', 'grade', 'result', 'status', 'comment',
-  'total', 'grand total', 'grandtotal',          // totals are computed, not raw
+  'total', 'grand total', 'grandtotal',
+  'sid', 'uid', 'sap', 'sap id', 'sapid', 'id',
+  'section', 'batch', 'branch', 'dept', 'department',
+  'father', 'email', 'phone', 'mobile', 'dob', 'gender',
 ]);
 
 /**
@@ -136,18 +139,20 @@ function detectColumns(rawRows) {
   });
 
   // ── 4. Build column descriptors ────────────────────────────────────────────
-  const columns = markHeaders.map(header => {
-    const maxFromHeader = extractMax(header);
-    const maxFromData   = maxFromHeader === null
-      ? inferMax(rawRows.map(r => r[header]))
-      : null;
-
-    return {
-      name           : cleanName(header),          // "Quiz1"
-      originalHeader : header,                     // "Quiz1(10)"
-      max            : maxFromHeader ?? maxFromData,
-    };
-  });
+const columns = markHeaders
+    .map(header => {
+      const maxFromHeader = extractMax(header);
+      const maxFromData   = maxFromHeader === null
+        ? inferMax(rawRows.map(r => r[header]))
+        : null;
+      const max = maxFromHeader ?? maxFromData;
+      return {
+        name           : cleanName(header),
+        originalHeader : header,
+        max,
+      };
+    })
+    .filter(col => col.max <= 200); // drop roll/SID columns with huge values
 
   // ── 5. Build normalised student rows ──────────────────────────────────────
   const studentRows = rawRows.map(row => {

@@ -7,7 +7,7 @@
 const pdfParse   = require('pdf-parse');
 const { PdfReader } = require('pdfreader');
 const XLSX       = require('xlsx');
-
+const { detectColumns } = require('../services/columnDetector');
 // ─────────────────────────────────────────────────────────────
 //  STEP 1 — PDF → rawRows
 //  Strategy:
@@ -421,40 +421,43 @@ exports.uploadPdf = async (req, res) => {
       });
     }
 
-    // ── Step 2: Detect schema ─────────────────────────────
-    const schema = detectSchema(rows);
+    // ── Step 2: Convert rows → objects using header row ───
+    const schema    = detectSchema(rows);
+    const headerRow = rows[schema.headerIdx];
+    const dataRows  = rows.slice(schema.headerIdx + 1);
 
-    if (schema.marksCols.length === 0) {
-      return res.status(422).json({
-        message: 'No marks columns detected. PDF must have at least one numeric column.',
+    const rawObjects = dataRows
+      .filter(r => r.length > 1)
+      .map(row => {
+        const obj = {};
+        headerRow.forEach((key, i) => { obj[key] = row[i] ?? ''; });
+        return obj;
       });
+
+    // ── Step 3: Smart column detection ───────────────────
+    const { columns, studentRows } = detectColumns(rawObjects);
+
+    if (!columns.length) {
+      return res.status(422).json({ message: 'No marks columns detected. PDF must have at least one numeric column.' });
+    }
+    if (!studentRows.length) {
+      return res.status(422).json({ message: 'No student records found in the PDF.' });
     }
 
-    // ── Step 3: Build student records ─────────────────────
-    const students = buildStudentRecords(rows, schema);
+    // ── Step 4: Reshape marks → rawMarks for rankMarks ───
+    const shaped = studentRows.map(s => ({
+      name:     s.name,
+      roll:     s.roll,
+      rawMarks: s.marks,
+    }));
 
-    if (students.length === 0) {
-      return res.status(422).json({
-        message: 'No student records found in the PDF.',
-      });
-    }
-
-    // ── Step 4: Infer max marks per column ────────────────
-    const maxMap = inferMaxMarks(rows, schema);
-
-    const columns = schema.marksCols.map(col => ({
-  name: col.label,
-  max:  maxMap[col.label] || 100,
-}));
-
-res.json({ method, columns, studentRows: students });
+    res.json({ method, columns, studentRows: shaped });
 
   } catch (err) {
     console.error('[uploadPdf]', err);
     res.status(500).json({ message: 'PDF processing failed: ' + err.message });
   }
 };
-
 /**
  * POST /api/marks/rank
  * Body (JSON):
