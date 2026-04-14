@@ -169,6 +169,29 @@ function findHeaderRow(rows) {
 }
 
 /**
+ * Remove duplicate header rows that appear on every page of a multi-page PDF.
+ * Keeps only the first occurrence and strips all repeats from data rows.
+ */
+function deduplicatePageHeaders(rows, headerIdx) {
+  const headerRow  = rows[headerIdx];
+  const headerKey  = headerRow.map(c => c.toLowerCase().trim()).join('|');
+  const dataRows   = rows.slice(headerIdx + 1);
+
+  const cleaned = dataRows.filter(row => {
+    const rowKey = row.map(c => c.toLowerCase().trim()).join('|');
+    // Drop rows that exactly match the header
+    if (rowKey === headerKey) return false;
+    // Drop rows where majority of cells match header cells (partial repeat)
+    const headerSet = new Set(headerRow.map(c => c.toLowerCase().trim()));
+    const matches   = row.filter(c => headerSet.has(c.toLowerCase().trim())).length;
+    if (matches >= Math.ceil(headerRow.length * 0.6)) return false;
+    return true;
+  });
+
+  return [headerRow, ...cleaned];
+}
+
+/**
  * Detect column schema from the header row.
  * Returns:
  *   { headerIdx, nameCol, rollCol, marksCols: [{idx, label}] }
@@ -421,10 +444,12 @@ exports.uploadPdf = async (req, res) => {
       });
     }
 
-    // ── Step 2: Convert rows → objects using header row ───
-    const schema    = detectSchema(rows);
-    const headerRow = rows[schema.headerIdx];
-    const dataRows  = rows.slice(schema.headerIdx + 1);
+ // ── Step 2: Convert rows → objects using header row ───
+    const schema      = detectSchema(rows);
+    // Remove repeated header rows from subsequent PDF pages
+    const cleanedRows = deduplicatePageHeaders(rows, schema.headerIdx);
+    const headerRow   = cleanedRows[0];
+    const dataRows    = cleanedRows.slice(1);
 
     const rawObjects = dataRows
       .filter(r => r.length > 1)
