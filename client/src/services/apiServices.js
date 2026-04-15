@@ -52,6 +52,7 @@ export const marksService = {
   getCGPAbySemester: ()     => apiRequest('get',    '/marks/cgpa-semester'),
 
   addSemester:       (data) => apiRequest('post',   '/marks/semester', data),
+  addManualSGPA:     (data) => apiRequest('post',   '/marks/semester/manual', data),
   updateSemester:    (id, data) => apiRequest('put', `/marks/semester/${id}`, data),
   deleteSemester:    (id)   => apiRequest('delete', `/marks/semester/${id}`),
 };

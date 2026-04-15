@@ -141,6 +141,31 @@ exports.updateSemester = async (req, res) => {
   }
 };
 
+// POST /api/marks/semester/manual
+exports.addManualSGPA = async (req, res) => {
+  try {
+    const { semesterNumber, semesterName, sgpa } = req.body;
+  const sgpaNum = Number(sgpa);
+    if (isNaN(sgpaNum) || sgpaNum < 0 || sgpaNum > 10)
+      return res.status(400).json({ message: 'SGPA must be between 0 and 10' });
+    if (!semesterNumber)
+      return res.status(400).json({ message: 'Semester number is required' });
+
+    const semester = new Semester({
+      student: req.user.id,
+      semesterNumber: Number(semesterNumber),
+      semesterName,
+      isManual: true,
+      directSGPA: sgpaNum,
+      subjects: [],
+    });
+    await semester.save();
+    res.status(201).json({ semester });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
 // DELETE /api/marks/semester/:id
 exports.deleteSemester = async (req, res) => {
   try {

@@ -11,6 +11,7 @@ const {
   addSemester,
   updateSemester,
   deleteSemester,
+  addManualSGPA,
 } = require('../controllers/marksController');
 
 const { protect } = require('../middleware/authMiddleware');
@@ -33,6 +34,7 @@ router.get('/grade-options',     getGradeOptions);
 router.get('/semesters',         getSemesters);
 router.get('/cgpa-semester',     getCGPAbySemester);
 router.post('/semester',         addSemester);
+router.post('/semester/manual',  addManualSGPA);
 router.put('/semester/:id',      updateSemester);
 router.delete('/semester/:id',   deleteSemester);
 

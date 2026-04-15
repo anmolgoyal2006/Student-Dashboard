@@ -9,7 +9,14 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend);
 
 const EMPTY = { subjectId: '', examType: 'midterm', marksObtained: '', maxMarks: 100, examDate: '' };
 
+const TABS = [
+  { id: 'marks',    label: '📝 Marks & CGPA' },
+  { id: 'upload',   label: '📄 Upload PDF'    },
+  { id: 'semester', label: '🎓 Semesters'     },
+];
+
 export default function Marks() {
+  const [activeTab,    setActiveTab]    = useState('marks');
   const [marks,        setMarks]        = useState([]);
   const [subjects,     setSubjects]     = useState([]);
   const [cgpaData,     setCgpaData]     = useState(null);
@@ -26,16 +33,19 @@ export default function Marks() {
   const [semLoading,   setSemLoading]   = useState(false);
   const [cgpaSem,      setCgpaSem]      = useState(null);
 
-  // ── No pdfResult here — UploadMarks renders Leaderboard internally now ──
+  // ── NEW: manual SGPA mode ──
+  const [semMode,      setSemMode]      = useState('full'); // 'full' | 'manual'
+  const [manualForm,   setManualForm]   = useState({ semesterNumber: '', semesterName: '', sgpa: '' });
+  const [manualLoading, setManualLoading] = useState(false);
 
   const load = async () => {
     try {
-      const m     = await marksService.getAll();
-      const s     = await subjectService.getAll();
-      const c     = await marksService.getCGPA();
-      const sems  = await marksService.getSemesters();
+      const m      = await marksService.getAll();
+      const s      = await subjectService.getAll();
+      const c      = await marksService.getCGPA();
+      const sems   = await marksService.getSemesters();
       const grades = await marksService.getGradeOptions();
-      const cgpas = await marksService.getCGPAbySemester();
+      const cgpas  = await marksService.getCGPAbySemester();
 
       setMarks(m.data.marks || []);
       setSubjects(s.data.subjects || []);
@@ -110,6 +120,24 @@ export default function Marks() {
     }
   };
 
+  // ── NEW: save manual SGPA ──
+  const handleAddManualSGPA = async () => {
+    const { semesterNumber, semesterName, sgpa } = manualForm;
+    if (!semesterNumber || !sgpa) return toast.error('Semester No. and SGPA are required');
+    if (Number(sgpa) < 0 || Number(sgpa) > 10) return toast.error('SGPA must be between 0 and 10');
+    try {
+      setManualLoading(true);
+      await marksService.addManualSGPA({ semesterNumber, semesterName, sgpa: Number(sgpa) });
+      toast.success('Past SGPA added!');
+      setManualForm({ semesterNumber: '', semesterName: '', sgpa: '' });
+      load();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed');
+    } finally {
+      setManualLoading(false);
+    }
+  };
+
   const handleDeleteSemester = async id => {
     await marksService.deleteSemester(id);
     toast.success('Semester deleted');
@@ -130,11 +158,8 @@ export default function Marks() {
 
   return (
     <div>
-      {/* ── PDF Upload + Leaderboard (self-contained) ── */}
-      <UploadMarks onResult={() => {}} />
-
-      {/* ── Page header ── */}
-      <div className="page-header">
+      {/* ── Unified Page Header ── */}
+      <div className="page-header" style={{ marginBottom: 0 }}>
         <div>
           <h1 className="page-title">📝 Marks & CGPA</h1>
           <p className="page-subtitle">Track your exam performance and calculate CGPA</p>
@@ -147,198 +172,329 @@ export default function Marks() {
         )}
       </div>
 
-      {/* ── Add marks form + chart ── */}
-      <div className="grid-2 mb-4">
-        <div className="card">
-          <div className="card-title">Add Exam Marks</div>
-          <form onSubmit={handleSubmit}>
-            <div className="form-group">
-              <label className="form-label">Subject</label>
-              <select className="form-select" value={form.subjectId} onChange={e => setForm(p => ({ ...p, subjectId: e.target.value }))} required>
-                <option value="">Select subject</option>
-                {subjects.map(s => <option key={s._id} value={s._id}>{s.name}</option>)}
-              </select>
-            </div>
-            <div className="form-group">
-              <label className="form-label">Exam Type</label>
-              <select className="form-select" value={form.examType} onChange={e => setForm(p => ({ ...p, examType: e.target.value }))}>
-                {['midterm', 'final', 'quiz', 'assignment', 'practical'].map(t => (
-                  <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>
-                ))}
-              </select>
-            </div>
-            <div className="grid-2">
-              <div className="form-group">
-                <label className="form-label">Marks Obtained</label>
-                <input className="form-input" type="number" min="0" value={form.marksObtained} onChange={e => setForm(p => ({ ...p, marksObtained: e.target.value }))} required />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Max Marks</label>
-                <input className="form-input" type="number" min="1" value={form.maxMarks} onChange={e => setForm(p => ({ ...p, maxMarks: e.target.value }))} required />
-              </div>
-            </div>
-            <div className="form-group">
-              <label className="form-label">Exam Date</label>
-              <input className="form-input" type="date" value={form.examDate} onChange={e => setForm(p => ({ ...p, examDate: e.target.value }))} />
-            </div>
-            <button className="btn btn-primary" type="submit">Add Marks</button>
-          </form>
-        </div>
-
-        <div className="card">
-          <div className="card-title">Grade Points (Final Exams)</div>
-          {cgpaData?.breakdown?.length > 0
-            ? <Bar data={chartData} options={{ responsive: true, plugins: { legend: { display: false } }, scales: { y: { min: 0, max: 10 } } }} />
-            : <p className="text-muted">Add final exam marks to see CGPA breakdown.</p>
-          }
-        </div>
+      {/* ── Tab Bar ── */}
+      <div style={{
+        display: 'flex', gap: 4,
+        borderBottom: '1px solid rgba(255,255,255,0.08)',
+        marginBottom: 24, marginTop: 20,
+      }}>
+        {TABS.map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            style={{
+              padding: '8px 18px',
+              fontSize: 13,
+              fontWeight: 600,
+              borderRadius: '8px 8px 0 0',
+              border: 'none',
+              cursor: 'pointer',
+              transition: 'all 0.15s',
+              background: activeTab === tab.id
+                ? 'rgba(165,180,252,0.15)'
+                : 'transparent',
+              color: activeTab === tab.id
+                ? 'var(--primary, #a5b4fc)'
+                : 'var(--muted)',
+              borderBottom: activeTab === tab.id
+                ? '2px solid var(--primary, #a5b4fc)'
+                : '2px solid transparent',
+            }}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
-      {/* ── All marks table ── */}
-      <div className="card">
-        <div className="card-title">All Marks</div>
-        {marks.length === 0
-          ? <p className="text-muted">No marks added yet.</p>
-          : (
-            <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr><th>Subject</th><th>Type</th><th>Marks</th><th>Grade Pt.</th><th>Action</th></tr>
-                </thead>
-                <tbody>
-                  {marks.map(m => (
-                    <tr key={m._id}>
-                      <td>{m.subjectId?.name || '—'}</td>
-                      <td><span className="badge badge-info">{m.examType}</span></td>
-                      <td>{m.marksObtained} / {m.maxMarks} ({((m.marksObtained / m.maxMarks) * 100).toFixed(1)}%)</td>
-                      <td><strong>{m.gradePoint}</strong></td>
-                      <td>
-                        <button className="btn btn-danger btn-sm" onClick={() => handleDelete(m._id)}>Delete</button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+      {/* ══════════════════════════════════════════
+          TAB 1 — Marks & CGPA
+      ══════════════════════════════════════════ */}
+      {activeTab === 'marks' && (
+        <>
+          <div className="grid-2 mb-4">
+            <div className="card">
+              <div className="card-title">Add Exam Marks</div>
+              <form onSubmit={handleSubmit}>
+                <div className="form-group">
+                  <label className="form-label">Subject</label>
+                  <select className="form-select" value={form.subjectId}
+                    onChange={e => setForm(p => ({ ...p, subjectId: e.target.value }))} required>
+                    <option value="">Select subject</option>
+                    {subjects.map(s => <option key={s._id} value={s._id}>{s.name}</option>)}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Exam Type</label>
+                  <select className="form-select" value={form.examType}
+                    onChange={e => setForm(p => ({ ...p, examType: e.target.value }))}>
+                    {['midterm', 'final', 'quiz', 'assignment', 'practical'].map(t => (
+                      <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="grid-2">
+                  <div className="form-group">
+                    <label className="form-label">Marks Obtained</label>
+                    <input className="form-input" type="number" min="0"
+                      value={form.marksObtained}
+                      onChange={e => setForm(p => ({ ...p, marksObtained: e.target.value }))} required />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Max Marks</label>
+                    <input className="form-input" type="number" min="1"
+                      value={form.maxMarks}
+                      onChange={e => setForm(p => ({ ...p, maxMarks: e.target.value }))} required />
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Exam Date</label>
+                  <input className="form-input" type="date" value={form.examDate}
+                    onChange={e => setForm(p => ({ ...p, examDate: e.target.value }))} />
+                </div>
+                <button className="btn btn-primary" type="submit">Add Marks</button>
+              </form>
             </div>
-          )
-        }
-      </div>
 
-      {/* ── Semester CGPA banner ── */}
-      {cgpaSem?.totalSemesters > 0 && (
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 20,
-          padding: '14px 20px', borderRadius: 14, margin: '28px 0 16px',
-          background: 'rgba(129,140,248,0.1)', border: '1px solid rgba(129,140,248,0.25)',
-          flexWrap: 'wrap',
-        }}>
-          <div>
-            <p style={{ margin: 0, fontSize: 11, color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase' }}>Semester CGPA</p>
-            <p style={{ margin: 0, fontSize: 32, fontWeight: 800, color: '#818cf8' }}>{cgpaSem.cgpa}</p>
-            <p style={{ margin: 0, fontSize: 11, color: 'var(--muted)' }}>
-              {cgpaSem.totalSemesters} semester{cgpaSem.totalSemesters > 1 ? 's' : ''}
-            </p>
+            <div className="card">
+              <div className="card-title">Grade Points (Final Exams)</div>
+              {cgpaData?.breakdown?.length > 0
+                ? <Bar data={chartData} options={{ responsive: true, plugins: { legend: { display: false } }, scales: { y: { min: 0, max: 10 } } }} />
+                : <p className="text-muted">Add final exam marks to see CGPA breakdown.</p>
+              }
+            </div>
           </div>
-          <div style={{ flex: 1 }}>
-            <p style={{ margin: '0 0 6px', fontSize: 11, color: 'var(--muted)', fontWeight: 600 }}>SGPA per Semester</p>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              {cgpaSem.sgpaList.map((s, i) => (
-                <span key={`sgpa-${i}`} style={{
-                  fontSize: 12, fontWeight: 600, padding: '3px 10px', borderRadius: 99,
-                  background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
-                  color: 'var(--text)',
-                }}>
-                  S{i + 1}: {s}
-                </span>
-              ))}
-            </div>
+
+          <div className="card">
+            <div className="card-title">All Marks</div>
+            {marks.length === 0
+              ? <p className="text-muted">No marks added yet.</p>
+              : (
+                <div className="table-wrap">
+                  <table>
+                    <thead>
+                      <tr><th>Subject</th><th>Type</th><th>Marks</th><th>Grade Pt.</th><th>Action</th></tr>
+                    </thead>
+                    <tbody>
+                      {marks.map(m => (
+                        <tr key={m._id}>
+                          <td>{m.subjectId?.name || '—'}</td>
+                          <td><span className="badge badge-info">{m.examType}</span></td>
+                          <td>{m.marksObtained} / {m.maxMarks} ({((m.marksObtained / m.maxMarks) * 100).toFixed(1)}%)</td>
+                          <td><strong>{m.gradePoint}</strong></td>
+                          <td>
+                            <button className="btn btn-danger btn-sm" onClick={() => handleDelete(m._id)}>Delete</button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )
+            }
+          </div>
+        </>
+      )}
+
+      {/* ══════════════════════════════════════════
+          TAB 2 — Upload PDF
+      ══════════════════════════════════════════ */}
+      {activeTab === 'upload' && (
+        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+          <div style={{ padding: '16px 24px 24px' }}>
+            <UploadMarks onResult={() => {}} />
           </div>
         </div>
       )}
 
-      {/* ── Add semester + semester list ── */}
-      <div className="grid-2" style={{ marginTop: 16 }}>
-        <div className="card">
-          <div className="card-title">➕ Add Semester (SGPA)</div>
-          <div className="form-group">
-            <label className="form-label">Semester No. *</label>
-            <input className="form-input" type="number" min="1" placeholder="e.g. 1"
-              value={semForm.semesterNumber}
-              onChange={e => setSemForm(p => ({ ...p, semesterNumber: e.target.value }))}
-            />
-          </div>
-          <div className="form-group">
-            <label className="form-label">Label (optional)</label>
-            <input className="form-input" type="text" placeholder="e.g. Fall 2024"
-              value={semForm.semesterName}
-              onChange={e => setSemForm(p => ({ ...p, semesterName: e.target.value }))}
-            />
-          </div>
-
-          <label className="form-label" style={{ marginBottom: 8 }}>Subjects *</label>
-          {semForm.subjects.map((s, i) => (
-            <div key={`semform-subj-${i}`} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>
-              <input className="form-input" style={{ flex: 2, minWidth: 120 }} placeholder="Subject name"
-                value={s.name} onChange={e => updateSubjectRow(i, 'name', e.target.value)} />
-              <input className="form-input" style={{ width: 80 }} type="number" min="1" placeholder="Credits"
-                value={s.credits} onChange={e => updateSubjectRow(i, 'credits', e.target.value)} />
-              <select className="form-select" style={{ width: 100 }} value={s.grade}
-                onChange={e => updateSubjectRow(i, 'grade', e.target.value)}>
-                {gradeOptions.map(({ grade, point }) => (
-                  <option key={grade} value={grade}>{grade} ({point})</option>
-                ))}
-              </select>
-              {semForm.subjects.length > 1 && (
-                <button className="btn btn-danger btn-sm" onClick={() => removeSubjectRow(i)}>✕</button>
-              )}
+      {/* ══════════════════════════════════════════
+          TAB 3 — Semesters & SGPA
+      ══════════════════════════════════════════ */}
+      {activeTab === 'semester' && (
+        <>
+          {/* Semester CGPA banner */}
+          {cgpaSem?.totalSemesters > 0 && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 20,
+              padding: '14px 20px', borderRadius: 14, marginBottom: 20,
+              background: 'rgba(129,140,248,0.1)', border: '1px solid rgba(129,140,248,0.25)',
+              flexWrap: 'wrap',
+            }}>
+              <div>
+                <p style={{ margin: 0, fontSize: 11, color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase' }}>Semester CGPA</p>
+                <p style={{ margin: 0, fontSize: 32, fontWeight: 800, color: '#818cf8' }}>{cgpaSem.cgpa}</p>
+                <p style={{ margin: 0, fontSize: 11, color: 'var(--muted)' }}>
+                  {cgpaSem.totalSemesters} semester{cgpaSem.totalSemesters > 1 ? 's' : ''}
+                </p>
+              </div>
+              <div style={{ flex: 1 }}>
+                <p style={{ margin: '0 0 6px', fontSize: 11, color: 'var(--muted)', fontWeight: 600 }}>SGPA per Semester</p>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {cgpaSem.sgpaList.map((s, i) => (
+                    <span key={`sgpa-${i}`} style={{
+                      fontSize: 12, fontWeight: 600, padding: '3px 10px', borderRadius: 99,
+                      background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+                      color: 'var(--text)',
+                    }}>
+                      S{i + 1}: {s}
+                    </span>
+                  ))}
+                </div>
+              </div>
             </div>
-          ))}
+          )}
 
-          <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
-            <button className="btn btn-secondary" onClick={addSubjectRow}>+ Subject</button>
-            <button className="btn btn-primary" onClick={handleAddSemester} disabled={semLoading}>
-              {semLoading ? 'Saving…' : 'Save Semester'}
+          {/* ── NEW: Mode toggle ── */}
+          <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+            <button
+              onClick={() => setSemMode('full')}
+              style={{
+                padding: '7px 16px', fontSize: 12, fontWeight: 600, borderRadius: 8, cursor: 'pointer',
+                border: '1px solid rgba(129,140,248,0.4)',
+                background: semMode === 'full' ? 'rgba(129,140,248,0.2)' : 'transparent',
+                color: semMode === 'full' ? '#818cf8' : 'var(--muted)',
+              }}
+            >
+              📚 Add with Subjects
+            </button>
+            <button
+              onClick={() => setSemMode('manual')}
+              style={{
+                padding: '7px 16px', fontSize: 12, fontWeight: 600, borderRadius: 8, cursor: 'pointer',
+                border: '1px solid rgba(129,140,248,0.4)',
+                background: semMode === 'manual' ? 'rgba(129,140,248,0.2)' : 'transparent',
+                color: semMode === 'manual' ? '#818cf8' : 'var(--muted)',
+              }}
+            >
+              ⚡ Import Past SGPA Directly
             </button>
           </div>
-        </div>
 
-        <div className="card">
-          <div className="card-title">📚 Semesters</div>
-          {semesters.length === 0
-            ? <p className="text-muted">No semesters added yet.</p>
-            : semesters.map(sem => (
-                <div key={sem._id} style={{ padding: '12px 0', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--text)' }}>
-                        Semester {sem.semesterNumber}{sem.semesterName ? ` — ${sem.semesterName}` : ''}
-                      </span>
-                      <span style={{
-                        marginLeft: 10, fontSize: 11, fontWeight: 600, color: '#818cf8',
-                        background: 'rgba(129,140,248,0.12)', border: '1px solid rgba(129,140,248,0.25)',
-                        borderRadius: 99, padding: '2px 8px',
-                      }}>
-                        SGPA {sem.sgpa}
-                      </span>
-                    </div>
-                    <button className="btn btn-danger btn-sm" onClick={() => handleDeleteSemester(sem._id)}>Delete</button>
-                  </div>
-                  <div style={{ marginTop: 6, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                    {sem.subjects.map((s, i) => (
-                      <span key={`${sem._id}-subj-${i}`} style={{
-                        fontSize: 11, padding: '2px 8px', borderRadius: 99,
-                        background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
-                        color: 'var(--muted)',
-                      }}>
-                        {s.name} · {s.grade} · {s.credits}cr
-                      </span>
-                    ))}
-                  </div>
+          <div className="grid-2">
+            {/* ── Left panel: full form OR manual form ── */}
+            {semMode === 'full' ? (
+              <div className="card">
+                <div className="card-title">➕ Add Semester (SGPA)</div>
+                <div className="form-group">
+                  <label className="form-label">Semester No. *</label>
+                  <input className="form-input" type="number" min="1" placeholder="e.g. 1"
+                    value={semForm.semesterNumber}
+                    onChange={e => setSemForm(p => ({ ...p, semesterNumber: e.target.value }))} />
                 </div>
-              ))
-          }
-        </div>
-      </div>
+                <div className="form-group">
+                  <label className="form-label">Label (optional)</label>
+                  <input className="form-input" type="text" placeholder="e.g. Fall 2024"
+                    value={semForm.semesterName}
+                    onChange={e => setSemForm(p => ({ ...p, semesterName: e.target.value }))} />
+                </div>
+                <label className="form-label" style={{ marginBottom: 8 }}>Subjects *</label>
+                {semForm.subjects.map((s, i) => (
+                  <div key={`semform-subj-${i}`} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>
+                    <input className="form-input" style={{ flex: 2, minWidth: 120 }} placeholder="Subject name"
+                      value={s.name} onChange={e => updateSubjectRow(i, 'name', e.target.value)} />
+                    <input className="form-input" style={{ width: 80 }} type="number" min="1" placeholder="Credits"
+                      value={s.credits} onChange={e => updateSubjectRow(i, 'credits', e.target.value)} />
+                    <select className="form-select" style={{ width: 100 }} value={s.grade}
+                      onChange={e => updateSubjectRow(i, 'grade', e.target.value)}>
+                      {gradeOptions.map(({ grade, point }) => (
+                        <option key={grade} value={grade}>{grade} ({point})</option>
+                      ))}
+                    </select>
+                    {semForm.subjects.length > 1 && (
+                      <button className="btn btn-danger btn-sm" onClick={() => removeSubjectRow(i)}>✕</button>
+                    )}
+                  </div>
+                ))}
+                <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
+                  <button className="btn btn-secondary" onClick={addSubjectRow}>+ Subject</button>
+                  <button className="btn btn-primary" onClick={handleAddSemester} disabled={semLoading}>
+                    {semLoading ? 'Saving…' : 'Save Semester'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="card">
+                <div className="card-title">⚡ Import Past SGPA</div>
+                <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 16 }}>
+                  Already in 3rd or 4th sem? Enter your past semester SGPAs directly without re-entering all subjects.
+                </p>
+                <div className="form-group">
+                  <label className="form-label">Semester No. *</label>
+                  <input className="form-input" type="number" min="1" placeholder="e.g. 1"
+                    value={manualForm.semesterNumber}
+                    onChange={e => setManualForm(p => ({ ...p, semesterNumber: e.target.value }))} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Label (optional)</label>
+                  <input className="form-input" type="text" placeholder="e.g. First sem"
+                    value={manualForm.semesterName}
+                    onChange={e => setManualForm(p => ({ ...p, semesterName: e.target.value }))} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">SGPA *</label>
+                  <input className="form-input" type="number" min="0" max="10" step="0.01" placeholder="e.g. 8.75"
+                    value={manualForm.sgpa}
+                    onChange={e => setManualForm(p => ({ ...p, sgpa: e.target.value }))} />
+                </div>
+                <button className="btn btn-primary" onClick={handleAddManualSGPA} disabled={manualLoading}>
+                  {manualLoading ? 'Saving…' : 'Add Past SGPA'}
+                </button>
+                <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 10 }}>
+                  💡 Tip: Add all your past semesters one by one to get an accurate CGPA.
+                </p>
+              </div>
+            )}
+
+            {/* Right panel: semester list */}
+            <div className="card">
+              <div className="card-title">📚 Semesters</div>
+              {semesters.length === 0
+                ? <p className="text-muted">No semesters added yet.</p>
+                : semesters.map(sem => (
+                    <div key={sem._id} style={{ padding: '12px 0', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                          <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--text)' }}>
+                            Semester {sem.semesterNumber}{sem.semesterName ? ` — ${sem.semesterName}` : ''}
+                          </span>
+                          <span style={{
+                            marginLeft: 10, fontSize: 11, fontWeight: 600, color: '#818cf8',
+                            background: 'rgba(129,140,248,0.12)', border: '1px solid rgba(129,140,248,0.25)',
+                            borderRadius: 99, padding: '2px 8px',
+                          }}>
+                            SGPA {sem.sgpa}
+                          </span>
+                          {sem.isManual && (
+                            <span style={{
+                              marginLeft: 6, fontSize: 10, fontWeight: 600, color: '#f59e0b',
+                              background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.25)',
+                              borderRadius: 99, padding: '2px 7px',
+                            }}>
+                              manual
+                            </span>
+                          )}
+                        </div>
+                        <button className="btn btn-danger btn-sm" onClick={() => handleDeleteSemester(sem._id)}>Delete</button>
+                      </div>
+                      {!sem.isManual && (
+                        <div style={{ marginTop: 6, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                          {sem.subjects.map((s, i) => (
+                            <span key={`${sem._id}-subj-${i}`} style={{
+                              fontSize: 11, padding: '2px 8px', borderRadius: 99,
+                              background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
+                              color: 'var(--muted)',
+                            }}>
+                              {s.name} · {s.grade} · {s.credits}cr
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))
+              }
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

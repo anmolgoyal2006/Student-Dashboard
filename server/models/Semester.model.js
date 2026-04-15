@@ -39,12 +39,17 @@ const SemesterSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
-    subjects: {
+ subjects: {
       type: [SubjectSchema],
-      validate: {
-        validator: (v) => v.length > 0,
-        message: 'At least one subject is required',
-      },
+      default: [],
+    },
+    isManual: {
+      type: Boolean,
+      default: false,
+    },
+    directSGPA: {
+      type: Number,
+      default: null,
     },
     sgpa: {
       type: Number,
@@ -56,6 +61,13 @@ const SemesterSchema = new mongoose.Schema(
 
 // Auto-compute SGPA before saving
 SemesterSchema.pre('save', function (next) {
+  if (this.isManual && this.directSGPA !== null) {
+    this.sgpa = this.directSGPA;
+    return next();
+  }
+  if (!this.isManual && (!this.subjects || this.subjects.length === 0)) {
+    return next(new Error('At least one subject is required'));
+  }
   const { calculateSGPA } = require('../utils/gradeUtils');
   this.sgpa = calculateSGPA(this.subjects);
   next();

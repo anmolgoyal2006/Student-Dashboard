@@ -4,7 +4,7 @@ import {
   Chart as ChartJS, CategoryScale, LinearScale,
   BarElement, ArcElement, Tooltip, Legend
 } from 'chart.js';
-import { attendanceService, marksService, aiService, notificationService } from '../services/apiServices';
+import { attendanceService, marksService, aiService, notificationService, subjectService } from '../services/apiServices';
 import { useAuth } from '../context/AuthContext';
 import SmartPlanCard from '../components/SmartPlanCard';
 
@@ -19,11 +19,12 @@ const getGreeting = () => {
 
 export default function Dashboard() {
   const { user }  = useAuth();
-  const [summary, setSummary]   = useState([]);
-  const [cgpa, setCgpa]         = useState(null);
-  const [recs, setRecs]         = useState([]);
-  const [notifs, setNotifs]     = useState([]);
-  const [loading, setLoading]   = useState(true);
+  const [summary, setSummary]         = useState([]);
+  const [cgpa, setCgpa]               = useState(null);
+  const [recs, setRecs]               = useState([]);
+  const [notifs, setNotifs]           = useState([]);
+  const [subjectCount, setSubjectCount] = useState(0);   // ← NEW
+  const [loading, setLoading]         = useState(true);
 
   useEffect(() => {
     Promise.all([
@@ -31,11 +32,13 @@ export default function Dashboard() {
       marksService.getCGPAbySemester(),
       aiService.getRecommendations(),
       notificationService.getAll(),
-    ]).then(([a, m, r, n]) => {
+      subjectService.getAll(),               // ← NEW
+    ]).then(([a, m, r, n, s]) => {
       setSummary(a.data.summary || []);
       setCgpa(m.data.cgpa);
       setRecs(r.data.suggestions || []);
       setNotifs(n.data.notifications || []);
+      setSubjectCount((s.data.subjects || []).length);   // ← NEW
     }).finally(() => setLoading(false));
   }, []);
 
@@ -95,10 +98,10 @@ export default function Dashboard() {
   };
 
   const stats = [
-    { label: 'CGPA',            value: cgpa ?? '—',                              icon: '🎯', color: '#818cf8' },
-    { label: 'Attendance',      value: `${overallAttendance}%`,                  icon: '✅', color: '#34d399' },
-    { label: 'Subjects',        value: summary.length,                           icon: '📚', color: '#fbbf24' },
-    { label: 'Low Alerts',      value: summary.filter(s => s.isLow).length,      icon: '⚠️', color: '#f87171' },
+    { label: 'CGPA',        value: cgpa ?? '—',                             icon: '🎯', color: '#818cf8' },
+    { label: 'Attendance',  value: `${overallAttendance}%`,                 icon: '✅', color: '#34d399' },
+    { label: 'Subjects',    value: subjectCount,                            icon: '📚', color: '#fbbf24' }, // ← FIXED
+    { label: 'Low Alerts',  value: summary.filter(s => s.isLow).length,    icon: '⚠️', color: '#f87171' },
   ];
 
   if (loading) return <div className="spinner" />;
@@ -106,7 +109,7 @@ export default function Dashboard() {
   return (
     <div>
 
-  {/* Header */}
+      {/* Header */}
       <div className="page-header">
         <div>
           <h1 className="page-title">
@@ -211,7 +214,8 @@ export default function Dashboard() {
           }
         </div>
       </div>
-       {/* ── Smart Study Plan ────────────────────────────── */}
+
+      {/* Smart Study Plan */}
       <SmartPlanCard />
     </div>
   );
