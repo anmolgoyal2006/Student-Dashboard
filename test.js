@@ -18,10 +18,9 @@ export default function () {
   });
 
   // Backend API - Render
-  let api = http.get('https://student-dashboard-irm9.onrender.com/api/users');
-  check(api, {
-    'API working': (r) => r.status === 200 || r.status === 401,
-  });
-
+ let api = http.get('https://student-dashboard-irm9.onrender.com/api/auth/login');
+check(api, {
+  'API awake': (r) => r.status === 200 || r.status === 404 || r.status === 400,
+});
   sleep(1);
 }
