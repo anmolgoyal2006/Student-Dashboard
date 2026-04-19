@@ -11,7 +11,7 @@ export default function () {
     'https://student-dashboard-irm9.onrender.com/api/auth/login',
     JSON.stringify({
       email: 'anmolgoyal1974@gmail.com',  // 👈 your real test account
-      password: 'your_password_here',      // 👈 replace this
+      password: 'Anmol@1974',      // 👈 replace this
     }),
     { headers: { 'Content-Type': 'application/json' } }
   );
