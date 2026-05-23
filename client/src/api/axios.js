@@ -20,9 +20,15 @@ async function withRetry(fn, retries = 3, delayMs = 2000) {
   }
 }
 
+// Ensure base URL always includes /api (avoids "Route not found" on misconfigured .env)
+function resolveApiBaseUrl() {
+  const raw = (process.env.REACT_APP_API_URL || 'http://localhost:5000/api').trim().replace(/\/$/, '');
+  return raw.endsWith('/api') ? raw : `${raw}/api`;
+}
+
 // ─── Axios instance ─────────────────────────────────────────────────────────
 const API = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5000/api',
+  baseURL: resolveApiBaseUrl(),
   timeout: 60000,          // 60 s — enough for a cold start
   withCredentials: false,  // set true only if you use httpOnly cookies
   headers: {

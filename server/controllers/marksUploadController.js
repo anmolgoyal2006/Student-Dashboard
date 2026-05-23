@@ -1,45 +1,28 @@
 /**
- * marksUploadController.js  (FIXED)
+ * marksUploadController.js
  * ─────────────────────────────────────────────────────────────────────────────
- * POST /marks/upload-pdf
- *
- * ROOT CAUSE OF OLD BUG:
- *   pdf-parse extracts text line-by-line and loses column alignment on page 2+
- *   when the PDF has no visible grid lines. Names and marks merged into one
- *   token: "PULKIT SACHDEVA7735 16" → impossible to split correctly.
- *
- * FIX:
- *   Use Python pdfplumber via child_process.spawn. pdfplumber uses
- *   x-coordinate bounding boxes to cluster characters into correct columns
- *   regardless of page. Works for ANY tabular PDF.
- *
- * Pipeline:
- *   1. Save uploaded buffer to tmp file
- *   2. Spawn: python3 parsePdf.py <tmpFile>  → JSON array of raw rows
- *   3. detectColumns()   → { columns, studentRows }
- *   4. applyWeights()    → weightedRows
- *   5. rankStudents()    → rankedRows + summary
- *   6. Cleanup tmp file  → return JSON
- *
- * One-time server setup:
- *   pip install pdfplumber
+ * POST /marks/upload-pdf        — legacy single-PDF column-based flow
+ * POST /marks/parse-pdfs        — parse one or more PDFs → per-file student scores
+ * POST /marks/generate-leaderboard — merge sources with labels/weights → ranked list
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-const { spawn }                         = require('child_process');
-const fs                                = require('fs');
-const path                              = require('path');
-const os                                = require('os');
+const { spawn } = require('child_process');
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
 const { detectColumns } = require('../services/columnDetector');
 const { applyWeights } = require('../services/weightCalculator');
 const { processLeaderboard } = require('../services/rankingService');
-// Path to the Python parser script
+const {
+  studentsFromRawRows,
+  scoreStudentsForSource,
+  computeSourceFileWeight,
+} = require('../services/pdfScoreExtractor');
+const { mergeSourcesAndScore } = require('../services/multiPdfMergeService');
+
 const PARSER_SCRIPT = path.join(__dirname, '../scripts/parsePdf.py');
 
-/* ─────────────────────────────────────────────────────────────────────────────
-   parsePdfWithPython
-   Saves buffer → tmp file → runs parsePdf.py → returns parsed rows array
-   ───────────────────────────────────────────────────────────────────────────── */
 function parsePdfWithPython(buffer) {
   return new Promise((resolve, reject) => {
     const tmpPath = path.join(
@@ -51,22 +34,22 @@ function parsePdfWithPython(buffer) {
     let stdout = '';
     let stderr = '';
 
- const PYTHON_BIN = process.platform === 'win32' ? 'python' : 'python3';
-const proc = spawn(PYTHON_BIN, [PARSER_SCRIPT, tmpPath]);
+    const PYTHON_BIN = process.platform === 'win32' ? 'python' : 'python3';
+    const proc = spawn(PYTHON_BIN, [PARSER_SCRIPT, tmpPath]);
 
-    proc.stdout.on('data', chunk => { stdout += chunk.toString(); });
-   proc.stderr.on('data', chunk => { 
-  stderr += chunk.toString(); 
-  console.error("PYTHON ERROR:", chunk.toString());
-});
+    proc.stdout.on('data', (chunk) => { stdout += chunk.toString(); });
+    proc.stderr.on('data', (chunk) => {
+      stderr += chunk.toString();
+      console.error('PYTHON ERROR:', chunk.toString());
+    });
 
-    proc.on('close', code => {
+    proc.on('close', (code) => {
       try { fs.unlinkSync(tmpPath); } catch (_) {}
 
       if (code !== 0) {
         return reject(new Error(
           `PDF parser failed (exit ${code}). ` +
-          (stderr ? stderr : 'Is pdfplumber installed? Run: pip install pdfplumber')
+          (stderr || 'Is pdfplumber installed? Run: pip install pdfplumber')
         ));
       }
 
@@ -80,26 +63,30 @@ const proc = spawn(PYTHON_BIN, [PARSER_SCRIPT, tmpPath]);
       }
     });
 
-    proc.on('error', err => {
+    proc.on('error', (err) => {
       try { fs.unlinkSync(tmpPath); } catch (_) {}
       reject(new Error(`Could not start Python: ${err.message}. Is Python 3 in PATH?`));
     });
   });
 }
 
-/* ─────────────────────────────────────────────────────────────────────────────
-   Route handler
-   ───────────────────────────────────────────────────────────────────────────── */
+function defaultLabelFromFilename(filename, index) {
+  const base = String(filename || `PDF ${index + 1}`)
+    .replace(/\.pdf$/i, '')
+    .replace(/[_-]+/g, ' ')
+    .trim();
+  return base || `Source ${index + 1}`;
+}
+
+/* ── Legacy: single PDF + column weights ─────────────────────────────────── */
 async function uploadPdfHandler(req, res) {
   try {
-    // ── 0. Validate ───────────────────────────────────────────────────────────
     if (!req.file) {
       return res.status(400).json({ message: 'No PDF file uploaded.' });
     }
 
-    // ── 1. Parse request body params ──────────────────────────────────────────
     let selectedColumns = [];
-    let weights         = {};
+    let weights = {};
 
     try {
       if (req.body.selectedColumns) selectedColumns = JSON.parse(req.body.selectedColumns);
@@ -113,7 +100,6 @@ async function uploadPdfHandler(req, res) {
       return res.status(400).json({ message: 'weights must be a JSON object string.' });
     }
 
-    // ── 2. Parse PDF → rawRows via Python/pdfplumber ──────────────────────────
     let rawRows;
     try {
       rawRows = await parsePdfWithPython(req.file.buffer);
@@ -128,7 +114,6 @@ async function uploadPdfHandler(req, res) {
       });
     }
 
-    // ── 3. Detect columns ─────────────────────────────────────────────────────
     const { columns, studentRows } = detectColumns(rawRows);
 
     if (columns.length === 0) {
@@ -139,74 +124,181 @@ async function uploadPdfHandler(req, res) {
       });
     }
 
-    // ── 4. Validate weights ───────────────────────────────────────────────────
-    const active = selectedColumns.length > 0 ? selectedColumns : columns.map(c => c.name);
-    
-
-    // ── 5. Apply weights → normalized scores ──────────────────────────────────
+    const active = selectedColumns.length > 0 ? selectedColumns : columns.map((c) => c.name);
     const weightedRows = applyWeights(studentRows, columns, selectedColumns, weights);
+    const result = processLeaderboard(weightedRows, columns);
 
-    // ── 6. Rank ───────────────────────────────────────────────────────────────
-    // ── 6. Rank + Build Leaderboard ───────────────────────────────────────────
-const result = processLeaderboard(weightedRows, columns);
+    if (req.query.exportExcel === 'true') {
+      const XLSX = require('xlsx');
+      const students = result.leaderboard?.[0]?.students || [];
+      const rows = students.map((s) => ({
+        Rank : s.rank,
+        Name : s.name,
+        Roll : s.roll,
+        Total: s.totalScore,
+      }));
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Leaderboard');
+      const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+      res.setHeader('Content-Disposition', 'attachment; filename=leaderboard.xlsx');
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      return res.send(buffer);
+    }
 
-// 👉 EXCEL MODE
-if (req.query.exportExcel === 'true') {
-  const XLSX = require('xlsx');
-
-  const students = result.leaderboard?.[0]?.students || [];
-
-  const rows = students.map(s => ({
-    Rank: s.rank,
-    Name: s.name,
-    Roll: s.roll,
-    Total: s.totalScore
-  }));
-
-  const ws = XLSX.utils.json_to_sheet(rows);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Leaderboard');
-
-  const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
-
-  res.setHeader(
-    'Content-Disposition',
-    'attachment; filename=leaderboard.xlsx'
-  );
-  res.setHeader(
-    'Content-Type',
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-  );
-
-  return res.send(buffer);
-}
-
-// 👉 NORMAL JSON RESPONSE
-return res.json({
-  columns,
-  selectedColumns: active,
-  weights,
-  ...result
-});
-
+    return res.json({
+      columns,
+      studentRows,
+      selectedColumns: active,
+      weights,
+      method: 'columns',
+      ...result,
+    });
   } catch (err) {
     console.error('[upload-pdf]', err);
     return res.status(500).json({ message: err.message || 'Unexpected server error.' });
   }
 }
 
-module.exports = { uploadPdfHandler };
+/* ── New: parse multiple PDFs ───────────────────────────────────────────── */
+async function parsePdfsHandler(req, res) {
+  try {
+    const files = req.files?.length ? req.files : (req.file ? [req.file] : []);
+    if (!files.length) {
+      return res.status(400).json({ message: 'No PDF files uploaded.' });
+    }
 
-/*
-────────────────────────────────────────────────────────────────────
-ROUTER REGISTRATION (add to your marks router — unchanged):
-────────────────────────────────────────────────────────────────────
+    const sources = [];
 
-const multer               = require('multer');
-const { uploadPdfHandler } = require('./controllers/marksUploadController');
-const upload               = multer({ storage: multer.memoryStorage() });
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      let rawRows;
+      try {
+        rawRows = await parsePdfWithPython(file.buffer);
+      } catch (err) {
+        return res.status(422).json({
+          message: `Failed to parse "${file.originalname}".`,
+          detail: err.message,
+        });
+      }
 
-router.post('/upload-pdf', authMiddleware, upload.single('file'), uploadPdfHandler);
+      const parsed = studentsFromRawRows(rawRows);
+      if (!parsed.studentRows.length) {
+        return res.status(422).json({
+          message: `No students found in "${file.originalname}".`,
+          hint: 'Ensure the PDF is a tabular marks sheet with a header row.',
+        });
+      }
 
-────────────────────────────────────────────────────────────────────
-*/
+      sources.push({
+        id              : `pdf_${Date.now()}_${i}_${Math.random().toString(36).slice(2, 8)}`,
+        fileName        : file.originalname,
+        label           : defaultLabelFromFilename(file.originalname, i),
+        columns         : parsed.columns.map((c) => ({ name: c.name, max: c.max })),
+        studentRows     : parsed.studentRows,
+        columnWeights   : parsed.columnWeights,
+        selectedColumns : parsed.selectedColumns,
+        studentCount    : parsed.studentRows.length,
+      });
+    }
+
+    return res.json({ method: 'multi-pdf', sources });
+  } catch (err) {
+    console.error('[parse-pdfs]', err);
+    return res.status(500).json({ message: err.message || 'Unexpected server error.' });
+  }
+}
+
+/* ── New: generate leaderboard from parsed sources ──────────────────────── */
+async function generateLeaderboardHandler(req, res) {
+  try {
+    let sources = req.body?.sources;
+    if (typeof sources === 'string') {
+      try {
+        sources = JSON.parse(sources);
+      } catch {
+        return res.status(400).json({ message: 'sources must be valid JSON.' });
+      }
+    }
+
+    if (!Array.isArray(sources) || sources.length === 0) {
+      return res.status(400).json({ message: 'sources array is required.' });
+    }
+
+    const normalized = sources.map((s, i) => {
+      const label = String(s.label || `Source ${i + 1}`).trim() || `Source ${i + 1}`;
+      const columns = Array.isArray(s.columns) ? s.columns : [];
+      const studentRows = Array.isArray(s.studentRows) ? s.studentRows : [];
+      const selectedColumns = Array.isArray(s.selectedColumns) && s.selectedColumns.length
+        ? s.selectedColumns
+        : columns.map((c) => c.name);
+      const columnWeights = s.columnWeights && typeof s.columnWeights === 'object'
+        ? s.columnWeights
+        : {};
+
+      // Per-column weights → one score per student, then PDF-level weight merge
+      const students = studentRows.length
+        ? scoreStudentsForSource({
+          studentRows,
+          columns,
+          selectedColumns,
+          columnWeights,
+        })
+        : (Array.isArray(s.students) ? s.students : []);
+
+      const weight = computeSourceFileWeight(columns, selectedColumns, columnWeights);
+
+      return {
+        id       : s.id || `source_${i}`,
+        label,
+        weight,
+        students,
+        columns,
+        selectedColumns,
+        columnWeights,
+      };
+    });
+
+    if (normalized.some((s) => !s.label)) {
+      return res.status(400).json({ message: 'Each source must have a label.' });
+    }
+    if (normalized.some((s) => Number.isNaN(s.weight))) {
+      return res.status(400).json({ message: 'Each source must have a numeric weight.' });
+    }
+
+    const result = mergeSourcesAndScore(normalized);
+
+    if (req.query.exportExcel === 'true') {
+      const XLSX = require('xlsx');
+      const students = result.leaderboard?.[0]?.students || [];
+      const labels = result.sources.map((s) => s.label);
+      const rows = students.map((s) => {
+        const row = { Rank: s.rank, Name: s.name, Roll: s.roll || '' };
+        labels.forEach((label) => {
+          row[label] = s.breakdown?.[label]?.raw ?? 0;
+        });
+        row['Final Score'] = s.totalScore;
+        return row;
+      });
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Leaderboard');
+      const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+      res.setHeader('Content-Disposition', 'attachment; filename=leaderboard.xlsx');
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      return res.send(buffer);
+    }
+
+    return res.json({ method: 'multi-pdf', ...result });
+  } catch (err) {
+    console.error('[generate-leaderboard]', err);
+    return res.status(500).json({ message: err.message || 'Unexpected server error.' });
+  }
+}
+
+module.exports = {
+  uploadPdfHandler,
+  parsePdfsHandler,
+  generateLeaderboardHandler,
+  parsePdfWithPython,
+};

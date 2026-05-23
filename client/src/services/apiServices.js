@@ -55,6 +55,18 @@ export const marksService = {
   addManualSGPA:     (data) => apiRequest('post',   '/marks/semester/manual', data),
   updateSemester:    (id, data) => apiRequest('put', `/marks/semester/${id}`, data),
   deleteSemester:    (id)   => apiRequest('delete', `/marks/semester/${id}`),
+
+  // PDF leaderboard (multi-PDF dynamic)
+  parsePdfs: (formData) =>
+    API.post('/marks/parse-pdfs', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
+  generateLeaderboard: (payload) =>
+    apiRequest('post', '/marks/generate-leaderboard', payload),
+  uploadPdf: (formData) =>
+    API.post('/marks/upload-pdf', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
 };
 
 // ─── Career ───────────────────────────────────────────────────────────────

@@ -111,18 +111,26 @@ setInterval(() => {
   const http = require('http');
   http.get(`http://localhost:${process.env.PORT || 5000}/api/ping`, () => {});
 }, 10 * 60 * 1000);
+const startServer = () => {
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+};
+
 mongoose.connect(process.env.MONGO_URI, {
   serverSelectionTimeoutMS: 10000,
   socketTimeoutMS: 45000,
 })
   .then(() => {
     console.log('MongoDB connected');
-    startDailyNotificationJob(); // ← ADDED: starts only after DB is ready
-    app.listen(PORT, '0.0.0.0', () => {
-      console.log(`Server running on port ${PORT}`);
-    });
+    startDailyNotificationJob();
+    startServer();
   })
   .catch((err) => {
     console.error('MongoDB connection failed:', err.message);
-    process.exit(1);
+    if (process.env.NODE_ENV === 'production') {
+      process.exit(1);
+    }
+    console.warn('[Dev] Starting API without MongoDB — DB-backed features may fail.');
+    startServer();
   });

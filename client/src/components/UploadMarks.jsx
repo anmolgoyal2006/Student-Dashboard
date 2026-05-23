@@ -1,314 +1,409 @@
 /**
- * UploadMarks.jsx  (FIXED)
+ * UploadMarks.jsx — dynamic multi-PDF leaderboard
  *
- * Key fixes:
- *  1. Passes onDownloadExcel to Leaderboard (Excel is a separate /rank call
- *     with exportExcel:true — backend sends a binary buffer, not base64)
- *  2. WeightInput is now included inline (was missing as a separate file)
- *  3. rankPayload is stored so Excel re-uses the same columns/weights
+ * Flow:
+ *   1. Select one or more PDFs → parse via POST /marks/parse-pdfs
+ *   2. Set label + per-score weights (file weight is auto sum of column weights)
+ *   3. Generate leaderboard → POST /marks/generate-leaderboard
  */
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import * as XLSX from 'xlsx';
-import axios from 'axios';
-import MarksFilter from './MarksFilter';
 import Leaderboard from './Leaderboard';
+import MarksFilter from './MarksFilter';
 import WeightInput from './WeightInput';
+import { marksService } from '../services/apiServices';
 
-const API = process.env.REACT_APP_API_URL;
-
-const STEP_UPLOAD    = 'upload';
-const STEP_CONFIGURE = 'configure';
-const STEP_DONE      = 'done';
+/** Sum of selected column weights for one PDF (drives file-level weight in merge). */
+function getSourceFileWeight(src) {
+  const selected = src.selectedColumns || [];
+  const weights = src.columnWeights || {};
+  const maxByCol = Object.fromEntries((src.columns || []).map((c) => [c.name, c.max]));
+  return selected.reduce((sum, col) => {
+    const w = weights[col];
+    const effective = w !== undefined && w !== '' ? Number(w) : (maxByCol[col] || 0);
+    return sum + (Number.isFinite(effective) ? effective : 0);
+  }, 0);
+}
 
 export default function UploadMarks({ onResult }) {
-  const [file,            setFile]            = useState(null);
-  const [loading,         setLoading]         = useState(false);
-  const [error,           setError]           = useState('');
-  const [step,            setStep]            = useState(STEP_UPLOAD);
+  const [sources, setSources]       = useState([]);
+  const [leaderboard, setLeaderboard] = useState(null);
+  const [loading, setLoading]       = useState(false);
+  const [error, setError]           = useState('');
 
-  const [parsedData,      setParsedData]      = useState(null);
-  const [columns,         setColumns]         = useState([]);
-  const [selectedColumns, setSelectedColumns] = useState([]);
-  const [weights,         setWeights]         = useState({});
-  const [originalMax,     setOriginalMax]     = useState({});
+  const totalWeight = useMemo(
+    () => sources.reduce((s, src) => s + getSourceFileWeight(src), 0),
+    [sources]
+  );
 
-  // Leaderboard result (shown inline here after STEP_DONE)
-  const [leaderboard,     setLeaderboard]     = useState(null);
+  const normalizedPreview = useMemo(() => {
+    if (totalWeight <= 0) return {};
+    return Object.fromEntries(
+      sources.map((src) => {
+        const fw = getSourceFileWeight(src);
+        return [src.id, Math.round((fw / totalWeight) * 10000) / 100];
+      })
+    );
+  }, [sources, totalWeight]);
 
-  // Stored so Excel re-uses same payload
-
-  // ── Step 1: Upload ──────────────────────────────────────────────────────
-  const handleUpload = async () => {
-    if (!file) return;
-    setLoading(true);
-    setError('');
-
-    try {
-      const form  = new FormData();
-      form.append('file', file);
-
-      const token = localStorage.getItem('token');
-      const res   = await axios.post(`${API}/marks/upload-pdf`, form, {
-        headers: {
-          'Content-Type' : 'multipart/form-data',
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      // Backend returns: { studentRows, columns: [{ name, max }], method }
-      const { studentRows, columns: detectedCols } = res.data;
-
-      setParsedData({ studentRows });
-      setColumns(detectedCols);
-
-      const defaultW = {};
-      const maxMap   = {};
-      detectedCols.forEach(c => {
-        defaultW[c.name] = c.max;
-        maxMap[c.name]   = c.max;
-      });
-
-      setSelectedColumns(detectedCols.map(c => c.name));
-      setWeights(defaultW);
-      setOriginalMax(maxMap);
-      setStep(STEP_CONFIGURE);
-    } catch (err) {
-      setError(err.response?.data?.message || 'Upload failed.');
-    } finally {
-      setLoading(false);
-    }
+  const formatParsedSource = (s) => {
+    const cols = s.columns || [];
+    const defaultColWeights = Object.fromEntries(
+      cols.map((c) => [c.name, s.columnWeights?.[c.name] ?? c.max])
+    );
+    return {
+      ...s,
+      selectedColumns: s.selectedColumns?.length
+        ? s.selectedColumns
+        : cols.map((c) => c.name),
+      columnWeights: { ...defaultColWeights, ...(s.columnWeights || {}) },
+    };
   };
 
-  // ── Step 2: Generate leaderboard ────────────────────────────────────────
-  const handleRank = async () => {
-    if (!selectedColumns.length) {
-      setError('Please select at least one column.');
+  const handleFilesSelected = async (fileList) => {
+    const files = Array.from(fileList || []).filter((f) =>
+      f.name.toLowerCase().endsWith('.pdf')
+    );
+    if (!files.length) {
+      setError('Please select at least one PDF file.');
       return;
     }
+
     setLoading(true);
     setError('');
 
-try {
-  const token = localStorage.getItem('token');
+    try {
+      const form = new FormData();
+      files.forEach((f) => form.append('files', f));
 
-  const form = new FormData();
-  form.append('file', file);
-  form.append('selectedColumns', JSON.stringify(selectedColumns));
-  form.append('weights', JSON.stringify(weights));
+      const res = await marksService.parsePdfs(form);
+      const incoming = (res.data.sources || []).map(formatParsedSource);
 
-  const res = await axios.post(`${API}/marks/upload-pdf`, form, {
-    headers: {
-      'Content-Type': 'multipart/form-data',
-      'Authorization': `Bearer ${token}`,
-    },
-  });
+      let addedCount = 0;
+      setSources((prev) => {
+        const existingFiles = new Set(
+          prev.map((p) => (p.fileName || '').toLowerCase())
+        );
+        const novel = incoming.filter(
+          (s) => !existingFiles.has((s.fileName || '').toLowerCase())
+        );
+        addedCount = novel.length;
+        return novel.length ? [...prev, ...novel] : prev;
+      });
 
-  setLeaderboard(res.data);
-  onResult(res.data);
-  setStep(STEP_DONE);
+      if (addedCount) {
+        setLeaderboard(null);
+        onResult?.(null);
+        setError('');
+      } else if (incoming.length) {
+        setError('Those PDF(s) are already in the list.');
+      }
     } catch (err) {
-      setError(err.response?.data?.message || 'Ranking failed.');
+      setError(err.response?.data?.message || 'Failed to parse PDFs.');
     } finally {
       setLoading(false);
     }
   };
 
-  // ── Excel download (separate request with exportExcel:true) ─────────────
-const handleDownloadExcel = () => {
+  const updateSource = (id, field, value) => {
+    setSources((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, [field]: value } : s))
+    );
+  };
+
+  const updateSourceNested = (id, patch) => {
+    setSources((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, ...patch } : s))
+    );
+  };
+
+  const removeSource = (id) => {
+    setSources((prev) => prev.filter((s) => s.id !== id));
+    setLeaderboard(null);
+    onResult?.(null);
+  };
+
+  const handleGenerate = async () => {
+    if (!sources.length) {
+      setError('Upload at least one PDF first.');
+      return;
+    }
+    if (totalWeight <= 0) {
+      setError('Total weight must be greater than zero.');
+      return;
+    }
+    if (sources.some((s) => !String(s.label || '').trim())) {
+      setError('Every PDF must have a label.');
+      return;
+    }
+    if (sources.some((s) => !(s.selectedColumns?.length))) {
+      setError('Each PDF must have at least one score column selected.');
+      return;
+    }
+    if (sources.some((s) => getSourceFileWeight(s) <= 0)) {
+      setError('Each PDF must have at least one score with a weight greater than zero.');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+
     try {
-      if (!leaderboard?.leaderboard) {
-        alert('No leaderboard data to export.');
-        return;
-      }
+      const payload = {
+        sources: sources.map((s) => ({
+          id              : s.id,
+          label           : s.label.trim(),
+          weight          : getSourceFileWeight(s),
+          columns         : s.columns,
+          studentRows     : s.studentRows,
+          selectedColumns : s.selectedColumns,
+          columnWeights   : s.columnWeights,
+        })),
+      };
 
-      // Build rows from leaderboard data
-      const students = leaderboard?.leaderboard?.[0]?.students || [];
+      const res = await marksService.generateLeaderboard(payload);
 
-const rows = students.map(s => {
-        const row = {
-          Rank : s.rank,
-          Name : s.name,
-          Roll : s.roll || '',
-        };
-        // Add breakdown columns
-        if (s.breakdown) {
-          Object.entries(s.breakdown).forEach(([col, val]) => {
-            row[col] = val?.score ?? val ?? '';
-          });
-        }
-        row['Total'] = s.totalScore ?? s.total ?? '';
-        return row;
-      });
-
-      const ws = XLSX.utils.json_to_sheet(rows);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Leaderboard');
-      XLSX.writeFile(wb, 'leaderboard.xlsx');
+      setLeaderboard(res.data);
+      onResult?.(res.data);
     } catch (err) {
-      alert('Excel export failed: ' + err.message);
+      setError(err.response?.data?.message || 'Failed to generate leaderboard.');
+    } finally {
+      setLoading(false);
     }
   };
 
-  // ── Reset ────────────────────────────────────────────────────────────────
-  const handleReset = () => {
-    setFile(null);
-    setError('');
-    setStep(STEP_UPLOAD);
-    setParsedData(null);
-    setColumns([]);
-    setSelectedColumns([]);
-    setWeights({});
-    setLeaderboard(null);
-    onResult(null);
+  const handleDownloadExcel = () => {
+    const students = leaderboard?.leaderboard?.[0]?.students || [];
+    if (!students.length) {
+      alert('No leaderboard data to export.');
+      return;
+    }
+
+    const labels = (leaderboard.sources || sources).map((s) => s.label);
+    const rows = students.map((s) => {
+      const row = { Rank: s.rank, Name: s.name, Roll: s.roll || '' };
+      labels.forEach((label) => {
+        row[label] = s.breakdown?.[label]?.raw ?? 0;
+      });
+      row['Final Score'] = s.totalScore;
+      return row;
+    });
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Leaderboard');
+    XLSX.writeFile(wb, 'leaderboard.xlsx');
   };
 
-  // ── Render ───────────────────────────────────────────────────────────────
+  const handleReset = () => {
+    setSources([]);
+    setLeaderboard(null);
+    setError('');
+    onResult?.(null);
+  };
+
   return (
     <>
       <div className="card">
-        <div className="card-title">📄 Upload Marks PDF</div>
+        <div className="card-title">📄 Upload Marks PDFs</div>
+        <p className="text-muted" style={{ marginBottom: 16 }}>
+          Upload PDFs one batch or use &quot;+ Add more PDFs&quot; to keep earlier files. Students are
+          matched by name across PDFs. Set weights on each score — file weight is calculated automatically.
+        </p>
 
-        {/* STEP 1 — File picker */}
-        {step === STEP_UPLOAD && (
+        <div
+          style={{
+            border: '2px dashed var(--card-border)',
+            borderRadius: 10,
+            padding: 24,
+            textAlign: 'center',
+            marginBottom: 16,
+            cursor: 'pointer',
+          }}
+          onClick={() => document.getElementById('pdf-multi-input').click()}
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={(e) => {
+            e.preventDefault();
+            handleFilesSelected(e.dataTransfer.files);
+          }}
+        >
+          <span>🗂 Drag & drop PDFs here, or <u>click to browse</u></span>
+          <input
+            id="pdf-multi-input"
+            type="file"
+            accept=".pdf"
+            multiple
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              handleFilesSelected(e.target.files);
+              e.target.value = '';
+            }}
+          />
+        </div>
+
+        {sources.length > 0 && (
           <>
-            <p className="text-muted" style={{ marginBottom: 16 }}>
-              Upload a PDF with student names and marks to generate a ranked leaderboard.
-            </p>
-
-            <div
-              style={{
-                border      : '2px dashed var(--card-border)',
-                borderRadius: 10,
-                padding     : 24,
-                textAlign   : 'center',
-                marginBottom: 16,
-                cursor      : 'pointer',
-              }}
-              onClick={() => document.getElementById('pdf-input').click()}
-            >
-              {file
-                ? <span>📄 <strong>{file.name}</strong> — {(file.size / 1024).toFixed(1)} KB</span>
-                : <span>🗂 Drag & drop a PDF, or <u>click to browse</u></span>
-              }
-              <input
-                id="pdf-input"
-                type="file"
-                accept=".pdf"
-                style={{ display: 'none' }}
-                onChange={e => setFile(e.target.files[0])}
-              />
+            <div style={{ marginBottom: 12, fontSize: 13, color: 'var(--muted)' }}>
+              {sources.length} PDF{sources.length > 1 ? 's' : ''} loaded · total weight:{' '}
+              <strong style={{ color: 'var(--text)' }}>{totalWeight}</strong>
             </div>
 
-            <div style={{ display: 'flex', gap: 10 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 16 }}>
+              {sources.map((src) => (
+                <div
+                  key={src.id}
+                  style={{
+                    padding: 14,
+                    borderRadius: 10,
+                    border: '1px solid var(--border)',
+                    background: 'rgba(255,255,255,0.02)',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 10 }}>
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: 13 }}>📄 {src.fileName}</div>
+                      <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
+                        {src.studentCount} students · {src.columns?.length || 0} score column(s)
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn-outline btn-sm"
+                      style={{ fontSize: 11, flexShrink: 0 }}
+                      onClick={() => removeSource(src.id)}
+                    >
+                      ✕
+                    </button>
+                  </div>
+
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label">Label</label>
+                    <input
+                      className="form-input"
+                      type="text"
+                      value={src.label}
+                      placeholder="e.g. Mid Sem, Quiz 1"
+                      onChange={(e) => updateSource(src.id, 'label', e.target.value)}
+                    />
+                  </div>
+
+                  <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 10 }}>
+                    File weight (auto):{' '}
+                    <strong style={{ color: '#818cf8' }}>{getSourceFileWeight(src)}</strong>
+                    {totalWeight > 0 && (
+                      <span style={{ marginLeft: 8, color: '#a5b4fc' }}>
+                        · {normalizedPreview[src.id] ?? 0}% of total
+                      </span>
+                    )}
+                  </div>
+
+                  {src.columns?.length > 0 && (
+                    <>
+                      <div style={{ marginTop: 14, marginBottom: 4, fontSize: 12, fontWeight: 600 }}>
+                        Scores in this PDF
+                      </div>
+                      <MarksFilter
+                        columns={src.columns}
+                        selected={src.selectedColumns || []}
+                        onChange={(selected) =>
+                          updateSourceNested(src.id, { selectedColumns: selected })
+                        }
+                      />
+                      <WeightInput
+                        columns={src.columns}
+                        selectedColumns={src.selectedColumns || []}
+                        weights={src.columnWeights || {}}
+                        onChange={(columnWeights) =>
+                          updateSourceNested(src.id, { columnWeights })
+                        }
+                      />
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
               <button
                 className="btn btn-primary"
-                onClick={handleUpload}
-                disabled={!file || loading}
+                onClick={handleGenerate}
+                disabled={loading || !sources.length}
               >
-                {loading ? '⏳ Parsing PDF…' : '🚀 Upload & Detect Columns'}
+                {loading ? '⏳ Generating…' : '🏆 Generate Leaderboard'}
               </button>
-              {file && (
-                <button className="btn btn-outline" onClick={() => { setFile(null); setError(''); }}>
-                  ✕ Clear
-                </button>
-              )}
+              <button
+                className="btn btn-outline"
+                onClick={() => document.getElementById('pdf-multi-input').click()}
+                disabled={loading}
+              >
+                + Add more PDFs
+              </button>
+              <button className="btn btn-outline" onClick={handleReset} disabled={loading}>
+                ✕ Clear all
+              </button>
             </div>
           </>
         )}
 
-        {/* STEP 2 — Configure */}
-        {step === STEP_CONFIGURE && (
-          <>
-            <div style={{
-              display     : 'flex', alignItems: 'center', gap: 8,
-              marginBottom: 20, padding: '10px 14px', borderRadius: 8,
-              background  : 'rgba(129,140,248,0.07)',
-              border      : '1px solid rgba(129,140,248,0.2)',
-            }}>
-              <span style={{ fontSize: 13, color: '#818cf8', fontWeight: 600 }}>
-                ✅ {parsedData?.studentRows?.length ?? 0} students detected
-              </span>
-              <span style={{ color: 'var(--muted)', fontSize: 12 }}>·</span>
-              <span style={{ fontSize: 12, color: 'var(--muted)' }}>
-                {columns.length} columns found
-              </span>
-              <button
-                style={{
-                  marginLeft: 'auto', fontSize: 11, color: 'var(--muted)',
-                  background: 'none', border: 'none', cursor: 'pointer',
-                  textDecoration: 'underline',
-                }}
-                onClick={handleReset}
-              >
-                ← Upload different file
-              </button>
-            </div>
-
-            <MarksFilter
-              columns={columns}
-              selected={selectedColumns}
-              onChange={setSelectedColumns}
-            />
-
-            <WeightInput
-              columns={columns}
-              selectedColumns={selectedColumns}
-              weights={weights}
-              onChange={setWeights}
-            />
-
-            <div style={{ display: 'flex', gap: 10 }}>
-              <button
-                className="btn btn-primary"
-                onClick={handleRank}
-                disabled={loading || selectedColumns.length === 0}
-              >
-                {loading ? '⏳ Ranking…' : '🏆 Generate Leaderboard'}
-              </button>
-              <button className="btn btn-outline" onClick={handleReset}>✕ Cancel</button>
-            </div>
-          </>
-        )}
-
-        {/* STEP 3 — Done banner */}
-        {step === STEP_DONE && (
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 12,
-            padding: '10px 14px', borderRadius: 8,
-            background: 'rgba(34,197,94,0.07)',
-            border: '1px solid rgba(34,197,94,0.2)',
-          }}>
-            <span style={{ fontSize: 13, color: '#4ade80', fontWeight: 600 }}>
-              ✅ Leaderboard generated
-            </span>
-            <button
-              className="btn btn-outline btn-sm"
-              style={{ marginLeft: 'auto', fontSize: 11 }}
-              onClick={handleReset}
-            >
-              Upload another PDF
-            </button>
-          </div>
+        {!sources.length && (
+          <button
+            className="btn btn-primary"
+            disabled={loading}
+            onClick={() => document.getElementById('pdf-multi-input').click()}
+          >
+            {loading ? '⏳ Parsing PDFs…' : '🚀 Select PDFs'}
+          </button>
         )}
 
         {error && (
-          <div style={{
-            marginTop: 12, padding: 12, borderRadius: 8,
-            background: 'rgba(239,68,68,0.1)',
-            border: '1px solid rgba(239,68,68,0.3)',
-            color: '#f87171', fontSize: 13,
-          }}>
+          <div
+            style={{
+              marginTop: 12,
+              padding: 12,
+              borderRadius: 8,
+              background: 'rgba(239,68,68,0.1)',
+              border: '1px solid rgba(239,68,68,0.3)',
+              color: '#f87171',
+              fontSize: 13,
+            }}
+          >
             ❌ {error}
           </div>
         )}
       </div>
 
-      {/* ── Leaderboard shown right below the upload card ── */}
-      {leaderboard && step === STEP_DONE && (
+      {leaderboard && (
         <div className="card" style={{ marginTop: 16 }}>
+          {leaderboard.sources?.length > 0 && (
+            <div
+              style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: 8,
+                marginBottom: 14,
+                fontSize: 12,
+              }}
+            >
+              {leaderboard.sources.map((s) => (
+                <span
+                  key={s.id || s.label}
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: 6,
+                    background: 'rgba(129,140,248,0.1)',
+                    border: '1px solid rgba(129,140,248,0.25)',
+                    color: '#a5b4fc',
+                  }}
+                >
+                  {s.label}: w={s.weight} ({s.normalizedWeight * 100}%)
+                </span>
+              ))}
+            </div>
+          )}
           <Leaderboard
             data={leaderboard}
             onDownloadExcel={handleDownloadExcel}
+            scoreLabel="Final Score"
           />
         </div>
       )}

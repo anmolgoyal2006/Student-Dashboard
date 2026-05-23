@@ -17,7 +17,11 @@ const {
 const { protect } = require('../middleware/authMiddleware');
 
 // 🔥 NEW (FIXED)
-const { uploadPdfHandler } = require('../controllers/marksUploadController');
+const {
+  uploadPdfHandler,
+  parsePdfsHandler,
+  generateLeaderboardHandler,
+} = require('../controllers/marksUploadController');
 const multer = require('multer');
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -38,7 +42,9 @@ router.post('/semester/manual',  addManualSGPA);
 router.put('/semester/:id',      updateSemester);
 router.delete('/semester/:id',   deleteSemester);
 
-// 🔥 ONLY THIS
+// PDF leaderboard
 router.post('/upload-pdf', upload.single('file'), uploadPdfHandler);
+router.post('/parse-pdfs', upload.array('files', 20), parsePdfsHandler);
+router.post('/generate-leaderboard', generateLeaderboardHandler);
 
 module.exports = router;

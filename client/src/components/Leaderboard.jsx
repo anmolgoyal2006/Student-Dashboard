@@ -7,7 +7,7 @@
  * Excel comes via a separate "Download Excel" button that calls
  * /marks/rank again with exportExcel:true — handled by onDownloadExcel prop.
  */
-export default function Leaderboard({ data, onDownloadExcel, loading = false }) {
+export default function Leaderboard({ data, onDownloadExcel, loading = false, scoreLabel = 'Total' }) {
 
   if (loading) {
     return (
@@ -89,7 +89,7 @@ export default function Leaderboard({ data, onDownloadExcel, loading = false }) 
               {topper.name}
             </div>
             <div style={{ fontSize: 12, color: 'var(--muted)' }}>
-              Topper · {fmt(topper.totalScore)} pts
+              Topper · {fmt(topper.totalScore)} {scoreLabel === 'Final Score' ? 'final score' : 'pts'}
               {topper.roll ? ` · Roll: ${topper.roll}` : ''}
             </div>
           </div>
@@ -103,11 +103,11 @@ export default function Leaderboard({ data, onDownloadExcel, loading = false }) 
             <tr>
               <th>Rank</th>
               <th>Name</th>
-              <th>Roll</th>
+              <th>SID / Roll</th>
               {breakdownCols.map(col => (
                 <th key={col} style={{ fontSize: 12 }}>{col}</th>
               ))}
-              <th>Total</th>
+              <th>{scoreLabel}</th>
             </tr>
           </thead>
           <tbody>
