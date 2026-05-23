@@ -39,6 +39,8 @@ export default function Dashboard() {
       setRecs(r.data.suggestions || []);
       setNotifs(n.data.notifications || []);
       setSubjectCount((s.data.subjects || []).length);   // ← NEW
+    }).catch(() => {
+      // 401 is handled globally (redirect to login); swallow to avoid error overlay
     }).finally(() => setLoading(false));
   }, []);
 

@@ -2,24 +2,35 @@
 
 import { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { saveTokenToIDB, clearTokenFromIDB, saveTokenToCache } from '../utils/authIDB';
+import { authService } from '../services/apiServices';
 
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(() => {
+    const token = localStorage.getItem('token');
+    if (!token) return null;
     try { return JSON.parse(localStorage.getItem('user')) || null; }
     catch { return null; }
   });
 
-  // Refresh role from server on every app load
+  const logout = useCallback(() => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    clearTokenFromIDB();
+    setUser(null);
+  }, []);
+
+  // Validate session once on app load
   useEffect(() => {
     const token = localStorage.getItem('token');
-    if (!token) return;
-    fetch(`${process.env.REACT_APP_API_URL}/auth/me`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then(r => r.json())
-      .then(data => {
+    if (!token) {
+      localStorage.removeItem('user');
+      setUser(null);
+      return;
+    }
+    authService.getMe()
+      .then(({ data }) => {
         if (data?.user) {
           const fresh = {
             id      : data.user._id,
@@ -34,8 +45,10 @@ export const AuthProvider = ({ children }) => {
           localStorage.setItem('user', JSON.stringify(fresh));
         }
       })
-      .catch(() => {});
-  }, []);
+      .catch((err) => {
+        if (err.response?.status === 401) logout();
+      });
+  }, [logout]);
 
   const login = useCallback((userData, token) => {
     localStorage.setItem('token', token);
@@ -62,11 +75,6 @@ export const AuthProvider = ({ children }) => {
     setUser(userData);
   }, []);
 
-  const logout = useCallback(() => {
-    localStorage.clear();
-    clearTokenFromIDB();
-    setUser(null);
-  }, []);
 
   const updateUser = useCallback((userData, newToken) => {
     setUser(prev => {
@@ -81,7 +89,13 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, updateUser, isLoggedIn: !!user }}>
+    <AuthContext.Provider value={{
+      user,
+      login,
+      logout,
+      updateUser,
+      isLoggedIn: Boolean(user && localStorage.getItem('token')),
+    }}>
       {children}
     </AuthContext.Provider>
   );

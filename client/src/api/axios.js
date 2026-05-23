@@ -38,6 +38,8 @@ API.interceptors.request.use((config) => {
 });
 
 // ─── Global response error handler ──────────────────────────────────────────
+let authRedirecting = false;
+
 API.interceptors.response.use(
   (res) => res,
   (err) => {
@@ -45,6 +47,15 @@ API.interceptors.response.use(
       err.message = 'Request timed out. The server may be waking up — please try again.';
     } else if (!err.response) {
       err.message = 'Cannot reach the server. Check your connection or try again shortly.';
+    } else if (err.response.status === 401) {
+      const url = err.config?.url || '';
+      const isPublicAuth = /\/auth\/(login|signup|forgot-password|reset-password)/.test(url);
+      if (!isPublicAuth && !authRedirecting && !window.location.pathname.startsWith('/login')) {
+        authRedirecting = true;
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        window.location.replace('/login');
+      }
     }
     return Promise.reject(err);
   }
