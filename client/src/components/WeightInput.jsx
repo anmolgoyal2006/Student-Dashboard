@@ -17,7 +17,10 @@ export default function WeightInput({ columns = [], selectedColumns = [], weight
   const activeCols = columns.filter(c => selectedColumns.includes(c.name));
   if (!activeCols.length) return null;
 
-  const totalWeight = activeCols.reduce((sum, c) => sum + (Number(weights[c.name]) || 0), 0);
+  const totalWeight = activeCols.reduce((sum, c) => {
+    const w = weights[c.name] !== undefined ? weights[c.name] : c.max;
+    return sum + (Number(w) || 0);
+  }, 0);
 
   const handleChange = (name, raw) => {
     const val = raw === '' ? '' : Math.max(0, Number(raw));
