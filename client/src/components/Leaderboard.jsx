@@ -93,8 +93,19 @@ export default function Leaderboard({
   setGradeCounts,
 }) {
   const [panelExpanded, setPanelExpanded] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const leaderboard = data?.leaderboard?.[0]?.students || [];
+
+  const filteredLeaderboard = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return leaderboard;
+    return leaderboard.filter(
+      (s) =>
+        s.name.toLowerCase().includes(q) ||
+        (s.roll && String(s.roll).toLowerCase().includes(q))
+    );
+  }, [leaderboard, searchQuery]);
 
   useEffect(() => {
     if (leaderboard.length > 0) {
@@ -204,6 +215,108 @@ export default function Leaderboard({
               {topper.roll ? ` · Roll: ${topper.roll}` : ''}
               {relativeGradingEnabled && topper.grade ? ` · Grade: ${topper.grade}` : ''}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Search Bar ── */}
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ position: 'relative' }}>
+          <span style={{
+            position: 'absolute',
+            left: 12,
+            top: '50%',
+            transform: 'translateY(-50%)',
+            fontSize: 16,
+            color: 'var(--muted)',
+            pointerEvents: 'none'
+          }}>🔍</span>
+          <input
+            type="text"
+            className="form-input"
+            placeholder="Search student by Name or Student ID (SID)..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            style={{
+              paddingLeft: 40,
+              fontSize: 14,
+              borderRadius: 10,
+              background: 'rgba(255, 255, 255, 0.02)',
+              border: '1px solid var(--border)',
+              color: 'var(--text)',
+              transition: 'all 0.2s',
+            }}
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              style={{
+                position: 'absolute',
+                right: 12,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                background: 'none',
+                border: 'none',
+                color: 'var(--muted)',
+                cursor: 'pointer',
+                fontSize: 14,
+              }}
+            >
+              ✕
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* ── Rank Finder Highlight Cards ── */}
+      {searchQuery.trim() && filteredLeaderboard.length > 0 && (
+        <div style={{
+          padding: '16px',
+          borderRadius: 12,
+          background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(129, 140, 248, 0.1) 100%)',
+          border: '1px solid rgba(129, 140, 248, 0.25)',
+          marginBottom: 16,
+          boxShadow: '0 8px 32px 0 rgba(99, 102, 241, 0.05)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 12,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 700, color: '#818cf8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            <span>🔍 Rank Finder Results ({filteredLeaderboard.length})</span>
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+            {filteredLeaderboard.slice(0, 3).map((st) => (
+              <div key={st.roll || st.name} style={{
+                flex: '1 1 240px',
+                padding: '12px 16px',
+                borderRadius: 10,
+                background: 'rgba(255, 255, 255, 0.02)',
+                border: '1px solid rgba(255, 255, 255, 0.04)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}>
+                <div>
+                  <div style={{ fontWeight: 700, color: 'var(--text)', fontSize: 14 }}>{st.name}</div>
+                  <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
+                    Roll/SID: {st.roll || '—'} · Score: {fmt(st.totalScore)}
+                  </div>
+                </div>
+                <div style={{
+                  fontSize: 18,
+                  fontWeight: 900,
+                  color: st.rank === 1 ? '#facc15' : st.rank === 2 ? '#94a3b8' : st.rank === 3 ? '#cd7c2f' : '#818cf8',
+                  paddingLeft: 8,
+                }}>
+                  {medalFor(st.rank)}
+                </div>
+              </div>
+            ))}
+            {filteredLeaderboard.length > 3 && (
+              <div style={{ alignSelf: 'center', fontSize: 12, color: 'var(--muted)', paddingLeft: 8 }}>
+                + {filteredLeaderboard.length - 3} more matches...
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -388,7 +501,7 @@ export default function Leaderboard({
             </tr>
           </thead>
           <tbody>
-            {leaderboard.map((s, i) => (
+            {filteredLeaderboard.map((s, i) => (
               <tr
                 key={s.roll || s.name || i}
                 style={{ background: s.rank <= 3 ? 'rgba(250,204,21,0.04)' : 'transparent' }}
