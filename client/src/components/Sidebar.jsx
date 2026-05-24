@@ -173,13 +173,6 @@ export default function Sidebar() {
             {l.label}
           </NavLink>
         ))}
-
-        <div style={{ borderTop: '1px solid var(--border)', margin: '12px 10px 0', paddingTop: 12, paddingBottom: 16 }}>
-          <button className="sidebar-logout" onClick={logout} style={{ width: '100%' }}>
-            <span className="sidebar-link-icon">🚪</span>
-            Logout
-          </button>
-        </div>
       </aside>
     </>
   );
