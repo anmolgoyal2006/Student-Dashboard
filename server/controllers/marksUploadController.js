@@ -124,8 +124,23 @@ async function uploadPdfHandler(req, res) {
       });
     }
 
-    const active = selectedColumns.length > 0 ? selectedColumns : columns.map((c) => c.name);
-    const weightedRows = applyWeights(studentRows, columns, selectedColumns, weights);
+    let active;
+    if (selectedColumns.length > 0) {
+      active = selectedColumns;
+    } else {
+      const pretotalCol = columns.find((c) => {
+        const nameLower = (c.name || '').toLowerCase();
+        const headerLower = (c.originalHeader || '').toLowerCase();
+        return nameLower.includes('pretotal') || headerLower.includes('pretotal');
+      });
+      if (pretotalCol) {
+        active = [pretotalCol.name];
+      } else {
+        active = columns.filter((c) => !c.isAggregate).map((c) => c.name);
+        if (!active.length) active = columns.map((c) => c.name);
+      }
+    }
+    const weightedRows = applyWeights(studentRows, columns, active, weights);
     const result = processLeaderboard(weightedRows, columns);
 
     if (req.query.exportExcel === 'true') {
@@ -236,15 +251,22 @@ async function generateLeaderboardHandler(req, res) {
         ? s.columnWeights
         : {};
 
+      // Backend MUST ALWAYS enforce student limits even if frontend already slices rows
+      const studentLimit = s.studentLimit !== undefined && s.studentLimit !== '' ? parseInt(s.studentLimit) : null;
+      let rowsToProcess = studentRows;
+      if (studentLimit !== null && !isNaN(studentLimit) && studentLimit > 0) {
+        rowsToProcess = studentRows.slice(0, studentLimit);
+      }
+
       // Per-column weights → one score per student, then PDF-level weight merge
-      const students = studentRows.length
+      const students = rowsToProcess.length
         ? scoreStudentsForSource({
-          studentRows,
+          studentRows: rowsToProcess,
           columns,
           selectedColumns,
           columnWeights,
         })
-        : (Array.isArray(s.students) ? s.students : []);
+        : (Array.isArray(s.students) ? s.students.slice(0, studentLimit || s.students.length) : []);
 
       const weight = computeSourceFileWeight(columns, selectedColumns, columnWeights);
 
@@ -266,7 +288,26 @@ async function generateLeaderboardHandler(req, res) {
       return res.status(400).json({ message: 'Each source must have a numeric weight.' });
     }
 
-    const result = mergeSourcesAndScore(normalized);
+    let result = mergeSourcesAndScore(normalized);
+
+    // Apply Relative Grading if enabled
+    const relativeGradingEnabled = req.body?.relativeGradingEnabled === true || req.body?.relativeGradingEnabled === 'true';
+    if (relativeGradingEnabled) {
+      const { assignRelativeGrades } = require('../services/relativeGradingService');
+      const gradeCounts = req.body?.gradeCounts || {};
+      
+      // Relative grades MUST be assigned AFTER sorting students by marks descending
+      result.rankedStudents = assignRelativeGrades(result.rankedStudents, gradeCounts);
+
+      // Map back to leaderboard structure
+      const studentGradeMap = new Map(result.rankedStudents.map(st => [st.roll || st.name, st.grade]));
+      if (result.leaderboard?.[0]?.students) {
+        result.leaderboard[0].students = result.leaderboard[0].students.map(st => ({
+          ...st,
+          grade: studentGradeMap.get(st.roll || st.name) || 'F'
+        }));
+      }
+    }
 
     if (req.query.exportExcel === 'true') {
       const XLSX = require('xlsx');
@@ -278,6 +319,9 @@ async function generateLeaderboardHandler(req, res) {
           row[label] = s.breakdown?.[label]?.raw ?? 0;
         });
         row['Final Score'] = s.totalScore;
+        if (s.grade) {
+          row['Grade'] = s.grade;
+        }
         return row;
       });
       const ws = XLSX.utils.json_to_sheet(rows);

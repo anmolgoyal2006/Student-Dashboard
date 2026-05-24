@@ -91,7 +91,7 @@ function mergeSourcesAndScore(sources) {
 
     for (const entry of studentMap.values()) {
       const raw = lookupScore(entry, lookup);
-      const contribution = nw * raw;
+      const contribution = raw;
       entry.marksByLabel[label] = raw;
       entry.breakdown[label] = {
         raw,

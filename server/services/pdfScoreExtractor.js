@@ -13,9 +13,22 @@ function studentsFromRawRows(rawRows) {
   if (!studentRows.length) return { columns, studentRows: [], columnWeights: {} };
 
   const columnWeights = defaultWeights(columns);
-  const selectedColumns = columns
-    .filter((c) => !c.isAggregate)
-    .map((c) => c.name);
+
+  // Check if a pretotal column is present (case-insensitive)
+  const pretotalCol = columns.find((c) => {
+    const nameLower = (c.name || '').toLowerCase();
+    const headerLower = (c.originalHeader || '').toLowerCase();
+    return nameLower.includes('pretotal') || headerLower.includes('pretotal');
+  });
+
+  let selectedColumns;
+  if (pretotalCol) {
+    selectedColumns = [pretotalCol.name];
+  } else {
+    selectedColumns = columns
+      .filter((c) => !c.isAggregate)
+      .map((c) => c.name);
+  }
 
   return {
     columns,

@@ -1,13 +1,110 @@
+import { useState, useEffect, useMemo } from 'react';
+
 /**
- * Leaderboard.jsx  (FIXED)
- *
- * Backend /marks/rank returns:
- *   { leaderboard: [{ rank, name, roll, total, breakdown }] }
- *
- * Excel comes via a separate "Download Excel" button that calls
- * /marks/rank again with exportExcel:true — handled by onDownloadExcel prop.
+ * Leaderboard.jsx
+ * 
+ * Renders the ranked student leaderboard with premium Spatial Dark aesthetics,
+ * interactive relative grading control panel, live validation, and dynamic colored badges.
  */
-export default function Leaderboard({ data, onDownloadExcel, loading = false, scoreLabel = 'Total' }) {
+
+const targetRatios = {
+  'A+' : 0.1077,
+  'A'  : 0.1538,
+  'B+' : 0.1923,
+  'B'  : 0.2308,
+  'C+' : 0.1538,
+  'C'  : 0.0769,
+  'D'  : 0.0462,
+  'F'  : 0.0385,
+};
+
+const gradesOrder = ['A+', 'A', 'B+', 'B', 'C+', 'C', 'D', 'F'];
+
+const getProportionalCounts = (total) => {
+  if (!total || total <= 0) {
+    return { 'A+': 0, 'A': 0, 'B+': 0, 'B': 0, 'C+': 0, 'C': 0, 'D': 0, 'F': 0 };
+  }
+  
+  const floorCounts = {};
+  const remainders = [];
+  let allocated = 0;
+
+  gradesOrder.forEach((grade) => {
+    const exact = total * targetRatios[grade];
+    const floor = Math.floor(exact);
+    const rem = exact - floor;
+    floorCounts[grade] = floor;
+    allocated += floor;
+    remainders.push({ grade, rem });
+  });
+
+  remainders.sort((a, b) => {
+    if (Math.abs(a.rem - b.rem) < 1e-9) {
+      return gradesOrder.indexOf(a.grade) - gradesOrder.indexOf(b.grade);
+    }
+    return b.rem - a.rem;
+  });
+
+  let remaining = total - allocated;
+  for (let i = 0; i < remaining; i++) {
+    const targetGrade = remainders[i].grade;
+    floorCounts[targetGrade] += 1;
+  }
+
+  return floorCounts;
+};
+
+const getGradeBadgeStyle = (grade) => {
+  const colors = {
+    'A+': { bg: 'rgba(16,185,129,0.12)', text: '#10b981', border: 'rgba(16,185,129,0.25)' },
+    'A' : { bg: 'rgba(34,197,94,0.12)', text: '#22c55e', border: 'rgba(34,197,94,0.25)' },
+    'B+': { bg: 'rgba(59,130,246,0.12)', text: '#3b82f6', border: 'rgba(59,130,246,0.25)' },
+    'B' : { bg: 'rgba(99,102,241,0.12)', text: '#6366f1', border: 'rgba(99,102,241,0.25)' },
+    'C+': { bg: 'rgba(234,179,8,0.12)', text: '#eab308', border: 'rgba(234,179,8,0.25)' },
+    'C' : { bg: 'rgba(249,115,22,0.12)', text: '#f97316', border: 'rgba(249,115,22,0.25)' },
+    'D' : { bg: 'rgba(239,68,68,0.12)', text: '#ef4444', border: 'rgba(239,68,68,0.25)' },
+    'F' : { bg: 'rgba(148,163,184,0.12)', text: '#94a3b8', border: 'rgba(148,163,184,0.25)' }
+  };
+  const c = colors[grade] || colors['F'];
+  return {
+    display: 'inline-block',
+    padding: '3px 8px',
+    borderRadius: '12px',
+    fontSize: '11px',
+    fontWeight: '700',
+    letterSpacing: '0.5px',
+    backgroundColor: c.bg,
+    color: c.text,
+    border: `1px solid ${c.border}`,
+    textAlign: 'center',
+    minWidth: '40px',
+    boxShadow: `0 0 6px ${c.bg}`,
+  };
+};
+
+export default function Leaderboard({
+  data,
+  onDownloadExcel,
+  loading = false,
+  scoreLabel = 'Total',
+  relativeGradingEnabled = false,
+  setRelativeGradingEnabled,
+  gradeCounts = {},
+  setGradeCounts,
+}) {
+  const [panelExpanded, setPanelExpanded] = useState(false);
+
+  const leaderboard = data?.leaderboard?.[0]?.students || [];
+
+  useEffect(() => {
+    if (leaderboard.length > 0) {
+      const total = leaderboard.length;
+      const sumCounts = Object.values(gradeCounts || {}).reduce((a, b) => a + b, 0);
+      if (sumCounts === 0 && setGradeCounts) {
+        setGradeCounts(getProportionalCounts(total));
+      }
+    }
+  }, [leaderboard.length]);
 
   if (loading) {
     return (
@@ -27,10 +124,6 @@ export default function Leaderboard({ data, onDownloadExcel, loading = false, sc
       </div>
     );
   }
-
-  // ── data shape from backend ──────────────────────────────────────────────
-  // { leaderboard: [{ rank, name, roll, total, breakdown }] }
-  const leaderboard = data?.leaderboard?.[0]?.students || [];
 
   if (!leaderboard?.length) {
     return (
@@ -56,6 +149,24 @@ export default function Leaderboard({ data, onDownloadExcel, loading = false, sc
     : [];
 
   const topper = leaderboard[0];
+
+  // Allocation status calculations
+  const totalStudents = leaderboard.length;
+  const allocatedCount = Object.values(gradeCounts || {}).reduce((sum, val) => sum + (Math.max(0, parseInt(val) || 0)), 0);
+  const remainingCount = Math.max(0, totalStudents - allocatedCount);
+  const overflowCount = Math.max(0, allocatedCount - totalStudents);
+
+  // Grade Boundary Preview
+  const gradeBoundaries = {};
+  gradesOrder.forEach((g) => {
+    const matches = leaderboard.filter((s) => s.grade === g);
+    if (matches.length > 0) {
+      const minScore = Math.min(...matches.map((s) => s.totalScore));
+      gradeBoundaries[g] = minScore;
+    } else {
+      gradeBoundaries[g] = null;
+    }
+  });
 
   return (
     <div>
@@ -91,10 +202,175 @@ export default function Leaderboard({ data, onDownloadExcel, loading = false, sc
             <div style={{ fontSize: 12, color: 'var(--muted)' }}>
               Topper · {fmt(topper.totalScore)} {scoreLabel === 'Final Score' ? 'final score' : 'pts'}
               {topper.roll ? ` · Roll: ${topper.roll}` : ''}
+              {relativeGradingEnabled && topper.grade ? ` · Grade: ${topper.grade}` : ''}
             </div>
           </div>
         </div>
       )}
+
+      {/* ── Relative Grading Options Panel ── */}
+      <div style={{
+        background: 'rgba(255, 255, 255, 0.02)',
+        backdropFilter: 'blur(16px)',
+        border: '1px solid var(--border)',
+        borderRadius: 12,
+        padding: '16px',
+        marginBottom: 16,
+        boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.2)',
+        transition: 'all 0.3s ease',
+      }}>
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          cursor: 'pointer',
+        }} onClick={() => setPanelExpanded(!panelExpanded)}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontWeight: 700, fontSize: 14 }}>
+            <span>📊 Relative Grading Options</span>
+            {relativeGradingEnabled && (
+              <span style={{
+                backgroundColor: 'rgba(16,185,129,0.15)',
+                color: '#10b981',
+                padding: '2px 8px',
+                borderRadius: 20,
+                fontSize: 11,
+                border: '1px solid rgba(16,185,129,0.3)',
+              }}>Active</span>
+            )}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }} onClick={(e) => e.stopPropagation()}>
+            {/* Toggle Switch */}
+            <label style={{
+              position: 'relative',
+              display: 'inline-block',
+              width: 44,
+              height: 22,
+              marginBottom: 0,
+              cursor: 'pointer',
+            }}>
+              <input
+                type="checkbox"
+                checked={relativeGradingEnabled}
+                onChange={(e) => setRelativeGradingEnabled?.(e.target.checked)}
+                style={{ opacity: 0, width: 0, height: 0 }}
+              />
+              <span style={{
+                position: 'absolute',
+                top: 0, left: 0, right: 0, bottom: 0,
+                backgroundColor: relativeGradingEnabled ? '#818cf8' : 'rgba(255,255,255,0.1)',
+                transition: '.3s',
+                borderRadius: 34,
+                boxShadow: relativeGradingEnabled ? '0 0 10px rgba(129,140,248,0.5)' : 'none',
+              }}>
+                <span style={{
+                  position: 'absolute',
+                  height: 16, width: 16,
+                  left: relativeGradingEnabled ? 25 : 3,
+                  bottom: 3,
+                  backgroundColor: '#fff',
+                  transition: '.3s',
+                  borderRadius: '50%',
+                }} />
+              </span>
+            </label>
+            <span style={{
+              fontSize: 16,
+              transform: panelExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+              transition: 'transform 0.2s ease',
+              cursor: 'pointer',
+            }} onClick={() => setPanelExpanded(!panelExpanded)}>▼</span>
+          </div>
+        </div>
+
+        {panelExpanded && (
+          <div style={{ marginTop: 16, borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: 16 }}>
+            {/* Status bar */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: 16,
+              flexWrap: 'wrap',
+              gap: 8,
+            }}>
+              <div>
+                {allocatedCount === totalStudents ? (
+                  <div style={{ color: '#10b981', fontWeight: 600, fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    ✓ {allocatedCount}/{totalStudents} students allocated (Exact distribution)
+                  </div>
+                ) : allocatedCount < totalStudents ? (
+                  <div style={{ color: '#f59e0b', fontWeight: 600, fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    ⚠️ {allocatedCount}/{totalStudents} students allocated ({remainingCount} remaining will receive F)
+                  </div>
+                ) : (
+                  <div style={{ color: '#ef4444', fontWeight: 600, fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    ❌ {allocatedCount}/{totalStudents} students allocated (Over-allocated by {overflowCount})
+                  </div>
+                )}
+              </div>
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                style={{ fontSize: 11, padding: '4px 10px' }}
+                onClick={() => setGradeCounts?.(getProportionalCounts(totalStudents))}
+              >
+                🔄 Reset to Proportional Distribution
+              </button>
+            </div>
+
+            {/* Grid of grade inputs */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+              gap: 12,
+              marginBottom: 8,
+            }}>
+              {gradesOrder.map((g) => {
+                const count = gradeCounts?.[g] ?? 0;
+                const percentage = totalStudents > 0 ? ((count / totalStudents) * 100).toFixed(1) : '0.0';
+                const boundary = gradeBoundaries[g];
+
+                return (
+                  <div key={g} style={{
+                    padding: '10px 12px',
+                    borderRadius: 8,
+                    border: '1px solid rgba(255,255,255,0.04)',
+                    background: 'rgba(255,255,255,0.01)',
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                      <span style={getGradeBadgeStyle(g)}>{g}</span>
+                      {relativeGradingEnabled && boundary !== null && boundary !== undefined && (
+                        <span style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 600 }}>
+                          ({fmt(boundary)}+)
+                        </span>
+                      )}
+                    </div>
+                    <input
+                      className="form-input"
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={count}
+                      style={{ fontSize: 13, padding: '6px 10px', height: 'auto', background: 'rgba(255,255,255,0.02)' }}
+                      disabled={!relativeGradingEnabled}
+                      onChange={(e) => {
+                        const val = Math.max(0, parseInt(e.target.value) || 0);
+                        setGradeCounts?.({
+                          ...gradeCounts,
+                          [g]: val,
+                        });
+                      }}
+                    />
+                    <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 4 }}>
+                      {percentage}% of total
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* ── Table ── */}
       <div className="table-wrap">
@@ -104,6 +380,7 @@ export default function Leaderboard({ data, onDownloadExcel, loading = false, sc
               <th>Rank</th>
               <th>Name</th>
               <th>SID / Roll</th>
+              {relativeGradingEnabled && <th>Grade</th>}
               {breakdownCols.map(col => (
                 <th key={col} style={{ fontSize: 12 }}>{col}</th>
               ))}
@@ -121,6 +398,11 @@ export default function Leaderboard({ data, onDownloadExcel, loading = false, sc
                 </td>
                 <td style={{ fontWeight: s.rank <= 3 ? 600 : 400 }}>{s.name}</td>
                 <td style={{ color: 'var(--muted)', fontSize: 13 }}>{s.roll || '—'}</td>
+                {relativeGradingEnabled && (
+                  <td>
+                    <span style={getGradeBadgeStyle(s.grade)}>{s.grade || 'F'}</span>
+                  </td>
+                )}
                 {breakdownCols.map(col => (
                   <td key={col} style={{ fontSize: 12, color: 'var(--muted)' }}>
                     {fmt(s.breakdown?.[col]?.score?? '')}

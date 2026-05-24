@@ -31,6 +31,33 @@ export default function UploadMarks({ onResult }) {
   const [loading, setLoading]       = useState(false);
   const [error, setError]           = useState('');
 
+  const [relativeGradingEnabled, setRelativeGradingEnabled] = useState(false);
+  const [gradeCounts, setGradeCounts] = useState({
+    'A+': 0, 'A': 0, 'B+': 0, 'B': 0, 'C+': 0, 'C': 0, 'D': 0, 'F': 0
+  });
+
+  const gradedStudents = useMemo(() => {
+    const rawStudents = leaderboard?.leaderboard?.[0]?.students || [];
+    if (!relativeGradingEnabled) return rawStudents;
+
+    const gradesOrder = ['A+', 'A', 'B+', 'B', 'C+', 'C', 'D', 'F'];
+    let idx = 0;
+    return rawStudents.map((s) => {
+      let grade = 'F';
+      let cumulative = 0;
+      for (const g of gradesOrder) {
+        const quota = parseInt(gradeCounts[g]) || 0;
+        cumulative += quota;
+        if (idx < cumulative) {
+          grade = g;
+          break;
+        }
+      }
+      idx++;
+      return { ...s, grade };
+    });
+  }, [leaderboard, relativeGradingEnabled, gradeCounts]);
+
   const totalWeight = useMemo(
     () => sources.reduce((s, src) => s + getSourceFileWeight(src), 0),
     [sources]
@@ -57,6 +84,7 @@ export default function UploadMarks({ onResult }) {
         ? s.selectedColumns
         : cols.map((c) => c.name),
       columnWeights: { ...defaultColWeights, ...(s.columnWeights || {}) },
+      studentLimit: s.studentLimit !== undefined ? s.studentLimit : s.studentCount,
     };
   };
 
@@ -155,10 +183,13 @@ export default function UploadMarks({ onResult }) {
           label           : s.label.trim(),
           weight          : getSourceFileWeight(s),
           columns         : s.columns,
-          studentRows     : s.studentRows,
+          studentRows     : s.studentLimit ? s.studentRows.slice(0, s.studentLimit) : s.studentRows,
           selectedColumns : s.selectedColumns,
           columnWeights   : s.columnWeights,
+          studentLimit    : s.studentLimit || s.studentRows.length,
         })),
+        relativeGradingEnabled,
+        gradeCounts,
       };
 
       const res = await marksService.generateLeaderboard(payload);
@@ -173,19 +204,21 @@ export default function UploadMarks({ onResult }) {
   };
 
   const handleDownloadExcel = () => {
-    const students = leaderboard?.leaderboard?.[0]?.students || [];
-    if (!students.length) {
+    if (!gradedStudents.length) {
       alert('No leaderboard data to export.');
       return;
     }
 
     const labels = (leaderboard.sources || sources).map((s) => s.label);
-    const rows = students.map((s) => {
+    const rows = gradedStudents.map((s) => {
       const row = { Rank: s.rank, Name: s.name, Roll: s.roll || '' };
       labels.forEach((label) => {
         row[label] = s.breakdown?.[label]?.raw ?? 0;
       });
       row['Final Score'] = s.totalScore;
+      if (relativeGradingEnabled) {
+        row['Grade'] = s.grade || 'F';
+      }
       return row;
     });
 
@@ -276,15 +309,31 @@ export default function UploadMarks({ onResult }) {
                     </button>
                   </div>
 
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">Label</label>
-                    <input
-                      className="form-input"
-                      type="text"
-                      value={src.label}
-                      placeholder="e.g. Mid Sem, Quiz 1"
-                      onChange={(e) => updateSource(src.id, 'label', e.target.value)}
-                    />
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 0 }}>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label className="form-label">Label</label>
+                      <input
+                        className="form-input"
+                        type="text"
+                        value={src.label}
+                        placeholder="e.g. Mid Sem, Quiz 1"
+                        onChange={(e) => updateSource(src.id, 'label', e.target.value)}
+                      />
+                    </div>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label className="form-label">Include first N students</label>
+                      <input
+                        className="form-input"
+                        type="number"
+                        min="1"
+                        max={src.studentCount}
+                        value={src.studentLimit !== undefined ? src.studentLimit : src.studentCount}
+                        onChange={(e) => {
+                          const val = e.target.value === '' ? '' : Math.max(1, Math.min(src.studentCount, parseInt(e.target.value) || 1));
+                          updateSource(src.id, 'studentLimit', val);
+                        }}
+                      />
+                    </div>
                   </div>
 
                   <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 10 }}>
@@ -401,9 +450,19 @@ export default function UploadMarks({ onResult }) {
             </div>
           )}
           <Leaderboard
-            data={leaderboard}
+            data={{
+              ...leaderboard,
+              leaderboard: leaderboard.leaderboard ? [{
+                ...leaderboard.leaderboard[0],
+                students: gradedStudents
+              }] : []
+            }}
             onDownloadExcel={handleDownloadExcel}
             scoreLabel="Final Score"
+            relativeGradingEnabled={relativeGradingEnabled}
+            setRelativeGradingEnabled={setRelativeGradingEnabled}
+            gradeCounts={gradeCounts}
+            setGradeCounts={setGradeCounts}
           />
         </div>
       )}
