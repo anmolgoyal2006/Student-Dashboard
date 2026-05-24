@@ -72,15 +72,38 @@ export default function Sidebar() {
   return (
     <>
       {/* Mobile top navbar */}
-      <nav className="mobile-navbar">
+      <nav className="mobile-navbar" style={{ padding: '0 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <span className="mobile-nav-logo">🎓 StudentAI</span>
-        <button
-          className="mobile-menu-btn"
-          onClick={() => setOpen(o => !o)}
-          aria-label="Toggle menu"
-        >
-          {open ? '✕' : '☰'}
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button
+            onClick={logout}
+            style={{
+              background: 'rgba(248, 113, 113, 0.1)',
+              border: 'none',
+              borderRadius: '8px',
+              color: 'var(--danger, #f87171)',
+              padding: '6px 10px',
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4
+            }}
+            title="Logout"
+          >
+            <span>🚪</span>
+            <span style={{ fontSize: 11 }}>Logout</span>
+          </button>
+          <button
+            className="mobile-menu-btn"
+            onClick={() => setOpen(o => !o)}
+            aria-label="Toggle menu"
+            style={{ margin: 0 }}
+          >
+            {open ? '✕' : '☰'}
+          </button>
+        </div>
       </nav>
 
       {/* Overlay */}
@@ -95,23 +118,46 @@ export default function Sidebar() {
      <aside className={`sidebar${open ? ' open' : ''}`} style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflowY: 'auto' }}>
         <div className="sidebar-logo">StudentAI</div>
 
- <div className="sidebar-user">
-<div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-  <div style={{
-    width: 34, height: 34, borderRadius: '50%',
-    background: 'linear-gradient(135deg, #6366f1, #818cf8)',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    fontSize: 13, fontWeight: 700, color: '#fff',
-    flexShrink: 0, boxShadow: '0 0 12px rgba(129,140,248,0.3)',
-  }}>
-    {initials}
-  </div>
-  <div style={{ minWidth: 0, flex: 1 }}>
-    <div className="sidebar-user-name">{user?.name}</div>
-    <div className="sidebar-user-email">{user?.email}</div>
-  </div>
-</div>
-</div>
+        <div className="sidebar-user">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{
+              width: 34, height: 34, borderRadius: '50%',
+              background: 'linear-gradient(135deg, #6366f1, #818cf8)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 13, fontWeight: 700, color: '#fff',
+              flexShrink: 0, boxShadow: '0 0 12px rgba(129,140,248,0.3)',
+            }}>
+              {initials}
+            </div>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div className="sidebar-user-name">{user?.name}</div>
+              <div className="sidebar-user-email">{user?.email}</div>
+            </div>
+            {/* Quick Logout button in User Card */}
+            <button
+              onClick={logout}
+              style={{
+                background: 'rgba(248, 113, 113, 0.1)',
+                border: 'none',
+                borderRadius: '8px',
+                color: 'var(--danger, #f87171)',
+                width: 28,
+                height: 28,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                flexShrink: 0,
+                transition: 'background 0.2s',
+              }}
+              title="Logout"
+              onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(248, 113, 113, 0.2)'}
+              onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(248, 113, 113, 0.1)'}
+            >
+              🚪
+            </button>
+          </div>
+        </div>
 
         <div className="sidebar-section-label">Navigation</div>
 
@@ -128,19 +174,12 @@ export default function Sidebar() {
           </NavLink>
         ))}
 
-       <div style={{ flex: 1 }} />
-        <button className="sidebar-logout" onClick={logout} style={{
-          position: 'sticky',
-          bottom: 0,
-          borderTop: '1px solid var(--border)',
-          marginTop: 8,
-          background: 'var(--bg-sidebar, #0d1117)',
-          width: '100%',
-          zIndex: 10,
-        }}>
-          <span className="sidebar-link-icon">🚪</span>
-          Logout
-        </button>
+        <div style={{ borderTop: '1px solid var(--border)', margin: '12px 10px 0', paddingTop: 12, paddingBottom: 16 }}>
+          <button className="sidebar-logout" onClick={logout} style={{ width: '100%' }}>
+            <span className="sidebar-link-icon">🚪</span>
+            Logout
+          </button>
+        </div>
       </aside>
     </>
   );
