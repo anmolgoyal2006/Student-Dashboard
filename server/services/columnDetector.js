@@ -108,7 +108,18 @@ function detectColumns(rawRows) {
     })
     .filter((s) => looksLikePersonName(s.name));
 
-  return { columns, studentRows };
+  // Deduplicate student rows by roll number (or name if roll is absent) to guarantee unique entries
+  const seenStudents = new Set();
+  const uniqueStudentRows = [];
+  for (const s of studentRows) {
+    const key = s.roll ? `roll:${s.roll.toLowerCase()}` : `name:${s.name.toLowerCase()}`;
+    if (!seenStudents.has(key)) {
+      seenStudents.add(key);
+      uniqueStudentRows.push(s);
+    }
+  }
+
+  return { columns, studentRows: uniqueStudentRows };
 }
 
 module.exports = { detectColumns, parseMarkValue };

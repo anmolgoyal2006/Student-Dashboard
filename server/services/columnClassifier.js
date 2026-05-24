@@ -22,8 +22,36 @@ function valuesForColumn(rows, header) {
 function looksLikePersonName(val) {
   const s = String(val ?? '').trim();
   if (!s || s.length < 2) return false;
-  if (/^\d+(\.\d+)?$/.test(s)) return false;
-  return /[a-zA-Z]{2,}/.test(s) && !/^(ab|absent|na|n\/a|nil|null)$/i.test(s);
+  // A person's name never contains digits (0-9)
+  if (/\d/.test(s)) return false;
+  
+  const lower = s.toLowerCase();
+  
+  const badKeywords = [
+    'total', 'average', 'avg', 'maximum', 'minimum', 'max', 'min', 'mean', 'median', 'std dev', 'highest', 'lowest',
+    'topper', 'pass', 'fail', 'absent', 'present', 'grand total', 'subtotal', 'aggregate', 'marks', 'score',
+    'grade', 'gpa', 'cgpa', 'pretotal', 'page', 'signature', 'instructor', 'coordinator', 'hod', 'director',
+    'dean', 'professor', 'teacher', 'examiner', 'course', 'subject', 'code', 'title', 'branch', 'session',
+    'semester', 'serial', 'sr. no', 's.no', 'sl.no', 'roll no', 'rollno', 'enrollment', 'enrolment', 'reg. no',
+    'reg no', 'registration', 'absentee', 'class', 'summary', 'percentage', 'result', 'status', 'checked by',
+    'verified by', 'date', 'remark', 'theory', 'practical', 'assignment', 'quiz', 'midsem', 'endsem', 'mid term',
+    'end term', 'evaluated by', 'prepared by', 'marksheet', 'total marks', 'out of', 'roll_no',
+    'sl no', 'sr no', 's no', 'sl. no', 'sr. no', 'serial no', 'academic', 'college', 'university', 'department',
+    'institute', 'btech', 'mtech', 'b.tech', 'm.tech', 'examination', 'semester', 'academic year', 'group', 'section'
+  ];
+  
+  if (badKeywords.some(keyword => lower === keyword || lower.startsWith(keyword) || lower.endsWith(keyword) || lower.includes(' ' + keyword) || lower.includes(keyword + ' '))) {
+    return false;
+  }
+  
+  if (/^(ab|absent|na|n\/a|nil|null|none|total|avg|max|min|mean|yes|no|pass|fail|grade|score|marks|s\.no|sr\.no|sl\.no|roll|rollno|enrol|enroll|reg|reg\.no|sno|slno|srno|overall)$/i.test(s)) {
+    return false;
+  }
+
+  if (!/[a-zA-Z]{2,}/.test(s)) return false;
+  if (/^[_\-\s|=+*#@!$%^&()]+$/.test(s)) return false;
+
+  return true;
 }
 
 function looksLikeStudentId(val) {
@@ -34,11 +62,22 @@ function looksLikeStudentId(val) {
 }
 
 function columnIsSequentialSerial(values) {
-  if (values.length < 3) return false;
-  const nums = values.map((v) => parseInt(String(v).trim(), 10));
-  if (nums.some((n) => isNaN(n))) return false;
-  const start = nums[0];
-  return nums.every((n, i) => n === start + i);
+  const nums = values
+    .map((v) => parseInt(String(v).trim(), 10))
+    .filter((n) => !isNaN(n));
+  
+  if (nums.length < 3) return false;
+  
+  // Check how many numbers strictly increase by exactly 1
+  let sequentialCount = 0;
+  for (let i = 0; i < nums.length - 1; i++) {
+    if (nums[i + 1] === nums[i] + 1) {
+      sequentialCount++;
+    }
+  }
+  
+  // If at least 75% of numeric rows are strictly sequential (+1), it is a serial column
+  return (sequentialCount / (nums.length - 1)) >= 0.75;
 }
 
 function isAggregateHeader(header) {
@@ -83,8 +122,8 @@ function classifyColumn(header, rows) {
   const headerName = /name|student|candidate|learner|pupil/.test(n);
   const headerId = /sid|roll|enrol|reg|admission|sap|uid|emp/.test(n) && !headerName
     && !/mark|score|quiz|exam/i.test(n);
-  const headerSerial = /^(s\.?\s*no\.?|sr\.?\s*no\.?|serial|sl\.?\s*no\.?|#)$/.test(n.replace(/\s/g, ''))
-    || n === 'no' || n === 'no.';
+  const headerSerial = /^(s\.?\s*no\.?|sr\.?\s*no\.?|serial|sl\.?\s*no\.?|#|sno|srno|slno)$/.test(n.replace(/\s/g, ''))
+    || n === 'no' || n === 'no.' || n.includes('serial') || n.includes('s.no') || n.includes('sr.no') || n.includes('sl.no');
   const headerMarks = extractMaxFromHeader(header) !== null
     || /mark|score|quiz|exam|test|lab|mid|end|theory|practical|assignment|mt\b/i.test(n);
 

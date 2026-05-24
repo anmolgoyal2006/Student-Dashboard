@@ -88,8 +88,28 @@ def looks_like_person_name(val):
     s = str(val or '').strip()
     if not s or len(s) < 2:
         return False
-    if re.match(r'^\d+(\.\d+)?$', s):
+    # A person's name never contains digits (0-9)
+    if re.search(r'\d', s):
         return False
+    
+    lower = s.lower()
+    bad_keywords = {
+        'total', 'average', 'avg', 'maximum', 'minimum', 'max', 'min', 'mean', 'median', 'std dev', 'highest', 'lowest',
+        'topper', 'pass', 'fail', 'absent', 'present', 'grand total', 'subtotal', 'aggregate', 'marks', 'score',
+        'grade', 'gpa', 'cgpa', 'pretotal', 'page', 'signature', 'instructor', 'coordinator', 'hod', 'director',
+        'dean', 'professor', 'teacher', 'examiner', 'course', 'subject', 'code', 'title', 'branch', 'session',
+        'semester', 'serial', 'sr. no', 's.no', 'sl.no', 'roll no', 'rollno', 'enrollment', 'enrolment', 'reg. no',
+        'reg no', 'registration', 'absentee', 'class', 'summary', 'percentage', 'result', 'status', 'checked by',
+        'verified by', 'date', 'remark', 'theory', 'practical', 'assignment', 'quiz', 'midsem', 'endsem', 'mid term',
+        'end term', 'evaluated by', 'prepared by', 'marksheet', 'total marks', 'out of', 'roll_no',
+        'sl no', 'sr no', 's no', 'sl. no', 'sr. no', 'serial no', 'academic', 'college', 'university', 'department',
+        'institute', 'btech', 'mtech', 'b.tech', 'm.tech', 'examination', 'semester', 'academic year', 'group', 'section'
+    }
+    
+    for kw in bad_keywords:
+        if lower == kw or lower.startswith(kw) or lower.endswith(kw) or (' ' + kw) in lower or (kw + ' ') in lower:
+            return False
+            
     return bool(re.search(r'[a-zA-Z]{2,}', s))
 
 
@@ -105,7 +125,7 @@ def is_likely_data_row(obj):
     values = [str(v).strip() for v in obj.values() if v and str(v).strip()]
     if not values:
         return False
-    if all(len(v) == 1 and v.isalpha() for v in values):
+    if all(len(v) == 0 or (len(v) == 1 and v.isalpha()) for v in values):
         return False
     joined = ' '.join(values).lower()
     if joined in ('s.no.', 's.no', 'sid', 'name', 'roll no', 'roll'):
@@ -116,28 +136,103 @@ def is_likely_data_row(obj):
     return False
 
 
+def extract_table_from_words(page):
+    """Fallback: Reconstruct tabular rows from word coordinates for borderless/invisible tables."""
+    try:
+        words = page.extract_words()
+    except Exception:
+        return []
+        
+    if not words or len(words) < 5:
+        return []
+    
+    # 1. Group words into horizontal lines by 'top' coordinate with 3-point tolerance
+    lines = []
+    for w in sorted(words, key=lambda x: x['top']):
+        placed = False
+        for line in lines:
+            line_top = min(x['top'] for x in line)
+            line_bottom = max(x['bottom'] for x in line)
+            word_center = (w['top'] + w['bottom']) / 2.0
+            
+            # If vertical center of word overlaps with the line's bounds (with tolerance)
+            if line_top - 2.5 <= word_center <= line_bottom + 2.5:
+                line.append(w)
+                placed = True
+                break
+        if not placed:
+            lines.append([w])
+            
+    # 2. Reconstruct cells within each line by horizontal spacing
+    table = []
+    for line in lines:
+        if not line:
+            continue
+        sorted_words = sorted(line, key=lambda x: x['x0'])
+        
+        cells = []
+        current_cell = []
+        prev_word = None
+        
+        for w in sorted_words:
+            if prev_word is None:
+                current_cell.append(w['text'])
+            else:
+                # Spacing between previous word's right edge and current word's left edge
+                space = w['x0'] - prev_word['x1']
+                # If space > 8.0 points, treat it as a new column/cell
+                if space > 8.0:
+                    cells.append(' '.join(current_cell))
+                    current_cell = [w['text']]
+                else:
+                    current_cell.append(w['text'])
+            prev_word = w
+            
+        if current_cell:
+            cells.append(' '.join(current_cell))
+            
+        # Only keep rows that look like they belong to a table (at least 2 columns)
+        if len(cells) >= 2:
+            table.append(cells)
+            
+    return table
+
+
 def extract_tables_from_page(page):
     seen = []
     for settings in TABLE_SETTINGS:
         try:
             tables = page.extract_tables(table_settings=settings) or []
         except Exception:
-            tables = page.extract_tables() or []
-        for t in tables:
-            if t and len(t) >= 2:
+            tables = []
+        
+        valid_tables = [t for t in tables if t and len(t) >= 2]
+        if valid_tables:
+            for t in valid_tables:
                 key = json.dumps(t[:3])
                 if key not in seen:
                     seen.append(key)
                     yield t
+            # If we successfully extracted tables with a strict strategy, don't fall back to looser ones
+            break
 
 
 def parse_pdf(path):
     rows = []
     headers = None
+    seen_rows = set()
 
     with pdfplumber.open(path) as pdf:
         for page in pdf.pages:
-            for table in extract_tables_from_page(page):
+            tables = list(extract_tables_from_page(page))
+            
+            # Fallback strategy: If no tables were extracted, reconstruct from coordinates!
+            if not tables:
+                word_table = extract_table_from_words(page)
+                if word_table and len(word_table) >= 2:
+                    tables = [word_table]
+            
+            for table in tables:
                 if headers is None:
                     hi = find_header_index(table)
                     headers = normalize_headers(table[hi])
@@ -154,7 +249,11 @@ def parse_pdf(path):
                 for row in data_rows:
                     obj = row_to_obj(headers, row)
                     if is_likely_data_row(obj):
-                        rows.append(obj)
+                        # Unique row key to prevent duplicates
+                        row_key = tuple((k, str(v).strip()) for k, v in sorted(obj.items()))
+                        if row_key not in seen_rows:
+                            seen_rows.add(row_key)
+                            rows.append(obj)
 
     return rows
 
