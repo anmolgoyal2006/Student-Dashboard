@@ -9,13 +9,17 @@ import {
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend, Filler);
 
 const DEFAULT_TOTAL = 8;
+const DEFAULT_CREDITS = 161;
 
 export default function Prediction() {
-  const [targetCGPA,    setTargetCGPA]    = useState('');
-  const [totalSemesters,setTotalSemesters]= useState(DEFAULT_TOTAL);
-  const [data,          setData]          = useState(null);
-  const [loading,       setLoading]       = useState(false);
-  const [error,         setError]         = useState('');
+  const [targetCGPA,         setTargetCGPA]        = useState('');
+  const [totalSemesters,     setTotalSemesters]    = useState(DEFAULT_TOTAL);
+  const [totalDegreeCredits, setTotalDegreeCredits]= useState(DEFAULT_CREDITS);
+  const [manualCGPA,         setManualCGPA]        = useState('');
+  const [completedManual,    setCompletedManual]   = useState('');
+  const [data,               setData]              = useState(null);
+  const [loading,            setLoading]           = useState(false);
+  const [error,              setError]             = useState('');
 
   const fetchPredict = async () => {
     setError('');
@@ -23,10 +27,14 @@ export default function Prediction() {
       return setError('Target CGPA must be between 0 and 10.');
     setLoading(true);
     try {
-      const res = await predictionService.getPredict({
-        targetCGPA:     targetCGPA || '',
-        totalSemesters: totalSemesters,
-      });
+      const params = {
+        targetCGPA:         targetCGPA || '',
+        totalSemesters:     totalSemesters,
+        totalDegreeCredits: totalDegreeCredits,
+      };
+      if (manualCGPA) params.currentCGPA = manualCGPA;
+      if (completedManual) params.completed = completedManual;
+      const res = await predictionService.getPredict(params);
       setData(res.data);
     } catch {
       setError('Failed to fetch prediction.');
@@ -39,8 +47,8 @@ export default function Prediction() {
 
   const chartLabels = data
     ? [
-        ...data.sgpaList.map((_, i)  => `S${i + 1} (actual)`),
-        ...data.futureSGPAs.map((_, i) => `S${data.completed + i + 1} (predicted)`),
+        ...(data.sgpaList || []).map((_, i)  => `S${i + 1} (actual)`),
+        ...(data.futureSGPAs || []).map((_, i) => `S${data.completed + i + 1} (predicted)`),
       ]
     : [];
 
@@ -49,7 +57,7 @@ export default function Prediction() {
     datasets: [
       {
         label: 'Actual SGPA',
-        data: data ? [...data.sgpaList, ...Array(data.futureSGPAs.length).fill(null)] : [],
+        data: data ? [...(data.sgpaList || []), ...Array((data.futureSGPAs || []).length).fill(null)] : [],
         borderColor: '#818cf8',
         backgroundColor: 'rgba(129,140,248,0.15)',
         pointBackgroundColor: '#818cf8',
@@ -59,9 +67,9 @@ export default function Prediction() {
       {
         label: 'Predicted SGPA',
         data: data
-          ? [...Array(data.sgpaList.length - 1).fill(null),
-             data.sgpaList[data.sgpaList.length - 1],
-             ...data.futureSGPAs]
+          ? [...Array(Math.max(0, (data.sgpaList || []).length - 1)).fill(null),
+             data.sgpaList?.[(data.sgpaList || []).length - 1],
+             ...(data.futureSGPAs || [])]
           : [],
         borderColor: '#34d399',
         backgroundColor: 'rgba(52,211,153,0.08)',
@@ -116,8 +124,28 @@ export default function Prediction() {
 
       {/* Controls */}
       <div className="card mb-4" style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-        <div className="form-group" style={{ margin: 0, flex: 1, minWidth: 160 }}>
-          <label className="form-label">Target CGPA (0–10)</label>
+        <div className="form-group" style={{ margin: 0, flex: 1, minWidth: 140 }}>
+          <label className="form-label">Current CGPA (optional)</label>
+          <input
+            className="form-input"
+            type="number" min="0" max="10" step="0.01"
+            placeholder="e.g. 8.71"
+            value={manualCGPA}
+            onChange={e => setManualCGPA(e.target.value)}
+          />
+        </div>
+        <div className="form-group" style={{ margin: 0, flex: 1, minWidth: 120 }}>
+          <label className="form-label">Completed Sems</label>
+          <input
+            className="form-input"
+            type="number" min="1" max="16"
+            placeholder="e.g. 3"
+            value={completedManual}
+            onChange={e => setCompletedManual(e.target.value)}
+          />
+        </div>
+        <div className="form-group" style={{ margin: 0, flex: 1, minWidth: 140 }}>
+          <label className="form-label">Target CGPA</label>
           <input
             className="form-input"
             type="number" min="0" max="10" step="0.1"
@@ -126,13 +154,22 @@ export default function Prediction() {
             onChange={e => setTargetCGPA(e.target.value)}
           />
         </div>
-        <div className="form-group" style={{ margin: 0, flex: 1, minWidth: 160 }}>
-          <label className="form-label">Total Semesters in Degree</label>
+        <div className="form-group" style={{ margin: 0, flex: 1, minWidth: 120 }}>
+          <label className="form-label">Total Semesters</label>
           <input
             className="form-input"
             type="number" min="1" max="16"
             value={totalSemesters}
             onChange={e => setTotalSemesters(Number(e.target.value))}
+          />
+        </div>
+        <div className="form-group" style={{ margin: 0, flex: 1, minWidth: 120 }}>
+          <label className="form-label">Total Credits</label>
+          <input
+            className="form-input"
+            type="number" min="1" step="1"
+            value={totalDegreeCredits}
+            onChange={e => setTotalDegreeCredits(Number(e.target.value))}
           />
         </div>
         <button className="btn btn-primary" onClick={fetchPredict} disabled={loading}>
@@ -142,100 +179,119 @@ export default function Prediction() {
 
       {error && <p style={{ color: '#f87171', marginBottom: 16 }}>{error}</p>}
 
-      {data && data.sgpaList.length === 0 && (
+      {data && data.sgpaList && data.sgpaList.length === 0 && (
         <div className="card">
-          <p className="text-muted">No semester data found. Add semesters in the Marks page first.</p>
+          <p className="text-muted">No semester data found in your account. Enter your Current CGPA manually above to get started.</p>
         </div>
       )}
 
-      {data && data.sgpaList.length > 0 && (
+      {data && data.currentCGPA != null && (
         <>
-          {/* Insight cards */}
-         <div className="grid-4 mb-4">
-  <div className="card stat-card">
-    <div className="stat-icon">📊</div>
-    <div className="stat-value" style={{ color: '#818cf8' }}>{data.currentCGPA}</div>
-    <div className="stat-label">Current CGPA</div>
-  </div>
-  <div className="card stat-card">
-    <div className="stat-icon">🔮</div>
-    <div className="stat-value" style={{ color: '#34d399' }}>{data.predictedCGPA}</div>
-    <div className="stat-label">Predicted CGPA</div>
-  </div>
-  <div className="card stat-card">
-    <div className="stat-icon">✅</div>
-    <div className="stat-value" style={{ color: '#fbbf24' }}>{data.completed}</div>
-    <div className="stat-label">Completed</div>
-  </div>
-  <div className="card stat-card">
-    <div className="stat-icon">⏳</div>
-    <div className="stat-value" style={{ color: '#f87171' }}>{data.remaining}</div>
-    <div className="stat-label">Remaining</div>
-  </div>
-</div>
+          {/* Stat cards */}
+          <div className="grid-4 mb-4">
+            <div className="card stat-card">
+              <div className="stat-icon">📊</div>
+              <div className="stat-value" style={{ color: '#818cf8' }}>{data.currentCGPA}</div>
+              <div className="stat-label">Current CGPA (credit-weighted)</div>
+            </div>
+            <div className="card stat-card">
+              <div className="stat-icon">🔮</div>
+              <div className="stat-value" style={{ color: '#34d399' }}>{data.predictedCGPA}</div>
+              <div className="stat-label">Predicted CGPA</div>
+            </div>
+            <div className="card stat-card">
+              <div className="stat-icon">✅</div>
+              <div className="stat-value" style={{ color: '#fbbf24' }}>{data.completed}</div>
+              <div className="stat-label">Completed</div>
+            </div>
+            <div className="card stat-card">
+              <div className="stat-icon">⏳</div>
+              <div className="stat-value" style={{ color: '#f87171' }}>{data.remaining}</div>
+              <div className="stat-label">Remaining</div>
+            </div>
+          </div>
 
-{/* Required SGPA banner — only shows when target is set */}
-{data.requiredSGPA !== null && targetCGPA && (
-  <div className="card mb-4" style={{
-    display: 'flex',
-    alignItems: 'center',
-    gap: 20,
-    padding: '16px 20px',
-    borderLeft: `4px solid ${insightColor(data.requiredSGPA)}`,
-    flexWrap: 'wrap',
-  }}>
-    <div style={{ fontSize: 32 }}>🎯</div>
-    <div style={{ flex: 1 }}>
-      <p style={{ margin: 0, fontSize: 12, color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-        Required SGPA — Next Semester
-      </p>
-      <p style={{ margin: '4px 0 0', fontSize: 28, fontWeight: 800, color: insightColor(data.requiredSGPA) }}>
-        {data.requiredSGPA > 10
-          ? 'Not achievable'
-          : data.requiredSGPA < 0
-          ? 'Already achieved!'
-          : data.requiredSGPA}
-      </p>
-      <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--muted)' }}>
-        {data.requiredSGPA > 10
-          ? `Target CGPA ${targetCGPA} cannot be reached in ${data.remaining} remaining semester(s).`
-          : data.requiredSGPA < 0
-          ? `You've already surpassed your target CGPA of ${targetCGPA}.`
-          : `Maintain this SGPA for each of the ${data.remaining} remaining semester(s) to hit CGPA ${targetCGPA}.`
-        }
-      </p>
-    </div>
-    {data.requiredSGPA >= 0 && data.requiredSGPA <= 10 && (
-      <div style={{
-        padding: '10px 20px', borderRadius: 10,
-        background: `${insightColor(data.requiredSGPA)}20`,
-        border: `1px solid ${insightColor(data.requiredSGPA)}40`,
-        textAlign: 'center',
-        flexShrink: 0,
-      }}>
-        <p style={{ margin: 0, fontSize: 11, color: 'var(--muted)' }}>Difficulty</p>
-        <p style={{ margin: '4px 0 0', fontSize: 13, fontWeight: 700, color: insightColor(data.requiredSGPA) }}>
-          {data.requiredSGPA > 9.5 ? '🔴 Very Hard'
-           : data.requiredSGPA > 8.5 ? '🟡 Challenging'
-           : data.requiredSGPA > 7.0 ? '🟢 Achievable'
-           : '✅ Easy'}
-        </p>
-      </div>
-    )}
-  </div>
-)}
-  <div className="card mb-4">
-  <span style={{ fontSize: 13, color: '#34d399', fontWeight: 600 }}>
-    📈 At your current trend, your CGPA will be approximately {data.predictedCGPA} by semester {totalSemesters}.
-  </span>
-</div>
+          {/* Required SGPA banner */}
+          {data.requiredSGPA !== null && targetCGPA && (
+            <div className="card mb-4" style={{
+              display: 'flex', alignItems: 'center', gap: 20,
+              padding: '16px 20px',
+              borderLeft: `4px solid ${insightColor(data.requiredSGPA)}`,
+              flexWrap: 'wrap',
+            }}>
+              <div style={{ fontSize: 32 }}>🎯</div>
+              <div style={{ flex: 1 }}>
+                <p style={{ margin: 0, fontSize: 12, color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Required SGPA — Each Remaining Semester
+                </p>
+                <p style={{ margin: '4px 0 0', fontSize: 28, fontWeight: 800, color: insightColor(data.requiredSGPA) }}>
+                  {data.requiredSGPA > 10
+                    ? 'Not achievable'
+                    : data.requiredSGPA < 0
+                    ? 'Already achieved!'
+                    : data.requiredSGPA}
+                </p>
+                <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--muted)' }}>
+                  {data.requiredSGPA > 10
+                    ? `Target CGPA ${targetCGPA} cannot be reached in ${data.remaining} remaining semester(s).`
+                    : data.requiredSGPA < 0
+                    ? `You've already surpassed your target CGPA of ${targetCGPA}.`
+                    : `Maintain this SGPA each semester to hit CGPA ${targetCGPA}.`
+                  }
+                </p>
+              </div>
+              {data.requiredSGPA >= 0 && data.requiredSGPA <= 10 && (
+                <div style={{
+                  padding: '10px 20px', borderRadius: 10,
+                  background: `${insightColor(data.requiredSGPA)}20`,
+                  border: `1px solid ${insightColor(data.requiredSGPA)}40`,
+                  textAlign: 'center', flexShrink: 0,
+                }}>
+                  <p style={{ margin: 0, fontSize: 11, color: 'var(--muted)' }}>Difficulty</p>
+                  <p style={{ margin: '4px 0 0', fontSize: 13, fontWeight: 700, color: insightColor(data.requiredSGPA) }}>
+                    {data.requiredSGPA > 9.5 ? '🔴 Very Hard'
+                     : data.requiredSGPA > 8.5 ? '🟡 Challenging'
+                     : data.requiredSGPA > 7.0 ? '🟢 Achievable'
+                     : '✅ Easy'}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
 
+          {/* Trend message */}
+          <div className="card mb-4">
+            <span style={{ fontSize: 13, color: '#34d399', fontWeight: 600 }}>
+              📈 At your current trend, your CGPA will be approximately {data.predictedCGPA} by semester {totalSemesters}.
+            </span>
+          </div>
+
+          {/* Credit Breakdown */}
+          {data.creditBreakdown && (
+            <div className="card mb-4">
+              <div className="card-title">📋 Credit Distribution</div>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {data.creditBreakdown.map((c, i) => (
+                  <span key={i} style={{
+                    fontSize: 11, padding: '4px 10px', borderRadius: 99,
+                    background: i < data.completed ? 'rgba(129,140,248,0.12)' : 'rgba(52,211,153,0.12)',
+                    border: `1px solid ${i < data.completed ? 'rgba(129,140,248,0.25)' : 'rgba(52,211,153,0.25)'}`,
+                    color: i < data.completed ? '#a5b4fc' : '#34d399',
+                  }}>
+                    S{i + 1}: {c}cr {i < data.completed ? '(done)' : '(ahead)'}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Chart */}
-          <div className="card">
-            <div className="card-title">📉 SGPA Trend + Prediction</div>
-            <Line data={chartData} options={chartOptions} />
-          </div>
+          {data.sgpaList && data.sgpaList.length > 0 && (
+            <div className="card">
+              <div className="card-title">📉 SGPA Trend + Prediction</div>
+              <Line data={chartData} options={chartOptions} />
+            </div>
+          )}
         </>
       )}
     </div>
