@@ -11,7 +11,7 @@ const EMPTY = { subjectId: '', examType: 'midterm', marksObtained: '', maxMarks:
 
 const TABS = [
   { id: 'marks',    label: '📝 Marks & CGPA' },
-  { id: 'upload',   label: '📄 Upload PDF'    },
+  { id: 'upload',   label: '📄 Upload PDF & Rank Students'    },
   { id: 'semester', label: '🎓 Semesters'     },
 ];
 

@@ -34,7 +34,7 @@ const baseLinks = [
   { to: '/',             label: 'Dashboard',    icon: '🏠' },
   { to: '/timetable',    label: 'Timetable',    icon: '📅' },
   { to: '/attendance',   label: 'Attendance',   icon: '✅' },
-  { to: '/marks',        label: 'Marks',        icon: '📝' },
+  { to: '/marks',        label: 'Marks & Ranking', icon: '📊' },
   { to: '/career',       label: 'Career',       icon: '🚀' },
   { to: '/scheduler',    label: 'Scheduler',    icon: '🗓️' },
   { to: '/profile',      label: 'Profile',      icon: '⚙️' },
