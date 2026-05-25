@@ -108,12 +108,8 @@ export default function Leaderboard({
   }, [leaderboard, searchQuery]);
 
   useEffect(() => {
-    if (leaderboard.length > 0) {
-      const total = leaderboard.length;
-      const sumCounts = Object.values(gradeCounts || {}).reduce((a, b) => a + b, 0);
-      if (sumCounts === 0 && setGradeCounts) {
-        setGradeCounts(getProportionalCounts(total));
-      }
+    if (leaderboard.length > 0 && setGradeCounts) {
+      setGradeCounts(getProportionalCounts(leaderboard.length));
     }
   }, [leaderboard.length]);
 
