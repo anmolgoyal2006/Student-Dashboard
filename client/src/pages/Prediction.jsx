@@ -9,17 +9,40 @@ import {
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend, Filler);
 
 const DEFAULT_TOTAL = 8;
-const DEFAULT_CREDITS = 161;
+const DEFAULT_CREDITS = [22, 21, 22, 24, 20, 12, 19, 21];
 
 export default function Prediction() {
   const [targetCGPA,         setTargetCGPA]        = useState('');
   const [totalSemesters,     setTotalSemesters]    = useState(DEFAULT_TOTAL);
-  const [totalDegreeCredits, setTotalDegreeCredits]= useState(DEFAULT_CREDITS);
+  const [semCredits,         setSemCredits]        = useState(DEFAULT_CREDITS);
+  const [showCredits,        setShowCredits]       = useState(false);
   const [manualCGPA,         setManualCGPA]        = useState('');
   const [completedManual,    setCompletedManual]   = useState('');
   const [data,               setData]              = useState(null);
   const [loading,            setLoading]           = useState(false);
   const [error,              setError]             = useState('');
+
+  const totalDegreeCredits = semCredits.reduce((a, b) => a + b, 0);
+
+  const updateSemCredits = (idx, val) => {
+    setSemCredits(prev => {
+      const next = [...prev];
+      next[idx] = Math.max(1, parseInt(val) || 1);
+      return next;
+    });
+  };
+
+  const handleTotalSemestersChange = (val) => {
+    const n = Math.max(1, parseInt(val) || 1);
+    setTotalSemesters(n);
+    setSemCredits(prev => {
+      if (n > prev.length) {
+        const extra = Array(n - prev.length).fill(20);
+        return [...prev, ...extra];
+      }
+      return prev.slice(0, n);
+    });
+  };
 
   const fetchPredict = async () => {
     setError('');
@@ -31,6 +54,7 @@ export default function Prediction() {
         targetCGPA:         targetCGPA || '',
         totalSemesters:     totalSemesters,
         totalDegreeCredits: totalDegreeCredits,
+        semesterCredits:    semCredits.join(','),
       };
       if (manualCGPA) params.currentCGPA = manualCGPA;
       if (completedManual) params.completed = completedManual;
@@ -160,16 +184,7 @@ export default function Prediction() {
             className="form-input"
             type="number" min="1" max="16"
             value={totalSemesters}
-            onChange={e => setTotalSemesters(Number(e.target.value))}
-          />
-        </div>
-        <div className="form-group" style={{ margin: 0, flex: 1, minWidth: 120 }}>
-          <label className="form-label">Total Credits</label>
-          <input
-            className="form-input"
-            type="number" min="1" step="1"
-            value={totalDegreeCredits}
-            onChange={e => setTotalDegreeCredits(Number(e.target.value))}
+            onChange={e => handleTotalSemestersChange(e.target.value)}
           />
         </div>
         <button className="btn btn-primary" onClick={fetchPredict} disabled={loading}>
@@ -177,11 +192,42 @@ export default function Prediction() {
         </button>
       </div>
 
+      {/* Per-semester credits toggle */}
+      <div className="card mb-4">
+        <div
+          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
+          onClick={() => setShowCredits(!showCredits)}
+        >
+          <span style={{ fontWeight: 600, fontSize: 13 }}>
+            📋 Per-Semester Credits — Total: <strong>{totalDegreeCredits}</strong>
+          </span>
+          <span style={{ fontSize: 12, color: 'var(--muted)' }}>
+            {showCredits ? '▲ Hide' : '▼ Edit (default: 22,21,22,24,20,12,19,21)'}
+          </span>
+        </div>
+        {showCredits && (
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
+            {semCredits.map((c, i) => (
+              <div key={i} className="form-group" style={{ margin: 0, width: 80 }}>
+                <label className="form-label" style={{ fontSize: 10 }}>S{i + 1}</label>
+                <input
+                  className="form-input"
+                  type="number" min="1" step="1"
+                  style={{ fontSize: 12, padding: '4px 8px', height: 'auto' }}
+                  value={c}
+                  onChange={e => updateSemCredits(i, e.target.value)}
+                />
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       {error && <p style={{ color: '#f87171', marginBottom: 16 }}>{error}</p>}
 
-      {data && data.sgpaList && data.sgpaList.length === 0 && (
+      {data && data.sgpaList && data.sgpaList.length === 0 && !manualCGPA && (
         <div className="card">
-          <p className="text-muted">No semester data found in your account. Enter your Current CGPA manually above to get started.</p>
+          <p className="text-muted">No semester data found. Enter your Current CGPA manually above to get started.</p>
         </div>
       )}
 

@@ -2,25 +2,7 @@ const Semester = require('../models/Semester.model');
 
 const round2 = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
 
-// Default per-semester credit distribution: 8 semesters
 const DEFAULT_CREDIT_PATTERN = [22, 21, 22, 24, 20, 12, 19, 21];
-
-/**
- * Build a per-semester credit array for `total` semesters,
- * scaled to match `totalCredits`. Uses the default pattern as the
- * distribution ratio, then normalizes so the sum equals totalCredits.
- */
-function buildCreditDistribution(total, totalCredits) {
-  const pattern = DEFAULT_CREDIT_PATTERN.slice(0, total);
-  // If more semesters than pattern length, extend by repeating last
-  while (pattern.length < total) {
-    pattern.push(DEFAULT_CREDIT_PATTERN[DEFAULT_CREDIT_PATTERN.length - 1]);
-  }
-  const patternSum = pattern.reduce((a, b) => a + b, 0);
-  if (patternSum === 0) return Array(total).fill(totalCredits / total);
-  const scale = totalCredits / patternSum;
-  return pattern.map((c) => round2(c * scale));
-}
 
 /**
  * Computes a weighted recent trend from the last `window` semesters.
@@ -57,13 +39,22 @@ function clamp(value, min = 0, max = 10) {
  */
 exports.getPredict = async (req, res) => {
   try {
-    const { currentCGPA: manualCGPA, completed: manualCompleted, targetCGPA, totalSemesters, totalDegreeCredits } = req.query;
+    const { currentCGPA: manualCGPA, completed: manualCompleted, targetCGPA, totalSemesters, totalDegreeCredits, semesterCredits: rawSemCredits } = req.query;
     const target     = parseFloat(targetCGPA);
     const total      = parseInt(totalSemesters, 10) || 8;
-    const totalCreds = parseInt(totalDegreeCredits, 10) || 161;
 
     // ── 1. Build per-semester credit distribution ──────────────────────────
-    const semesterCredits = buildCreditDistribution(total, totalCreds);
+    let adjustedCredits = rawSemCredits
+      ? rawSemCredits.split(',').map(s => parseInt(s, 10) || 20).slice(0, total)
+      : (() => {
+          const p = DEFAULT_CREDIT_PATTERN.slice(0, total);
+          while (p.length < total) p.push(DEFAULT_CREDIT_PATTERN[DEFAULT_CREDIT_PATTERN.length - 1]);
+          return p;
+        })();
+    // Pad/trim to match total semesters
+    while (adjustedCredits.length < total) adjustedCredits.push(20);
+    adjustedCredits = adjustedCredits.slice(0, total);
+    const sumCredits = adjustedCredits.reduce((a, b) => a + b, 0);
 
     // ── 2. Determine current CGPA and completed count ──────────────────────
     let currentCGPA, completed, sgpaList, currentWeightedSum;
@@ -73,7 +64,7 @@ exports.getPredict = async (req, res) => {
       currentCGPA = clamp(parseFloat(manualCGPA), 0, 10);
       completed   = parseInt(manualCompleted, 10) || 0;
       sgpaList    = [];
-      currentWeightedSum = currentCGPA * semesterCredits.slice(0, completed).reduce((a, b) => a + b, 0);
+      currentWeightedSum = currentCGPA * adjustedCredits.slice(0, completed).reduce((a, b) => a + b, 0);
     } else {
       // Auto mode: fetch from DB semesters
       const semesters = await Semester.find({ student: req.user.id })
@@ -89,7 +80,7 @@ exports.getPredict = async (req, res) => {
           currentCGPA: null,
           predictedCGPA: null,
           requiredSGPA: null,
-          creditBreakdown: semesterCredits,
+          creditBreakdown: adjustedCredits,
           completed: 0,
           remaining: total,
           message: 'No semester data found. Enter your Current CGPA manually above.',
@@ -97,7 +88,7 @@ exports.getPredict = async (req, res) => {
       }
 
       // Credit-weighted current CGPA from DB semesters
-      const completedCredits = semesterCredits.slice(0, completed);
+      const completedCredits = adjustedCredits.slice(0, completed);
       currentWeightedSum = sgpaList.reduce((sum, sgpa, i) => {
         const cr = i < completedCredits.length ? completedCredits[i] : 0;
         return sum + sgpa * cr;
@@ -131,10 +122,10 @@ exports.getPredict = async (req, res) => {
       // Credit-weighted predicted CGPA
       const allSGPAs = [...sgpaList, ...futureSGPAs];
       const weightedSum = allSGPAs.reduce((sum, sgpa, i) => {
-        const cr = i < semesterCredits.length ? semesterCredits[i] : 0;
+        const cr = i < adjustedCredits.length ? adjustedCredits[i] : 0;
         return sum + sgpa * cr;
       }, 0);
-      predictedCGPA = round2(weightedSum / totalCreds);
+      predictedCGPA = round2(weightedSum / sumCredits);
     }
 
     // ── 4. Required SGPA to hit target ────────────────────────────────────
@@ -142,10 +133,10 @@ exports.getPredict = async (req, res) => {
     let targetInsight = null;
 
     if (!isNaN(target) && remaining > 0) {
-      const futureCredits = semesterCredits.slice(completed).reduce((a, b) => a + b, 0);
+      const futureCredits = adjustedCredits.slice(completed).reduce((a, b) => a + b, 0);
 
       if (futureCredits > 0) {
-        const raw = (target * totalCreds - currentWeightedSum) / futureCredits;
+        const raw = (target * sumCredits - currentWeightedSum) / futureCredits;
         requiredSGPA = round2(clamp(raw));
 
         if (raw > 10) {
@@ -173,7 +164,7 @@ exports.getPredict = async (req, res) => {
       requiredSGPA,
       completed,
       remaining,
-      creditBreakdown: semesterCredits,
+      creditBreakdown: adjustedCredits,
       insights: {
         recentTrend  : round2(recentTrend),
         performance  : trendLabel,
