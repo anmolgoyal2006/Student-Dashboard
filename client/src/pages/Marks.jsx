@@ -35,7 +35,7 @@ export default function Marks() {
 
   // ── NEW: manual SGPA mode ──
   const [semMode,      setSemMode]      = useState('full'); // 'full' | 'manual'
-  const [manualForm,   setManualForm]   = useState({ semesterNumber: '', semesterName: '', sgpa: '' });
+  const [manualForm,   setManualForm]   = useState({ semesterNumber: '', semesterName: '', sgpa: '', semCredits: '' });
   const [manualLoading, setManualLoading] = useState(false);
 
   const load = async () => {
@@ -127,9 +127,9 @@ export default function Marks() {
     if (Number(sgpa) < 0 || Number(sgpa) > 10) return toast.error('SGPA must be between 0 and 10');
     try {
       setManualLoading(true);
-      await marksService.addManualSGPA({ semesterNumber, semesterName, sgpa: Number(sgpa) });
+      await marksService.addManualSGPA({ semesterNumber, semesterName, sgpa: Number(sgpa), semCredits: manualForm.semCredits ? Number(manualForm.semCredits) : undefined });
       toast.success('Past SGPA added!');
-      setManualForm({ semesterNumber: '', semesterName: '', sgpa: '' });
+      setManualForm({ semesterNumber: '', semesterName: '', sgpa: '', semCredits: '' });
       load();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed');
@@ -435,6 +435,12 @@ export default function Marks() {
                     value={manualForm.sgpa}
                     onChange={e => setManualForm(p => ({ ...p, sgpa: e.target.value }))} />
                 </div>
+                <div className="form-group">
+                  <label className="form-label">Total Credits (for accurate CGPA)</label>
+                  <input className="form-input" type="number" min="1" step="1" placeholder="e.g. 24"
+                    value={manualForm.semCredits}
+                    onChange={e => setManualForm(p => ({ ...p, semCredits: e.target.value }))} />
+                </div>
                 <button className="btn btn-primary" onClick={handleAddManualSGPA} disabled={manualLoading}>
                   {manualLoading ? 'Saving…' : 'Add Past SGPA'}
                 </button>
@@ -475,7 +481,11 @@ export default function Marks() {
                         </div>
                         <button className="btn btn-danger btn-sm" onClick={() => handleDeleteSemester(sem._id)}>Delete</button>
                       </div>
-                      {!sem.isManual && (
+                      {sem.isManual && sem.totalCredits ? (
+                        <div style={{ marginTop: 6, fontSize: 11, color: 'var(--muted)' }}>
+                          {sem.totalCredits} credits
+                        </div>
+                      ) : !sem.isManual ? (
                         <div style={{ marginTop: 6, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                           {sem.subjects.map((s, i) => (
                             <span key={`${sem._id}-subj-${i}`} style={{
@@ -487,7 +497,7 @@ export default function Marks() {
                             </span>
                           ))}
                         </div>
-                      )}
+                      ) : null}
                     </div>
                   ))
               }

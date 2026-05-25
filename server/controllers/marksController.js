@@ -54,7 +54,7 @@ exports.getCGPA = async (req, res) => {
       };
     });
 
-    const cgpa = totalCredits ? +(totalWeighted / totalCredits).toFixed(2) : 0;
+    const cgpa = totalCredits ? Math.round((totalWeighted / totalCredits + Number.EPSILON) * 100) / 100 : 0;
     res.json({ cgpa, totalCredits, breakdown });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -95,8 +95,34 @@ exports.getSemesters = async (req, res) => {
 exports.getCGPAbySemester = async (req, res) => {
   try {
     const semesters = await Semester.find({ student: req.user.id }).sort({ semesterNumber: 1 });
-    const sgpaList  = semesters.map(s => s.sgpa);
-    const cgpa      = calculateCGPA(sgpaList);
+
+    // Recalculate SGPAs from raw subject data (fixes old toFixed bugs in stored values)
+    const { calculateSGPA } = require('../utils/gradeUtils');
+    const sgpaList = semesters.map((s) =>
+      s.isManual && s.directSGPA !== null ? s.directSGPA : calculateSGPA(s.subjects)
+    );
+
+    // Credit-weighted CGPA: Σ(SGPA × credits) / Σ(credits)
+    // Only applies when every semester has credit data available
+    const allHaveCredits = semesters.every((s) =>
+      s.isManual ? (s.totalCredits != null && s.totalCredits > 0) : s.subjects?.length > 0
+    );
+
+    let cgpa;
+    if (allHaveCredits) {
+      let weightedSum = 0;
+      let totalCreditsAll = 0;
+      for (const s of semesters) {
+        const sgpa = s.isManual && s.directSGPA !== null ? s.directSGPA : calculateSGPA(s.subjects);
+        const cr = s.isManual ? s.totalCredits : s.subjects.reduce((a, b) => a + (b.credits || 0), 0);
+        weightedSum += sgpa * cr;
+        totalCreditsAll += cr;
+      }
+      cgpa = calculateCGPA.withWeightedTotal(weightedSum, totalCreditsAll);
+    } else {
+      cgpa = calculateCGPA(sgpaList);
+    }
+
     res.json({ cgpa, sgpaList, totalSemesters: semesters.length });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -144,7 +170,7 @@ exports.updateSemester = async (req, res) => {
 // POST /api/marks/semester/manual
 exports.addManualSGPA = async (req, res) => {
   try {
-    const { semesterNumber, semesterName, sgpa } = req.body;
+    const { semesterNumber, semesterName, sgpa, semCredits } = req.body;
   const sgpaNum = Number(sgpa);
     if (isNaN(sgpaNum) || sgpaNum < 0 || sgpaNum > 10)
       return res.status(400).json({ message: 'SGPA must be between 0 and 10' });
@@ -157,6 +183,7 @@ exports.addManualSGPA = async (req, res) => {
       semesterName,
       isManual: true,
       directSGPA: sgpaNum,
+      totalCredits: semCredits ? Number(semCredits) : null,
       subjects: [],
     });
     await semester.save();

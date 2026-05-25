@@ -40,7 +40,7 @@ const getCGPA = async (userId) => {
     totalWt += m.gradePoint * cr;
     totalCr += cr;
   }
-  return totalCr ? +(totalWt / totalCr).toFixed(2) : 0;
+  return totalCr ? Math.round((totalWt / totalCr + Number.EPSILON) * 100) / 100 : 0;
 };
 
 const getCareerData = async (userId) => {

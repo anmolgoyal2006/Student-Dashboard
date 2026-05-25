@@ -51,6 +51,10 @@ const SemesterSchema = new mongoose.Schema(
       type: Number,
       default: null,
     },
+    totalCredits: {
+      type: Number,
+      default: null,
+    },
     sgpa: {
       type: Number,
       default: 0,
