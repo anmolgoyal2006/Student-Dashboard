@@ -179,7 +179,7 @@ export default function UploadMarks({ onResult }) {
     setBestOfGroups((prev) =>
       prev.map((g) => {
         if (g.id !== groupId) return g;
-        return { ...g, items: [...g.items, { sourceId: firstSrc?.id || '', columnName: firstCol }] };
+        return { ...g, items: [...(g.items || []), { sourceId: firstSrc?.id || '', columnName: firstCol, outOf: '' }] };
       })
     );
   };
@@ -261,10 +261,14 @@ export default function UploadMarks({ onResult }) {
       const bestOfConfigs = bestOfGroups
         .filter((g) => (g.items || []).length >= 1)
         .map((g) => ({
-          items: (g.items || []).map((item) => ({
-            sourceId: item.sourceId,
-            columnName: item.columnName,
-          })),
+          items: (g.items || []).map((item) => {
+            const outOf = parseFloat(item.outOf);
+            return {
+              sourceId: item.sourceId,
+              columnName: item.columnName,
+              ...(isFinite(outOf) && outOf > 0 ? { outOf } : {}),
+            };
+          }),
           bestOf: Math.max(1, parseInt(g.bestOf, 10) || 2),
         }));
 
@@ -563,6 +567,15 @@ export default function UploadMarks({ onResult }) {
                               </option>
                             ))}
                           </select>
+                          <input
+                            className="form-input"
+                            type="number"
+                            min="0"
+                            placeholder="out of"
+                            value={item.outOf || ''}
+                            onChange={(e) => updateItemInGroup(g.id, idx, { outOf: e.target.value === '' ? '' : parseFloat(e.target.value) || '' })}
+                            style={{ width: 70, fontSize: 12, textAlign: 'center' }}
+                          />
                           <button
                             type="button"
                             className="btn btn-outline btn-sm"

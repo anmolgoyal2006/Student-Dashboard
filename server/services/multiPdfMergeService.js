@@ -227,7 +227,12 @@ function mergeSourcesAndScore(sources, bestOfConfigs = []) {
         const cache = sourceLookups.get(item.sourceId);
         if (!cache) return 0;
         const studentData = findFullStudent(entry, cache.fullLookup);
-        return studentData?.breakdown?.[item.columnName]?.score ?? 0;
+        const colScore = studentData?.breakdown?.[item.columnName];
+        if (!colScore) return 0;
+        if (item.outOf) {
+          return (colScore.raw / (colScore.max || 1)) * item.outOf;
+        }
+        return colScore.score ?? 0;
       });
 
       const validScores = rawScores.filter(
