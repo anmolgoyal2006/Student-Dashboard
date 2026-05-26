@@ -288,7 +288,8 @@ async function generateLeaderboardHandler(req, res) {
       return res.status(400).json({ message: 'Each source must have a numeric weight.' });
     }
 
-    let result = mergeSourcesAndScore(normalized);
+    const bestOfConfigs = Array.isArray(req.body?.bestOfConfigs) ? req.body.bestOfConfigs : [];
+    let result = mergeSourcesAndScore(normalized, bestOfConfigs);
 
     // Apply Relative Grading if enabled
     const relativeGradingEnabled = req.body?.relativeGradingEnabled === true || req.body?.relativeGradingEnabled === 'true';

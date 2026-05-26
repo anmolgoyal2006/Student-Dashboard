@@ -31,6 +31,7 @@ export default function UploadMarks({ onResult }) {
   const [loading, setLoading]       = useState(false);
   const [error, setError]           = useState('');
 
+  const [bestOfGroups, setBestOfGroups] = useState([]);
   const [relativeGradingEnabled, setRelativeGradingEnabled] = useState(false);
   const [gradeCounts, setGradeCounts] = useState({
     'A+': 0, 'A': 0, 'B+': 0, 'B': 0, 'C+': 0, 'C': 0, 'D': 0, 'F': 0
@@ -147,8 +148,44 @@ export default function UploadMarks({ onResult }) {
 
   const removeSource = (id) => {
     setSources((prev) => prev.filter((s) => s.id !== id));
+    setBestOfGroups((prev) =>
+      prev.map((g) => ({
+        ...g,
+        sourceIds: g.sourceIds.filter((sid) => sid !== id),
+      })).filter((g) => g.sourceIds.length > 0)
+    );
     setLeaderboard(null);
     onResult?.(null);
+  };
+
+  const addBestOfGroup = () => {
+    setBestOfGroups((prev) => [
+      ...prev,
+      { id: `bg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`, bestOf: 2, sourceIds: [] },
+    ]);
+  };
+
+  const updateBestOfGroup = (id, patch) => {
+    setBestOfGroups((prev) => prev.map((g) => (g.id === id ? { ...g, ...patch } : g)));
+  };
+
+  const removeBestOfGroup = (id) => {
+    setBestOfGroups((prev) => prev.filter((g) => g.id !== id));
+  };
+
+  const toggleSourceInGroup = (groupId, sourceId) => {
+    setBestOfGroups((prev) =>
+      prev.map((g) => {
+        if (g.id !== groupId) return g;
+        const has = g.sourceIds.includes(sourceId);
+        return {
+          ...g,
+          sourceIds: has
+            ? g.sourceIds.filter((sid) => sid !== sourceId)
+            : [...g.sourceIds, sourceId],
+        };
+      })
+    );
   };
 
   const handleGenerate = async () => {
@@ -177,17 +214,27 @@ export default function UploadMarks({ onResult }) {
     setError('');
 
     try {
+      const bestOfConfigs = bestOfGroups
+        .filter((g) => g.sourceIds.length >= 1)
+        .map((g) => ({
+          sourceIds: g.sourceIds,
+          bestOf: Math.max(1, parseInt(g.bestOf, 10) || 2),
+        }));
+
+      const groupedIds = new Set(bestOfConfigs.flatMap((c) => c.sourceIds));
+
       const payload = {
         sources: sources.map((s) => ({
           id              : s.id,
           label           : s.label.trim(),
-          weight          : getSourceFileWeight(s),
+          weight          : groupedIds.has(s.id) ? 0 : getSourceFileWeight(s),
           columns         : s.columns,
           studentRows     : s.studentLimit ? s.studentRows.slice(0, s.studentLimit) : s.studentRows,
           selectedColumns : s.selectedColumns,
           columnWeights   : s.columnWeights,
           studentLimit    : s.studentLimit || s.studentRows.length,
         })),
+        bestOfConfigs,
         relativeGradingEnabled,
         gradeCounts,
       };
@@ -230,6 +277,7 @@ export default function UploadMarks({ onResult }) {
 
   const handleReset = () => {
     setSources([]);
+    setBestOfGroups([]);
     setLeaderboard(null);
     setError('');
     onResult?.(null);
@@ -372,6 +420,90 @@ export default function UploadMarks({ onResult }) {
               ))}
             </div>
 
+            {sources.length >= 1 && (
+              <div
+                style={{
+                  marginTop: 8,
+                  marginBottom: 12,
+                  padding: 14,
+                  borderRadius: 10,
+                  border: '1px solid var(--border)',
+                  background: 'rgba(52,211,153,0.04)',
+                }}
+              >
+                <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 8 }}>
+                  🎯 Best-Of Groups
+                </div>
+                <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 10 }}>
+                  Group multiple PDFs so each student&apos;s <strong>top N</strong> scores are used
+                  (e.g. best 2 out of 3 midterms). Sources in a group skip weighted averaging.
+                </p>
+
+                {bestOfGroups.map((g) => (
+                  <div
+                    key={g.id}
+                    style={{
+                      padding: 10,
+                      borderRadius: 8,
+                      border: '1px solid var(--border)',
+                      marginBottom: 8,
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 13, fontWeight: 600 }}>Best</span>
+                        <input
+                          className="form-input"
+                          type="number"
+                          min="1"
+                          max={sources.length}
+                          value={g.bestOf}
+                          onChange={(e) => updateBestOfGroup(g.id, { bestOf: Math.max(1, parseInt(e.target.value) || 1) })}
+                          style={{ width: 60, textAlign: 'center' }}
+                        />
+                        <span style={{ fontSize: 13 }}>of {sources.length} ({g.sourceIds.length} selected)</span>
+                      </div>
+                      <button
+                        type="button"
+                        className="btn btn-outline btn-sm"
+                        style={{ fontSize: 11, flexShrink: 0 }}
+                        onClick={() => removeBestOfGroup(g.id)}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                      {sources.map((src) => {
+                        const selected = g.sourceIds.includes(src.id);
+                        return (
+                          <button
+                            key={src.id}
+                            type="button"
+                            onClick={() => toggleSourceInGroup(g.id, src.id)}
+                            style={{
+                              padding: '4px 10px',
+                              borderRadius: 6,
+                              fontSize: 12,
+                              border: `1px solid ${selected ? '#34d399' : 'var(--border)'}`,
+                              background: selected ? 'rgba(52,211,153,0.15)' : 'transparent',
+                              color: selected ? '#34d399' : 'var(--text)',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            {selected ? '✓ ' : ''}{src.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+
+                <button className="btn btn-outline btn-sm" onClick={addBestOfGroup}>
+                  + Add Group
+                </button>
+              </div>
+            )}
+
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
               <button
                 className="btn btn-primary"
@@ -433,20 +565,26 @@ export default function UploadMarks({ onResult }) {
                 fontSize: 12,
               }}
             >
-              {leaderboard.sources.map((s) => (
-                <span
-                  key={s.id || s.label}
-                  style={{
-                    padding: '4px 10px',
-                    borderRadius: 6,
-                    background: 'rgba(129,140,248,0.1)',
-                    border: '1px solid rgba(129,140,248,0.25)',
-                    color: '#a5b4fc',
-                  }}
-                >
-                  {s.label}: w={s.weight} ({s.normalizedWeight * 100}%)
-                </span>
-              ))}
+              {leaderboard.sources.map((s) => {
+                const isBestOf = s.isBestOf || s.bestOfGroup;
+                return (
+                  <span
+                    key={s.id || s.label}
+                    style={{
+                      padding: '4px 10px',
+                      borderRadius: 6,
+                      background: isBestOf ? 'rgba(52,211,153,0.1)' : 'rgba(129,140,248,0.1)',
+                      border: `1px solid ${isBestOf ? 'rgba(52,211,153,0.25)' : 'rgba(129,140,248,0.25)'}`,
+                      color: isBestOf ? '#34d399' : '#a5b4fc',
+                    }}
+                  >
+                    {s.label}{isBestOf
+                      ? ` (best ${s.bestOfGroup.bestOf}/${s.bestOfGroup.total})`
+                      : `: w=${s.weight} (${Math.round(s.normalizedWeight * 100)}%)`
+                    }
+                  </span>
+                );
+              })}
             </div>
           )}
           <Leaderboard
