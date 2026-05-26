@@ -1,6 +1,6 @@
 /**
  * Merge multiple PDF sources — format-agnostic student matching.
- * Supports best-of groups (e.g. best 2 out of 3).
+ * Supports column-level best-of groups (e.g. best 3 out of 4 quizzes across PDFs).
  */
 
 const { rankStudents, buildLeaderboard } = require('./rankingService');
@@ -16,22 +16,69 @@ const {
 const round2 = (n) => Math.round(n * 100) / 100;
 
 /**
+ * Build a student lookup that returns the full student object (with breakdown).
+ */
+function buildFullStudentLookup(students) {
+  const bySid = new Map();
+  const byRoll = new Map();
+  const byName = new Map();
+  const nameList = [];
+
+  for (const st of students || []) {
+    const roll = normalizeRoll(st.roll);
+    const nk = normalizeName(st.name);
+    if (roll && /^\d{5,12}$/.test(roll) && !bySid.has(roll)) bySid.set(roll, st);
+    else if (roll && !byRoll.has(roll)) byRoll.set(roll, st);
+    if (nk && !byName.has(nk)) {
+      byName.set(nk, st);
+      nameList.push({ nk, name: st.name, s: st });
+    }
+  }
+  return { bySid, byRoll, byName, nameList };
+}
+
+function findFullStudent(entry, lookup) {
+  const roll = normalizeRoll(entry.roll);
+  if (roll && /^\d{5,12}$/.test(roll) && lookup.bySid.has(roll)) return lookup.bySid.get(roll);
+  if (roll && lookup.byRoll.has(roll)) return lookup.byRoll.get(roll);
+  const nk = normalizeName(entry.name);
+  if (nk && lookup.byName.has(nk)) return lookup.byName.get(nk);
+  for (const { name, s } of lookup.nameList) {
+    if (fuzzyNameMatch(entry.name, name)) return s;
+  }
+  return null;
+}
+
+/**
  * @param {Object[]} sources         - Normalized PDF sources
  * @param {Object[]} [bestOfConfigs] - Best-of group definitions
- *   [{ sourceIds: string[], bestOf: number }]
+ *   [{ bestOf: number, items: [{ sourceId, columnName }] }]
  */
 function mergeSourcesAndScore(sources, bestOfConfigs = []) {
   if (!sources?.length) throw new Error('At least one PDF source is required.');
 
-  // Sources that belong to best-of groups are excluded from weight calculation
-  const groupedIds = new Set();
+  // ── Track which (sourceId, columnName) pairs are in best-of groups ──
+  const groupedColumns = new Map(); // sourceId → Set<columnName>
   for (const cfg of bestOfConfigs) {
-    for (const sid of (cfg.sourceIds || [])) {
-      groupedIds.add(sid);
+    for (const item of (cfg.items || [])) {
+      if (!groupedColumns.has(item.sourceId)) {
+        groupedColumns.set(item.sourceId, new Set());
+      }
+      groupedColumns.get(item.sourceId).add(item.columnName);
     }
   }
 
-  const ungrouped = sources.filter((s) => !groupedIds.has(s.id));
+  const hasGroupedColumns = (sid) => groupedColumns.has(sid) && groupedColumns.get(sid).size > 0;
+
+  // Sources that have ALL selected columns in best-of groups → excluded from non-grouped scoring
+  const isFullyGrouped = (s) => {
+    if (!hasGroupedColumns(s.id)) return false;
+    const grouped = groupedColumns.get(s.id);
+    const selected = s.selectedColumns || s.columns.map((c) => c.name);
+    return selected.every((col) => grouped.has(col));
+  };
+
+  const ungrouped = sources.filter((s) => !isFullyGrouped(s));
   const weights = ungrouped.map((s) => Number(s.weight) || 0);
   const totalWeight = weights.reduce((a, b) => a + b, 0);
 
@@ -100,16 +147,35 @@ function mergeSourcesAndScore(sources, bestOfConfigs = []) {
     entry.totalScore = 0;
   }
 
-  // ── Process non-grouped sources (current behavior) ───────────────────
+  // ── Process non-grouped sources ─────────────────────────────────────
+  // For sources that have SOME columns in best-of groups, subtract those
+  // column scores so they aren't double-counted.
   let ungroupedIdx = 0;
   for (const source of ungrouped) {
     const label = source.label || `Source ${ungroupedIdx + 1}`;
     const nw = normalizedWeights[ungroupedIdx];
     const w = weights[ungroupedIdx];
     const lookup = buildScoreLookup(source.students);
+    const fullLookup = hasGroupedColumns(source.id)
+      ? buildFullStudentLookup(source.students)
+      : null;
+    const groupedCols = groupedColumns.get(source.id);
 
     for (const entry of studentMap.values()) {
-      const raw = lookupScore(entry, lookup) || 0;
+      let raw = lookupScore(entry, lookup) || 0;
+
+      // Subtract scores of columns that are in best-of groups
+      if (fullLookup && groupedCols) {
+        const studentData = findFullStudent(entry, fullLookup);
+        if (studentData?.breakdown) {
+          for (const colName of groupedCols) {
+            const colScore = studentData.breakdown[colName]?.score ?? 0;
+            raw -= colScore;
+          }
+        }
+      }
+
+      raw = Math.max(0, raw);
       entry.marksByLabel[label] = raw;
       entry.breakdown[label] = {
         raw,
@@ -122,19 +188,48 @@ function mergeSourcesAndScore(sources, bestOfConfigs = []) {
     ungroupedIdx++;
   }
 
-  // ── Process best-of groups ─────────────────────────────────────────
+  // ── Process best-of groups (column-level) ──────────────────────────
   const processedGroups = [];
-  for (const cfg of bestOfConfigs) {
-    const { sourceIds, bestOf } = cfg;
-    const groupSources = sourceIds
-      .map((id) => sources.find((s) => s.id === id))
-      .filter(Boolean);
+  const bestOfItemMeta = []; // { groupIdx, itemIndex, srcId, colName }
 
-    const groupLabel = groupSources.map((s) => s.label).join(' / ');
-    const lookups = groupSources.map((s) => buildScoreLookup(s.students));
+  for (let gi = 0; gi < bestOfConfigs.length; gi++) {
+    const cfg = bestOfConfigs[gi];
+    const { bestOf, items } = cfg;
+    if (!items || items.length === 0) continue;
+
+    // Build a lookup per unique sourceId among items
+    const sourceLookups = new Map(); // sourceId → { fullLookup, source }
+    for (const item of items) {
+      if (!sourceLookups.has(item.sourceId)) {
+        const src = sources.find((s) => s.id === item.sourceId);
+        if (src) {
+          sourceLookups.set(item.sourceId, {
+            source: src,
+            fullLookup: buildFullStudentLookup(src.students),
+          });
+        }
+      }
+    }
+
+    const groupLabel = [...new Set(items.map((i) => {
+      const src = sources.find((s) => s.id === i.sourceId);
+      return src ? `${src.label} · ${i.columnName}` : i.columnName;
+    }))].join(' / ');
+
+    // Map column scores to human-readable labels for the breakdown
+    const scoreLabels = items.map((item) => {
+      const src = sources.find((s) => s.id === item.sourceId);
+      return src ? `${src.label} · ${item.columnName}` : item.columnName;
+    });
 
     for (const entry of studentMap.values()) {
-      const rawScores = lookups.map((lk) => lookupScore(entry, lk));
+      const rawScores = items.map((item) => {
+        const cache = sourceLookups.get(item.sourceId);
+        if (!cache) return 0;
+        const studentData = findFullStudent(entry, cache.fullLookup);
+        return studentData?.breakdown?.[item.columnName]?.score ?? 0;
+      });
+
       const validScores = rawScores.filter(
         (s) => s !== null && s !== undefined && !isNaN(s)
       );
@@ -142,18 +237,18 @@ function mergeSourcesAndScore(sources, bestOfConfigs = []) {
       const topN = sorted.slice(0, Math.min(bestOf, sorted.length));
       const groupScore = topN.reduce((a, b) => a + b, 0);
 
-      // Store individual source scores in marksByLabel
-      groupSources.forEach((src, idx) => {
-        entry.marksByLabel[src.label] = rawScores[idx];
+      // Store individual column scores in marksByLabel
+      scoreLabels.forEach((label, idx) => {
+        entry.marksByLabel[label] = rawScores[idx];
       });
 
       // Store the best-of combined breakdown
-      entry.breakdown[groupLabel] = {
+      entry.breakdown[`🎯 ${groupLabel}`] = {
         raw: rawScores,
         bestOf: {
           selected: topN,
           n: bestOf,
-          total: groupSources.length,
+          total: items.length,
         },
         score: round2(groupScore),
       };
@@ -163,8 +258,12 @@ function mergeSourcesAndScore(sources, bestOfConfigs = []) {
     processedGroups.push({
       label: groupLabel,
       bestOf,
-      sourceCount: groupSources.length,
-      sourceIds: groupSources.map((s) => s.id),
+      itemCount: items.length,
+      items: items.map((item) => ({
+        sourceId: item.sourceId,
+        columnName: item.columnName,
+        sourceLabel: sources.find((s) => s.id === item.sourceId)?.label || '',
+      })),
     });
   }
 
@@ -179,20 +278,51 @@ function mergeSourcesAndScore(sources, bestOfConfigs = []) {
 
   const ranked = rankStudents(scoredStudents);
 
+  const allSourceIds = new Set(sources.map((s) => s.id));
+  const sourceMeta = sources.map((s, i) => {
+    const gCols = groupedColumns.get(s.id);
+    const isPartiallyGrouped = gCols && gCols.size > 0;
+    const fullyGrouped = isFullyGrouped(s);
+    const group = bestOfConfigs.find((g) =>
+      (g.items || []).some((item) => item.sourceId === s.id)
+    );
+    return {
+      id               : s.id,
+      label            : s.label || `Source ${i + 1}`,
+      weight           : fullyGrouped ? 0 : (weights[ungrouped.indexOf(s)] || 0),
+      normalizedWeight : fullyGrouped
+        ? 0
+        : round2(normalizedWeights[ungrouped.indexOf(s)] || 0),
+      studentCount     : (s.students || []).length,
+      isBestOf         : isPartiallyGrouped,
+      bestOfColumns    : isPartiallyGrouped ? [...gCols] : undefined,
+      bestOfGroup      : group
+        ? { bestOf: group.bestOf, total: group.items.length }
+        : undefined,
+    };
+  });
+
   const labels = sources.map((s, i) => s.label || `Source ${i + 1}`);
   const metaColumns = labels.map((label, i) => {
-    const isGrouped = groupedIds.has(sources[i].id);
-    // Find the group this source belongs to
-    const group = bestOfConfigs.find((g) => (g.sourceIds || []).includes(sources[i].id));
+    const src = sources[i];
+    const gCols = groupedColumns.get(src.id);
+    const isPartiallyGrouped = gCols && gCols.size > 0;
+    const fullyGrouped = isFullyGrouped(src);
+    const group = bestOfConfigs.find((g) =>
+      (g.items || []).some((item) => item.sourceId === src.id)
+    );
     return {
       name             : label,
-      max              : isGrouped ? 0 : (weights[ungrouped.indexOf(sources[i])] || 0),
-      effectiveWeight  : isGrouped ? 0 : (weights[ungrouped.indexOf(sources[i])] || 0),
-      normalizedWeight : isGrouped
+      max              : fullyGrouped ? 0 : (weights[ungrouped.indexOf(src)] || 0),
+      effectiveWeight  : fullyGrouped ? 0 : (weights[ungrouped.indexOf(src)] || 0),
+      normalizedWeight : fullyGrouped
         ? 0
-        : round2(normalizedWeights[ungrouped.indexOf(sources[i])] || 0),
-      isBestOf         : isGrouped,
-      bestOfGroup      : group ? { bestOf: group.bestOf, total: group.sourceIds.length } : undefined,
+        : round2(normalizedWeights[ungrouped.indexOf(src)] || 0),
+      isBestOf         : isPartiallyGrouped,
+      bestOfColumns    : isPartiallyGrouped ? [...gCols] : undefined,
+      bestOfGroup      : group
+        ? { bestOf: group.bestOf, total: group.items.length }
+        : undefined,
     };
   });
 
@@ -202,23 +332,7 @@ function mergeSourcesAndScore(sources, bestOfConfigs = []) {
     leaderboard     : [entry],
     rankedStudents  : ranked,
     totalStudents   : ranked.length,
-    sources         : sources.map((s, i) => {
-      const isGrouped = groupedIds.has(s.id);
-      const group = bestOfConfigs.find((g) => (g.sourceIds || []).includes(s.id));
-      return {
-        id               : s.id,
-        label            : s.label || `Source ${i + 1}`,
-        weight           : isGrouped ? 0 : (weights[ungrouped.indexOf(s)] || 0),
-        normalizedWeight : isGrouped
-          ? 0
-          : round2(normalizedWeights[ungrouped.indexOf(s)] || 0),
-        studentCount     : (s.students || []).length,
-        isBestOf         : isGrouped,
-        bestOfGroup      : group
-          ? { bestOf: group.bestOf, total: group.sourceIds.length }
-          : undefined,
-      };
-    }),
+    sources         : sourceMeta,
     bestOfGroups    : processedGroups,
   };
 }

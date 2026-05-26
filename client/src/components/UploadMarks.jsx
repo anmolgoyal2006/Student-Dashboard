@@ -151,8 +151,8 @@ export default function UploadMarks({ onResult }) {
     setBestOfGroups((prev) =>
       prev.map((g) => ({
         ...g,
-        sourceIds: g.sourceIds.filter((sid) => sid !== id),
-      })).filter((g) => g.sourceIds.length > 0)
+        items: g.items.filter((item) => item.sourceId !== id),
+      })).filter((g) => g.items.length > 0)
     );
     setLeaderboard(null);
     onResult?.(null);
@@ -161,7 +161,7 @@ export default function UploadMarks({ onResult }) {
   const addBestOfGroup = () => {
     setBestOfGroups((prev) => [
       ...prev,
-      { id: `bg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`, bestOf: 2, sourceIds: [] },
+      { id: `bg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`, bestOf: 2, items: [] },
     ]);
   };
 
@@ -173,17 +173,34 @@ export default function UploadMarks({ onResult }) {
     setBestOfGroups((prev) => prev.filter((g) => g.id !== id));
   };
 
-  const toggleSourceInGroup = (groupId, sourceId) => {
+  const addItemToGroup = (groupId) => {
+    const firstSrc = sources[0];
+    const firstCol = firstSrc?.columns?.[0]?.name || '';
     setBestOfGroups((prev) =>
       prev.map((g) => {
         if (g.id !== groupId) return g;
-        const has = g.sourceIds.includes(sourceId);
-        return {
-          ...g,
-          sourceIds: has
-            ? g.sourceIds.filter((sid) => sid !== sourceId)
-            : [...g.sourceIds, sourceId],
-        };
+        return { ...g, items: [...g.items, { sourceId: firstSrc?.id || '', columnName: firstCol }] };
+      })
+    );
+  };
+
+  const updateItemInGroup = (groupId, itemIndex, patch) => {
+    setBestOfGroups((prev) =>
+      prev.map((g) => {
+        if (g.id !== groupId) return g;
+        const items = g.items.map((item, idx) =>
+          idx === itemIndex ? { ...item, ...patch } : item
+        );
+        return { ...g, items };
+      })
+    );
+  };
+
+  const removeItemFromGroup = (groupId, itemIndex) => {
+    setBestOfGroups((prev) =>
+      prev.map((g) => {
+        if (g.id !== groupId) return g;
+        return { ...g, items: g.items.filter((_, idx) => idx !== itemIndex) };
       })
     );
   };
@@ -215,13 +232,19 @@ export default function UploadMarks({ onResult }) {
 
     try {
       const bestOfConfigs = bestOfGroups
-        .filter((g) => g.sourceIds.length >= 1)
+        .filter((g) => g.items.length >= 1)
         .map((g) => ({
-          sourceIds: g.sourceIds,
+          items: g.items.map((item) => ({
+            sourceId: item.sourceId,
+            columnName: item.columnName,
+          })),
           bestOf: Math.max(1, parseInt(g.bestOf, 10) || 2),
         }));
 
-      const groupedIds = new Set(bestOfConfigs.flatMap((c) => c.sourceIds));
+      // All source+column pairs in best-of groups
+      const groupedIds = new Set(
+        bestOfConfigs.flatMap((c) => c.items.map((i) => i.sourceId))
+      );
 
       const payload = {
         sources: sources.map((s) => ({
@@ -456,12 +479,12 @@ export default function UploadMarks({ onResult }) {
                           className="form-input"
                           type="number"
                           min="1"
-                          max={sources.length}
+                          max={Math.max(1, g.items.length)}
                           value={g.bestOf}
                           onChange={(e) => updateBestOfGroup(g.id, { bestOf: Math.max(1, parseInt(e.target.value) || 1) })}
                           style={{ width: 60, textAlign: 'center' }}
                         />
-                        <span style={{ fontSize: 13 }}>of {sources.length} ({g.sourceIds.length} selected)</span>
+                        <span style={{ fontSize: 13 }}>of {g.items.length}</span>
                       </div>
                       <button
                         type="button"
@@ -469,32 +492,60 @@ export default function UploadMarks({ onResult }) {
                         style={{ fontSize: 11, flexShrink: 0 }}
                         onClick={() => removeBestOfGroup(g.id)}
                       >
-                        ✕
+                        ✕ Remove group
                       </button>
                     </div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                      {sources.map((src) => {
-                        const selected = g.sourceIds.includes(src.id);
-                        return (
-                          <button
-                            key={src.id}
-                            type="button"
-                            onClick={() => toggleSourceInGroup(g.id, src.id)}
-                            style={{
-                              padding: '4px 10px',
-                              borderRadius: 6,
-                              fontSize: 12,
-                              border: `1px solid ${selected ? '#34d399' : 'var(--border)'}`,
-                              background: selected ? 'rgba(52,211,153,0.15)' : 'transparent',
-                              color: selected ? '#34d399' : 'var(--text)',
-                              cursor: 'pointer',
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {g.items.map((item, idx) => (
+                        <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                          <select
+                            className="form-input"
+                            value={item.sourceId}
+                            onChange={(e) => {
+                              const src = sources.find((s) => s.id === e.target.value);
+                              const firstCol = src?.columns?.[0]?.name || '';
+                              updateItemInGroup(g.id, idx, { sourceId: e.target.value, columnName: firstCol });
                             }}
+                            style={{ flex: 1, fontSize: 12 }}
                           >
-                            {selected ? '✓ ' : ''}{src.label}
+                            {sources.map((src) => (
+                              <option key={src.id} value={src.id}>
+                                {src.label}
+                              </option>
+                            ))}
+                          </select>
+                          <select
+                            className="form-input"
+                            value={item.columnName}
+                            onChange={(e) => updateItemInGroup(g.id, idx, { columnName: e.target.value })}
+                            style={{ flex: 1, fontSize: 12 }}
+                          >
+                            {(sources.find((s) => s.id === item.sourceId)?.columns || []).map((col) => (
+                              <option key={col.name} value={col.name}>
+                                {col.name} ({col.max})
+                              </option>
+                            ))}
+                          </select>
+                          <button
+                            type="button"
+                            className="btn btn-outline btn-sm"
+                            style={{ fontSize: 11, flexShrink: 0 }}
+                            onClick={() => removeItemFromGroup(g.id, idx)}
+                          >
+                            ✕
                           </button>
-                        );
-                      })}
+                        </div>
+                      ))}
                     </div>
+
+                    <button
+                      className="btn btn-outline btn-sm"
+                      style={{ marginTop: 8 }}
+                      onClick={() => addItemToGroup(g.id)}
+                    >
+                      + Add score
+                    </button>
                   </div>
                 ))}
 
@@ -567,6 +618,7 @@ export default function UploadMarks({ onResult }) {
             >
               {leaderboard.sources.map((s) => {
                 const isBestOf = s.isBestOf || s.bestOfGroup;
+                const colsInfo = s.bestOfColumns?.length ? ` columns: ${s.bestOfColumns.join(', ')}` : '';
                 return (
                   <span
                     key={s.id || s.label}
@@ -579,7 +631,7 @@ export default function UploadMarks({ onResult }) {
                     }}
                   >
                     {s.label}{isBestOf
-                      ? ` (best ${s.bestOfGroup.bestOf}/${s.bestOfGroup.total})`
+                      ? ` (best ${s.bestOfGroup.bestOf}/${s.bestOfGroup.total}${colsInfo})`
                       : `: w=${s.weight} (${Math.round(s.normalizedWeight * 100)}%)`
                     }
                   </span>
