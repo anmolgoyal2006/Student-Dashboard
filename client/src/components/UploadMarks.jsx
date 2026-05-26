@@ -320,11 +320,27 @@ export default function UploadMarks({ onResult }) {
     }
 
     const labels = (leaderboard.sources || sources).map((s) => s.label);
+    const bestOfGroupsMeta = leaderboard.bestOfGroups || [];
+    const bestOfColLabels = bestOfGroupsMeta.map((g, i) =>
+      `Best ${g.bestOf}/${g.itemCount}: ${g.label}`
+    );
+
     const rows = gradedStudents.map((s) => {
       const row = { Rank: s.rank, Name: s.name, Roll: s.roll || '' };
+
       labels.forEach((label) => {
         row[label] = s.breakdown?.[label]?.raw ?? 0;
       });
+
+      bestOfGroupsMeta.forEach((bg, i) => {
+        const key = `🎯 ${bg.label}`;
+        const bd = s.breakdown?.[key];
+        row[bestOfColLabels[i]] = bd?.score ?? 0;
+        if (bd?.bestOf?.selected?.length) {
+          row[`Best ${i + 1} selected`] = bd.bestOf.selected.join(', ');
+        }
+      });
+
       row['Final Score'] = s.totalScore;
       if (relativeGradingEnabled) {
         row['Grade'] = s.grade || 'F';
