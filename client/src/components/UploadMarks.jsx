@@ -151,8 +151,8 @@ export default function UploadMarks({ onResult }) {
     setBestOfGroups((prev) =>
       prev.map((g) => ({
         ...g,
-        items: g.items.filter((item) => item.sourceId !== id),
-      })).filter((g) => g.items.length > 0)
+        items: (g.items || []).filter((item) => item.sourceId !== id),
+      })).filter((g) => (g.items || []).length > 0)
     );
     setLeaderboard(null);
     onResult?.(null);
@@ -188,7 +188,7 @@ export default function UploadMarks({ onResult }) {
     setBestOfGroups((prev) =>
       prev.map((g) => {
         if (g.id !== groupId) return g;
-        const items = g.items.map((item, idx) =>
+        const items = (g.items || []).map((item, idx) =>
           idx === itemIndex ? { ...item, ...patch } : item
         );
         return { ...g, items };
@@ -200,7 +200,7 @@ export default function UploadMarks({ onResult }) {
     setBestOfGroups((prev) =>
       prev.map((g) => {
         if (g.id !== groupId) return g;
-        return { ...g, items: g.items.filter((_, idx) => idx !== itemIndex) };
+        return { ...g, items: (g.items || []).filter((_, idx) => idx !== itemIndex) };
       })
     );
   };
@@ -210,7 +210,26 @@ export default function UploadMarks({ onResult }) {
       setError('Upload at least one PDF first.');
       return;
     }
-    if (totalWeight <= 0) {
+
+    // ── Compute best-of column map (used for validations + payload) ──
+    const bestOfColsBySource = new Map();
+    for (const g of bestOfGroups) {
+      for (const item of (g.items || [])) {
+        if (!bestOfColsBySource.has(item.sourceId)) {
+          bestOfColsBySource.set(item.sourceId, new Set());
+        }
+        bestOfColsBySource.get(item.sourceId).add(item.columnName);
+      }
+    }
+
+    const isSourceCoveredByBestOf = (s) => {
+      const cols = bestOfColsBySource.get(s.id);
+      if (!cols || cols.size === 0) return false;
+      const allSourceCols = new Set((s.columns || []).map((c) => c.name));
+      return [...cols].every((c) => allSourceCols.has(c));
+    };
+
+    if (totalWeight <= 0 && sources.some((s) => !isSourceCoveredByBestOf(s))) {
       setError('Total weight must be greater than zero.');
       return;
     }
@@ -218,11 +237,19 @@ export default function UploadMarks({ onResult }) {
       setError('Every PDF must have a label.');
       return;
     }
-    if (sources.some((s) => !(s.selectedColumns?.length))) {
+    // Allow 0 selected columns if source is fully covered by best-of groups
+    if (sources.some((s) => {
+      if (s.selectedColumns?.length) return false;
+      return !isSourceCoveredByBestOf(s);
+    })) {
       setError('Each PDF must have at least one score column selected.');
       return;
     }
-    if (sources.some((s) => getSourceFileWeight(s) <= 0)) {
+    // Weight check: skip sources fully covered by best-of
+    if (sources.some((s) => {
+      if (isSourceCoveredByBestOf(s)) return false;
+      return getSourceFileWeight(s) <= 0;
+    })) {
       setError('Each PDF must have at least one score with a weight greater than zero.');
       return;
     }
@@ -232,31 +259,40 @@ export default function UploadMarks({ onResult }) {
 
     try {
       const bestOfConfigs = bestOfGroups
-        .filter((g) => g.items.length >= 1)
+        .filter((g) => (g.items || []).length >= 1)
         .map((g) => ({
-          items: g.items.map((item) => ({
+          items: (g.items || []).map((item) => ({
             sourceId: item.sourceId,
             columnName: item.columnName,
           })),
           bestOf: Math.max(1, parseInt(g.bestOf, 10) || 2),
         }));
 
-      // All source+column pairs in best-of groups
       const groupedIds = new Set(
         bestOfConfigs.flatMap((c) => c.items.map((i) => i.sourceId))
       );
 
       const payload = {
-        sources: sources.map((s) => ({
-          id              : s.id,
-          label           : s.label.trim(),
-          weight          : groupedIds.has(s.id) ? 0 : getSourceFileWeight(s),
-          columns         : s.columns,
-          studentRows     : s.studentLimit ? s.studentRows.slice(0, s.studentLimit) : s.studentRows,
-          selectedColumns : s.selectedColumns,
-          columnWeights   : s.columnWeights,
-          studentLimit    : s.studentLimit || s.studentRows.length,
-        })),
+        sources: sources.map((s) => {
+          // Auto-include best-of columns so breakdown data is available
+          const bestOfCols = bestOfColsBySource.get(s.id);
+          let selectedColumns = s.selectedColumns || [];
+          if (bestOfCols) {
+            const merged = new Set(selectedColumns);
+            for (const col of bestOfCols) merged.add(col);
+            selectedColumns = [...merged];
+          }
+          return {
+            id              : s.id,
+            label           : s.label.trim(),
+            weight          : isSourceCoveredByBestOf(s) ? 0 : getSourceFileWeight(s),
+            columns         : s.columns,
+            studentRows     : s.studentLimit ? s.studentRows.slice(0, s.studentLimit) : s.studentRows,
+            selectedColumns,
+            columnWeights   : s.columnWeights,
+            studentLimit    : s.studentLimit || s.studentRows.length,
+          };
+        }),
         bestOfConfigs,
         relativeGradingEnabled,
         gradeCounts,
@@ -479,12 +515,12 @@ export default function UploadMarks({ onResult }) {
                           className="form-input"
                           type="number"
                           min="1"
-                          max={Math.max(1, g.items.length)}
+                          max={Math.max(1, (g.items || []).length)}
                           value={g.bestOf}
                           onChange={(e) => updateBestOfGroup(g.id, { bestOf: Math.max(1, parseInt(e.target.value) || 1) })}
                           style={{ width: 60, textAlign: 'center' }}
                         />
-                        <span style={{ fontSize: 13 }}>of {g.items.length}</span>
+                        <span style={{ fontSize: 13 }}>of {(g.items || []).length}</span>
                       </div>
                       <button
                         type="button"
@@ -497,17 +533,17 @@ export default function UploadMarks({ onResult }) {
                     </div>
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      {g.items.map((item, idx) => (
+                      {(g.items || []).map((item, idx) => (
                         <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                           <select
-                            className="form-input"
+                            className="form-select"
                             value={item.sourceId}
                             onChange={(e) => {
                               const src = sources.find((s) => s.id === e.target.value);
                               const firstCol = src?.columns?.[0]?.name || '';
                               updateItemInGroup(g.id, idx, { sourceId: e.target.value, columnName: firstCol });
                             }}
-                            style={{ flex: 1, fontSize: 12 }}
+                            style={{ flex: 1, fontSize: 12, color: 'var(--text)', background: 'var(--bg-2)' }}
                           >
                             {sources.map((src) => (
                               <option key={src.id} value={src.id}>
@@ -516,10 +552,10 @@ export default function UploadMarks({ onResult }) {
                             ))}
                           </select>
                           <select
-                            className="form-input"
+                            className="form-select"
                             value={item.columnName}
                             onChange={(e) => updateItemInGroup(g.id, idx, { columnName: e.target.value })}
-                            style={{ flex: 1, fontSize: 12 }}
+                            style={{ flex: 1, fontSize: 12, color: 'var(--text)', background: 'var(--bg-2)' }}
                           >
                             {(sources.find((s) => s.id === item.sourceId)?.columns || []).map((col) => (
                               <option key={col.name} value={col.name}>
