@@ -6,6 +6,9 @@ const { sendTodayNotifications } = require('./services/notificationService');
 
 const app = express();
 
+// ─── Health check (before all other middleware/routes) ─────────────────
+app.get('/health', (_req, res) => res.status(200).send('OK'));
+
 const passport = require('./config/passport');
 app.use(passport.initialize());
 
