@@ -16,4 +16,17 @@ const userSchema = new mongoose.Schema({
   fcmToken: { type: String, default: null },  
 }, { timestamps: true });
 
+userSchema.pre('save', function (next) {
+  if (this.sid === '') this.sid = null;
+  if (this.googleId === '') this.googleId = null;
+  next();
+});
+
+userSchema.pre('findOneAndUpdate', function (next) {
+  const update = this.getUpdate();
+  if (update?.$set?.sid === '') update.$set.sid = null;
+  if (update?.sid === '') update.sid = null;
+  next();
+});
+
 module.exports = mongoose.model('User', userSchema);
