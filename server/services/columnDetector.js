@@ -12,6 +12,15 @@ const {
 } = require('./columnClassifier');
 
 const norm = (s) => String(s ?? '').trim().toLowerCase();
+const VALID_GRADES = new Set(['A+', 'A', 'B+', 'B', 'C+', 'C', 'D', 'F']);
+
+function normalizeGradeValue(value) {
+  const grade = String(value ?? '').trim().toUpperCase().replace(/\s+/g, '');
+  if (grade === 'APLUS' || grade === 'A+') return 'A+';
+  if (grade === 'BPLUS' || grade === 'B+') return 'B+';
+  if (grade === 'CPLUS' || grade === 'C+') return 'C+';
+  return grade;
+}
 
 function extractMax(header) {
   const bracketMatch = String(header).match(/[(\[]\s*(\d+(?:\.\d+)?)\s*[)\]]/);
@@ -69,12 +78,31 @@ function resolveIdentity(row, nameKey, rollKey, allHeaders, markHeaders) {
   return { name: name.trim(), roll: roll.trim() };
 }
 
+function resolveGradeKey(rows, allHeaders, nameKey, rollKey, markHeaders) {
+  const skip = new Set([nameKey, rollKey, ...markHeaders].filter(Boolean));
+  const candidates = allHeaders.filter((h) => !skip.has(h));
+
+  const headerMatch = candidates.find((h) => {
+    const n = norm(h);
+    return n.includes('grade') || n.includes('result');
+  });
+  if (headerMatch) return headerMatch;
+
+  return candidates.find((h) => {
+    const values = rows.map((r) => normalizeGradeValue(r[h])).filter(Boolean);
+    if (!values.length) return false;
+    const hits = values.filter((v) => VALID_GRADES.has(v)).length;
+    return hits / values.length >= 0.45;
+  }) || null;
+}
+
 function detectColumns(rawRows) {
   const rows = normalizeRawRows(rawRows);
   if (!rows.length) return { columns: [], studentRows: [] };
 
   const allHeaders = Object.keys(rows[0]);
   const { nameKey, rollKey, markHeaders } = classifyTable(rows);
+  const gradeKey = resolveGradeKey(rows, allHeaders, nameKey, rollKey, markHeaders);
 
   const columns = markHeaders
     .map((header) => {
@@ -104,7 +132,7 @@ function detectColumns(rawRows) {
         marks[col.name] = parseMarkValue(row[col.originalHeader]);
       }
       const { name, roll } = resolveIdentity(row, nameKey, rollKey, allHeaders, markHeaders);
-      return { name, roll, marks };
+      return { name, roll, grade: gradeKey ? normalizeGradeValue(row[gradeKey]) : '', marks };
     })
     .filter((s) => looksLikePersonName(s.name));
 

@@ -6,9 +6,36 @@ const { detectColumns } = require('./columnDetector');
 const { defaultWeights, applyWeights } = require('./weightCalculator');
 
 /**
- * @param {Array<Object>} rawRows - rows from parsePdf.py
+ * @param {Array<Object>} rawRows - rows from parsePdf.py or parseScannedGradePdf
  */
 function studentsFromRawRows(rawRows) {
+  // Detect OCR rows — preserve all fields, bypass column detection
+  const isOcrSource = Array.isArray(rawRows) && rawRows.some((r) => r.source === 'ocr' || r.ocrGradeRaw);
+
+  if (isOcrSource) {
+    const studentRows = rawRows.map((r) => ({
+      name: r.name || 'Unknown Student',
+      roll: r.roll || '',
+      grade: r.grade || '',
+      marks: r.marks || { Grade: r.grade || '' },
+      ocrGradeRaw: r.ocrGradeRaw || '',
+      ocrConfidence: r.ocrConfidence || 0,
+      ocrConfidenceLevel: r.ocrConfidenceLevel || 'low',
+      overallConfidence: r.overallConfidence || 0,
+      gradeImage: r.gradeImage || '',
+      sidImage: r.sidImage || '',
+      source: 'ocr',
+      ocrWarning: r.ocrWarning || '',
+    }));
+
+    return {
+      columns: [{ name: 'Grade', max: 10 }],
+      studentRows,
+      columnWeights: { Grade: 10 },
+      selectedColumns: ['Grade'],
+    };
+  }
+
   const { columns, studentRows } = detectColumns(rawRows);
   if (!studentRows.length) return { columns, studentRows: [], columnWeights: {} };
 

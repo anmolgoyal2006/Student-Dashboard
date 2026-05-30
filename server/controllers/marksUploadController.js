@@ -20,6 +20,9 @@ const {
   computeSourceFileWeight,
 } = require('../services/pdfScoreExtractor');
 const { mergeSourcesAndScore } = require('../services/multiPdfMergeService');
+const { buildSgpaLeaderboard, DEFAULT_CREDITS } = require('../services/sgpaLeaderboardService');
+const { parseScannedGradePdf, normalizeGrade, fuzzyMatchGrade } = require('../services/ocrGradePdfParser');
+const { aiCorrectGrades } = require('../services/aiOcrCorrectionService');
 
 const PARSER_SCRIPT = path.join(__dirname, '../scripts/parsePdf.py');
 
@@ -190,6 +193,9 @@ async function parsePdfsHandler(req, res) {
       let rawRows;
       try {
         rawRows = await parsePdfWithPython(file.buffer);
+        if (!rawRows.length) {
+          rawRows = await parseScannedGradePdf(file.buffer);
+        }
       } catch (err) {
         return res.status(422).json({
           message: `Failed to parse "${file.originalname}".`,
@@ -209,6 +215,7 @@ async function parsePdfsHandler(req, res) {
         id              : `pdf_${Date.now()}_${i}_${Math.random().toString(36).slice(2, 8)}`,
         fileName        : file.originalname,
         label           : defaultLabelFromFilename(file.originalname, i),
+        credits         : DEFAULT_CREDITS,
         columns         : parsed.columns.map((c) => ({ name: c.name, max: c.max })),
         studentRows     : parsed.studentRows,
         columnWeights   : parsed.columnWeights,
@@ -353,9 +360,133 @@ async function generateLeaderboardHandler(req, res) {
   }
 }
 
+async function generateSgpaLeaderboardHandler(req, res) {
+  try {
+    let sources = req.body?.sources;
+    if (typeof sources === 'string') {
+      try {
+        sources = JSON.parse(sources);
+      } catch {
+        return res.status(400).json({ message: 'sources must be valid JSON.' });
+      }
+    }
+
+    if (!Array.isArray(sources) || sources.length === 0) {
+      return res.status(400).json({ message: 'sources array is required.' });
+    }
+
+    const normalized = sources.map((s, i) => ({
+      id: s.id || `source_${i}`,
+      fileName: s.fileName || `PDF ${i + 1}`,
+      label: String(s.label || s.fileName || `Subject ${i + 1}`).trim() || `Subject ${i + 1}`,
+      credits: s.credits === '' || s.credits === undefined ? DEFAULT_CREDITS : Number(s.credits),
+      studentRows: Array.isArray(s.studentRows) ? s.studentRows : [],
+    }));
+
+    const result = buildSgpaLeaderboard(normalized);
+
+    if (req.query.exportExcel === 'true') {
+      const XLSX = require('xlsx');
+      const rows = result.rankedStudents.map((s) => ({
+        Rank: s.rank,
+        SID: s.sid || '',
+        'Roll Number': s.roll || '',
+        'Student Name': s.name,
+        SGPA: s.sgpa,
+        'Total Credits': s.totalCredits,
+        'Subjects Count': s.subjectsCount,
+      }));
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'SGPA Leaderboard');
+      const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+      res.setHeader('Content-Disposition', 'attachment; filename=sgpa-leaderboard.xlsx');
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      return res.send(buffer);
+    }
+
+    return res.json({ method: 'sgpa-multi-pdf', ...result });
+  } catch (err) {
+    console.error('[generate-sgpa-leaderboard]', err);
+    const message = err.message || 'Unexpected server error.';
+    return res.status(message.includes('Credits') ? 400 : 500).json({ message });
+  }
+}
+
+/* ── AI-powered OCR grade correction ─────────────────────────────────── */
+async function ocrAiCorrectHandler(req, res) {
+  try {
+    const { students } = req.body;
+    if (!Array.isArray(students) || !students.length) {
+      return res.status(400).json({ message: 'students array is required.' });
+    }
+
+    const corrections = await aiCorrectGrades(students);
+    return res.json({ corrections });
+  } catch (err) {
+    console.error('[ocr-ai-correct]', err);
+    return res.status(500).json({ message: err.message || 'Unexpected server error.' });
+  }
+}
+
+/* ── Save OCR review corrections and generate SGPA leaderboard ───────── */
+async function ocrReviewGenerateHandler(req, res) {
+  try {
+    const { sources, correctedGrades } = req.body;
+    if (!Array.isArray(sources) || !sources.length) {
+      return res.status(400).json({ message: 'sources array is required.' });
+    }
+
+    const correctedMap = new Map();
+    if (Array.isArray(correctedGrades)) {
+      for (const cg of correctedGrades) {
+        if (cg.roll && cg.grade) {
+          const fuzzy = fuzzyMatchGrade(cg.grade);
+          correctedMap.set(cg.roll, fuzzy.grade || cg.grade);
+        }
+      }
+    }
+
+    const normalized = sources.map((s, i) => {
+      const label = String(s.label || s.fileName || `Subject ${i + 1}`).trim() || `Subject ${i + 1}`;
+      const credits = Number(s.credits ?? DEFAULT_CREDITS);
+
+      let studentRows = Array.isArray(s.studentRows) ? s.studentRows : [];
+      if (correctedMap.size > 0) {
+        studentRows = studentRows.map((row) => {
+          const corrected = correctedMap.get(row.roll);
+          if (corrected) {
+            return { ...row, grade: corrected, marks: { ...row.marks, Grade: corrected } };
+          }
+          return row;
+        });
+      }
+
+      return {
+        id: s.id || `source_${i}`,
+        fileName: s.fileName || `PDF ${i + 1}`,
+        label,
+        credits,
+        studentRows,
+      };
+    });
+
+    const result = buildSgpaLeaderboard(normalized);
+
+    return res.json({ method: 'sgpa-ocr-reviewed', ...result });
+  } catch (err) {
+    console.error('[ocr-review-generate]', err);
+    const message = err.message || 'Unexpected server error.';
+    return res.status(message.includes('Credits') ? 400 : 500).json({ message });
+  }
+}
+
 module.exports = {
   uploadPdfHandler,
   parsePdfsHandler,
   generateLeaderboardHandler,
+  generateSgpaLeaderboardHandler,
+  ocrAiCorrectHandler,
+  ocrReviewGenerateHandler,
   parsePdfWithPython,
 };

@@ -21,6 +21,9 @@ const {
   uploadPdfHandler,
   parsePdfsHandler,
   generateLeaderboardHandler,
+  generateSgpaLeaderboardHandler,
+  ocrAiCorrectHandler,
+  ocrReviewGenerateHandler,
 } = require('../controllers/marksUploadController');
 const multer = require('multer');
 const upload = multer({ storage: multer.memoryStorage() });
@@ -46,5 +49,10 @@ router.delete('/semester/:id',   deleteSemester);
 router.post('/upload-pdf', upload.single('file'), uploadPdfHandler);
 router.post('/parse-pdfs', upload.array('files', 20), parsePdfsHandler);
 router.post('/generate-leaderboard', generateLeaderboardHandler);
+router.post('/generate-sgpa-leaderboard', generateSgpaLeaderboardHandler);
+
+// OCR review & AI correction
+router.post('/ocr-ai-correct', ocrAiCorrectHandler);
+router.post('/ocr-review-generate', ocrReviewGenerateHandler);
 
 module.exports = router;

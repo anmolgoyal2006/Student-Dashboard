@@ -63,10 +63,18 @@ export const marksService = {
     }),
   generateLeaderboard: (payload) =>
     apiRequest('post', '/marks/generate-leaderboard', payload),
+  generateSgpaLeaderboard: (payload) =>
+    apiRequest('post', '/marks/generate-sgpa-leaderboard', payload),
   uploadPdf: (formData) =>
     API.post('/marks/upload-pdf', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     }),
+
+  // OCR review & AI correction
+  ocrAiCorrect: (payload) =>
+    apiRequest('post', '/marks/ocr-ai-correct', payload),
+  ocrReviewGenerate: (payload) =>
+    apiRequest('post', '/marks/ocr-review-generate', payload),
 };
 
 // ─── Career ───────────────────────────────────────────────────────────────

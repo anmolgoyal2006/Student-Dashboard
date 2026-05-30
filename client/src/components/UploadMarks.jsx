@@ -11,6 +11,7 @@ import * as XLSX from 'xlsx';
 import Leaderboard from './Leaderboard';
 import MarksFilter from './MarksFilter';
 import WeightInput from './WeightInput';
+import OcrReviewPanel from './OcrReviewPanel';
 import { marksService } from '../services/apiServices';
 
 /** Sum of selected column weights for one PDF (drives file-level weight in merge). */
@@ -36,6 +37,18 @@ export default function UploadMarks({ onResult }) {
   const [gradeCounts, setGradeCounts] = useState({
     'A+': 0, 'A': 0, 'B+': 0, 'B': 0, 'C+': 0, 'C': 0, 'D': 0, 'F': 0
   });
+
+  const [showOcrReview, setShowOcrReview] = useState(false);
+  const [sgpaLeaderboard, setSgpaLeaderboard] = useState(null);
+  const [sgpaLoading, setSgpaLoading] = useState(false);
+  const [ocrCorrectedGrades, setOcrCorrectedGrades] = useState(null);
+
+  const hasOcrSources = useMemo(
+    () => sources.some((src) =>
+      (src.studentRows || []).some((row) => row.source === 'ocr' || row.ocrGradeRaw)
+    ),
+    [sources]
+  );
 
   const gradedStudents = useMemo(() => {
     const rawStudents = leaderboard?.leaderboard?.[0]?.students || [];
@@ -354,10 +367,66 @@ export default function UploadMarks({ onResult }) {
     XLSX.writeFile(wb, 'leaderboard.xlsx');
   };
 
+  const handleOcrReviewProceed = (correctedGrades) => {
+    setOcrCorrectedGrades(correctedGrades);
+    setShowOcrReview(false);
+  };
+
+  const handleGenerateSgpa = async () => {
+    if (!ocrCorrectedGrades) {
+      setError('Please review and save OCR corrections first.');
+      return;
+    }
+    setSgpaLoading(true);
+    setError('');
+    setLeaderboard(null);
+    try {
+      const payload = {
+        sources: sources.map((s) => ({
+          id: s.id,
+          fileName: s.fileName,
+          label: s.label.trim(),
+          credits: s.credits || 4,
+          studentRows: s.studentLimit
+            ? s.studentRows.slice(0, s.studentLimit)
+            : s.studentRows,
+        })),
+        correctedGrades: ocrCorrectedGrades,
+      };
+
+      const res = await marksService.ocrReviewGenerate(payload);
+      setSgpaLeaderboard(res.data);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to generate SGPA leaderboard.');
+    } finally {
+      setSgpaLoading(false);
+    }
+  };
+
+  const handleSgpaDownloadExcel = () => {
+    if (!sgpaLeaderboard?.rankedStudents?.length) return;
+    const rows = sgpaLeaderboard.rankedStudents.map((s) => ({
+      Rank: s.rank,
+      SID: s.sid || '',
+      'Roll Number': s.roll || '',
+      'Student Name': s.name,
+      SGPA: s.sgpa,
+      'Total Credits': s.totalCredits,
+      'Subjects Count': s.subjectsCount,
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'SGPA Leaderboard');
+    XLSX.writeFile(wb, 'sgpa-leaderboard.xlsx');
+  };
+
   const handleReset = () => {
     setSources([]);
     setBestOfGroups([]);
     setLeaderboard(null);
+    setSgpaLeaderboard(null);
+    setShowOcrReview(false);
+    setOcrCorrectedGrades(null);
     setError('');
     onResult?.(null);
   };
@@ -499,6 +568,46 @@ export default function UploadMarks({ onResult }) {
               ))}
             </div>
 
+            {hasOcrSources && !showOcrReview && (
+              <div
+                style={{
+                  marginTop: 8,
+                  marginBottom: 12,
+                  padding: 14,
+                  borderRadius: 10,
+                  border: '1px solid rgba(129,140,248,0.3)',
+                  background: 'rgba(129,140,248,0.05)',
+                }}
+              >
+                <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>
+                  🖊 Handwritten Grades Detected
+                </div>
+                <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 10 }}>
+                  Some sources contain OCR-extracted handwritten grades. Review and correct them
+                  before generating the SGPA leaderboard.
+                </p>
+                <button
+                  className="btn btn-primary"
+                  onClick={() => setShowOcrReview(true)}
+                  disabled={sgpaLoading}
+                >
+                  {ocrCorrectedGrades ? '📝 Re-review OCR Grades' : '🔍 Review OCR Grades'}
+                </button>
+                {ocrCorrectedGrades && (
+                  <span style={{ marginLeft: 10, fontSize: 11, color: '#10b981' }}>
+                    ✓ {ocrCorrectedGrades.length} corrections saved
+                  </span>
+                )}
+              </div>
+            )}
+
+            {showOcrReview && (
+              <OcrReviewPanel
+                sources={sources}
+                onProceed={handleOcrReviewProceed}
+              />
+            )}
+
             {sources.length >= 1 && (
               <div
                 style={{
@@ -626,16 +735,30 @@ export default function UploadMarks({ onResult }) {
                 onClick={handleGenerate}
                 disabled={loading || !sources.length}
               >
-                {loading ? '⏳ Generating…' : '🏆 Generate Leaderboard'}
+                {loading ? '⏳ Generating…' : '🏆 Generate Normal Leaderboard'}
               </button>
+              {ocrCorrectedGrades && (
+                <button
+                  className="btn btn-secondary"
+                  onClick={handleGenerateSgpa}
+                  disabled={sgpaLoading || !sources.length}
+                  style={{
+                    background: 'rgba(16,185,129,0.15)',
+                    border: '1px solid rgba(16,185,129,0.3)',
+                    color: '#10b981',
+                  }}
+                >
+                  {sgpaLoading ? '⏳ Generating…' : '🎓 Generate SGPA Leaderboard from OCR'}
+                </button>
+              )}
               <button
                 className="btn btn-outline"
                 onClick={() => document.getElementById('pdf-multi-input').click()}
-                disabled={loading}
+                disabled={loading || sgpaLoading}
               >
                 + Add more PDFs
               </button>
-              <button className="btn btn-outline" onClick={handleReset} disabled={loading}>
+              <button className="btn btn-outline" onClick={handleReset} disabled={loading || sgpaLoading}>
                 ✕ Clear all
               </button>
             </div>
@@ -719,6 +842,92 @@ export default function UploadMarks({ onResult }) {
             gradeCounts={gradeCounts}
             setGradeCounts={setGradeCounts}
           />
+        </div>
+      )}
+
+      {sgpaLeaderboard && (
+        <div className="card" style={{ marginTop: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <div>
+              <div className="card-title" style={{ margin: 0 }}>🎓 SGPA Leaderboard</div>
+              <div className="text-muted" style={{ fontSize: 13 }}>
+                {sgpaLeaderboard.totalStudents} students ranked by SGPA
+              </div>
+            </div>
+            <button className="btn btn-primary" onClick={handleSgpaDownloadExcel} disabled={sgpaLoading}>
+              ⬇ Download Excel
+            </button>
+          </div>
+
+          {/* Stats */}
+          {sgpaLeaderboard.stats && (
+            <div style={{
+              display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 16,
+              padding: 12, borderRadius: 10,
+              background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)',
+            }}>
+              <div style={{ fontSize: 12 }}>🏆 Highest: <strong>{sgpaLeaderboard.stats.highestSGPA}</strong></div>
+              <div style={{ fontSize: 12 }}>📉 Lowest: <strong>{sgpaLeaderboard.stats.lowestSGPA}</strong></div>
+              <div style={{ fontSize: 12 }}>📊 Average: <strong>{sgpaLeaderboard.stats.averageSGPA}</strong></div>
+              <div style={{ fontSize: 12 }}>📈 Median: <strong>{sgpaLeaderboard.stats.medianSGPA}</strong></div>
+            </div>
+          )}
+
+          {/* Sources */}
+          {sgpaLeaderboard.sources?.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14, fontSize: 12 }}>
+              {sgpaLeaderboard.sources.map((s) => (
+                <span key={s.id || s.label} style={{
+                  padding: '4px 10px', borderRadius: 6,
+                  background: 'rgba(129,140,248,0.1)',
+                  border: '1px solid rgba(129,140,248,0.25)',
+                  color: '#a5b4fc',
+                }}>
+                  {s.label}: {s.validGradeCount} students, {s.credits}cr
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* Table */}
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Rank</th>
+                  <th>Name</th>
+                  <th>SID / Roll</th>
+                  <th>SGPA</th>
+                  <th>Subjects</th>
+                  <th>Credits</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sgpaLeaderboard.rankedStudents.map((s, i) => {
+                  const medal = s.rank === 1 ? '🥇' : s.rank === 2 ? '🥈' : s.rank === 3 ? '🥉' : `#${s.rank}`;
+                  return (
+                    <tr key={s.sid || s.roll || i} style={{
+                      background: s.rank <= 3 ? 'rgba(250,204,21,0.04)' : 'transparent',
+                    }}>
+                      <td style={{ fontWeight: 700 }}>{medal}</td>
+                      <td style={{ fontWeight: s.rank <= 3 ? 600 : 400 }}>{s.name}</td>
+                      <td style={{ color: 'var(--muted)', fontSize: 13 }}>{s.roll || s.sid || '—'}</td>
+                      <td>
+                        <span style={{
+                          fontWeight: 700,
+                          color: s.sgpa >= 9 ? '#10b981' : s.sgpa >= 7 ? '#3b82f6' : s.sgpa >= 5 ? '#f59e0b' : '#ef4444',
+                        }}>
+                          {s.sgpa.toFixed(2)}
+                        </span>
+                      </td>
+                      <td style={{ fontSize: 12, color: 'var(--muted)' }}>{s.subjectsCount}</td>
+                      <td style={{ fontSize: 12, color: 'var(--muted)' }}>{s.totalCredits}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </>
