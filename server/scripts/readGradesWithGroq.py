@@ -26,16 +26,15 @@ def read_grade_from_image(image_path):
     ext = 'image/png' if image_path.lower().endswith('.png') else 'image/jpeg'
     
     payload = json.dumps({
-      'model': 'meta-llama/llama-4-scout-17b-16e-instruct',
-        'messages': [{
-            'role': 'user',
-            'content': [
+        'contents': [{
+            'parts': [
                 {
-                    'type': 'image_url',
-                    'image_url': {'url': f'data:{ext};base64,{b64}'}
+                    'inline_data': {
+                        'mime_type': ext,
+                        'data': b64
+                    }
                 },
                 {
-                    'type': 'text',
                     'text': (
                         'This is a cropped cell from a handwritten university grade sheet.\n'
                         'The cell contains exactly ONE handwritten letter grade.\n'
@@ -49,32 +48,35 @@ def read_grade_from_image(image_path):
                 }
             ]
         }],
-        'temperature': 0,
-        'max_tokens': 10
+        'generationConfig': {'temperature': 0, 'maxOutputTokens': 10}
     }).encode('utf-8')
     
     req = urllib.request.Request(
-        'https://api.groq.com/openai/v1/chat/completions',
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent',
         data=payload,
-       headers={
-            'Authorization': f'Bearer {GROQ_API_KEY}',
+        headers={
             'Content-Type': 'application/json',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            'X-goog-api-key': GROQ_API_KEY
         }
     )
     
     try:
         with urllib.request.urlopen(req, timeout=15) as resp:
             result = json.loads(resp.read().decode('utf-8'))
-            raw = result['choices'][0]['message']['content'].strip()
+            raw = result['candidates'][0]['content']['parts'][0]['text'].strip()
             return normalize_grade(raw)
     except urllib.error.HTTPError as e:
         body = e.read().decode('utf-8')
         if e.code == 429:
             try:
-                wait = float(json.loads(body)['error']['message'].split('try again in ')[1].split('s')[0].strip())
+                retry_delay = json.loads(body).get('error', {}).get('details', [{}])
+                wait = 5  # default
+                for d in retry_delay:
+                    if 'retryDelay' in str(d):
+                        wait = float(str(d).split('retryDelay')[1].split("'")[1].replace('s',''))
+                        break
             except Exception:
-                wait = 3
+                wait = 5
             wait = min(wait + 0.5, 10)
             sys.stderr.write(f'[Groq] Rate limited, waiting {wait}s...\n')
             time.sleep(wait)
