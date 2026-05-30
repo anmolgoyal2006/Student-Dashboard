@@ -44,7 +44,7 @@ function parsePdfWithPython(buffer) {
       proc.kill();
       try { fs.unlinkSync(tmpPath); } catch (_) {}
       reject(new Error('PDF parsing timed out after 120s. The PDF may be too large or corrupted.'));
-    }, 120000);
+    }, 600000);
 
     proc.stdout.on('data', (chunk) => { stdout += chunk.toString(); });
     proc.stderr.on('data', (chunk) => {
