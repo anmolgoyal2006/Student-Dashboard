@@ -7,7 +7,7 @@ const Semester   = require('../models/Semester.model');
 const { sendNotification } = require('../utils/sendNotification');
 const User = require('../models/User');
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+const groq = new Groq({ apiKey: process.env.GROQ_CHAT_KEY || process.env.GROQ_API_KEY });
 console.log('[AI] GROQ_API_KEY loaded:', process.env.GROQ_API_KEY ? process.env.GROQ_API_KEY.substring(0, 15) + '...' : 'UNDEFINED');
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -209,6 +209,7 @@ exports.handleCommand = async (req, res) => {
 
   try {
     // ── Step 1: Call Groq ──────────────────────────────────────────────────
+    console.log('[AI] Calling Groq with model: llama-3.1-8b-instant, key prefix:', process.env.GROQ_API_KEY ? process.env.GROQ_API_KEY.substring(0, 10) : 'NONE');
     const completion = await groq.chat.completions.create({
       model     : 'llama-3.1-8b-instant',
       messages   : [

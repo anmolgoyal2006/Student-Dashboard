@@ -2,7 +2,7 @@ const Groq = require('groq-sdk');
 const fs = require('fs');
 const { fuzzyMatchGrade, VALID_GRADES } = require('./ocrGradePdfParser');
 
-const groq = new Groq({ apiKey: process.env.GROQ_CHAT_KEY || process.env.GROQ_API_KEY });
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 // ── Vision: read a single grade cell image directly ──────────────────────────
 async function readGradeCellImage(imagePath) {

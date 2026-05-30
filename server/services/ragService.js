@@ -2,7 +2,7 @@ const mongoose  = require('mongoose');
 const Groq      = require('groq-sdk');
 const NoteChunk = require('../models/NoteChunk');
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+const groq = new Groq({ apiKey: process.env.GROQ_CHAT_KEY || process.env.GROQ_API_KEY });
 
 function chunkText(text, size = 500, overlap = 50) {
   const words  = text.split(/\s+/);
@@ -56,7 +56,7 @@ async function chatWithRAG(userId, message, mode = 'chat') {
   console.log('[RAG] userId:', userId, 'mode:', mode);
   console.log('[RAG] GROQ_API_KEY exists:', !!process.env.GROQ_API_KEY);
 
-  if (!process.env.GROQ_API_KEY)
+if (!process.env.GROQ_CHAT_KEY && !process.env.GROQ_API_KEY)
     throw new Error('GROQ_API_KEY is not set');
 
   const relevantChunks = await retrieveRelevantChunks(userId, message);
