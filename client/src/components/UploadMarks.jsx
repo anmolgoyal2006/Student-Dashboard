@@ -42,7 +42,8 @@ export default function UploadMarks({ onResult }) {
   const [showOcrReview, setShowOcrReview] = useState(false);
   const [sgpaLeaderboard, setSgpaLeaderboard] = useState(null);
   const [sgpaLoading, setSgpaLoading] = useState(false);
-  const [ocrCorrectedGrades, setOcrCorrectedGrades] = useState(null);
+const [ocrCorrectedGrades, setOcrCorrectedGrades] = useState(null);
+  const [sgpaSearch, setSgpaSearch] = useState('');
 
   const hasOcrSources = useMemo(
     () => sources.some((src) =>
@@ -956,6 +957,32 @@ export default function UploadMarks({ onResult }) {
             </div>
           )}
 
+       {/* Search */}
+          <div style={{ marginBottom: 14, position: 'relative' }}>
+            <span style={{
+              position: 'absolute', left: 12, top: '50%',
+              transform: 'translateY(-50%)', fontSize: 15,
+              color: 'var(--muted)', pointerEvents: 'none',
+            }}>🔍</span>
+            <input
+              className="form-input"
+              placeholder="Search by name or roll number..."
+              value={sgpaSearch}
+              onChange={(e) => setSgpaSearch(e.target.value)}
+              style={{ paddingLeft: 38, fontSize: 13 }}
+            />
+            {sgpaSearch && (
+              <button
+                onClick={() => setSgpaSearch('')}
+                style={{
+                  position: 'absolute', right: 12, top: '50%',
+                  transform: 'translateY(-50%)', background: 'none',
+                  border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: 13,
+                }}
+              >✕</button>
+            )}
+          </div>
+
           {/* Table */}
           <div className="table-wrap">
             <table>
@@ -970,7 +997,15 @@ export default function UploadMarks({ onResult }) {
                 </tr>
               </thead>
               <tbody>
-                {sgpaLeaderboard.rankedStudents.map((s, i) => {
+               {sgpaLeaderboard.rankedStudents.filter((s) => {
+                    const q = sgpaSearch.trim().toLowerCase();
+                    if (!q) return true;
+                    return (
+                      s.name.toLowerCase().includes(q) ||
+                      String(s.roll || '').toLowerCase().includes(q) ||
+                      String(s.sid || '').toLowerCase().includes(q)
+                    );
+                  }).map((s, i) => {
                   const medal = s.rank === 1 ? '🥇' : s.rank === 2 ? '🥈' : s.rank === 3 ? '🥉' : `#${s.rank}`;
                   return (
                     <tr key={s.sid || s.roll || i} style={{
