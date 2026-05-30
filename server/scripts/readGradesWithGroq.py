@@ -17,7 +17,7 @@ def encode_image(path):
     with open(path, 'rb') as f:
         return base64.b64encode(f.read()).decode('utf-8')
 
-def read_grade_from_image(image_path):
+def read_grade_from_image(image_path, _retries=0):
    
     if not image_path or not os.path.exists(image_path):
         return ''
@@ -51,8 +51,9 @@ def read_grade_from_image(image_path):
         'generationConfig': {'temperature': 0, 'maxOutputTokens': 10}
     }).encode('utf-8')
     
+    sys.stderr.write(f'[Gemini] Calling gemini-2.0-flash-lite for {image_path}\n')
     req = urllib.request.Request(
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent',
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent',
         data=payload,
         headers={
             'Content-Type': 'application/json',
@@ -77,10 +78,12 @@ def read_grade_from_image(image_path):
                         break
             except Exception:
                 wait = 5
-            wait = min(wait + 0.5, 10)
+            wait = min(wait + 0.5, 30)
             sys.stderr.write(f'[Groq] Rate limited, waiting {wait}s...\n')
             time.sleep(wait)
-            return read_grade_from_image(image_path)  # retry once
+            if _retries < 3:
+                return read_grade_from_image(image_path, _retries + 1)
+            return ''
         sys.stderr.write(f'[Groq] Error for {image_path}: {str(e)} | {body}\n')
         return ''
     except Exception as e:
