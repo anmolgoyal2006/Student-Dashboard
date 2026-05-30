@@ -5,7 +5,30 @@ const { spawn } = require('child_process');
 const { createWorker, PSM } = require('tesseract.js');
 
 const EXTRACT_SCRIPT = path.join(__dirname, '../scripts/extractGradeCells.py');
+const GROQ_GRADE_SCRIPT = path.join(__dirname, '../scripts/readGradesWithGroq.py');
 const VALID_GRADES = ['A+', 'A', 'B+', 'B', 'C+', 'C', 'D', 'F'];
+const VALID_GRADES_SET = new Set(VALID_GRADES);
+
+function readGradesWithGroq(imagePaths) {
+  return new Promise((resolve) => {
+    const pythonBin = process.platform === 'win32' ? 'python' : 'python3';
+    const proc = spawn(pythonBin, [GROQ_GRADE_SCRIPT], { env: { ...process.env } });
+    let stdout = '';
+    proc.stdout.on('data', (chunk) => { stdout += chunk.toString(); });
+    proc.stderr.on('data', (chunk) => { console.error('[Groq Grade]', chunk.toString()); });
+    proc.on('close', () => {
+      try {
+        const result = JSON.parse(stdout.trim() || '{}');
+        resolve(result.grades || imagePaths.map(() => ''));
+      } catch {
+        resolve(imagePaths.map(() => ''));
+      }
+    });
+    proc.on('error', () => resolve(imagePaths.map(() => '')));
+    proc.stdin.write(JSON.stringify({ images: imagePaths }));
+    proc.stdin.end();
+  });
+}
 
 function cleanup(dir) {
   try {
@@ -59,29 +82,26 @@ function levenshtein(a, b) {
   }
   return dp[m][n];
 }
+
 function fuzzyMatchGrade(text) {
-  // Pre-normalize cursive handwriting patterns before fuzzy matching:
-  // "Bt" → "B+", "Ct" → "C+", "At" → "A+"
-  // "F(UMC)" or "F (UMC)" → "F"
-  // "D)" or "D]" → "D"
   let raw = String(text || '').toUpperCase().replace(/\s+/g, '');
   if (!raw) return { grade: '', confidence: 0, matches: [] };
 
   // Strip annotations like (UMC), (I), etc.
   raw = raw.replace(/\([^)]*\)/g, '').replace(/\[[^\]]*\]/g, '').trim();
 
-  // Cursive "t" at end means "+" (e.g. Bt→B+, Ct→C+, At→A+)
+  // Cursive "t" at end means "+"
   raw = raw.replace(/^([ABC])T$/, '$1+');
 
-  // Handle common OCR confusions
+  // Common OCR confusions
   raw = raw
     .replace(/^APLUS$/, 'A+')
     .replace(/^BPLUS$/, 'B+')
     .replace(/^CPLUS$/, 'C+')
     .replace(/^A\+?PLUS$/, 'A+')
-    .replace(/^([ABC])\+\+$/, '$1+')   // A++ → A+
-    .replace(/^([ABCDF])[)\]|]+$/, '$1') // trailing junk
-    .replace(/^[)\]|]+([ABCDF])$/, '$1'); // leading junk
+    .replace(/^([ABC])\+\+$/, '$1+')
+    .replace(/^([ABCDF])[)\]|]+$/, '$1')
+    .replace(/^[)\]|]+([ABCDF])$/, '$1');
 
   const candidates = [];
   for (const grade of VALID_GRADES) {
@@ -121,7 +141,11 @@ function extractSidFuzzy(text) {
   const cleaned = cleanText(text);
   const strict = cleaned.match(/\b\d{5,12}\b/)?.[0];
   if (strict) return strict;
-  const digitsOnly = cleaned.replace(/[OoD]/g, '0').replace(/[IilL]/g, '1').replace(/[Ss]/g, '5').replace(/[Bb]/g, '8');
+  const digitsOnly = cleaned
+    .replace(/[OoD]/g, '0')
+    .replace(/[IilL]/g, '1')
+    .replace(/[Ss]/g, '5')
+    .replace(/[Bb]/g, '8');
   const digitMatch = digitsOnly.match(/\b\d{4,12}\b/);
   return digitMatch ? digitMatch[0] : '';
 }
@@ -199,11 +223,6 @@ async function recognizeCell(worker, filePath, mode = PSM.SINGLE_LINE, whitelist
   return { text, confidence };
 }
 
-async function recognizeCellText(worker, filePath, mode, whitelist) {
-  const result = await recognizeCell(worker, filePath, mode, whitelist);
-  return result.text;
-}
-
 async function parseScannedGradePdf(buffer) {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'grade_ocr_'));
   const pdfPath = path.join(tmpDir, 'input.pdf');
@@ -250,19 +269,17 @@ async function parseScannedGradePdf(buffer) {
         if (!sid && lastSidNumber && String(lastSidNumber).startsWith('241') && name) {
           sid = String(lastSidNumber + 1);
         }
-        // If still no SID, generate a synthetic key from name + page + row
         if (!sid) {
-          if (name) {
-            sid = `ocr_${page.page}_${rowIdx}_${name.replace(/\s+/g, '_').toLowerCase().slice(0, 20)}`;
-          } else {
-            sid = `ocr_${page.page}_${rowIdx}`;
-          }
+          sid = name
+            ? `ocr_${page.page}_${rowIdx}_${name.replace(/\s+/g, '_').toLowerCase().slice(0, 20)}`
+            : `ocr_${page.page}_${rowIdx}`;
         }
         if (seen.has(sid)) continue;
         if (/^\d{8}$/.test(sid)) {
           pagePrefix = sid.slice(0, 3);
           lastSidNumber = Number(sid);
         }
+
         const gradeWithConfidence = normalizeGradeWithConfidence(gradeResult.text);
         const grade = gradeWithConfidence.grade;
         const ocrConfidence = gradeWithConfidence.confidence;
@@ -271,7 +288,6 @@ async function parseScannedGradePdf(buffer) {
         if (!name && pageTextRow.name) name = pageTextRow.name;
         const gradeFromPage = pageTextRow.grade || pageGradeMap.get(sid) || '';
         const finalGrade = gradeFromPage || grade;
-
         const displayName = name || 'Unknown Student';
         seen.add(sid);
 
@@ -298,7 +314,7 @@ async function parseScannedGradePdf(buffer) {
           grade: finalGrade,
           sidImage,
           gradeImage,
-          gradeCellPath: row.grade || '',   // ← add this line
+          gradeCellPath: row.grade || '',
           ocrGradeRaw: gradeResult.text.trim(),
           ocrConfidence,
           ocrConfidenceLevel: confidenceLevel(ocrConfidence),
@@ -321,6 +337,7 @@ async function parseScannedGradePdf(buffer) {
           grade: row.grade || '',
           sidImage: '',
           gradeImage: '',
+          gradeCellPath: '',
           ocrGradeRaw: '',
           ocrConfidence: 0,
           ocrConfidenceLevel: 'low',
@@ -333,6 +350,27 @@ async function parseScannedGradePdf(buffer) {
           source: 'ocr',
         });
       }
+    }
+
+    // ── Groq vision pass: correct all grades ──
+    try {
+      const gradePaths = rows.map((r) => r.gradeCellPath || '');
+      const hasImages = gradePaths.some((p) => p && fs.existsSync(p));
+      if (hasImages) {
+        console.error('[OCR] Running Groq vision grade correction...');
+        const correctedGrades = await readGradesWithGroq(gradePaths);
+        correctedGrades.forEach((g, idx) => {
+          if (g && VALID_GRADES_SET.has(g)) {
+            rows[idx].grade = g;
+            rows[idx].marks = { ...rows[idx].marks, Grade: g };
+            rows[idx].ocrConfidence = 95;
+            rows[idx].ocrConfidenceLevel = 'high';
+          }
+        });
+        console.error(`[OCR] Groq corrected ${correctedGrades.filter(g => g).length}/${rows.length} grades`);
+      }
+    } catch (err) {
+      console.error('[OCR] Groq vision pass failed:', err.message);
     }
 
     return rows;
