@@ -1,7 +1,7 @@
 const express  = require('express');
 const cors     = require('cors');
 const mongoose = require('mongoose');
-require('dotenv').config();
+require('dotenv').config({ path: require('path').join(__dirname, '.env') });
 const { sendTodayNotifications } = require('./services/notificationService');
 
 const app = express();

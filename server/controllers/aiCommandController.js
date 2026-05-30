@@ -8,6 +8,7 @@ const { sendNotification } = require('../utils/sendNotification');
 const User = require('../models/User');
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+console.log('[AI] GROQ_API_KEY loaded:', process.env.GROQ_API_KEY ? process.env.GROQ_API_KEY.substring(0, 15) + '...' : 'UNDEFINED');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SYSTEM_PROMPT — Groq handles ALL routing: commands, queries, conversation
