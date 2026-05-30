@@ -51,7 +51,7 @@ app.use('/api', (_req, res, next) => {
 
 // ─── Request timeout (180s) ───────────────────────────────────────────────
 app.use((req, res, next) => {
-  res.setTimeout(180000, () => {
+  res.setTimeout(600000, () => {
     res.status(503).json({ message: 'Request timeout — server busy' });
   });
   next();

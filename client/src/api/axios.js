@@ -29,7 +29,7 @@ function resolveApiBaseUrl() {
 // ─── Axios instance ─────────────────────────────────────────────────────────
 const API = axios.create({
   baseURL: resolveApiBaseUrl(),
-  timeout: 180000,         // 180 s — allows for PDF parsing / cold start
+  timeout: 600000,         // 600 s — allows for PDF parsing / cold start
   withCredentials: false,  // set true only if you use httpOnly cookies
   headers: {
     'Content-Type': 'application/json',
