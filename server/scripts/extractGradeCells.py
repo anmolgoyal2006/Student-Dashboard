@@ -139,6 +139,20 @@ def detect_rows_adaptive(page_image):
 
 # ─── COLUMN DETECTION ────────────────────────────────────────────────────────
 
+def merge_close(values, max_gap=20):
+    """Merge values that are very close together (double-edged lines)."""
+    if not values:
+        return []
+    sorted_vals = sorted(values)
+    merged = [sorted_vals[0]]
+    for v in sorted_vals[1:]:
+        if v - merged[-1] <= max_gap:
+            merged[-1] = (merged[-1] + v) // 2
+        else:
+            merged.append(v)
+    return merged
+
+
 def detect_columns_by_grid(page_image, row_ys):
     """Detect vertical column boundaries using grid lines near the rows."""
     gray = cv2.cvtColor(page_image, cv2.COLOR_RGB2GRAY)
@@ -161,50 +175,86 @@ def detect_columns_by_grid(page_image, row_ys):
     vert = cv2.morphologyEx(region, cv2.MORPH_OPEN, vert_kernel)
     min_pixels = max(8, region_h * 0.15)
     xs = np.where(vert.sum(axis=0) > 255 * min_pixels)[0]
-    x_groups = groups(xs)
+    x_groups = groups(xs, gap=3)
     x_centers = [g[2] for g in x_groups]
     x_centers = [x for x in x_centers if 0 <= x <= w]
 
-    if len(x_centers) >= 4 and x_centers[-1] < w * 0.80:
-        x_centers.append(w - 8)
-    elif len(x_centers) >= 4 and x_centers[-1] < w - 40:
-        x_centers.append(w - 8)
+    if not x_centers:
+        return []
 
-    return sorted(x_centers)
+    x_centers = merge_close(x_centers, max_gap=20)
+
+    if 4 <= len(x_centers) <= 6:
+        gaps = [x_centers[i+1] - x_centers[i] for i in range(len(x_centers)-1)]
+        min_gap = w * 0.03
+        max_gap = w * 0.45
+        if all(min_gap <= g <= max_gap for g in gaps):
+            if x_centers[-1] < w * 0.80:
+                x_centers.append(w - 8)
+            elif x_centers[-1] < w - 40:
+                x_centers.append(w - 8)
+            return x_centers
+
+    if len(x_centers) >= 4:
+        return x_centers
+
+    return []
 
 
 def build_column_regions(x_centers, width):
     """Map detected vertical lines to logical columns (sid, name, units, grade)."""
-    if len(x_centers) < 3:
+    if len(x_centers) < 4:
         return None
 
     x = sorted(x_centers)
     num_cols = len(x)
 
+    def validate(col_map):
+        for key, (left, right) in col_map.items():
+            if right - left < width * 0.02:
+                return False
+        return True
+
     if num_cols >= 6:
-        return {
+        col_map = {
             "sid": (x[0], x[1]),
             "name": (x[1], x[2]),
             "units": (x[3], x[4]),
             "grade": (x[4], x[5]),
         }
-    elif num_cols == 5:
-        return {
+        if validate(col_map):
+            return col_map
+    if num_cols == 5:
+        col_map = {
             "sid": (x[0], x[1]),
             "name": (x[1], x[2]),
             "units": (x[2], x[3]),
             "grade": (x[3], x[4]),
         }
-    elif num_cols == 4:
-        # 4 columns: sid, name, (units or blank), grade
-        return {
+        if validate(col_map):
+            return col_map
+    if num_cols == 4:
+        col_map = {
             "sid": (x[0], x[1]),
             "name": (x[1], x[2]),
             "units": (x[2], int((x[2] + x[3]) * 0.5)),
             "grade": (int((x[2] + x[3]) * 0.5), x[3]),
         }
-    else:
-        return None
+        if validate(col_map):
+            return col_map
+
+    if num_cols >= 6:
+        # Try mapping first 5 when we have more columns
+        col_map = {
+            "sid": (x[0], x[1]),
+            "name": (x[1], x[2]),
+            "units": (x[2], x[3]),
+            "grade": (x[3], x[4]),
+        }
+        if validate(col_map):
+            return col_map
+
+    return None
 
 
 def build_column_regions_fallback(width):
