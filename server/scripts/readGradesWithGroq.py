@@ -7,6 +7,8 @@ import os
 import base64
 import urllib.request
 import urllib.error
+import time
+import re
 
 GROQ_API_KEY = os.environ.get('GROQ_API_KEY', '')
 VALID_GRADES = {'A+', 'A', 'B+', 'B', 'C+', 'C', 'D', 'F'}
@@ -16,7 +18,7 @@ def encode_image(path):
         return base64.b64encode(f.read()).decode('utf-8')
 
 def read_grade_from_image(image_path):
-    sys.stderr.write(f'[DEBUG] GROQ_API_KEY = "{GROQ_API_KEY[:8] if GROQ_API_KEY else "EMPTY"}"\n')
+   
     if not image_path or not os.path.exists(image_path):
         return ''
     
@@ -69,10 +71,8 @@ def read_grade_from_image(image_path):
     except urllib.error.HTTPError as e:
         body = e.read().decode('utf-8')
         if e.code == 429:
-            import time
-            import json as _json
             try:
-                wait = float(_json.loads(body)['error']['message'].split('try again in ')[1].split('s')[0].strip())
+                wait = float(json.loads(body)['error']['message'].split('try again in ')[1].split('s')[0].strip())
             except Exception:
                 wait = 3
             wait = min(wait + 0.5, 10)
@@ -91,8 +91,7 @@ def normalize_grade(raw):
     
     text = raw.upper().strip()
     
-    # Strip annotations like (UMC)
-    import re
+  # Strip annotations like (UMC)
     text = re.sub(r'\([^)]*\)', '', text).strip()
     text = re.sub(r'\[[^\]]*\]', '', text).strip()
     
@@ -120,12 +119,10 @@ def normalize_grade(raw):
 
 def read_grades_batch(image_paths):
     """Read multiple grade images, return list of grades in same order."""
-    import time
     results = []
     for path in image_paths:
         grade = read_grade_from_image(path)
         results.append(grade)
-        time.sleep(2)
     return results
 
 
