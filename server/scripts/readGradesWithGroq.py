@@ -68,6 +68,17 @@ def read_grade_from_image(image_path):
             return normalize_grade(raw)
     except urllib.error.HTTPError as e:
         body = e.read().decode('utf-8')
+        if e.code == 429:
+            import time
+            import json as _json
+            try:
+                wait = float(_json.loads(body)['error']['message'].split('try again in ')[1].split('s')[0].strip())
+            except Exception:
+                wait = 3
+            wait = min(wait + 0.5, 10)
+            sys.stderr.write(f'[Groq] Rate limited, waiting {wait}s...\n')
+            time.sleep(wait)
+            return read_grade_from_image(image_path)  # retry once
         sys.stderr.write(f'[Groq] Error for {image_path}: {str(e)} | {body}\n')
         return ''
     except Exception as e:
