@@ -183,12 +183,14 @@ async function parsePdfsHandler(req, res) {
   try {
     const files = req.files?.length ? req.files : (req.file ? [req.file] : []);
     if (!files.length) {
-      return res.status(400).json({ message: 'No PDF files uploaded.' });
+      if (!res.headersSent) return res.status(400).json({ message: 'No PDF files uploaded.' });
+      return;
     }
 
     const sources = [];
 
     for (let i = 0; i < files.length; i++) {
+      if (res.headersSent) return;
       const file = files[i];
       let rawRows;
       try {
@@ -197,18 +199,20 @@ async function parsePdfsHandler(req, res) {
           rawRows = await parseScannedGradePdf(file.buffer);
         }
       } catch (err) {
-        return res.status(422).json({
+        if (!res.headersSent) return res.status(422).json({
           message: `Failed to parse "${file.originalname}".`,
           detail: err.message,
         });
+        return;
       }
 
       const parsed = studentsFromRawRows(rawRows);
       if (!parsed.studentRows.length) {
-        return res.status(422).json({
+        if (!res.headersSent) return res.status(422).json({
           message: `No students found in "${file.originalname}".`,
           hint: 'Ensure the PDF is a tabular marks sheet with a header row.',
         });
+        return;
       }
 
       sources.push({
@@ -224,10 +228,10 @@ async function parsePdfsHandler(req, res) {
       });
     }
 
-    return res.json({ method: 'multi-pdf', sources });
+    if (!res.headersSent) return res.json({ method: 'multi-pdf', sources });
   } catch (err) {
     console.error('[parse-pdfs]', err);
-    return res.status(500).json({ message: err.message || 'Unexpected server error.' });
+    if (!res.headersSent) return res.status(500).json({ message: err.message || 'Unexpected server error.' });
   }
 }
 
