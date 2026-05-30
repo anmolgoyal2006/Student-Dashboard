@@ -13,7 +13,6 @@ import MarksFilter from './MarksFilter';
 import WeightInput from './WeightInput';
 import OcrReviewPanel from './OcrReviewPanel';
 import { marksService } from '../services/apiServices';
-import GradeEntryForm from './GradeEntryForm';
 
 /** Sum of selected column weights for one PDF (drives file-level weight in merge). */
 function getSourceFileWeight(src) {
@@ -459,36 +458,8 @@ const [ocrCorrectedGrades, setOcrCorrectedGrades] = useState(null);
     onResult?.(null);
   };
 
- const [activeTab, setActiveTab] = useState('pdf'); // 'pdf' | 'manual'
-
   return (
     <>
-      {/* Tab switcher */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-        <button
-          className={`btn ${activeTab === 'pdf' ? 'btn-primary' : 'btn-outline'}`}
-          onClick={() => setActiveTab('pdf')}
-        >
-          📄 PDF Upload
-        </button>
-        <button
-          className={`btn ${activeTab === 'manual' ? 'btn-primary' : 'btn-outline'}`}
-          onClick={() => setActiveTab('manual')}
-        >
-          ✍️ Grade Entry
-        </button>
-      </div>
-
-      {activeTab === 'manual' && (
-        <GradeEntryForm
-          onLeaderboardGenerated={(data) => {
-            setSgpaLeaderboard(data);
-            setLeaderboard(null);
-          }}
-        />
-      )}
-
-      {activeTab === 'pdf' && <>
       <div className="card">
         <div className="card-title">📄 Upload Marks PDFs</div>
         <p className="text-muted" style={{ marginBottom: 16 }}>
@@ -1032,7 +1003,6 @@ const [ocrCorrectedGrades, setOcrCorrectedGrades] = useState(null);
           </div>
         </div>
       )}
-  </>}
-    </>
+  </>
   );
 }
