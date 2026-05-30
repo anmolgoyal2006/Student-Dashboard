@@ -12,7 +12,7 @@ const VALID_GRADES_SET = new Set(VALID_GRADES);
 function readGradesWithGroq(imagePaths) {
   return new Promise((resolve) => {
     const pythonBin = process.platform === 'win32' ? 'python' : 'python3';
-    const proc = spawn(pythonBin, [GROQ_GRADE_SCRIPT], { env: { ...process.env } });
+    const proc = spawn(pythonBin, [GROQ_GRADE_SCRIPT], { env: { ...process.env, GROQ_API_KEY: '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' } });
     let stdout = '';
     proc.stdout.on('data', (chunk) => { stdout += chunk.toString(); });
     proc.stderr.on('data', (chunk) => { console.error('[Groq Grade]', chunk.toString()); });

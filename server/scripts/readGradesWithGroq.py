@@ -16,6 +16,7 @@ def encode_image(path):
         return base64.b64encode(f.read()).decode('utf-8')
 
 def read_grade_from_image(image_path):
+    sys.stderr.write(f'[DEBUG] GROQ_API_KEY = "{GROQ_API_KEY[:8] if GROQ_API_KEY else "EMPTY"}"\n')
     if not image_path or not os.path.exists(image_path):
         return ''
     
@@ -23,7 +24,7 @@ def read_grade_from_image(image_path):
     ext = 'image/png' if image_path.lower().endswith('.png') else 'image/jpeg'
     
     payload = json.dumps({
-        'model': 'meta-llama/llama-4-scout-17b-16e-instruct',
+      'model': 'meta-llama/llama-4-scout-17b-16e-instruct',
         'messages': [{
             'role': 'user',
             'content': [
@@ -53,9 +54,10 @@ def read_grade_from_image(image_path):
     req = urllib.request.Request(
         'https://api.groq.com/openai/v1/chat/completions',
         data=payload,
-        headers={
+       headers={
             'Authorization': f'Bearer {GROQ_API_KEY}',
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         }
     )
     
@@ -64,6 +66,10 @@ def read_grade_from_image(image_path):
             result = json.loads(resp.read().decode('utf-8'))
             raw = result['choices'][0]['message']['content'].strip()
             return normalize_grade(raw)
+    except urllib.error.HTTPError as e:
+        body = e.read().decode('utf-8')
+        sys.stderr.write(f'[Groq] Error for {image_path}: {str(e)} | {body}\n')
+        return ''
     except Exception as e:
         sys.stderr.write(f'[Groq] Error for {image_path}: {str(e)}\n')
         return ''
