@@ -13,6 +13,7 @@ import MarksFilter from './MarksFilter';
 import WeightInput from './WeightInput';
 import OcrReviewPanel from './OcrReviewPanel';
 import { marksService } from '../services/apiServices';
+import GradeEntryForm from './GradeEntryForm';
 
 /** Sum of selected column weights for one PDF (drives file-level weight in merge). */
 function getSourceFileWeight(src) {
@@ -403,6 +404,32 @@ export default function UploadMarks({ onResult }) {
     }
   };
 
+  const handleGenerateSgpaDirect = async () => {
+    setSgpaLoading(true);
+    setError('');
+    setLeaderboard(null);
+    try {
+      const payload = {
+        sources: sources.map((s) => ({
+          id: s.id,
+          fileName: s.fileName,
+          label: s.label.trim(),
+          credits: s.credits || 4,
+          studentRows: s.studentLimit
+            ? s.studentRows.slice(0, s.studentLimit)
+            : s.studentRows,
+        })),
+      };
+
+      const res = await marksService.generateSgpaLeaderboard(payload);
+      setSgpaLeaderboard(res.data);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to generate SGPA leaderboard.');
+    } finally {
+      setSgpaLoading(false);
+    }
+  };
+
   const handleSgpaDownloadExcel = () => {
     if (!sgpaLeaderboard?.rankedStudents?.length) return;
     const rows = sgpaLeaderboard.rankedStudents.map((s) => ({
@@ -431,8 +458,36 @@ export default function UploadMarks({ onResult }) {
     onResult?.(null);
   };
 
+ const [activeTab, setActiveTab] = useState('pdf'); // 'pdf' | 'manual'
+
   return (
     <>
+      {/* Tab switcher */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+        <button
+          className={`btn ${activeTab === 'pdf' ? 'btn-primary' : 'btn-outline'}`}
+          onClick={() => setActiveTab('pdf')}
+        >
+          📄 PDF Upload
+        </button>
+        <button
+          className={`btn ${activeTab === 'manual' ? 'btn-primary' : 'btn-outline'}`}
+          onClick={() => setActiveTab('manual')}
+        >
+          ✍️ Grade Entry
+        </button>
+      </div>
+
+      {activeTab === 'manual' && (
+        <GradeEntryForm
+          onLeaderboardGenerated={(data) => {
+            setSgpaLeaderboard(data);
+            setLeaderboard(null);
+          }}
+        />
+      )}
+
+      {activeTab === 'pdf' && <>
       <div className="card">
         <div className="card-title">📄 Upload Marks PDFs</div>
         <p className="text-muted" style={{ marginBottom: 16 }}>
@@ -748,9 +803,21 @@ export default function UploadMarks({ onResult }) {
                     color: '#10b981',
                   }}
                 >
-                  {sgpaLoading ? '⏳ Generating…' : '🎓 Generate SGPA Leaderboard from OCR'}
+                  {sgpaLoading ? '⏳ Generating…' : '🎓 SGPA from OCR'}
                 </button>
               )}
+              <button
+                className="btn btn-secondary"
+                onClick={handleGenerateSgpaDirect}
+                disabled={sgpaLoading || !sources.length}
+                style={{
+                  background: 'rgba(59,130,246,0.15)',
+                  border: '1px solid rgba(59,130,246,0.3)',
+                  color: '#3b82f6',
+                }}
+              >
+                {sgpaLoading ? '⏳ Generating…' : '🎓 Generate SGPA Leaderboard'}
+              </button>
               <button
                 className="btn btn-outline"
                 onClick={() => document.getElementById('pdf-multi-input').click()}
@@ -930,6 +997,7 @@ export default function UploadMarks({ onResult }) {
           </div>
         </div>
       )}
+  </>}
     </>
   );
 }

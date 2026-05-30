@@ -12,16 +12,30 @@ const VALID_GRADES = new Set(Object.keys(GRADE_MAP));
 const round2 = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
 
 function normalizeGrade(value) {
-  const raw = String(value ?? '').trim().toUpperCase().replace(/\s+/g, '');
+  let raw = String(value ?? '').trim().toUpperCase().replace(/\s+/g, '');
   if (!raw) return '';
-  if (raw === 'A PLUS' || raw === 'APLUS') return 'A+';
-  if (raw === 'B PLUS' || raw === 'BPLUS') return 'B+';
-  if (raw === 'C PLUS' || raw === 'CPLUS') return 'C+';
+
+  // Strip annotations like (UMC), (I), (W)
+  raw = raw.replace(/\([^)]*\)/g, '').replace(/\[[^\]]*\]/g, '').trim();
+
+  // Cursive "t" suffix means "+" — Bt→B+, Ct→C+, At→A+
+  raw = raw.replace(/^([ABC])T$/, '$1+');
+
+  // Named variants
+  if (raw === 'APLUS' || raw === 'A PLUS') return 'A+';
+  if (raw === 'BPLUS' || raw === 'B PLUS') return 'B+';
+  if (raw === 'CPLUS' || raw === 'C PLUS') return 'C+';
+
+  // Strip trailing junk from single-letter grades
+  const cleaned = raw.replace(/[^A-F+]/g, '');
+  if (['A+','A','B+','B','C+','C','D','F'].includes(cleaned)) return cleaned;
+
   return raw;
 }
 
 function getGradeFromStudentRow(row) {
   if (row.grade) return normalizeGrade(row.grade);
+
   const marks = row.marks || {};
   for (const [key, value] of Object.entries(marks)) {
     const header = String(key || '').toLowerCase();
@@ -29,6 +43,20 @@ function getGradeFromStudentRow(row) {
       return normalizeGrade(value);
     }
   }
+
+  for (const value of Object.values(marks)) {
+    const v = String(value ?? '').trim();
+    if (!v) continue;
+    const normal = normalizeGrade(v);
+    if (normal && VALID_GRADES.has(normal)) return normal;
+  }
+
+  for (const [key, value] of Object.entries(row)) {
+    if (key === 'name' || key === 'roll' || key === 'marks' || key === 'grade') continue;
+    const normal = normalizeGrade(value);
+    if (normal && VALID_GRADES.has(normal)) return normal;
+  }
+
   return '';
 }
 

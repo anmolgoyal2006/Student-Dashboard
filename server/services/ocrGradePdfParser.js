@@ -59,10 +59,29 @@ function levenshtein(a, b) {
   }
   return dp[m][n];
 }
-
 function fuzzyMatchGrade(text) {
-  const raw = String(text || '').toUpperCase().replace(/\s+/g, '');
+  // Pre-normalize cursive handwriting patterns before fuzzy matching:
+  // "Bt" → "B+", "Ct" → "C+", "At" → "A+"
+  // "F(UMC)" or "F (UMC)" → "F"
+  // "D)" or "D]" → "D"
+  let raw = String(text || '').toUpperCase().replace(/\s+/g, '');
   if (!raw) return { grade: '', confidence: 0, matches: [] };
+
+  // Strip annotations like (UMC), (I), etc.
+  raw = raw.replace(/\([^)]*\)/g, '').replace(/\[[^\]]*\]/g, '').trim();
+
+  // Cursive "t" at end means "+" (e.g. Bt→B+, Ct→C+, At→A+)
+  raw = raw.replace(/^([ABC])T$/, '$1+');
+
+  // Handle common OCR confusions
+  raw = raw
+    .replace(/^APLUS$/, 'A+')
+    .replace(/^BPLUS$/, 'B+')
+    .replace(/^CPLUS$/, 'C+')
+    .replace(/^A\+?PLUS$/, 'A+')
+    .replace(/^([ABC])\+\+$/, '$1+')   // A++ → A+
+    .replace(/^([ABCDF])[)\]|]+$/, '$1') // trailing junk
+    .replace(/^[)\]|]+([ABCDF])$/, '$1'); // leading junk
 
   const candidates = [];
   for (const grade of VALID_GRADES) {
@@ -279,6 +298,7 @@ async function parseScannedGradePdf(buffer) {
           grade: finalGrade,
           sidImage,
           gradeImage,
+          gradeCellPath: row.grade || '',   // ← add this line
           ocrGradeRaw: gradeResult.text.trim(),
           ocrConfidence,
           ocrConfidenceLevel: confidenceLevel(ocrConfidence),

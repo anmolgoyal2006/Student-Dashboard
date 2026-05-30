@@ -207,6 +207,7 @@ async function parsePdfsHandler(req, res) {
           rawRows = await parseScannedGradePdf(file.buffer);
         }
       } catch (err) {
+        console.error(`[parse-pdfs] Failed to parse "${file.originalname}":`, err.message);
         if (!res.headersSent) return res.status(422).json({
           message: `Failed to parse "${file.originalname}".`,
           detail: err.message,
@@ -223,16 +224,44 @@ async function parsePdfsHandler(req, res) {
         return;
       }
 
+     // Auto-correct OCR grades using vision AI if any rows came from OCR
+      let studentRows = parsed.studentRows;
+      const hasOcr = studentRows.some((r) => r.source === 'ocr' || r.ocrGradeRaw);
+      if (hasOcr) {
+        try {
+          const corrections = await aiCorrectGrades(
+            studentRows.map((r) => ({
+              name: r.name,
+              roll: r.roll,
+              ocrGradeRaw: r.ocrGradeRaw || '',
+              grade: r.grade || '',
+              ocrConfidence: r.ocrConfidence || 0,
+              gradeCellPath: r.gradeCellPath || '',
+            }))
+          );
+          const corrMap = new Map(corrections.map((c) => [c.index, c.correctedGrade]));
+          studentRows = studentRows.map((r, idx) => {
+            const corrected = corrMap.get(idx);
+            if (corrected) {
+              return { ...r, grade: corrected, marks: { ...r.marks, Grade: corrected } };
+            }
+            return r;
+          });
+        } catch (err) {
+          console.error('[parsePdfs] Auto AI correction failed:', err.message);
+        }
+      }
+
       sources.push({
         id              : `pdf_${Date.now()}_${i}_${Math.random().toString(36).slice(2, 8)}`,
         fileName        : file.originalname,
         label           : defaultLabelFromFilename(file.originalname, i),
         credits         : DEFAULT_CREDITS,
         columns         : parsed.columns.map((c) => ({ name: c.name, max: c.max })),
-        studentRows     : parsed.studentRows,
+        studentRows,
         columnWeights   : parsed.columnWeights,
         selectedColumns : parsed.selectedColumns,
-        studentCount    : parsed.studentRows.length,
+        studentCount    : studentRows.length,
       });
     }
 
@@ -443,6 +472,7 @@ async function ocrAiCorrectHandler(req, res) {
 
 /* ── Save OCR review corrections and generate SGPA leaderboard ───────── */
 async function ocrReviewGenerateHandler(req, res) {
+  // Auto-run vision AI correction on all students before generating
   try {
     const { sources, correctedGrades } = req.body;
     if (!Array.isArray(sources) || !sources.length) {

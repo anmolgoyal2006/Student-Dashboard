@@ -214,42 +214,38 @@ def build_column_regions(x_centers, width):
             if right - left < width * 0.02:
                 return False
         return True
+# This PDF format: Sr.No. | SID | Student Name | Units | Grade
+    # That gives 6 vertical lines → 5 columns (indices 0-4)
+    # Always take the LAST column as grade, second-last as units
 
     if num_cols >= 6:
+        # 5 columns: srno | sid | name | units | grade
         col_map = {
-            "sid": (x[0], x[1]),
-            "name": (x[1], x[2]),
+            "sid":   (x[1], x[2]),
+            "name":  (x[2], x[3]),
             "units": (x[3], x[4]),
-            "grade": (x[4], x[5]),
+            "grade": (x[4], min(x[5], x[4] + int(width * 0.18))),
         }
         if validate(col_map):
             return col_map
+
     if num_cols == 5:
+        # 4 columns: sid | name | units | grade
         col_map = {
-            "sid": (x[0], x[1]),
-            "name": (x[1], x[2]),
+            "sid":   (x[0], x[1]),
+            "name":  (x[1], x[2]),
             "units": (x[2], x[3]),
-            "grade": (x[3], x[4]),
+            "grade": (x[3], min(x[4], x[3] + int(width * 0.18))),
         }
         if validate(col_map):
             return col_map
+
     if num_cols == 4:
         col_map = {
-            "sid": (x[0], x[1]),
-            "name": (x[1], x[2]),
-            "units": (x[2], int((x[2] + x[3]) * 0.5)),
-            "grade": (int((x[2] + x[3]) * 0.5), x[3]),
-        }
-        if validate(col_map):
-            return col_map
-
-    if num_cols >= 6:
-        # Try mapping first 5 when we have more columns
-        col_map = {
-            "sid": (x[0], x[1]),
-            "name": (x[1], x[2]),
+            "sid":   (x[0], x[1]),
+            "name":  (x[1], x[2]),
             "units": (x[2], x[3]),
-            "grade": (x[3], x[4]),
+            "grade": (x[3], min(width - 8, x[3] + int(width * 0.18))),
         }
         if validate(col_map):
             return col_map
@@ -335,7 +331,7 @@ def extract_cells(pdf_path, output_dir):
             for key, (left, right) in col_regions.items():
                 if key == "extra":
                     continue
-                pad_x = 10 if key != "grade" else 4
+                pad_x = 10 if key != "grade" else 2
                 crop_left = max(0, left + pad_x)
                 crop_right = min(width, right - pad_x)
                 crop_top = max(0, top)
