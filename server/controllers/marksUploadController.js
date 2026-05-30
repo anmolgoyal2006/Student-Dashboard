@@ -40,6 +40,12 @@ function parsePdfWithPython(buffer) {
     const PYTHON_BIN = process.platform === 'win32' ? 'python' : 'python3';
     const proc = spawn(PYTHON_BIN, [PARSER_SCRIPT, tmpPath]);
 
+    const timeout = setTimeout(() => {
+      proc.kill();
+      try { fs.unlinkSync(tmpPath); } catch (_) {}
+      reject(new Error('PDF parsing timed out after 120s. The PDF may be too large or corrupted.'));
+    }, 120000);
+
     proc.stdout.on('data', (chunk) => { stdout += chunk.toString(); });
     proc.stderr.on('data', (chunk) => {
       stderr += chunk.toString();
@@ -47,6 +53,7 @@ function parsePdfWithPython(buffer) {
     });
 
     proc.on('close', (code) => {
+      clearTimeout(timeout);
       try { fs.unlinkSync(tmpPath); } catch (_) {}
 
       if (code !== 0) {
@@ -67,6 +74,7 @@ function parsePdfWithPython(buffer) {
     });
 
     proc.on('error', (err) => {
+      clearTimeout(timeout);
       try { fs.unlinkSync(tmpPath); } catch (_) {}
       reject(new Error(`Could not start Python: ${err.message}. Is Python 3 in PATH?`));
     });
