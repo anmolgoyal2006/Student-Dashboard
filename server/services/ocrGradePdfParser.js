@@ -6,30 +6,7 @@ require('dotenv').config({ path: path.join(__dirname, '../.env') });
 const { createWorker, PSM } = require('tesseract.js');
 
 const EXTRACT_SCRIPT = path.join(__dirname, '../scripts/extractGradeCells.py');
-const GROQ_GRADE_SCRIPT = path.join(__dirname, '../scripts/readGradesWithGroq.py');
 const VALID_GRADES = ['A+', 'A', 'B+', 'B', 'C+', 'C', 'D', 'F'];
-const VALID_GRADES_SET = new Set(VALID_GRADES);
-
-function readGradesWithGroq(imagePaths) {
-  return new Promise((resolve) => {
-    const pythonBin = process.platform === 'win32' ? 'python' : 'python3';
-   const proc = spawn(pythonBin, [GROQ_GRADE_SCRIPT], { env: { ...process.env, GROQ_API_KEY: process.env.GEMINI_API_KEY } });
-    let stdout = '';
-    proc.stdout.on('data', (chunk) => { stdout += chunk.toString(); });
-    proc.stderr.on('data', (chunk) => { console.error('[Groq Grade]', chunk.toString()); });
-    proc.on('close', () => {
-      try {
-        const result = JSON.parse(stdout.trim() || '{}');
-        resolve(result.grades || imagePaths.map(() => ''));
-      } catch {
-        resolve(imagePaths.map(() => ''));
-      }
-    });
-    proc.on('error', () => resolve(imagePaths.map(() => '')));
-    proc.stdin.write(JSON.stringify({ images: imagePaths }));
-    proc.stdin.end();
-  });
-}
 
 function cleanup(dir) {
   try {
@@ -37,10 +14,46 @@ function cleanup(dir) {
   } catch (_) {}
 }
 
+function resolvePython() {
+  if (process.env.PYTHON_PATH) return process.env.PYTHON_PATH;
+  if (process.platform !== 'win32') return 'python3';
+  const { execSync } = require('child_process');
+  try {
+    const paths = execSync('where.exe python', { encoding: 'utf8' })
+      .split(/\r?\n/)
+      .map(s => s.trim())
+      .filter(Boolean);
+    const real = paths.find(p => !p.includes('WindowsApps'));
+    if (real) return real;
+  } catch (_) {}
+  try {
+    execSync('py -3 --version', { stdio: 'ignore' });
+    return 'py -3';
+  } catch (_) {}
+  return 'python';
+}
+
+function childEnv() {
+  const env = { ...process.env };
+  if (process.platform !== 'win32') return env;
+  const { execSync } = require('child_process');
+  try {
+    const popplerDir = execSync(
+      'where.exe pdftoppm 2>nul | findstr /v WindowsApps',
+      { encoding: 'utf8', shell: true }
+    ).split(/\r?\n/).map(s => s.trim()).filter(Boolean)[0];
+    if (popplerDir) {
+      const binDir = path.dirname(popplerDir);
+      env.PATH = binDir + path.delimiter + (env.PATH || '');
+    }
+  } catch (_) {}
+  return env;
+}
+
 function runCellExtractor(pdfPath, outputDir) {
   return new Promise((resolve, reject) => {
-    const pythonBin = process.platform === 'win32' ? 'python' : 'python3';
-    const proc = spawn(pythonBin, [EXTRACT_SCRIPT, pdfPath, outputDir]);
+    const pythonBin = resolvePython();
+    const proc = spawn(pythonBin, [EXTRACT_SCRIPT, pdfPath, outputDir], { env: childEnv() });
     let stdout = '';
     let stderr = '';
 
@@ -353,27 +366,6 @@ async function parseScannedGradePdf(buffer) {
       }
     }
 
-    // ── Groq vision pass: correct all grades ──
-    try {
-      const gradePaths = rows.map((r) => r.gradeCellPath || '');
-      const hasImages = gradePaths.some((p) => p && fs.existsSync(p));
-      if (hasImages) {
-        console.error('[OCR] Running Groq vision grade correction...');
-        const correctedGrades = await readGradesWithGroq(gradePaths);
-        correctedGrades.forEach((g, idx) => {
-          if (g && VALID_GRADES_SET.has(g)) {
-            rows[idx].grade = g;
-            rows[idx].marks = { ...rows[idx].marks, Grade: g };
-            rows[idx].ocrConfidence = 95;
-            rows[idx].ocrConfidenceLevel = 'high';
-          }
-        });
-        console.error(`[OCR] Groq corrected ${correctedGrades.filter(g => g).length}/${rows.length} grades`);
-      }
-    } catch (err) {
-      console.error('[OCR] Groq vision pass failed:', err.message);
-    }
-
     return rows;
   } finally {
     if (worker) await worker.terminate();
@@ -387,4 +379,6 @@ module.exports = {
   normalizeGradeWithConfidence,
   fuzzyMatchGrade,
   VALID_GRADES,
+  resolvePython,
+  childEnv,
 };

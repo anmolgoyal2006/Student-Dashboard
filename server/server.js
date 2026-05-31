@@ -121,8 +121,10 @@ const startServer = () => {
 };
 
 mongoose.connect(process.env.MONGO_URI, {
-  serverSelectionTimeoutMS: 10000,
+  serverSelectionTimeoutMS: 30000,
   socketTimeoutMS: 45000,
+  retryWrites: true,
+  w: 'majority',
 })
   .then(() => {
     console.log('MongoDB connected');
@@ -137,3 +139,15 @@ mongoose.connect(process.env.MONGO_URI, {
     console.warn('[Dev] Starting API without MongoDB — DB-backed features may fail.');
     startServer();
   });
+
+mongoose.connection.on('disconnected', () => {
+  console.log('MongoDB disconnected — attempting to reconnect...');
+});
+
+mongoose.connection.on('reconnected', () => {
+  console.log('MongoDB reconnected');
+});
+
+mongoose.connection.on('error', (err) => {
+  console.error('MongoDB connection error:', err.message);
+});

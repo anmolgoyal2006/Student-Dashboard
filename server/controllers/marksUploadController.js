@@ -21,8 +21,10 @@ const {
 } = require('../services/pdfScoreExtractor');
 const { mergeSourcesAndScore } = require('../services/multiPdfMergeService');
 const { buildSgpaLeaderboard, DEFAULT_CREDITS } = require('../services/sgpaLeaderboardService');
-const { parseScannedGradePdf, normalizeGrade, fuzzyMatchGrade } = require('../services/ocrGradePdfParser');
+const { parseScannedGradePdf, fuzzyMatchGrade, resolvePython, childEnv } = require('../services/ocrGradePdfParser');
 const { aiCorrectGrades } = require('../services/aiOcrCorrectionService');
+const { isScannedPdf } = require('../utils/isScannedPdf');
+const { ocrPdf } = require('../utils/ocrPdf');
 
 const PARSER_SCRIPT = path.join(__dirname, '../scripts/parsePdf.py');
 
@@ -37,8 +39,7 @@ function parsePdfWithPython(buffer) {
     let stdout = '';
     let stderr = '';
 
-    const PYTHON_BIN = process.platform === 'win32' ? 'python' : 'python3';
-    const proc = spawn(PYTHON_BIN, [PARSER_SCRIPT, tmpPath]);
+    const proc = spawn(resolvePython(), [PARSER_SCRIPT, tmpPath], { env: childEnv() });
 
     const timeout = setTimeout(() => {
       proc.kill();
@@ -89,6 +90,12 @@ function defaultLabelFromFilename(filename, index) {
   return base || `Source ${index + 1}`;
 }
 
+const GRADE_POINTS = {
+  'A+':10,'A':9,'B+':8,'B':7,'C+':6,'C':5,'D':4,'F':0,'F(UMC)':0
+};
+
+
+
 /* ── Legacy: single PDF + column weights ─────────────────────────────────── */
 async function uploadPdfHandler(req, res) {
   try {
@@ -111,11 +118,25 @@ async function uploadPdfHandler(req, res) {
       return res.status(400).json({ message: 'weights must be a JSON object string.' });
     }
 
-    let rawRows;
+    const tmpPdfPath = path.join(os.tmpdir(), `upload_${Date.now()}_${Math.random().toString(36).slice(2)}.pdf`);
+    fs.writeFileSync(tmpPdfPath, req.file.buffer);
+
+    let rawRows = [];
     try {
-      rawRows = await parsePdfWithPython(req.file.buffer);
+      const scanned = await isScannedPdf(tmpPdfPath);
+      console.log('[OCR] isScanned:', scanned);
+      if (scanned) {
+        console.log('[OCR] Scanned PDF detected, using OCR parser...');
+        rawRows = await ocrPdf(tmpPdfPath);
+        rawRows = rawRows.map(r => ({ ...r, gradePoints: GRADE_POINTS[r.grade] ?? 0 }));
+        console.log('[OCR] rows parsed:', rawRows.length, JSON.stringify(rawRows.slice(0, 3)));
+      } else {
+        rawRows = await parsePdfWithPython(req.file.buffer);
+      }
     } catch (err) {
       return res.status(422).json({ message: 'Failed to extract data from PDF.', detail: err.message });
+    } finally {
+      try { fs.unlinkSync(tmpPdfPath); } catch (_) {}
     }
 
     if (rawRows.length === 0) {
@@ -126,6 +147,7 @@ async function uploadPdfHandler(req, res) {
     }
 
     const { columns, studentRows } = detectColumns(rawRows);
+    console.log('[OCR] final students:', studentRows.length, JSON.stringify(studentRows.slice(0, 2)));
 
     if (columns.length === 0) {
       return res.status(422).json({
@@ -201,18 +223,30 @@ async function parsePdfsHandler(req, res) {
       if (res.headersSent) return;
       const file = files[i];
       let rawRows;
+      const tmpPdfPath = path.join(os.tmpdir(), `parse_${Date.now()}_${Math.random().toString(36).slice(2)}.pdf`);
+      fs.writeFileSync(tmpPdfPath, file.buffer);
       try {
-        rawRows = await parsePdfWithPython(file.buffer);
-        if (!rawRows.length) {
-          rawRows = await parseScannedGradePdf(file.buffer);
+        const scanned = await isScannedPdf(tmpPdfPath);
+        if (scanned) {
+          console.log(`[OCR] Scanned PDF detected for "${file.originalname}", using OCR parser...`);
+          rawRows = await ocrPdf(tmpPdfPath);
+          rawRows = rawRows.map(r => ({ ...r, gradePoints: GRADE_POINTS[r.grade] ?? 0 }));
+        } else {
+          rawRows = await parsePdfWithPython(file.buffer);
+          if (!rawRows.length) {
+            rawRows = await parseScannedGradePdf(file.buffer);
+          }
         }
       } catch (err) {
+        try { fs.unlinkSync(tmpPdfPath); } catch (_) {}
         console.error(`[parse-pdfs] Failed to parse "${file.originalname}":`, err.message);
         if (!res.headersSent) return res.status(422).json({
           message: `Failed to parse "${file.originalname}".`,
           detail: err.message,
         });
         return;
+      } finally {
+        try { fs.unlinkSync(tmpPdfPath); } catch (_) {}
       }
 
       const parsed = studentsFromRawRows(rawRows);
