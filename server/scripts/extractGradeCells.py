@@ -19,6 +19,10 @@ import cv2
 import numpy as np
 import pytesseract
 from pdf2image import convert_from_path
+import tempfile
+
+DEBUG_DIR = os.path.join(tempfile.gettempdir(), 'grade_debug')
+os.makedirs(DEBUG_DIR, exist_ok=True)
 
 # Point pytesseract at the Tesseract binary on Windows
 if sys.platform == 'win32':
@@ -78,19 +82,34 @@ def clean_name(raw):
     return re.sub(r'[^A-Za-z\s]', '', raw).strip()
 
 
-def ocr_cell(gray_img):
+def ocr_cell(gray_img, psm=7, whitelist=''):
     if gray_img.size == 0:
         return ''
     resized = cv2.resize(gray_img, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
     _, thresh = cv2.threshold(resized, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
     try:
-        text = pytesseract.image_to_string(
-            thresh,
-            config='--psm 7 --oem 3 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/()'
-        )
+        config = f'--psm {psm} --oem 3'
+        if whitelist:
+            config += f' -c tessedit_char_whitelist={whitelist}'
+        text = pytesseract.image_to_string(thresh, config=config)
         return text.strip()
     except Exception:
         return ''
+
+
+def ocr_grade_cell(cell):
+    # Try PSM 8 (single word), PSM 7 (single line), PSM 6 (block)
+    for psm in [8, 7, 6]:
+        raw = ocr_cell(cell, psm=psm, whitelist='ABCDFabcdf+()')
+        if 'UMC' in raw.upper():
+            return 'F(UMC)'
+        grade = normalize_grade(raw)
+        if grade:
+            return grade
+    # Fix 5: log raw outputs when all PSM modes fail
+    sys.stderr.write(f'[Grade] All PSM failed, raw outputs: '
+                     f'{[ocr_cell(cell, psm=p, whitelist="ABCDFabcdf+()") for p in [8,7,6]]}\n')
+    return ''
 
 
 # ── image preprocessing ──────────────────────────────────────────────────
@@ -129,6 +148,28 @@ def detect_row_lines(gray):
             in_row = False
     if in_row and h - start >= 12:
         rows.append((start, h))
+    return rows
+
+
+def detect_rows_by_text(gray):
+    h, w = gray.shape
+    _, binary = cv2.threshold(gray, 0, 255,
+                              cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+    proj = binary.sum(axis=1) / 255
+    threshold = max(proj.max() * 0.15, w * 0.02)
+    rows = []
+    in_row = False
+    start = 0
+    for y in range(h):
+        if proj[y] > threshold and not in_row:
+            start = y
+            in_row = True
+        elif proj[y] <= threshold and in_row:
+            mid = (start + y) // 2
+            height = y - start
+            if 15 <= height <= 80:
+                rows.append(mid)
+            in_row = False
     return rows
 
 
@@ -179,10 +220,14 @@ def get_col_regions(col_bands, img_w):
 # ── per-page extraction ──────────────────────────────────────────────────
 
 
-def extract_page(bgr_img):
+def extract_page(bgr_img, page_num=0):
     gray = preprocess(bgr_img)
     h, w = gray.shape
     row_bands = detect_row_lines(gray)
+    # Fix 4: sparse page handling — fall back to text-projection method
+    if len(row_bands) < 2:
+        row_ys = detect_rows_by_text(gray)
+        row_bands = [(max(0, y - 12), min(h, y + 12)) for y in row_ys]
     # Get global column regions from the whole page
     col_bands = detect_col_lines(gray)
     col_regions = get_col_regions(col_bands, w)
@@ -194,7 +239,7 @@ def extract_page(bgr_img):
             'grade': (int(w * 0.78), int(w * 0.96)),
         }
     rows = []
-    for y1, y2 in row_bands:
+    for row_idx, (y1, y2) in enumerate(row_bands):
         row_h = y2 - y1
         if row_h < 14 or row_h > h * 0.08:
             continue
@@ -210,19 +255,35 @@ def extract_page(bgr_img):
         grade_text = ''
 
         for key, (x1, x2) in col_regions.items():
-            cx1 = max(0, x1)
-            cx2 = min(w, x2)
+            if key == 'grade':
+                # Fix 1: aggressively widen grade crop to catch handwritten "+"
+                cx1 = max(0, x1 - 10)
+                cx2 = min(w, x2 + 80)
+            else:
+                # Fix 1: tighter crop for sid/name — pad inward
+                cx1 = max(0, x1 + 4)
+                cx2 = min(w, x2 - 4)
             if cx2 <= cx1:
                 continue
             if key == 'sid':
                 cell = gray[cy1:cy2, cx1:cx2]
-                sid_text = clean_sid(ocr_cell(cell))
+                sid_text = clean_sid(ocr_cell(cell, whitelist='0123456789'))
             elif key == 'name':
                 cell = gray[cy1:cy2, cx1:cx2]
-                name_text = clean_name(ocr_cell(cell))
+                name_text = clean_name(ocr_cell(cell, whitelist='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz .-'))
             elif key == 'grade':
                 cell = gray[cy1:cy2, cx1:cx2]
-                grade_text = normalize_grade(ocr_cell(cell))
+                # Fix 3: scale up small grade cells before OCR
+                gh, gw = cell.shape[:2]
+                if gh < 40:
+                    scale = max(3, 60 // gh)
+                    cell = cv2.resize(cell, (gw * scale, gh * scale),
+                                      interpolation=cv2.INTER_CUBIC)
+                # Fix 4: save grade cell for debugging
+                debug_path = os.path.join(DEBUG_DIR, f'p{page_num}_r{row_idx}_grade.png')
+                cv2.imwrite(debug_path, cell)
+                # Fix 2: try multiple PSM modes for grade
+                grade_text = ocr_grade_cell(cell)
 
         if sid_text or grade_text:
             rows.append({
@@ -307,15 +368,19 @@ def main():
         print(json.dumps({'error': f'pdf2image failed: {str(e)}'}))
         sys.exit(1)
     all_rows = []
-    for pil_img in images:
+    for page_num, pil_img in enumerate(images, 1):
         bgr = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
         # Try full-page OCR fallback first (better for scanned grade lists)
         fallback = full_page_ocr_fallback(bgr)
         if fallback:
             page_rows = fallback
         else:
-            page_rows = extract_page(bgr)
+            page_rows = extract_page(bgr, page_num)
         all_rows.extend(page_rows)
+        # Fix 5: debug per-page output
+        sys.stderr.write(f'[Python] Page {page_num}: {len(page_rows)} rows, '
+                         f'grades: {[r["grade"] for r in page_rows]}\n')
+    sys.stderr.write(f'[Debug] Grade cell images saved to {DEBUG_DIR}\n')
     print(json.dumps(all_rows))
 
 
