@@ -17,7 +17,8 @@ function ocrPdf(filePath) {
       try {
         const result = JSON.parse(stdout);
         if (result.error) return reject(new Error(result.error));
-        resolve(result.rows || []);
+        const rows = Array.isArray(result) ? result : (result.rows || []);
+        resolve(rows);
       } catch (e) {
         reject(new Error(`Python failed: ${stderr}`));
       }

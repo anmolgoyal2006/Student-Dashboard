@@ -233,6 +233,63 @@ def extract_page(bgr_img):
     return rows
 
 
+# ── full-page OCR fallback ─────────────────────────────────────────────
+
+
+def full_page_ocr_fallback(bgr_img):
+    """Use Tesseract full-page OCR and regex to find student rows.
+
+    Handles grade-list layout where table column boundaries are unclear.
+    """
+    import pytesseract as tsrt
+    gray = cv2.cvtColor(bgr_img, cv2.COLOR_BGR2GRAY)
+    _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    try:
+        text = tsrt.image_to_string(thresh, config='--psm 4 --oem 3')
+    except Exception:
+        return []
+    rows = []
+    sid_pattern = re.compile(r'\b(\d{7,12})\b')
+    # Grade-like token pattern (case-insensitive, allows trailing junk)
+    grade_pattern = re.compile(
+        r'(?<![A-Za-z0-9])([A-F][+]?)(?:\s|$|[^A-Za-z0-9+])',
+        re.IGNORECASE
+    )
+    for line in text.split('\n'):
+        line = line.strip()
+        if not line:
+            continue
+        sid_match = sid_pattern.search(line)
+        if not sid_match:
+            continue
+        sid = clean_sid(sid_match.group(1))
+        after_sid = line[sid_match.end():].strip()
+        # Strategy 1: split on last "4" (units column)
+        grade = ''
+        end_idx = after_sid.rfind('4')
+        if end_idx >= 0:
+            grade = normalize_grade(after_sid[end_idx + 1:])
+            name = clean_name(after_sid[:end_idx])
+        # Strategy 2: if no grade yet, search for a grade pattern in the tail
+        if not grade:
+            grade_match = grade_pattern.search(after_sid)
+            if grade_match:
+                g = normalize_grade(grade_match.group(1))
+                if g:
+                    grade = g
+                    gi = grade_match.start()
+                    name = clean_name(after_sid[:gi])
+                else:
+                    name = clean_name(after_sid)
+            else:
+                name = clean_name(after_sid)
+        else:
+            # Clean pipe chars from name
+            name = name.lstrip('|[').strip()
+        rows.append({'sid': sid, 'name': name, 'grade': grade})
+    return rows
+
+
 # ── main ─────────────────────────────────────────────────────────────────
 
 
@@ -245,14 +302,20 @@ def main():
         print(json.dumps({'error': f'File not found: {pdf_path}'}))
         sys.exit(1)
     try:
-        images = convert_from_path(pdf_path, dpi=300, fmt='jpeg')
+        images = convert_from_path(pdf_path, dpi=200, fmt='jpeg')
     except Exception as e:
         print(json.dumps({'error': f'pdf2image failed: {str(e)}'}))
         sys.exit(1)
     all_rows = []
     for pil_img in images:
         bgr = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
-        all_rows.extend(extract_page(bgr))
+        # Try full-page OCR fallback first (better for scanned grade lists)
+        fallback = full_page_ocr_fallback(bgr)
+        if fallback:
+            page_rows = fallback
+        else:
+            page_rows = extract_page(bgr)
+        all_rows.extend(page_rows)
     print(json.dumps(all_rows))
 
 
