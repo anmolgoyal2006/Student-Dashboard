@@ -105,6 +105,12 @@ User: "What Sgpa should i score next sem to get overally cgpa of 9"
 User: "What SGPA do I need next sem to reach 8.5 CGPA"
 → {"action":"answer","entity":"semester","data":{"targetCGPA":8.5,"query":"sgpa_needed"},"message":"Calculating required SGPA."}
 
+User: "if my cgpa 8.84 in 4 semester how much sgpa required in next sem for 9 cgpa"
+→ {"action":"answer","entity":"semester","data":{"currentCGPA":8.84,"completed":4,"targetCGPA":9.0,"query":"sgpa_needed"},"message":"Calculating required SGPA."}
+
+User: "I have 8.5 CGPA in 3 sems. What SGPA do I need next sem to reach 9.0 CGPA overall?"
+→ {"action":"answer","entity":"semester","data":{"currentCGPA":8.5,"completed":3,"targetCGPA":9.0,"query":"sgpa_needed"},"message":"Calculating required SGPA."}
+
 User: "If my CGPA is 8.0 till 4th sem, what will my CGPA be if I score 7 in the next 2 semesters?"
 → {"action":"answer","entity":"semester","data":{"currentCGPA":8.0,"completed":4,"hypotheticalSGPA":7.0,"hypotheticalSemestersCount":2,"query":"cgpa_predict"},"message":"Calculating hypothetical CGPA."}
 
@@ -425,10 +431,35 @@ let result   = null;
 
   // 1b. Target CGPA prediction (calculating required SGPA for a target CGPA)
   if (parsed.data?.targetCGPA || parsed.data?.query === 'sgpa_needed') {
-    const semesters = await Semester.find({ student: userId }).sort({ semesterNumber: 1 });
-    const target    = parseFloat(parsed.data.targetCGPA);
+    const target = parseFloat(parsed.data.targetCGPA);
     if (!isNaN(target)) {
-      const N = semesters.length;
+      let semesters = [];
+      let currentCGPAOverride = parsed.data.currentCGPA !== undefined ? parseFloat(parsed.data.currentCGPA) : null;
+      let completedSemestersCount = parsed.data.completed !== undefined ? parseInt(parsed.data.completed, 10) : null;
+      
+      let completedCreditsCount = 0;
+      let currentWeightedSum = 0;
+      let N = 0;
+      
+      if (currentCGPAOverride !== null && completedSemestersCount !== null && !isNaN(currentCGPAOverride) && !isNaN(completedSemestersCount)) {
+        // Manual override mode
+        N = completedSemestersCount;
+        for (let i = 1; i <= N; i++) {
+          const cr = getCreditsForSemesterNumber(i, []);
+          completedCreditsCount += cr;
+        }
+        currentWeightedSum = currentCGPAOverride * completedCreditsCount;
+      } else {
+        // Database mode
+        semesters = await Semester.find({ student: userId }).sort({ semesterNumber: 1 });
+        N = semesters.length;
+        for (const s of semesters) {
+          const cr = s.isManual ? (s.totalCredits || 20) : (s.subjects || []).reduce((sum, sub) => sum + (sub.credits || 0), 0) || 20;
+          currentWeightedSum += s.sgpa * cr;
+          completedCreditsCount += cr;
+        }
+      }
+      
       if (N === 0) {
         return res.json({
           success: true, action: 'answer', entity: 'none',
@@ -437,24 +468,15 @@ let result   = null;
         });
       }
       
-      // Sum current weighted score
-      let currentWeightedSum = 0;
-      let totalCredits = 0;
-      for (const s of semesters) {
-        const cr = s.isManual ? (s.totalCredits || 20) : (s.subjects || []).reduce((sum, sub) => sum + (sub.credits || 0), 0) || 20;
-        currentWeightedSum += s.sgpa * cr;
-        totalCredits += cr;
-      }
-      
       // Target next semester
-      const nextSemNum = Math.max(...semesters.map(s => s.semesterNumber)) + 1;
+      const nextSemNum = N + 1;
       const nextSemCredits = getCreditsForSemesterNumber(nextSemNum, semesters);
       
-      const totalDegreeCredits = totalCredits + nextSemCredits;
+      const totalDegreeCredits = completedCreditsCount + nextSemCredits;
       const needed = (target * totalDegreeCredits - currentWeightedSum) / nextSemCredits;
 
       let msg = "";
-      const currentCGPA = (currentWeightedSum / totalCredits).toFixed(2);
+      const currentCGPA = (currentWeightedSum / completedCreditsCount).toFixed(2);
       if (needed < 0) {
         msg = `You have already exceeded a CGPA of ${target}! Your current CGPA is ${currentCGPA}.`;
       } else if (needed > 10) {
@@ -462,7 +484,11 @@ let result   = null;
         const maxPossibleCGPA = ((currentWeightedSum + maxSGPA * nextSemCredits) / totalDegreeCredits).toFixed(2);
         msg = `It is mathematically impossible to reach a CGPA of ${target} next semester. Even with a perfect 10.0 SGPA next semester, your max CGPA would be ${maxPossibleCGPA}.`;
       } else {
-        msg = `To reach an overall CGPA of ${target}, you need to score an SGPA of ${needed.toFixed(2)} in your next semester (Semester ${nextSemNum}, assuming ${nextSemCredits} credits).`;
+        if (currentCGPAOverride !== null) {
+          msg = `With a CGPA of ${currentCGPAOverride} over ${N} semesters, you need to score an SGPA of ${needed.toFixed(2)} in your next semester (Semester ${nextSemNum}, assuming ${nextSemCredits} credits) to reach an overall CGPA of ${target}.`;
+        } else {
+          msg = `To reach an overall CGPA of ${target}, you need to score an SGPA of ${needed.toFixed(2)} in your next semester (Semester ${nextSemNum}, assuming ${nextSemCredits} credits).`;
+        }
       }
 
       return res.json({
