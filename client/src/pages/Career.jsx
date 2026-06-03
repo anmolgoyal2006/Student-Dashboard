@@ -164,7 +164,6 @@ export default function Career() {
     recognition.interimResults = true;
 
     const baseText = userAnswer ? userAnswer.trim() + ' ' : '';
-    let finalTranscript = '';
 
     recognition.onstart = () => {
       setIsListening(true);
@@ -184,15 +183,11 @@ export default function Career() {
     };
 
     recognition.onresult = (event) => {
-      let interimTranscript = '';
-      for (let i = event.resultIndex; i < event.results.length; ++i) {
-        if (event.results[i].isFinal) {
-          finalTranscript += event.results[i][0].transcript;
-        } else {
-          interimTranscript += event.results[i][0].transcript;
-        }
+      let sessionText = '';
+      for (let i = 0; i < event.results.length; ++i) {
+        sessionText += event.results[i][0].transcript;
       }
-      setUserAnswer(baseText + finalTranscript + interimTranscript);
+      setUserAnswer(baseText + sessionText);
     };
 
     recognition.start();

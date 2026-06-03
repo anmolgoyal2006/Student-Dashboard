@@ -489,26 +489,23 @@ export default function AIAssistant() {
     recognition.interimResults = true;
     recognition.continuous     = false;
 
-    let finalTranscript = '';
+    let currentText = '';
 
     recognition.onstart  = () => setListening(true);
     recognition.onend    = () => {
       setListening(false);
-      if (finalTranscript.trim()) {
-        handleSend(finalTranscript.trim());
+      if (currentText.trim()) {
+        handleSend(currentText.trim());
       }
     };
     recognition.onerror  = () => { setListening(false); toast.error('Voice error'); };
     recognition.onresult = (e) => {
-      let interim = '';
-      for (let i = e.resultIndex; i < e.results.length; ++i) {
-        if (e.results[i].isFinal) {
-          finalTranscript += e.results[i][0].transcript;
-        } else {
-          interim += e.results[i][0].transcript;
-        }
+      let resultText = '';
+      for (let i = 0; i < e.results.length; ++i) {
+        resultText += e.results[i][0].transcript;
       }
-      setInput(finalTranscript + interim);
+      currentText = resultText;
+      setInput(resultText);
     };
 
     toast('🎤 Listening... Speak now.', { duration: 2000, icon: '🎙️' });

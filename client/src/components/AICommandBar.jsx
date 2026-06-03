@@ -26,12 +26,12 @@ export default function AICommandBar({ onRefresh }) {
     recog.continuous     = false;
     recogRef.current     = recog;
 
-    let finalTranscript = '';
+    let currentText = '';
 
     recog.onstart  = () => setListening(true);
     recog.onend    = () => {
       setListening(false);
-      const cmd = finalTranscript.trim();
+      const cmd = currentText.trim();
       if (cmd) {
         handleCommand(cmd);
       }
@@ -43,15 +43,12 @@ export default function AICommandBar({ onRefresh }) {
       }
     };
     recog.onresult = (e) => {
-      let interim = '';
-      for (let i = e.resultIndex; i < e.results.length; ++i) {
-        if (e.results[i].isFinal) {
-          finalTranscript += e.results[i][0].transcript;
-        } else {
-          interim += e.results[i][0].transcript;
-        }
+      let resultText = '';
+      for (let i = 0; i < e.results.length; ++i) {
+        resultText += e.results[i][0].transcript;
       }
-      setInput(finalTranscript + interim);
+      currentText = resultText;
+      setInput(resultText);
     };
 
     recog.start();
