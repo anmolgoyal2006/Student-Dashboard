@@ -87,8 +87,8 @@ async function callNotesAI(action, payload) {
   return { text: data.answer, sources: data.sources };
 }
 
-async function callSmartAssistant(message) {
-  const { data } = await aiCommandService.send(message);
+async function callSmartAssistant(payload) {
+  const { data } = await aiCommandService.send(payload);
   return data;
 }
 
@@ -432,7 +432,22 @@ export default function AIAssistant() {
       } else {
         // Assistant mode — Groq decides if it's a command, query, or analytical answer
         // No frontend pattern matching — let the backend handle routing entirely
-        const res = await callSmartAssistant(text);
+        let res = await callSmartAssistant({ message: text });
+
+        if (res.success && res.action === 'confirm') {
+          const confirmed = window.confirm(res.message);
+          if (confirmed) {
+            res = await callSmartAssistant({ message: text, confirmed: true });
+          } else {
+            addMessage('assistant', {
+              role: 'ai',
+              text: '❌ Deletion cancelled.',
+              id: Date.now() + 2
+            });
+            setLoading(false);
+            return;
+          }
+        }
 
         addMessage('assistant', {
           role  : 'ai',

@@ -136,6 +136,12 @@ User: "delete task Submit assignment"
 User: "remove Math subject"
 → {"action":"delete","entity":"subject","data":{"name":"Math"},"message":"Deleting subject."}
 
+User: "delete all the subjects"
+→ {"action":"delete","entity":"subject","data":{"name":"all"},"message":"Deleting all subjects."}
+
+User: "remove all tasks"
+→ {"action":"delete","entity":"task","data":{"title":"all"},"message":"Deleting all tasks."}
+
 User: "change Maths class instructor to Dr. Smith"
 → {"action":"update","entity":"subject","data":{"name":"Maths","instructor":"Dr. Smith"},"message":"Updating Maths instructor."}
 
@@ -475,11 +481,41 @@ const keptSlots  = (existing.schedule || []).filter(sc => !newDays.includes(sc.d
   if (parsed.data.code)       s.code       = parsed.data.code;
 
   result = await s.save();
-}else if (parsed.action === 'delete') {
+      } else if (parsed.action === 'delete') {
+        if (parsed.data.name?.toLowerCase() === 'all' || parsed.data.all === true || parsed.data.deleteAll === true) {
+          if (req.body.confirmed !== true) {
+            return res.json({
+              success: true,
+              action: 'confirm',
+              entity: 'subject',
+              data: { originalAction: 'delete', name: 'all' },
+              message: '⚠️ Warning: Deleting all subjects will permanently erase all subject, attendance, and exam marks records. Are you sure you want to proceed?'
+            });
+          }
+          await Subject.deleteMany({ userId });
+          await Attendance.deleteMany({ userId });
+          await Marks.deleteMany({ userId });
+          return res.json({ success: true, action: 'delete', entity: 'subject', message: 'All subjects, marks, and attendance records have been deleted.' });
+        }
         if (!parsed.data.name) return res.json({ success: false, message: 'Please specify which subject to delete.' });
-        const s = await Subject.findOne({ userId, name: new RegExp(parsed.data.name, 'i') });
-        if (s) await Subject.findByIdAndDelete(s._id);
-        else   return res.json({ success: false, message: `Subject "${parsed.data.name}" not found.` });
+        const s = await Subject.findOne({ userId, name: new RegExp(`^${parsed.data.name}$`, 'i') });
+        if (s) {
+          if (req.body.confirmed !== true) {
+            return res.json({
+              success: true,
+              action: 'confirm',
+              entity: 'subject',
+              data: { originalAction: 'delete', name: s.name },
+              message: `Are you sure you want to delete the subject "${s.name}"? This will also delete all associated marks and attendance records.`
+            });
+          }
+          await Subject.findByIdAndDelete(s._id);
+          await Attendance.deleteMany({ userId, subjectId: s._id });
+          await Marks.deleteMany({ userId, subjectId: s._id });
+          return res.json({ success: true, action: 'delete', entity: 'subject', message: `Subject "${s.name}" deleted.`, data: s });
+        } else {
+          return res.json({ success: false, message: `Subject "${parsed.data.name}" not found.` });
+        }
 
       } else if (parsed.action === 'get') {
         // Today's schedule
@@ -649,10 +685,36 @@ if (userForNotif?.fcmToken) {
 }
 
       } else if (parsed.action === 'delete') {
+        if (parsed.data.title?.toLowerCase() === 'all' || parsed.data.all === true || parsed.data.deleteAll === true) {
+          if (req.body.confirmed !== true) {
+            return res.json({
+              success: true,
+              action: 'confirm',
+              entity: 'task',
+              data: { originalAction: 'delete', title: 'all' },
+              message: 'Are you sure you want to delete all pending tasks?'
+            });
+          }
+          await Task.deleteMany({ user: userId });
+          return res.json({ success: true, action: 'delete', entity: 'task', message: 'All tasks have been deleted.' });
+        }
         if (!parsed.data.title) return res.json({ success: false, message: 'Please specify which task to delete.' });
         const t = await Task.findOne({ user: userId, title: new RegExp(parsed.data.title, 'i') });
-        if (t) await Task.findByIdAndDelete(t._id);
-        else   return res.json({ success: false, message: `Task "${parsed.data.title}" not found.` });
+        if (t) {
+          if (req.body.confirmed !== true) {
+            return res.json({
+              success: true,
+              action: 'confirm',
+              entity: 'task',
+              data: { originalAction: 'delete', title: t.title },
+              message: `Are you sure you want to delete the task "${t.title}"?`
+            });
+          }
+          await Task.findByIdAndDelete(t._id);
+          return res.json({ success: true, action: 'delete', entity: 'task', message: `Task "${t.title}" deleted.`, data: t });
+        } else {
+          return res.json({ success: false, message: `Task "${parsed.data.title}" not found.` });
+        }
 
       } else if (parsed.action === 'update') {
         if (!parsed.data.title) return res.json({ success: false, message: 'Please specify which task to update.' });

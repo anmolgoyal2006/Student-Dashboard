@@ -15,6 +15,7 @@ export const subjectService = {
   update: (id, d) => apiRequest('put',    `/timetable/${id}`, d),
   remove: (id)    => apiRequest('delete', `/timetable/${id}`),
 };
+
 // ─── Attendance ───────────────────────────────────────────────────────────
 export const attendanceService = {
   mark:            (data) => apiRequest('post', '/attendance', data),
@@ -24,16 +25,11 @@ export const attendanceService = {
   getSummary: () => apiRequest('get', '/attendance/summary'),
 
   // [CHANGED] accepts optional months param (default 6, max 12)
-  // Usage: attendanceService.getTrends()        → last 6 months
-  //        attendanceService.getTrends(12)       → last 12 months
   getTrends: (months = 6) => apiRequest('get', '/attendance/trends', null, {
     params: { months },
   }),
 
   // [CHANGED] accepts optional pagination + date range params
-  // Usage: attendanceService.getBySubject(id)
-  //        attendanceService.getBySubject(id, { page: 2, limit: 20 })
-  //        attendanceService.getBySubject(id, { from: '2025-01-01', to: '2025-06-30' })
   getBySubject: (id, params = {}) => apiRequest('get', `/attendance/${id}`, null, {
     params,
   }),
@@ -113,6 +109,7 @@ export const userService = {
   resetPassword:  (token, newPassword) => apiRequest('post', `/user/reset-password/${token}`, { newPassword }),
   updateSID:      (data)               => apiRequest('put',  '/user/update-sid',              data),
 };
+
 // ─── AI Chat / Study Assistant ────────────────────────────────────────────
 export const aiChatService = {
   chat: (message, mode) =>
@@ -144,5 +141,5 @@ export const predictionService = {
 };
 
 export const aiCommandService = {
-  send: (message) => apiRequest('post', '/ai-command', { message }),
+  send: (payload) => apiRequest('post', '/ai-command', typeof payload === 'string' ? { message: payload } : payload),
 };
