@@ -611,7 +611,7 @@ export default function AIAssistant() {
   ];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 80px)' }}>
+    <div className="page-container-fixed">
 
       <style>{`
         @keyframes aiBubbleIn {

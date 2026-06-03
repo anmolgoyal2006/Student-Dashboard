@@ -32,6 +32,8 @@
   --shadow:        0 1px 8px rgba(0,0,0,0.35);
   --shadow-md:     0 4px 24px rgba(0,0,0,0.5);
   --shadow-glow:   0 0 20px rgba(129,140,248,0.15);
+  --main-padding-top: clamp(16px, 3vw, 32px);
+  --main-padding-bottom: clamp(16px, 3vw, 32px);
 }
 
 html {
@@ -62,8 +64,15 @@ body {
   flex: 1;
   min-width: 0;
   margin-left: var(--sidebar-w);
-  padding: clamp(16px, 3vw, 32px);
+  padding: var(--main-padding-top) clamp(16px, 3vw, 32px) var(--main-padding-bottom);
   transition: margin-left 0.3s ease;
+}
+
+.page-container-fixed {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - var(--main-padding-top) - var(--main-padding-bottom));
+  overflow: hidden;
 }
 
 /* ───── Sidebar ───── */
@@ -568,7 +577,11 @@ tr:hover td { background: rgba(255,255,255,0.025); }
 
 /* ───── Responsive breakpoints ───── */
 @media (max-width: 768px) {
-  :root { --sidebar-w: 0px; }
+  :root {
+    --sidebar-w: 0px;
+    --main-padding-top: 72px;
+    --main-padding-bottom: 24px;
+  }
 
   .mobile-navbar { display: flex; }
   .sidebar-overlay { display: block; }
@@ -584,7 +597,7 @@ tr:hover td { background: rgba(255,255,255,0.025); }
 
   .main-content {
     margin-left: 0;
-    padding: 72px 14px 24px; /* top padding for mobile navbar */
+    padding: var(--main-padding-top) 14px var(--main-padding-bottom);
   }
 
   .grid-2, .grid-3, .grid-4 {

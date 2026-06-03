@@ -72,7 +72,7 @@ export default function Sidebar() {
   return (
     <>
       {/* Mobile top navbar */}
-      <nav className="mobile-navbar" style={{ padding: '0 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <nav className="mobile-navbar">
         <span className="mobile-nav-logo">🎓 StudentAI</span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <button
