@@ -332,10 +332,21 @@ exports.handleCommand = async (req, res) => {
   try {
     // ── Step 1: Call Groq ──────────────────────────────────────────────────
     console.log('[AI] Calling Groq with model: llama-3.1-8b-instant, key prefix:', process.env.GROQ_API_KEY ? process.env.GROQ_API_KEY.substring(0, 10) : 'NONE');
+    
+    const historyMessages = [];
+    if (req.body.history && Array.isArray(req.body.history)) {
+      const recentHistory = req.body.history.slice(-6);
+      for (const msg of recentHistory) {
+        const role = msg.role === 'user' ? 'user' : 'assistant';
+        historyMessages.push({ role, content: msg.text || '' });
+      }
+    }
+
     const completion = await groq.chat.completions.create({
       model     : 'llama-3.1-8b-instant',
       messages   : [
         { role: 'system', content: buildPrompt() },
+        ...historyMessages,
         { role: 'user',   content: userInput },
       ],
       temperature: 0.1,

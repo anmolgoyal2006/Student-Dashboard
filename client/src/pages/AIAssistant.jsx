@@ -351,7 +351,19 @@ export default function AIAssistant() {
   const [listening, setListening]     = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(false);
   const recognitionRef                = useRef(null);
-  const [messages, setMessages]       = useState({ notes: [], assistant: [] });
+  const [messages, setMessages]       = useState(() => {
+    let savedNotes = [];
+    let savedAssistant = [];
+    try {
+      const n = localStorage.getItem("ai_assistant_chat_history_notes");
+      if (n) savedNotes = JSON.parse(n);
+      const a = localStorage.getItem("ai_assistant_chat_history_assistant");
+      if (a) savedAssistant = JSON.parse(a);
+    } catch (e) {
+      console.error(e);
+    }
+    return { notes: savedNotes, assistant: savedAssistant };
+  });
   const [input, setInput]             = useState('');
   const [loading, setLoading]         = useState(false);
   const [uploadedFile, setUploadedFile] = useState(null);
@@ -363,6 +375,15 @@ export default function AIAssistant() {
   const chatEndRef   = useRef();
   const inputRef     = useRef();
   const { refreshByEntity } = useGlobalData();
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("ai_assistant_chat_history_notes", JSON.stringify(messages.notes));
+      localStorage.setItem("ai_assistant_chat_history_assistant", JSON.stringify(messages.assistant));
+    } catch (e) {
+      console.error(e);
+    }
+  }, [messages]);
 
   const currentMessages = messages[mode];
 
@@ -425,19 +446,29 @@ export default function AIAssistant() {
     try {
       if (mode === 'notes') {
         // Notes mode — always goes to RAG/chat AI
-        const res = await callNotesAI('chat', { message: text });
+        const res = await callNotesAI('chat', { 
+          message: text,
+          history: messages.notes.map(m => ({ role: m.role, text: m.text }))
+        });
         addMessage('notes', { role: 'ai', text: res.text, sources: res.sources, id: Date.now() + 1 });
         speak(res.text);
 
       } else {
         // Assistant mode — Groq decides if it's a command, query, or analytical answer
         // No frontend pattern matching — let the backend handle routing entirely
-        let res = await callSmartAssistant({ message: text });
+        let res = await callSmartAssistant({ 
+          message: text,
+          history: messages.assistant.map(m => ({ role: m.role, text: m.text }))
+        });
 
         if (res.success && res.action === 'confirm') {
           const confirmed = window.confirm(res.message);
           if (confirmed) {
-            res = await callSmartAssistant({ message: text, confirmed: true });
+            res = await callSmartAssistant({ 
+              message: text, 
+              confirmed: true,
+              history: messages.assistant.map(m => ({ role: m.role, text: m.text }))
+            });
           } else {
             addMessage('assistant', {
               role: 'ai',
@@ -612,7 +643,7 @@ export default function AIAssistant() {
       `}</style>
 
       {/* ── Page header ── */}
-      <div className="page-header">
+      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <h1 className="page-title">🤖 AI Study Assistant</h1>
           <p className="page-subtitle">
@@ -621,6 +652,18 @@ export default function AIAssistant() {
               : 'Natural language dashboard control — powered by Groq'}
           </p>
         </div>
+        <button
+          className="btn btn-outline"
+          onClick={() => {
+            if (window.confirm(`Clear all chat history for ${mode === 'notes' ? 'Notes AI' : 'Dashboard AI'}?`)) {
+              setMessages(prev => ({ ...prev, [mode]: [] }));
+              toast.success('Chat history cleared');
+            }
+          }}
+          style={{ padding: '6px 12px', fontSize: 13, borderColor: 'var(--border)', color: 'var(--muted)', background: 'transparent' }}
+        >
+          🗑️ Clear Chat
+        </button>
       </div>
 
       {/* ── Main card ── */}

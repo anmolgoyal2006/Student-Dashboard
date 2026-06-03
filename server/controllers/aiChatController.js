@@ -126,11 +126,11 @@ exports.uploadNotes = async (req, res) => {
 // ── POST /api/ai/chat ─────────────────────────────────────────────────────
 exports.chat = async (req, res) => {
   try {
-    const { message, mode } = req.body;
+    const { message, mode, history } = req.body;
     if (!message?.trim())
       return res.status(400).json({ message: 'Message is required.' });
 
-    const result = await chatWithRAG(req.user.id, message.trim(), mode || 'chat');
+    const result = await chatWithRAG(req.user.id, message.trim(), mode || 'chat', history);
     res.json(result);
 
   } catch (err) {

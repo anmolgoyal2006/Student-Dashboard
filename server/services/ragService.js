@@ -52,11 +52,11 @@ async function retrieveRelevantChunks(userId, query, topK = 4) {
   return scored.sort((a, b) => b.score - a.score).slice(0, topK);
 }
 
-async function chatWithRAG(userId, message, mode = 'chat') {
+async function chatWithRAG(userId, message, mode = 'chat', history = []) {
   console.log('[RAG] userId:', userId, 'mode:', mode);
   console.log('[RAG] GROQ_API_KEY exists:', !!process.env.GROQ_API_KEY);
 
-if (!process.env.GROQ_CHAT_KEY && !process.env.GROQ_API_KEY)
+  if (!process.env.GROQ_CHAT_KEY && !process.env.GROQ_API_KEY)
     throw new Error('GROQ_API_KEY is not set');
 
   const relevantChunks = await retrieveRelevantChunks(userId, message);
@@ -83,10 +83,20 @@ Answer: [letter]
 ${context ? `Notes:\n\n${context}` : 'No notes found.'}`,
   };
 
+  const historyMessages = [];
+  if (Array.isArray(history)) {
+    const recentHistory = history.slice(-6);
+    for (const msg of recentHistory) {
+      const role = msg.role === 'user' ? 'user' : 'assistant';
+      historyMessages.push({ role, content: msg.text || '' });
+    }
+  }
+
   const completion = await groq.chat.completions.create({
     model:       'llama-3.3-70b-versatile',
     messages: [
       { role: 'system', content: systemPrompts[mode] || systemPrompts.chat },
+      ...historyMessages,
       { role: 'user',   content: message },
     ],
     max_tokens:  1000,
