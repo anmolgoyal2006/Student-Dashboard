@@ -486,21 +486,33 @@ export default function AIAssistant() {
     const recognition          = new SpeechRecognition();
     recognitionRef.current     = recognition;
     recognition.lang           = 'en-US';
-    recognition.interimResults = false;
+    recognition.interimResults = true;
     recognition.continuous     = false;
 
+    let finalTranscript = '';
+
     recognition.onstart  = () => setListening(true);
-    recognition.onend    = () => setListening(false);
+    recognition.onend    = () => {
+      setListening(false);
+      if (finalTranscript.trim()) {
+        handleSend(finalTranscript.trim());
+      }
+    };
     recognition.onerror  = () => { setListening(false); toast.error('Voice error'); };
     recognition.onresult = (e) => {
-      const transcript = e.results[0][0].transcript;
-      handleSend(transcript);
+      let interim = '';
+      for (let i = e.resultIndex; i < e.results.length; ++i) {
+        if (e.results[i].isFinal) {
+          finalTranscript += e.results[i][0].transcript;
+        } else {
+          interim += e.results[i][0].transcript;
+        }
+      }
+      setInput(finalTranscript + interim);
     };
 
-    // [CHANGED] 300ms warmup delay — prevents microphone cutting the first syllable
-    // Show mic is warming up, then start
-toast('🎤 Listening in 1 second…', { duration: 900, icon: '🎙️' });
-setTimeout(() => recognition.start(), 900);
+    toast('🎤 Listening... Speak now.', { duration: 2000, icon: '🎙️' });
+    recognition.start();
   };
 
   const handleAction = async (action) => {

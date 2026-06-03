@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { careerService }   from '../services/apiServices';
 import FocusMode           from '../components/FocusMode';
 import CareerProgressBar   from '../components/CareerProgressBar';
@@ -42,6 +42,8 @@ export default function Career() {
   const [evaluationResult, setEvaluationResult] = useState(null);
   const [showModelAnswer, setShowModelAnswer] = useState(false);
   const [selectedHistoryItem, setSelectedHistoryItem] = useState(null); // Selected past interview details
+  const [isListening, setIsListening] = useState(false);
+  const voiceRecogRef = useRef(null);
 
   const handleAnalyzeResume = async () => {
     if (!resumeText.trim()) return;
@@ -140,6 +142,60 @@ export default function Career() {
     } finally {
       setEvaluating(false);
     }
+  };
+
+  const handleVoiceAnswer = () => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      toast.error('Voice dictation not supported in this browser. Try Chrome.');
+      return;
+    }
+
+    if (isListening) {
+      voiceRecogRef.current?.stop();
+      setIsListening(false);
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    voiceRecogRef.current = recognition;
+    recognition.lang = 'en-US';
+    recognition.continuous = true;
+    recognition.interimResults = true;
+
+    const baseText = userAnswer ? userAnswer.trim() + ' ' : '';
+    let finalTranscript = '';
+
+    recognition.onstart = () => {
+      setIsListening(true);
+      toast('🎙️ Listening... Speak your answer.', { icon: '🎤', duration: 3000 });
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+
+    recognition.onerror = (e) => {
+      console.error('Speech recognition error:', e.error);
+      setIsListening(false);
+      if (e.error !== 'aborted') {
+        toast.error('Voice dictation error: ' + e.error);
+      }
+    };
+
+    recognition.onresult = (event) => {
+      let interimTranscript = '';
+      for (let i = event.resultIndex; i < event.results.length; ++i) {
+        if (event.results[i].isFinal) {
+          finalTranscript += event.results[i][0].transcript;
+        } else {
+          interimTranscript += event.results[i][0].transcript;
+        }
+      }
+      setUserAnswer(baseText + finalTranscript + interimTranscript);
+    };
+
+    recognition.start();
   };
 
   const handleNavQuestion = async (newIndex) => {
@@ -897,7 +953,43 @@ export default function Career() {
 
                 {/* Answer Area */}
                 <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label className="form-label">Your Response</label>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                    <label className="form-label" style={{ margin: 0 }}>Your Response</label>
+                    {!questions[activeQuestionIndex].isEvaluated && (
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-outline"
+                        style={{
+                          padding: '2px 8px',
+                          minHeight: 'auto',
+                          height: 26,
+                          borderColor: isListening ? '#ef4444' : 'var(--border)',
+                          background: isListening ? 'rgba(239,68,68,0.1)' : 'transparent',
+                          color: isListening ? '#ef4444' : 'var(--text-2)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 4
+                        }}
+                        onClick={handleVoiceAnswer}
+                      >
+                        {isListening ? (
+                          <>
+                            <span style={{
+                              width: 8,
+                              height: 8,
+                              borderRadius: '50%',
+                              background: '#ef4444',
+                              display: 'inline-block',
+                              animation: 'voicePulse 1.2s infinite'
+                            }}></span>
+                            Stop Listening
+                          </>
+                        ) : (
+                          <>🎤 Speak Answer</>
+                        )}
+                      </button>
+                    )}
+                  </div>
                   <textarea
                     className="form-input"
                     style={{ minHeight: 140, resize: 'vertical', fontFamily: 'inherit', fontSize: 13 }}
@@ -906,6 +998,13 @@ export default function Career() {
                     onChange={e => setUserAnswer(e.target.value)}
                     disabled={questions[activeQuestionIndex].isEvaluated}
                   />
+                  <style>{`
+                    @keyframes voicePulse {
+                      0% { opacity: 0.4; transform: scale(0.9); }
+                      50% { opacity: 1; transform: scale(1.1); }
+                      100% { opacity: 0.4; transform: scale(0.9); }
+                    }
+                  `}</style>
                 </div>
 
                 {/* Action Buttons */}

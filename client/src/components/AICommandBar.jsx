@@ -22,20 +22,36 @@ export default function AICommandBar({ onRefresh }) {
     }
     const recog          = new SpeechRecognition();
     recog.lang           = 'en-US';
-    recog.interimResults = false;
-    recog.maxAlternatives = 1;
+    recog.interimResults = true;
+    recog.continuous     = false;
     recogRef.current     = recog;
 
+    let finalTranscript = '';
+
     recog.onstart  = () => setListening(true);
-    recog.onend    = () => setListening(false);
+    recog.onend    = () => {
+      setListening(false);
+      const cmd = finalTranscript.trim();
+      if (cmd) {
+        handleCommand(cmd);
+      }
+    };
     recog.onerror  = (e) => {
       setListening(false);
-      toast.error('Voice error: ' + e.error);
+      if (e.error !== 'aborted') {
+        toast.error('Voice error: ' + e.error);
+      }
     };
     recog.onresult = (e) => {
-      const transcript = e.results[0][0].transcript;
-      setInput(transcript);
-      handleCommand(transcript); // auto-submit after voice
+      let interim = '';
+      for (let i = e.resultIndex; i < e.results.length; ++i) {
+        if (e.results[i].isFinal) {
+          finalTranscript += e.results[i][0].transcript;
+        } else {
+          interim += e.results[i][0].transcript;
+        }
+      }
+      setInput(finalTranscript + interim);
     };
 
     recog.start();
