@@ -184,6 +184,261 @@ export default function Prediction() {
 
   return (
     <div>
+      <style>{`
+        .ai-trajectory-card {
+          border-radius: 20px;
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          background: linear-gradient(135deg, rgba(30, 30, 46, 0.7) 0%, rgba(15, 23, 42, 0.8) 100%);
+          backdrop-filter: blur(16px);
+          -webkit-backdrop-filter: blur(16px);
+          overflow: hidden;
+          box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.05);
+          margin-bottom: 28px;
+          animation: aiFadeIn 0.4s ease-out both;
+        }
+        
+        .ai-trajectory-header {
+          padding: 20px 24px;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          flex-wrap: wrap;
+          gap: 16px;
+        }
+
+        .ai-brain-container {
+          width: 40px;
+          height: 40px;
+          border-radius: 12px;
+          background: linear-gradient(135deg, rgba(129, 140, 248, 0.2) 0%, rgba(99, 102, 241, 0.2) 100%);
+          border: 1px solid rgba(129, 140, 248, 0.4);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          position: relative;
+          overflow: hidden;
+        }
+
+        .ai-brain-pulse {
+          position: absolute;
+          width: 100%;
+          height: 100%;
+          background: rgba(129, 140, 248, 0.15);
+          border-radius: 50%;
+          animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+        }
+
+        @keyframes ping {
+          75%, 100% {
+            transform: scale(2);
+            opacity: 0;
+          }
+        }
+
+        .feasibility-pill {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 6px 16px;
+          border-radius: 99px;
+          font-size: 12px;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+          transition: all 0.3s ease;
+        }
+
+        .feasibility-pill:hover {
+          transform: scale(1.05);
+        }
+
+        .insight-banner {
+          padding: 16px 20px;
+          border-radius: 14px;
+          background: linear-gradient(90deg, rgba(99, 102, 241, 0.08) 0%, rgba(139, 92, 246, 0.04) 100%);
+          border: 1px solid rgba(99, 102, 241, 0.15);
+          font-size: 13.5px;
+          line-height: 1.6;
+          color: #e2e8f0;
+          margin-bottom: 24px;
+          display: flex;
+          align-items: flex-start;
+          gap: 12px;
+        }
+
+        .section-label {
+          margin: 0 0 12px;
+          font-size: 12px;
+          font-weight: 700;
+          color: #a5b4fc;
+          text-transform: uppercase;
+          letter-spacing: 0.08em;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .overview-text {
+          margin: 0;
+          font-size: 14px;
+          color: #cbd5e1;
+          line-height: 1.7;
+          background: rgba(255, 255, 255, 0.01);
+          padding: 16px;
+          border-radius: 12px;
+          border: 1px solid rgba(255, 255, 255, 0.03);
+        }
+
+        .bottleneck-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+          gap: 14px;
+        }
+
+        .bottleneck-card {
+          padding: 16px;
+          border-radius: 14px;
+          background: rgba(244, 63, 94, 0.01);
+          border: 1px solid rgba(244, 63, 94, 0.15);
+          border-left: 4px solid #f43f5e;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .bottleneck-card:hover {
+          transform: translateY(-2px);
+          background: rgba(244, 63, 94, 0.03);
+          border-color: rgba(244, 63, 94, 0.3);
+          box-shadow: 0 6px 20px rgba(244, 63, 94, 0.1);
+        }
+
+        .success-card {
+          padding: 20px;
+          border-radius: 14px;
+          background: linear-gradient(135deg, rgba(16, 185, 129, 0.02) 0%, rgba(52, 211, 153, 0.05) 100%);
+          border: 1px solid rgba(16, 185, 129, 0.15);
+          border-left: 4px solid #10b981;
+          display: flex;
+          align-items: center;
+          gap: 16px;
+          transition: all 0.3s ease;
+        }
+
+        .success-card:hover {
+          transform: translateY(-2px);
+          border-color: rgba(16, 185, 129, 0.3);
+          box-shadow: 0 6px 20px rgba(16, 185, 129, 0.1);
+        }
+
+        .success-check-circle {
+          width: 38px;
+          height: 38px;
+          border-radius: 50%;
+          background: rgba(16, 185, 129, 0.15);
+          border: 1.5px solid rgba(16, 185, 129, 0.3);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #34d399;
+          flex-shrink: 0;
+        }
+
+        .roadmap-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+          gap: 12px;
+        }
+
+        .roadmap-card {
+          padding: 16px 12px;
+          border-radius: 14px;
+          background: rgba(255, 255, 255, 0.02);
+          border: 1px solid rgba(255, 255, 255, 0.05);
+          text-align: center;
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+          position: relative;
+          overflow: hidden;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .roadmap-card::before {
+          content: '';
+          position: absolute;
+          top: 0; left: 0; width: 100%; height: 3px;
+          background: linear-gradient(90deg, #6366f1, #8b92f6);
+          opacity: 0.7;
+        }
+
+        .roadmap-card:hover {
+          transform: translateY(-5px);
+          background: rgba(255, 255, 255, 0.04);
+          border-color: rgba(99, 102, 241, 0.3);
+          box-shadow: 0 8px 25px rgba(99, 102, 241, 0.15);
+        }
+
+        .roadmap-card:hover::before {
+          opacity: 1;
+          height: 4px;
+        }
+
+        .roadmap-value {
+          font-size: 24px;
+          font-weight: 800;
+          background: linear-gradient(135deg, #a5b4fc 0%, #818cf8 100%);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          font-family: 'Space Grotesk', sans-serif;
+          margin: 4px 0;
+        }
+
+        .strategy-list {
+          margin: 0;
+          padding: 0;
+          list-style: none;
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+        }
+
+        .strategy-item {
+          font-size: 13.5px;
+          color: #cbd5e1;
+          line-height: 1.6;
+          padding: 12px 16px;
+          background: rgba(255, 255, 255, 0.01);
+          border: 1px solid rgba(255, 255, 255, 0.04);
+          border-radius: 10px;
+          display: flex;
+          align-items: flex-start;
+          gap: 12px;
+          transition: all 0.2s ease;
+        }
+
+        .strategy-item:hover {
+          background: rgba(255, 255, 255, 0.03);
+          border-color: rgba(129, 140, 248, 0.2);
+          transform: translateX(4px);
+        }
+
+        .strategy-bullet {
+          width: 20px;
+          height: 20px;
+          border-radius: 6px;
+          background: rgba(129, 140, 248, 0.12);
+          border: 1px solid rgba(129, 140, 248, 0.25);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #818cf8;
+          font-size: 11px;
+          font-weight: bold;
+          flex-shrink: 0;
+          margin-top: 1px;
+        }
+      `}</style>
       <div className="page-header">
         <div>
           <h1 className="page-title">🎯 CGPA Predictor</h1>
@@ -398,209 +653,199 @@ export default function Prediction() {
             </div>
           )}
 
-          {aiData && (
-            <div style={{
-              borderRadius: 16,
-              border: '1px solid rgba(255,255,255,0.08)',
-              background: 'linear-gradient(135deg, var(--surface-1, #1e1e2e) 0%, rgba(30, 30, 46, 0.95) 100%)',
-              overflow: 'hidden',
-              boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.3)',
-              marginBottom: 24
-            }}>
-              {/* Header */}
-              <div style={{
-                padding: '18px 20px',
-                borderBottom: '1px solid rgba(255,255,255,0.07)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                flexWrap: 'wrap',
-                gap: 12
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{
-                    width: 34,
-                    height: 34,
-                    borderRadius: 10,
-                    background: 'rgba(129,140,248,0.15)',
-                    border: '1px solid rgba(129,140,248,0.3)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: 16
-                  }}>
-                    🧠
-                  </div>
-                  <div>
-                    <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: 'var(--text-primary, #f1f5f9)' }}>
-                      StudentAI Trajectory Analysis
-                    </h3>
-                    <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--text-secondary, #94a3b8)' }}>
-                      Real-time academic projection & study roadmap
-                    </p>
-                  </div>
-                </div>
-                
-                {/* Feasibility Badge */}
-                {aiData.feasibility && (
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 6,
-                    padding: '4px 12px',
-                    borderRadius: 99,
-                    background: 
-                      aiData.feasibility === 'High' ? 'rgba(16,185,129,0.12)' :
-                      aiData.feasibility === 'Medium' ? 'rgba(99,102,241,0.12)' :
-                      aiData.feasibility === 'Challenging' ? 'rgba(245,158,11,0.12)' :
-                      aiData.feasibility === 'Low' ? 'rgba(244,63,94,0.12)' : 'rgba(239,68,68,0.15)',
-                    border: `1px solid ${
-                      aiData.feasibility === 'High' ? 'rgba(16,185,129,0.35)' :
-                      aiData.feasibility === 'Medium' ? 'rgba(99,102,241,0.35)' :
-                      aiData.feasibility === 'Challenging' ? 'rgba(245,158,11,0.35)' :
-                      aiData.feasibility === 'Low' ? 'rgba(244,63,94,0.35)' : 'rgba(239,68,68,0.45)'
-                    }`,
-                    color: 
-                      aiData.feasibility === 'High' ? '#34d399' :
-                      aiData.feasibility === 'Medium' ? '#818cf8' :
-                      aiData.feasibility === 'Challenging' ? '#fbbf24' :
-                      aiData.feasibility === 'Low' ? '#f43f5e' : '#ef4444',
-                    fontSize: 11,
-                    fontWeight: 700
-                  }}>
-                    <span style={{
-                      width: 5,
-                      height: 5,
-                      borderRadius: '50%',
-                      background: 
-                        aiData.feasibility === 'High' ? '#10b981' :
-                        aiData.feasibility === 'Medium' ? '#6366f1' :
-                        aiData.feasibility === 'Challenging' ? '#f59e0b' :
-                        aiData.feasibility === 'Low' ? '#f43f5e' : '#ef4444'
-                    }} />
-                    Feasibility: {aiData.feasibility}
-                  </div>
-                )}
-              </div>
+          {aiData && (() => {
+            const feasibilityColors = {
+              High: { bg: 'rgba(16, 185, 129, 0.1)', text: '#34d399', border: 'rgba(16, 185, 129, 0.25)', dot: '#10b981' },
+              Medium: { bg: 'rgba(99, 102, 241, 0.1)', text: '#818cf8', border: 'rgba(99, 102, 241, 0.25)', dot: '#6366f1' },
+              Challenging: { bg: 'rgba(245, 158, 11, 0.1)', text: '#fbbf24', border: 'rgba(245, 158, 11, 0.25)', dot: '#f59e0b' },
+              Low: { bg: 'rgba(244, 63, 94, 0.1)', text: '#f43f5e', border: 'rgba(244, 63, 94, 0.25)', dot: '#f43f5e' },
+              Impossible: { bg: 'rgba(239, 68, 68, 0.12)', text: '#ef4444', border: 'rgba(239, 68, 68, 0.3)', dot: '#ef4444' }
+            };
+            const fColor = feasibilityColors[aiData.feasibility] || feasibilityColors.Medium;
+            const hasNoBottlenecks = !aiData.bottlenecks || aiData.bottlenecks.length === 0 || 
+              (aiData.bottlenecks.length === 1 && (aiData.bottlenecks[0].subject === 'None' || aiData.bottlenecks[0].subject.toLowerCase() === 'none'));
 
-              {/* Body */}
-              <div style={{ padding: '20px' }}>
-                {/* Feasibility Reason banner */}
-                {aiData.feasibilityReason && (
-                  <div style={{
-                    padding: '12px 16px',
-                    borderRadius: 10,
-                    background: 'rgba(255,255,255,0.02)',
-                    border: '1px solid rgba(255,255,255,0.05)',
-                    fontSize: 13,
-                    lineHeight: 1.5,
-                    color: 'var(--text-secondary, #94a3b8)',
-                    marginBottom: 20
-                  }}>
-                    💡 <strong>Assessment:</strong> {aiData.feasibilityReason}
-                  </div>
-                )}
-
-                {/* AI analysis narrative */}
-                {aiData.analysis && (
-                  <div style={{ marginBottom: 20 }}>
-                    <h4 style={{ margin: '0 0 8px', fontSize: 12, fontWeight: 600, color: 'var(--text-primary, #f1f5f9)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                      Trajectory Overview
-                    </h4>
-                    <p style={{ margin: 0, fontSize: 13, color: 'var(--text-secondary, #94a3b8)', lineHeight: 1.6 }}>
-                      {aiData.analysis}
-                    </p>
-                  </div>
-                )}
-
-                {/* Bottlenecks (Warning list) */}
-                {aiData.bottlenecks && aiData.bottlenecks.length > 0 && (
-                  <div style={{ marginBottom: 20 }}>
-                    <h4 style={{ margin: '0 0 10px', fontSize: 12, fontWeight: 600, color: 'var(--text-primary, #f1f5f9)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                      ⚠️ Key Trajectory Bottlenecks
-                    </h4>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))', gap: 10 }}>
-                      {aiData.bottlenecks.map((btn, idx) => (
-                        <div key={idx} style={{
-                          padding: '12px',
-                          borderRadius: 10,
-                          background: 'rgba(244,63,94,0.02)',
-                          border: '1px solid rgba(244,63,94,0.12)',
-                          borderLeft: '3.5px solid #f43f5e',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: 4
-                        }}>
-                          <span style={{ fontSize: 12, fontWeight: 700, color: '#f43f5e' }}>
-                            {btn.subject}
-                          </span>
-                          <span style={{ fontSize: 12, color: 'var(--text-primary, #f1f5f9)' }}>
-                            <strong>Issue:</strong> {btn.issue}
-                          </span>
-                          <span style={{ fontSize: 11, color: 'var(--text-secondary, #64748b)' }}>
-                            <strong>Impact:</strong> {btn.impact}
-                          </span>
-                        </div>
-                      ))}
+            return (
+              <div className="ai-trajectory-card">
+                {/* Header */}
+                <div className="ai-trajectory-header">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div className="ai-brain-container">
+                      <div className="ai-brain-pulse" />
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#818cf8" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ position: 'relative', zIndex: 1 }}>
+                        <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+                        <path d="M19 10v1a7 7 0 0 1-14 0v-1" />
+                        <line x1="12" x2="12" y1="19" y2="22" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#f1f5f9', letterSpacing: '-0.01em' }}>
+                        StudentAI Trajectory Analysis
+                      </h3>
+                      <p style={{ margin: '2px 0 0', fontSize: 11, color: '#94a3b8' }}>
+                        Real-time academic projection & study roadmap
+                      </p>
                     </div>
                   </div>
-                )}
-
-                {/* Roadmap Suggested SGPAs */}
-                {aiData.roadmap && aiData.roadmap.length > 0 && (
-                  <div style={{ marginBottom: 20 }}>
-                    <h4 style={{ margin: '0 0 10px', fontSize: 12, fontWeight: 600, color: 'var(--text-primary, #f1f5f9)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                      🗺️ Suggested SGPA Targets By Semester
-                    </h4>
-                    <div style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))',
-                      gap: 10
+                  
+                  {/* Feasibility Badge */}
+                  {aiData.feasibility && (
+                    <div className="feasibility-pill" style={{
+                      background: fColor.bg,
+                      border: `1px solid ${fColor.border}`,
+                      color: fColor.text
                     }}>
-                      {aiData.roadmap.map((sem, idx) => (
-                        <div key={idx} style={{
-                          padding: '12px',
-                          borderRadius: 10,
-                          background: 'rgba(255,255,255,0.02)',
-                          border: '1px solid rgba(255,255,255,0.05)',
-                          textAlign: 'center',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: 4
-                        }}>
-                          <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-secondary, #94a3b8)' }}>
-                            Semester {sem.semester}
-                          </span>
-                          <span style={{ fontSize: 20, fontWeight: 800, color: '#818cf8', fontFamily: "'Space Grotesk', sans-serif" }}>
-                            {sem.suggestedSGPA}
-                          </span>
-                          <span style={{ fontSize: 10, color: 'var(--muted, #64748b)', lineHeight: 1.2 }}>
-                            {sem.focus}
-                          </span>
-                        </div>
-                      ))}
+                      <span style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: '50%',
+                        background: fColor.dot,
+                        boxShadow: `0 0 8px ${fColor.dot}`
+                      }} />
+                      Feasibility: {aiData.feasibility}
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
 
-                {/* Actionable Strategies */}
-                {aiData.strategies && aiData.strategies.length > 0 && (
-                  <div>
-                    <h4 style={{ margin: '0 0 10px', fontSize: 12, fontWeight: 600, color: 'var(--text-primary, #f1f5f9)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                      ⚡ AI-Powered Action Strategy
+                {/* Body */}
+                <div style={{ padding: '20px 24px 24px' }}>
+                  {/* Feasibility Reason banner */}
+                  {aiData.feasibilityReason && (
+                    <div className="insight-banner">
+                      <span style={{ fontSize: 18, marginTop: -2 }}>💡</span>
+                      <div>
+                        <strong>Assessment:</strong> {aiData.feasibilityReason}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* AI analysis narrative */}
+                  {aiData.analysis && (
+                    <div style={{ marginBottom: 24 }}>
+                      <h4 className="section-label">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
+                        </svg>
+                        Trajectory Overview
+                      </h4>
+                      <p className="overview-text">
+                        {aiData.analysis}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Bottlenecks (Warning list) */}
+                  <div style={{ marginBottom: 24 }}>
+                    <h4 className="section-label">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12" y1="17" y2="17.01"/>
+                      </svg>
+                      Key Trajectory Bottlenecks
                     </h4>
-                    <ul style={{ margin: 0, paddingLeft: 16, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      {aiData.strategies.map((strat, idx) => (
-                        <li key={idx} style={{ fontSize: 12, color: 'var(--text-secondary, #94a3b8)', lineHeight: 1.5 }}>
-                          {strat}
-                        </li>
-                      ))}
-                    </ul>
+                    
+                    {hasNoBottlenecks ? (
+                      <div className="success-card">
+                        <div className="success-check-circle">
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                        </div>
+                        <div>
+                          <h5 style={{ margin: 0, fontSize: '13.5px', fontWeight: 700, color: '#34d399' }}>
+                            Academic Path Clear
+                          </h5>
+                          <p style={{ margin: '3px 0 0', fontSize: '12px', color: '#94a3b8', lineHeight: 1.4 }}>
+                            No active bottlenecks detected. Attendance is above 75%, and grades are on track! Keep maintaining this momentum.
+                          </p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="bottleneck-grid">
+                        {aiData.bottlenecks.map((btn, idx) => (
+                          <div key={idx} className="bottleneck-card">
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                              <span style={{ fontSize: 13, fontWeight: 700, color: '#f43f5e' }}>
+                                {btn.subject}
+                              </span>
+                              <span style={{
+                                fontSize: 10,
+                                background: 'rgba(244,63,94,0.1)',
+                                padding: '2px 8px',
+                                borderRadius: 99,
+                                color: '#f43f5e',
+                                fontWeight: 600,
+                                border: '1px solid rgba(244,63,94,0.15)'
+                              }}>
+                                Risk Factor
+                              </span>
+                            </div>
+                            <div style={{ fontSize: 12.5, color: '#e2e8f0', marginBottom: 4 }}>
+                              <strong>Issue:</strong> {btn.issue}
+                            </div>
+                            <div style={{ fontSize: 11.5, color: '#94a3b8', lineHeight: 1.4 }}>
+                              <strong>Impact:</strong> {btn.impact}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                )}
+
+                  {/* Roadmap Suggested SGPAs */}
+                  {aiData.roadmap && aiData.roadmap.length > 0 && (
+                    <div style={{ marginBottom: 24 }}>
+                      <h4 className="section-label">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21 3 6"/><line x1="9" x2="9" y1="3" y2="18"/><line x1="15" x2="15" y1="6" y2="21"/>
+                        </svg>
+                        Suggested SGPA Targets By Semester
+                      </h4>
+                      <div className="roadmap-grid">
+                        {aiData.roadmap.map((sem, idx) => (
+                          <div key={idx} className="roadmap-card">
+                            <div style={{ fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                              Semester {sem.semester}
+                            </div>
+                            <div className="roadmap-value">
+                              {sem.suggestedSGPA}
+                            </div>
+                            <div style={{ fontSize: '11px', color: '#cbd5e1', lineHeight: 1.3, marginTop: '2px', minHeight: '2.6em', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              {sem.focus}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Actionable Strategies */}
+                  {aiData.strategies && aiData.strategies.length > 0 && (
+                    <div>
+                      <h4 className="section-label">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                        </svg>
+                        AI-Powered Action Strategy
+                      </h4>
+                      <ul className="roadmap-grid" style={{ display: 'none' /* hidden standard layout */ }} />
+                      <ul className="strategy-list">
+                        {aiData.strategies.map((strat, idx) => (
+                          <li key={idx} className="strategy-item">
+                            <div className="strategy-bullet">
+                              {idx + 1}
+                            </div>
+                            <div style={{ flex: 1 }}>
+                              {strat}
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* Credit Breakdown */}
           {data.creditBreakdown && (

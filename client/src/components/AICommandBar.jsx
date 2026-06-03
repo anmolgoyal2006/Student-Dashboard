@@ -156,7 +156,7 @@ export default function AICommandBar({ onRefresh }) {
         >
           {listening ? (
             <svg width="14" height="14" viewBox="0 0 24 24" fill="#f87171" style={{ display: 'block' }}>
-              <rect x="4" y="4" width="16" height="16" rx="2" />
+              <rect x="4" y="4" width="16" height="16" />
             </svg>
           ) : (
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#818cf8" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'block' }}>

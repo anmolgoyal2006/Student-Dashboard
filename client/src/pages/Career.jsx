@@ -978,7 +978,7 @@ export default function Career() {
                         {isListening ? (
                           <>
                             <svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor" style={{ display: 'inline-block', verticalAlign: 'middle', animation: 'voicePulse 1.2s infinite' }}>
-                              <rect x="4" y="4" width="16" height="16" rx="2" />
+                              <rect x="4" y="4" width="16" height="16" />
                             </svg>
                             Stop Listening
                           </>
