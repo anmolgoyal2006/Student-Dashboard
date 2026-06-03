@@ -48,7 +48,7 @@ const getConflicts = (subjects) => {
       const aStart = toMinutes(a.startTime), aEnd = toMinutes(a.endTime);
       const bStart = toMinutes(b.startTime), bEnd = toMinutes(b.endTime);
       if (aStart < bEnd && bStart < aEnd) {
-        conflicts.push(`⚠️ Conflict: ${a.name} & ${b.name} overlap on ${a.day} (${fmt12(a.startTime)}–${fmt12(a.endTime)})`);
+        conflicts.push(`⚠️ Conflict: ${a.name} (${fmt12(a.startTime)}–${fmt12(a.endTime)}) & ${b.name} (${fmt12(b.startTime)}–${fmt12(b.endTime)}) overlap on ${a.day}`);
       }
     }
   }
@@ -78,8 +78,9 @@ export default function WeeklyGrid({ subjects }) {
       const color = colorMap[s._id];
       (s.schedule || []).forEach(slot => {
         if (!slot.day || !slot.startTime) return;
-        // Find which hour slot this falls in
-        const startHour = slot.startTime.slice(0,5);
+        // Find which hour slot this falls in (normalize non-exact hour to nearest exact hour slot)
+        const hourPrefix = slot.startTime.split(':')[0];
+        const startHour = `${hourPrefix.padStart(2, '0')}:00`;
         if (!g[slot.day]) return;
         g[slot.day][startHour] = {
           name:      s.name,

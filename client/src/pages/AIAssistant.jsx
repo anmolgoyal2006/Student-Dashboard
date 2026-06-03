@@ -92,10 +92,135 @@ async function callSmartAssistant(message) {
   return data;
 }
 
+// ─── Code block & parsing components ─────────────────────────────────────────
+function CodeBlock({ code, language }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(code);
+    setCopied(true);
+    toast.success('Code copied to clipboard!');
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div style={{
+      background: '#0d1117',
+      border: '1px solid rgba(255,255,255,0.08)',
+      borderRadius: '8px',
+      margin: '12px 0',
+      overflow: 'hidden',
+      fontFamily: 'SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace',
+    }}>
+      {/* Header bar */}
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        background: 'rgba(255,255,255,0.03)',
+        padding: '6px 12px',
+        borderBottom: '1px solid rgba(255,255,255,0.08)',
+        fontSize: '11px',
+        color: '#8b949e',
+        textTransform: 'uppercase',
+        userSelect: 'none'
+      }}>
+        <span>{language || 'code'}</span>
+        <button
+          onClick={handleCopy}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            color: copied ? '#34d399' : '#8b949e',
+            cursor: 'pointer',
+            fontSize: '11px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px',
+            padding: '2px 6px',
+            borderRadius: '4px',
+            transition: 'all 0.15s ease'
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = '#c9d1d9'; e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = copied ? '#34d399' : '#8b949e'; e.currentTarget.style.background = 'transparent'; }}
+        >
+          {copied ? '✓ Copied' : '📋 Copy'}
+        </button>
+      </div>
+      {/* Pre/Code content */}
+      <pre style={{
+        margin: 0,
+        padding: '12px',
+        overflowX: 'auto',
+        fontSize: '13px',
+        lineHeight: '1.5',
+        color: '#c9d1d9',
+        textAlign: 'left'
+      }}>
+        <code>{code}</code>
+      </pre>
+    </div>
+  );
+}
+
+function renderMessageText(text) {
+  if (!text) return null;
+
+  // Split by fenced code blocks
+  const parts = text.split(/(```[\s\S]*?```)/g);
+  
+  return parts.map((part, index) => {
+    // If it's an odd index, it's a code block
+    if (index % 2 === 1) {
+      const match = part.match(/^```(\w*)\r?\n?([\s\S]*?)```$/);
+      if (match) {
+        const language = match[1] || 'code';
+        const code = match[2];
+        return <CodeBlock key={index} code={code} language={language} />;
+      }
+      return <pre key={index} style={{ whiteSpace: 'pre-wrap', margin: '4px 0' }}>{part}</pre>;
+    } else {
+      // It's normal text, split by inline code blocks
+      const inlineParts = part.split(/(`[^`\n]+`)/g);
+      return inlineParts.map((subPart, subIndex) => {
+        if (subIndex % 2 === 1) {
+          const cleanCode = subPart.slice(1, -1);
+          return (
+            <code
+              key={subIndex}
+              style={{
+                background: 'rgba(255,255,255,0.08)',
+                border: '1px solid rgba(255,255,255,0.12)',
+                fontFamily: 'SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace',
+                padding: '2px 6px',
+                borderRadius: '4px',
+                fontSize: '0.85em',
+                color: '#fb7185', // nice rose color for contrast in dark mode
+                wordBreak: 'break-all'
+              }}
+            >
+              {cleanCode}
+            </code>
+          );
+        }
+        return subPart;
+      });
+    }
+  });
+}
+
 // ─── Message bubble ───────────────────────────────────────────────────────────
 function MessageBubble({ msg, mode }) {
   const isUser = msg.role === 'user';
   const accent = mode === 'notes' ? '#10b981' : 'var(--primary)';
+  const [copied, setCopied] = useState(false);
+
+  const handleBubbleCopy = () => {
+    navigator.clipboard.writeText(msg.text);
+    setCopied(true);
+    toast.success('Message copied!');
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   return (
     <div style={{
@@ -115,7 +240,9 @@ function MessageBubble({ msg, mode }) {
         </div>
       )}
       <div style={{
+        position: 'relative',
         maxWidth: '75%', padding: '11px 15px',
+        paddingRight: isUser ? '15px' : '40px',
         borderRadius: isUser ? '18px 18px 4px 18px' : '4px 18px 18px 18px',
         background: isUser
           ? (mode === 'notes'
@@ -124,9 +251,37 @@ function MessageBubble({ msg, mode }) {
           : 'var(--bg-3)',
         border: isUser ? 'none' : '1px solid var(--card-border)',
         color: 'var(--text)', fontSize: 14, lineHeight: 1.6,
-        whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+        wordBreak: 'break-word',
       }}>
-        {msg.text}
+        {!isUser && (
+          <button
+            onClick={handleBubbleCopy}
+            title="Copy message to clipboard"
+            style={{
+              position: 'absolute',
+              top: '8px',
+              right: '8px',
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              fontSize: '13px',
+              color: copied ? '#34d399' : 'var(--muted)',
+              opacity: 0.6,
+              transition: 'opacity 0.2s, color 0.2s',
+              padding: '4px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: '4px',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.6'; e.currentTarget.style.background = 'transparent'; }}
+          >
+            {copied ? '✓' : '📋'}
+          </button>
+        )}
+
+        {renderMessageText(msg.text)}
 
         {msg.sources?.length > 0 && (
           <div style={{ marginTop: 8, borderTop: '1px solid var(--border)', paddingTop: 8 }}>
@@ -142,7 +297,7 @@ function MessageBubble({ msg, mode }) {
         )}
 
         {/* Show "dashboard updated" only for real data mutations */}
-       {msg.entity && msg.entity !== 'none' && msg.action === 'add' && (
+       {msg.entity && msg.entity !== 'none' && ['add', 'update', 'delete'].includes(msg.action) && (
           <div style={{
             marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border)',
             fontSize: 11, color: accent, display: 'flex', alignItems: 'center', gap: 4,
@@ -289,7 +444,7 @@ export default function AIAssistant() {
         speak(res.message);
 
         // Refresh dashboard data only for real mutations (not answers or gets)
-        if (res.success && res.entity && res.entity !== 'none' && res.action === 'add') {
+        if (res.success && res.entity && res.entity !== 'none' && ['add', 'update', 'delete'].includes(res.action)) {
           refreshByEntity(res.entity);
         }
       }

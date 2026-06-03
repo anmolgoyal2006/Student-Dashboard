@@ -1,5 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
 import API from '../api/axios';
+import toast from 'react-hot-toast';
+import { taskService } from '../services/apiServices';
+
 
 /* ─── Risk config ──────────────────────────────────────────────────── */
 const RISK_CONFIG = {
@@ -50,7 +53,7 @@ function CheckIcon() {
 }
 
 /* ─── Single plan item ──────────────────────────────────────────────── */
-function PlanItem({ item, index, checked, onToggle }) {
+function PlanItem({ item, index, checked, onToggle, scheduled, onSchedule }) {
   const accentColor = getPriorityColor(item.priority);
   const [hovered, setHovered] = useState(false);
 
@@ -155,6 +158,44 @@ function PlanItem({ item, index, checked, onToggle }) {
             {item.reason}
           </p>
         )}
+
+        {/* Schedule Action Button */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            if (!scheduled && onSchedule) onSchedule();
+          }}
+          disabled={scheduled}
+          style={{
+            marginTop: '8px',
+            background: scheduled ? 'rgba(255,255,255,0.02)' : 'rgba(99,102,241,0.1)',
+            border: `1px solid ${scheduled ? 'rgba(255,255,255,0.05)' : 'rgba(99,102,241,0.25)'}`,
+            borderRadius: '6px',
+            padding: '4px 10px',
+            fontSize: '11px',
+            fontWeight: '600',
+            color: scheduled ? '#a7f3d0' : '#818cf8',
+            cursor: scheduled ? 'default' : 'pointer',
+            transition: 'all 0.15s ease',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '4px'
+          }}
+          onMouseEnter={(e) => {
+            if (!scheduled) {
+              e.currentTarget.style.background = 'rgba(99,102,241,0.2)';
+              e.currentTarget.style.transform = 'translateY(-0.5px)';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (!scheduled) {
+              e.currentTarget.style.background = 'rgba(99,102,241,0.1)';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }
+          }}
+        >
+          {scheduled ? '✓ Scheduled' : '📅 Schedule'}
+        </button>
       </div>
 
       {/* Checkbox */}
@@ -215,6 +256,29 @@ export default function SmartPlanCard() {
   const [error, setError]     = useState(false);
   const [checked, setChecked] = useState(new Set());
 
+  // Load scheduled items from localStorage on mount, keyed by today's date
+  const [scheduled, setScheduled] = useState(() => {
+    try {
+      const d = new Date();
+      const dateKey = `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+      const saved = localStorage.getItem(`ssp_scheduled_${dateKey}`);
+      return saved ? new Set(JSON.parse(saved)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
+
+  // Sync scheduled items to localStorage when it changes
+  useEffect(() => {
+    try {
+      const d = new Date();
+      const dateKey = `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+      localStorage.setItem(`ssp_scheduled_${dateKey}`, JSON.stringify(Array.from(scheduled)));
+    } catch (err) {
+      console.error(err);
+    }
+  }, [scheduled]);
+
   useEffect(() => {
     API.get('/decision/today-plan')
       .then((r) => setPlan(r.data))
@@ -229,6 +293,52 @@ export default function SmartPlanCard() {
       return next;
     });
   }, []);
+
+  const handleSchedule = useCallback(async (item, index) => {
+    // Determine priority
+    const priority = ['high', 'medium', 'low'].includes(item.priority?.toLowerCase())
+      ? item.priority.toLowerCase()
+      : 'medium';
+
+    // Determine type
+    let type = 'other';
+    const tag = item.tag?.toLowerCase();
+    if (tag === 'attendance') {
+      type = 'other';
+    } else if (tag === 'academics') {
+      type = 'revision';
+    } else if (tag === 'career') {
+      type = 'project';
+    }
+
+    // Today's date local YYYY-MM-DD
+    const d = new Date();
+    const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+    const taskData = {
+      title: item.action,
+      subject: item.tag || 'General',
+      description: item.reason || '',
+      dueDate: todayStr,
+      dueTime: '23:59',
+      priority,
+      type,
+      status: 'pending',
+    };
+
+    try {
+      await taskService.create(taskData);
+      toast.success(`Task scheduled: "${item.action}"`);
+      setScheduled((prev) => {
+        const next = new Set(prev);
+        next.add(item.action);
+        return next;
+      });
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to add task to scheduler');
+    }
+  }, [scheduled]);
 
   const rc = RISK_CONFIG[plan?.riskLevel] ?? RISK_CONFIG.Low;
   const totalItems  = plan?.todayPlan?.length ?? 0;
@@ -427,6 +537,8 @@ export default function SmartPlanCard() {
             index={i}
             checked={checked.has(i)}
             onToggle={() => toggleItem(i)}
+            scheduled={scheduled.has(item.action)}
+            onSchedule={() => handleSchedule(item, i)}
           />
         ))}
       </div>

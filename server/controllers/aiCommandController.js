@@ -120,6 +120,27 @@ User: "show me my final exam marks for Physics"
 
 User: "How many classes did I miss in Maths"
 → {"action":"answer","entity":"attendance","data":{"subjectName":"Maths","query":"attendance_status"},"message":"Checking Maths attendance."}
+
+User: "how many subjects this semester"
+→ {"action":"get","entity":"subject","data":{"query":"list"},"message":"Fetching your subjects."}
+
+User: "what are my subjects"
+→ {"action":"get","entity":"subject","data":{"query":"list"},"message":"Fetching your subjects."}
+
+User: "what are my GPAs or semester summary"
+→ {"action":"get","entity":"semester","data":{"query":"list"},"message":"Fetching your semester GPAs."}
+
+User: "delete task Submit assignment"
+→ {"action":"delete","entity":"task","data":{"title":"Submit assignment"},"message":"Deleting task."}
+
+User: "remove Math subject"
+→ {"action":"delete","entity":"subject","data":{"name":"Math"},"message":"Deleting subject."}
+
+User: "change Maths class instructor to Dr. Smith"
+→ {"action":"update","entity":"subject","data":{"name":"Maths","instructor":"Dr. Smith"},"message":"Updating Maths instructor."}
+
+User: "complete task Submit Project"
+→ {"action":"update","entity":"task","data":{"title":"Submit Project","status":"completed"},"message":"Task completed."}
 `;  
 
 // ← single backtick here, closing the template literal
@@ -479,7 +500,19 @@ const keptSlots  = (existing.schedule || []).filter(sc => !newDays.includes(sc.d
   : 'No classes scheduled for today.';
           return res.json({ success: true, action: 'get', entity: 'subject', message: msg, data: todayClasses });
         }
-        result = await Subject.find({ userId });
+        const subjects = await Subject.find({ userId });
+        const count = subjects.length;
+        const subjectNames = subjects.map(s => s.name).join(', ');
+        const msg = count > 0
+          ? `You have ${count} subjects this semester: ${subjectNames}.`
+          : 'You do not have any subjects registered for this semester yet.';
+        return res.json({
+          success: true,
+          action: 'get',
+          entity: 'subject',
+          message: msg,
+          data: subjects
+        });
       }
     }
 
@@ -533,7 +566,31 @@ if (userForNotif?.fcmToken) {
   await sendNotification(userForNotif.fcmToken, '📋 Attendance Marked', parsed.message);
 }
       } else if (parsed.action === 'get') {
-        result = await Attendance.find({ userId }).populate('subjectId', 'name');
+        const records = await Attendance.find({ userId }).populate('subjectId', 'name');
+        const map = {};
+        for (const r of records) {
+          if (!r.subjectId) continue;
+          const key = r.subjectId.name;
+          if (!map[key]) map[key] = { total: 0, present: 0 };
+          if (r.status !== 'cancelled') {
+            map[key].total++;
+            if (r.status === 'present') map[key].present++;
+          }
+        }
+        const summary = Object.entries(map).map(([name, s]) => {
+          const pct = s.total ? ((s.present / s.total) * 100).toFixed(1) : 0;
+          return `• ${name}: ${s.present}/${s.total} (${pct}%)`;
+        });
+        const msg = summary.length > 0
+          ? `📋 Your attendance summary:\n${summary.join('\n')}`
+          : 'You don\'t have any attendance records marked yet.';
+        return res.json({
+          success: true,
+          action: 'get',
+          entity: 'attendance',
+          message: msg,
+          data: records
+        });
       }
     }
       
@@ -604,7 +661,21 @@ if (userForNotif?.fcmToken) {
         else   return res.json({ success: false, message: `Task "${parsed.data.title}" not found.` });
 
       } else if (parsed.action === 'get') {
-        result = await Task.find({ user: userId });
+        const tasks = await Task.find({ user: userId, status: { $ne: 'completed' } }).sort({ dueDate: 1 });
+        const lines = tasks.map(t => {
+          const due = t.dueDate ? ` (due ${new Date(t.dueDate).toLocaleDateString()})` : '';
+          return `• [${t.priority.toUpperCase()}] ${t.title}${due}`;
+        });
+        const msg = tasks.length > 0
+          ? `🗓️ Your pending tasks:\n${lines.join('\n')}`
+          : '🎉 You have no pending tasks!';
+        return res.json({
+          success: true,
+          action: 'get',
+          entity: 'task',
+          message: msg,
+          data: tasks
+        });
       }
     }
 
@@ -613,7 +684,18 @@ if (userForNotif?.fcmToken) {
       if (parsed.action === 'add') {
         result = await Semester.create({ ...parsed.data, student: userId });
       } else if (parsed.action === 'get') {
-        result = await Semester.find({ student: userId }).sort({ semesterNumber: 1 });
+        const semesters = await Semester.find({ student: userId }).sort({ semesterNumber: 1 });
+        const lines = semesters.map(s => `• Semester ${s.semesterNumber}: SGPA ${s.sgpa}`);
+        const msg = semesters.length > 0
+          ? `🎓 Your semester GPA summary:\n${lines.join('\n')}`
+          : 'You don\'t have any semesters registered yet.';
+        return res.json({
+          success: true,
+          action: 'get',
+          entity: 'semester',
+          message: msg,
+          data: semesters
+        });
       }
     }
 

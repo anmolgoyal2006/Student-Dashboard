@@ -43,7 +43,20 @@ exports.getPredict = async (req, res) => {
     const target     = parseFloat(targetCGPA);
     const total      = parseInt(totalSemesters, 10) || 8;
 
-    // ── 1. Build per-semester credit distribution ──────────────────────────
+    // ── 1. Fetch DB semesters first if not in manual mode ─────────────────────
+    let semesters = [];
+    if (!manualCGPA) {
+      semesters = await Semester.find({ student: req.user.id }).sort({ semesterNumber: 1 });
+    }
+    const completed = manualCGPA ? (parseInt(manualCompleted, 10) || 0) : semesters.length;
+
+    // Extract actual database credits
+    const dbCredits = semesters.map(s => {
+      if (s.isManual) return s.totalCredits || 20;
+      return (s.subjects || []).reduce((sum, sub) => sum + sub.credits, 0) || 20;
+    });
+
+    // ── 2. Build per-semester credit distribution ──────────────────────────
     let adjustedCredits = rawSemCredits
       ? rawSemCredits.split(',').map(s => parseInt(s, 10) || 20).slice(0, total)
       : (() => {
@@ -51,29 +64,31 @@ exports.getPredict = async (req, res) => {
           while (p.length < total) p.push(DEFAULT_CREDIT_PATTERN[DEFAULT_CREDIT_PATTERN.length - 1]);
           return p;
         })();
-    // Pad/trim to match total semesters
     while (adjustedCredits.length < total) adjustedCredits.push(20);
     adjustedCredits = adjustedCredits.slice(0, total);
+
+    // Merge actual database credits for completed semesters
+    if (!manualCGPA) {
+      for (let i = 0; i < completed; i++) {
+        if (i < dbCredits.length) {
+          adjustedCredits[i] = dbCredits[i];
+        }
+      }
+    }
+
     const sumCredits = adjustedCredits.reduce((a, b) => a + b, 0);
 
-    // ── 2. Determine current CGPA and completed count ──────────────────────
-    let currentCGPA, completed, sgpaList, currentWeightedSum;
+    // ── 3. Determine current CGPA and completed count ──────────────────────
+    let currentCGPA, sgpaList, currentWeightedSum;
 
     if (manualCGPA) {
-      // Manual mode: user provides CGPA and completed count directly
       currentCGPA = clamp(parseFloat(manualCGPA), 0, 10);
-      completed   = parseInt(manualCompleted, 10) || 0;
       sgpaList    = [];
       currentWeightedSum = currentCGPA * adjustedCredits.slice(0, completed).reduce((a, b) => a + b, 0);
     } else {
-      // Auto mode: fetch from DB semesters
-      const semesters = await Semester.find({ student: req.user.id })
-        .sort({ semesterNumber: 1 });
-
       sgpaList  = semesters.map(s => s.sgpa);
-      completed = sgpaList.length;
 
-      if (completed === 0) {
+      if (completed === 0 && isNaN(target)) {
         return res.json({
           sgpaList:    [],
           futureSGPAs: [],
@@ -87,46 +102,23 @@ exports.getPredict = async (req, res) => {
         });
       }
 
-      // Credit-weighted current CGPA from DB semesters
-      const completedCredits = adjustedCredits.slice(0, completed);
-      currentWeightedSum = sgpaList.reduce((sum, sgpa, i) => {
-        const cr = i < completedCredits.length ? completedCredits[i] : 0;
-        return sum + sgpa * cr;
-      }, 0);
-      const totalCompletedCredits = completedCredits.reduce((a, b) => a + b, 0);
-      currentCGPA = totalCompletedCredits > 0
-        ? round2(currentWeightedSum / totalCompletedCredits)
-        : round2(sgpaList.reduce((a, b) => a + b, 0) / completed);
+      if (completed === 0) {
+        currentWeightedSum = 0;
+        currentCGPA = null;
+      } else {
+        const completedCredits = adjustedCredits.slice(0, completed);
+        currentWeightedSum = sgpaList.reduce((sum, sgpa, i) => {
+          const cr = i < completedCredits.length ? completedCredits[i] : 0;
+          return sum + sgpa * cr;
+        }, 0);
+        const totalCompletedCredits = completedCredits.reduce((a, b) => a + b, 0);
+        currentCGPA = totalCompletedCredits > 0
+          ? round2(currentWeightedSum / totalCompletedCredits)
+          : round2(sgpaList.reduce((a, b) => a + b, 0) / completed);
+      }
     }
 
     const remaining = Math.max(total - completed, 0);
-
-    // ── 3. Future SGPA prediction (only when we have actual SGPA data) ────
-    let futureSGPAs = [];
-    let predictedCGPA = currentCGPA;
-
-    if (sgpaList.length > 0 && remaining > 0) {
-      const recentTrend = computeWeightedTrend(sgpaList);
-      const lastSGPA    = sgpaList[sgpaList.length - 1];
-      const AVERAGE_WEIGHT = 0.70;
-      const TREND_WEIGHT   = 0.30;
-      const DAMP_FACTOR    = 0.65;
-
-      futureSGPAs = Array.from({ length: remaining }, (_, i) => {
-        const dampedTrend = recentTrend * Math.pow(DAMP_FACTOR, i + 1);
-        const trendBased  = lastSGPA + dampedTrend;
-        const blended     = (AVERAGE_WEIGHT * currentCGPA) + (TREND_WEIGHT * trendBased);
-        return round2(clamp(blended));
-      });
-
-      // Credit-weighted predicted CGPA
-      const allSGPAs = [...sgpaList, ...futureSGPAs];
-      const weightedSum = allSGPAs.reduce((sum, sgpa, i) => {
-        const cr = i < adjustedCredits.length ? adjustedCredits[i] : 0;
-        return sum + sgpa * cr;
-      }, 0);
-      predictedCGPA = round2(weightedSum / sumCredits);
-    }
 
     // ── 4. Required SGPA to hit target ────────────────────────────────────
     let requiredSGPA = null;
@@ -149,7 +141,39 @@ exports.getPredict = async (req, res) => {
       }
     }
 
-    // ── 5. Response ───────────────────────────────────────────────────────
+    // ── 5. Future SGPA prediction ─────────────────────────────────────────
+    let futureSGPAs = [];
+    let predictedCGPA = currentCGPA;
+
+    if (remaining > 0) {
+      if (sgpaList.length > 0) {
+        const recentTrend = computeWeightedTrend(sgpaList);
+        const lastSGPA    = sgpaList[sgpaList.length - 1];
+        const AVERAGE_WEIGHT = 0.70;
+        const TREND_WEIGHT   = 0.30;
+        const DAMP_FACTOR    = 0.65;
+
+        futureSGPAs = Array.from({ length: remaining }, (_, i) => {
+          const dampedTrend = recentTrend * Math.pow(DAMP_FACTOR, i + 1);
+          const trendBased  = lastSGPA + dampedTrend;
+          const blended     = (AVERAGE_WEIGHT * (currentCGPA || 0)) + (TREND_WEIGHT * trendBased);
+          return round2(clamp(blended));
+        });
+      } else if (requiredSGPA !== null) {
+        // If fresh student (0 sems) but target is set, predict target-aligned roadmap
+        futureSGPAs = Array(remaining).fill(requiredSGPA);
+      }
+
+      // Credit-weighted predicted CGPA
+      const allSGPAs = [...sgpaList, ...futureSGPAs];
+      const weightedSum = allSGPAs.reduce((sum, sgpa, i) => {
+        const cr = i < adjustedCredits.length ? adjustedCredits[i] : 0;
+        return sum + sgpa * cr;
+      }, 0);
+      predictedCGPA = round2(weightedSum / sumCredits);
+    }
+
+    // ── 6. Response ───────────────────────────────────────────────────────
     const recentTrend = sgpaList.length > 0 ? computeWeightedTrend(sgpaList) : 0;
     const trendLabel =
       recentTrend > 0.2  ? 'improving 📈' :
