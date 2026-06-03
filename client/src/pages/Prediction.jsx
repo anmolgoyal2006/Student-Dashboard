@@ -22,6 +22,11 @@ export default function Prediction() {
   const [loading,            setLoading]           = useState(false);
   const [error,              setError]             = useState('');
 
+  // AI analysis states
+  const [aiData,             setAiData]            = useState(null);
+  const [aiLoading,          setAiLoading]         = useState(false);
+  const [aiError,            setAiError]           = useState('');
+
   const totalDegreeCredits = semCredits.reduce((a, b) => a + b, 0);
 
   const updateSemCredits = (idx, val) => {
@@ -44,6 +49,29 @@ export default function Prediction() {
     });
   };
 
+  const fetchAIAnalysis = async () => {
+    setAiError('');
+    setAiLoading(true);
+    setAiData(null);
+    try {
+      const params = {
+        targetCGPA:         targetCGPA || '',
+        totalSemesters:     totalSemesters,
+        totalDegreeCredits: totalDegreeCredits,
+        semesterCredits:    semCredits.join(','),
+      };
+      if (manualCGPA) params.currentCGPA = manualCGPA;
+      if (completedManual) params.completed = completedManual;
+      const res = await predictionService.getAIAnalysis(params);
+      setAiData(res.data);
+    } catch (err) {
+      console.error(err);
+      setAiError('Failed to fetch AI analysis.');
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
   const fetchPredict = async () => {
     setError('');
     if (targetCGPA && (targetCGPA < 0 || targetCGPA > 10))
@@ -60,12 +88,29 @@ export default function Prediction() {
       if (completedManual) params.completed = completedManual;
       const res = await predictionService.getPredict(params);
       setData(res.data);
+      // Trigger AI Analysis
+      fetchAIAnalysis();
     } catch {
       setError('Failed to fetch prediction.');
     } finally {
       setLoading(false);
     }
   };
+
+  // Inject styles for skeleton animations
+  useEffect(() => {
+    const id = 'ai-pred-styles';
+    if (document.getElementById(id)) return;
+    const style = document.createElement('style');
+    style.id = id;
+    style.textContent = `
+      @keyframes ai-pulse {
+        0%, 100% { opacity: 1; }
+        50%       { opacity: 0.4; }
+      }
+    `;
+    document.head.appendChild(style);
+  }, []);
 
   useEffect(() => { fetchPredict(); }, []);
 
@@ -311,6 +356,251 @@ export default function Prediction() {
               📈 At your current trend, your CGPA will be approximately {data.predictedCGPA} by semester {totalSemesters}.
             </span>
           </div>
+
+          {/* AI-Powered Strategic Analysis section */}
+          {aiLoading && (
+            <div style={{
+              borderRadius: 16,
+              border: '1px solid rgba(255,255,255,0.08)',
+              background: 'var(--surface-1, #1e1e2e)',
+              padding: '24px 20px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 16,
+              marginBottom: 24
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ width: 34, height: 34, borderRadius: 10, background: 'rgba(255,255,255,0.06)', animation: 'ai-pulse 1.4s infinite' }} />
+                <div>
+                  <div style={{ width: 180, height: 16, borderRadius: 6, background: 'rgba(255,255,255,0.06)', animation: 'ai-pulse 1.4s infinite', marginBottom: 6 }} />
+                  <div style={{ width: 120, height: 11, borderRadius: 6, background: 'rgba(255,255,255,0.04)', animation: 'ai-pulse 1.4s infinite' }} />
+                </div>
+              </div>
+              <div style={{ width: '100%', height: 40, borderRadius: 10, background: 'rgba(255,255,255,0.04)', animation: 'ai-pulse 1.4s infinite' }} />
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                <div style={{ flex: 1, height: 80, minWidth: 200, borderRadius: 12, background: 'rgba(255,255,255,0.04)', animation: 'ai-pulse 1.4s infinite' }} />
+                <div style={{ flex: 1, height: 80, minWidth: 200, borderRadius: 12, background: 'rgba(255,255,255,0.04)', animation: 'ai-pulse 1.4s infinite' }} />
+              </div>
+            </div>
+          )}
+
+          {aiError && (
+            <div style={{
+              borderRadius: 16,
+              border: '1px solid rgba(244,63,94,0.2)',
+              background: 'rgba(244,63,94,0.05)',
+              padding: '16px 20px',
+              fontSize: 13,
+              color: '#f43f5e',
+              marginBottom: 24
+            }}>
+              ⚠️ {aiError}
+            </div>
+          )}
+
+          {aiData && (
+            <div style={{
+              borderRadius: 16,
+              border: '1px solid rgba(255,255,255,0.08)',
+              background: 'linear-gradient(135deg, var(--surface-1, #1e1e2e) 0%, rgba(30, 30, 46, 0.95) 100%)',
+              overflow: 'hidden',
+              boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.3)',
+              marginBottom: 24
+            }}>
+              {/* Header */}
+              <div style={{
+                padding: '18px 20px',
+                borderBottom: '1px solid rgba(255,255,255,0.07)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: 12
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{
+                    width: 34,
+                    height: 34,
+                    borderRadius: 10,
+                    background: 'rgba(129,140,248,0.15)',
+                    border: '1px solid rgba(129,140,248,0.3)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 16
+                  }}>
+                    🧠
+                  </div>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: 'var(--text-primary, #f1f5f9)' }}>
+                      StudentAI Trajectory Analysis
+                    </h3>
+                    <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--text-secondary, #94a3b8)' }}>
+                      Real-time academic projection & study roadmap
+                    </p>
+                  </div>
+                </div>
+                
+                {/* Feasibility Badge */}
+                {aiData.feasibility && (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    padding: '4px 12px',
+                    borderRadius: 99,
+                    background: 
+                      aiData.feasibility === 'High' ? 'rgba(16,185,129,0.12)' :
+                      aiData.feasibility === 'Medium' ? 'rgba(99,102,241,0.12)' :
+                      aiData.feasibility === 'Challenging' ? 'rgba(245,158,11,0.12)' :
+                      aiData.feasibility === 'Low' ? 'rgba(244,63,94,0.12)' : 'rgba(239,68,68,0.15)',
+                    border: `1px solid ${
+                      aiData.feasibility === 'High' ? 'rgba(16,185,129,0.35)' :
+                      aiData.feasibility === 'Medium' ? 'rgba(99,102,241,0.35)' :
+                      aiData.feasibility === 'Challenging' ? 'rgba(245,158,11,0.35)' :
+                      aiData.feasibility === 'Low' ? 'rgba(244,63,94,0.35)' : 'rgba(239,68,68,0.45)'
+                    }`,
+                    color: 
+                      aiData.feasibility === 'High' ? '#34d399' :
+                      aiData.feasibility === 'Medium' ? '#818cf8' :
+                      aiData.feasibility === 'Challenging' ? '#fbbf24' :
+                      aiData.feasibility === 'Low' ? '#f43f5e' : '#ef4444',
+                    fontSize: 11,
+                    fontWeight: 700
+                  }}>
+                    <span style={{
+                      width: 5,
+                      height: 5,
+                      borderRadius: '50%',
+                      background: 
+                        aiData.feasibility === 'High' ? '#10b981' :
+                        aiData.feasibility === 'Medium' ? '#6366f1' :
+                        aiData.feasibility === 'Challenging' ? '#f59e0b' :
+                        aiData.feasibility === 'Low' ? '#f43f5e' : '#ef4444'
+                    }} />
+                    Feasibility: {aiData.feasibility}
+                  </div>
+                )}
+              </div>
+
+              {/* Body */}
+              <div style={{ padding: '20px' }}>
+                {/* Feasibility Reason banner */}
+                {aiData.feasibilityReason && (
+                  <div style={{
+                    padding: '12px 16px',
+                    borderRadius: 10,
+                    background: 'rgba(255,255,255,0.02)',
+                    border: '1px solid rgba(255,255,255,0.05)',
+                    fontSize: 13,
+                    lineHeight: 1.5,
+                    color: 'var(--text-secondary, #94a3b8)',
+                    marginBottom: 20
+                  }}>
+                    💡 <strong>Assessment:</strong> {aiData.feasibilityReason}
+                  </div>
+                )}
+
+                {/* AI analysis narrative */}
+                {aiData.analysis && (
+                  <div style={{ marginBottom: 20 }}>
+                    <h4 style={{ margin: '0 0 8px', fontSize: 12, fontWeight: 600, color: 'var(--text-primary, #f1f5f9)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      Trajectory Overview
+                    </h4>
+                    <p style={{ margin: 0, fontSize: 13, color: 'var(--text-secondary, #94a3b8)', lineHeight: 1.6 }}>
+                      {aiData.analysis}
+                    </p>
+                  </div>
+                )}
+
+                {/* Bottlenecks (Warning list) */}
+                {aiData.bottlenecks && aiData.bottlenecks.length > 0 && (
+                  <div style={{ marginBottom: 20 }}>
+                    <h4 style={{ margin: '0 0 10px', fontSize: 12, fontWeight: 600, color: 'var(--text-primary, #f1f5f9)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      ⚠️ Key Trajectory Bottlenecks
+                    </h4>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))', gap: 10 }}>
+                      {aiData.bottlenecks.map((btn, idx) => (
+                        <div key={idx} style={{
+                          padding: '12px',
+                          borderRadius: 10,
+                          background: 'rgba(244,63,94,0.02)',
+                          border: '1px solid rgba(244,63,94,0.12)',
+                          borderLeft: '3.5px solid #f43f5e',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 4
+                        }}>
+                          <span style={{ fontSize: 12, fontWeight: 700, color: '#f43f5e' }}>
+                            {btn.subject}
+                          </span>
+                          <span style={{ fontSize: 12, color: 'var(--text-primary, #f1f5f9)' }}>
+                            <strong>Issue:</strong> {btn.issue}
+                          </span>
+                          <span style={{ fontSize: 11, color: 'var(--text-secondary, #64748b)' }}>
+                            <strong>Impact:</strong> {btn.impact}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Roadmap Suggested SGPAs */}
+                {aiData.roadmap && aiData.roadmap.length > 0 && (
+                  <div style={{ marginBottom: 20 }}>
+                    <h4 style={{ margin: '0 0 10px', fontSize: 12, fontWeight: 600, color: 'var(--text-primary, #f1f5f9)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      🗺️ Suggested SGPA Targets By Semester
+                    </h4>
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))',
+                      gap: 10
+                    }}>
+                      {aiData.roadmap.map((sem, idx) => (
+                        <div key={idx} style={{
+                          padding: '12px',
+                          borderRadius: 10,
+                          background: 'rgba(255,255,255,0.02)',
+                          border: '1px solid rgba(255,255,255,0.05)',
+                          textAlign: 'center',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 4
+                        }}>
+                          <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-secondary, #94a3b8)' }}>
+                            Semester {sem.semester}
+                          </span>
+                          <span style={{ fontSize: 20, fontWeight: 800, color: '#818cf8', fontFamily: "'Space Grotesk', sans-serif" }}>
+                            {sem.suggestedSGPA}
+                          </span>
+                          <span style={{ fontSize: 10, color: 'var(--muted, #64748b)', lineHeight: 1.2 }}>
+                            {sem.focus}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Actionable Strategies */}
+                {aiData.strategies && aiData.strategies.length > 0 && (
+                  <div>
+                    <h4 style={{ margin: '0 0 10px', fontSize: 12, fontWeight: 600, color: 'var(--text-primary, #f1f5f9)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      ⚡ AI-Powered Action Strategy
+                    </h4>
+                    <ul style={{ margin: 0, paddingLeft: 16, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {aiData.strategies.map((strat, idx) => (
+                        <li key={idx} style={{ fontSize: 12, color: 'var(--text-secondary, #94a3b8)', lineHeight: 1.5 }}>
+                          {strat}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Credit Breakdown */}
           {data.creditBreakdown && (

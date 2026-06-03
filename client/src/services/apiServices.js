@@ -147,6 +147,7 @@ export const decisionService = {
 // ─── Prediction ───────────────────────────────────────────────────────────
 export const predictionService = {
   getPredict: (params) => apiRequest('get', '/predict', null, { params }),
+  getAIAnalysis: (params) => apiRequest('get', '/predict/ai-analysis', null, { params }),
 };
 
 export const aiCommandService = {
