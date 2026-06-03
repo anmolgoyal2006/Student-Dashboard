@@ -99,6 +99,18 @@ User: "What will my CGPA be if I score 7.5 next semester"
 User: "What will my cgpa if I score 6 GPA next semester"
 → {"action":"answer","entity":"semester","data":{"hypotheticalSGPA":6,"query":"cgpa_predict"},"message":"Calculating your predicted CGPA."}
 
+User: "What Sgpa should i score next sem to get overally cgpa of 9"
+→ {"action":"answer","entity":"semester","data":{"targetCGPA":9,"query":"sgpa_needed"},"message":"Calculating required SGPA."}
+
+User: "What SGPA do I need next sem to reach 8.5 CGPA"
+→ {"action":"answer","entity":"semester","data":{"targetCGPA":8.5,"query":"sgpa_needed"},"message":"Calculating required SGPA."}
+
+User: "If my CGPA is 8.0 till 4th sem, what will my CGPA be if I score 7 in the next 2 semesters?"
+→ {"action":"answer","entity":"semester","data":{"currentCGPA":8.0,"completed":4,"hypotheticalSGPA":7.0,"hypotheticalSemestersCount":2,"query":"cgpa_predict"},"message":"Calculating hypothetical CGPA."}
+
+User: "What will my cgpa be if i have 8.2 cgpa till 3 sems and get 9 sgpa in next sem"
+→ {"action":"answer","entity":"semester","data":{"currentCGPA":8.2,"completed":3,"hypotheticalSGPA":9.0,"hypotheticalSemestersCount":1,"query":"cgpa_predict"},"message":"Calculating hypothetical CGPA."}
+
 User: "How many classes do I need to reach 75% in Maths"
 → {"action":"answer","entity":"none","data":{"subjectName":"Maths","query":"attendance_needed"},"message":"Let me check your Maths attendance and calculate what you need."}
 
@@ -284,6 +296,23 @@ async function upsertSemester(data, userId) {
   }
 }
 
+const DEFAULT_CREDIT_PATTERN = [22, 21, 22, 24, 20, 12, 19, 21];
+
+function getCreditsForSemesterNumber(semNum, semesters) {
+  // If the semester exists in DB, use its actual credits
+  const existing = semesters.find(s => s.semesterNumber === semNum);
+  if (existing) {
+    if (existing.isManual) return existing.totalCredits || 20;
+    return (existing.subjects || []).reduce((sum, sub) => sum + (sub.credits || 0), 0) || 20;
+  }
+  // Else return from pattern or default to 20
+  const idx = semNum - 1;
+  if (idx >= 0 && idx < DEFAULT_CREDIT_PATTERN.length) {
+    return DEFAULT_CREDIT_PATTERN[idx];
+  }
+  return 20;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Main handler
 // ─────────────────────────────────────────────────────────────────────────────
@@ -328,18 +357,118 @@ let result   = null;
 
     if (parsed.action === 'answer') {
 
-  // 1. CGPA prediction
+  // 1. CGPA prediction / hypothetical situation
   if (parsed.data?.hypotheticalSGPA || parsed.data?.query === 'cgpa_predict') {
-    const semesters = await Semester.find({ student: userId }).sort({ semesterNumber: 1 });
-    const sgpas     = semesters.map(s => s.sgpa).filter(Boolean);
-    const hypo      = parseFloat(parsed.data.hypotheticalSGPA);
-    if (sgpas.length && !isNaN(hypo)) {
-      const allSGPAs      = [...sgpas, hypo];
-      const predictedCGPA = (allSGPAs.reduce((a, b) => a + b, 0) / allSGPAs.length).toFixed(2);
+    const hypo = parseFloat(parsed.data.hypotheticalSGPA);
+    if (!isNaN(hypo)) {
+      let semesters = [];
+      let currentCGPAOverride = parsed.data.currentCGPA !== undefined ? parseFloat(parsed.data.currentCGPA) : null;
+      let completedSemestersCount = parsed.data.completed !== undefined ? parseInt(parsed.data.completed, 10) : null;
+      
+      let completedCreditsCount = 0;
+      let currentWeightedSum = 0;
+      let N = 0;
+      
+      if (currentCGPAOverride !== null && completedSemestersCount !== null && !isNaN(currentCGPAOverride) && !isNaN(completedSemestersCount)) {
+        // Manual override mode
+        N = completedSemestersCount;
+        // Estimate credits for manual override semesters based on pattern
+        for (let i = 1; i <= N; i++) {
+          const cr = getCreditsForSemesterNumber(i, []);
+          completedCreditsCount += cr;
+        }
+        currentWeightedSum = currentCGPAOverride * completedCreditsCount;
+      } else {
+        // Database mode
+        semesters = await Semester.find({ student: userId }).sort({ semesterNumber: 1 });
+        N = semesters.length;
+        for (const s of semesters) {
+          const cr = s.isManual ? (s.totalCredits || 20) : (s.subjects || []).reduce((sum, sub) => sum + (sub.credits || 0), 0) || 20;
+          currentWeightedSum += s.sgpa * cr;
+          completedCreditsCount += cr;
+        }
+      }
+      
+      // Future semesters count (default to 1 if not specified)
+      const futureCount = parsed.data.hypotheticalSemestersCount ? parseInt(parsed.data.hypotheticalSemestersCount, 10) : 1;
+      
+      let futureCredits = 0;
+      let futureWeightedSum = 0;
+      for (let i = 1; i <= futureCount; i++) {
+        const nextSemNum = N + i;
+        const cr = getCreditsForSemesterNumber(nextSemNum, semesters);
+        futureCredits += cr;
+        futureWeightedSum += hypo * cr;
+      }
+      
+      const totalCredits = completedCreditsCount + futureCredits;
+      const predictedCGPA = ((currentWeightedSum + futureWeightedSum) / totalCredits).toFixed(2);
+      
+      let message = "";
+      if (currentCGPAOverride !== null) {
+        message = `Starting with a CGPA of ${currentCGPAOverride} over ${N} semesters, if you score ${hypo} SGPA in the next ${futureCount === 1 ? 'semester' : `${futureCount} semesters`}, your overall CGPA will be ${predictedCGPA}.`;
+      } else {
+        if (N === 0) {
+          message = `Since you don't have any semesters registered yet, if you score ${hypo} SGPA in the next ${futureCount === 1 ? 'semester' : `${futureCount} semesters`}, your CGPA will be ${hypo.toFixed(2)}.`;
+        } else {
+          message = `Based on your existing ${N} semesters, if you score ${hypo} SGPA in the next ${futureCount === 1 ? 'semester' : `${futureCount} semesters`}, your predicted CGPA will be ${predictedCGPA}.`;
+        }
+      }
+      
       return res.json({
         success: true, action: 'answer', entity: 'none',
-        message: `If you score ${hypo} SGPA next semester, your CGPA will be ${predictedCGPA} (over ${allSGPAs.length} semesters).`,
-        data   : { predictedCGPA, currentSemesters: sgpas.length, hypotheticalSGPA: hypo },
+        message,
+        data: { predictedCGPA, currentSemesters: N, hypotheticalSGPA: hypo, hypotheticalSemestersCount: futureCount }
+      });
+    }
+  }
+
+  // 1b. Target CGPA prediction (calculating required SGPA for a target CGPA)
+  if (parsed.data?.targetCGPA || parsed.data?.query === 'sgpa_needed') {
+    const semesters = await Semester.find({ student: userId }).sort({ semesterNumber: 1 });
+    const target    = parseFloat(parsed.data.targetCGPA);
+    if (!isNaN(target)) {
+      const N = semesters.length;
+      if (N === 0) {
+        return res.json({
+          success: true, action: 'answer', entity: 'none',
+          message: `Since you don't have any semesters registered yet, you need to score an SGPA of ${target.toFixed(2)} in your next semester.`,
+          data   : { targetSGPA: target, currentSemesters: 0, targetCGPA: target },
+        });
+      }
+      
+      // Sum current weighted score
+      let currentWeightedSum = 0;
+      let totalCredits = 0;
+      for (const s of semesters) {
+        const cr = s.isManual ? (s.totalCredits || 20) : (s.subjects || []).reduce((sum, sub) => sum + (sub.credits || 0), 0) || 20;
+        currentWeightedSum += s.sgpa * cr;
+        totalCredits += cr;
+      }
+      
+      // Target next semester
+      const nextSemNum = Math.max(...semesters.map(s => s.semesterNumber)) + 1;
+      const nextSemCredits = getCreditsForSemesterNumber(nextSemNum, semesters);
+      
+      const totalDegreeCredits = totalCredits + nextSemCredits;
+      const needed = (target * totalDegreeCredits - currentWeightedSum) / nextSemCredits;
+
+      let msg = "";
+      const currentCGPA = (currentWeightedSum / totalCredits).toFixed(2);
+      if (needed < 0) {
+        msg = `You have already exceeded a CGPA of ${target}! Your current CGPA is ${currentCGPA}.`;
+      } else if (needed > 10) {
+        const maxSGPA = 10.0;
+        const maxPossibleCGPA = ((currentWeightedSum + maxSGPA * nextSemCredits) / totalDegreeCredits).toFixed(2);
+        msg = `It is mathematically impossible to reach a CGPA of ${target} next semester. Even with a perfect 10.0 SGPA next semester, your max CGPA would be ${maxPossibleCGPA}.`;
+      } else {
+        msg = `To reach an overall CGPA of ${target}, you need to score an SGPA of ${needed.toFixed(2)} in your next semester (Semester ${nextSemNum}, assuming ${nextSemCredits} credits).`;
+      }
+
+      return res.json({
+        success: true, action: 'answer', entity: 'none',
+        message: msg,
+        data   : { targetSGPA: parseFloat(needed.toFixed(2)), currentSemesters: N, targetCGPA: target, currentCGPA },
       });
     }
   }
