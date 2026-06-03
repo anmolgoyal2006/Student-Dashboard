@@ -911,13 +911,24 @@ export default function AIAssistant() {
               disabled={loading}
               style={{
                 minWidth: 36, height: 36, borderRadius: 8, border: 'none', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
                 background: listening
                   ? '#ef4444'
                   : mode === 'notes' ? 'rgba(16,185,129,0.2)' : 'rgba(129,140,248,0.2)',
                 color: listening ? '#fff' : 'var(--text)',
               }}
             >
-              {listening ? '🔴' : '🎤'}
+              {listening ? (
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                  <rect x="4" y="4" width="16" height="16" rx="2" />
+                </svg>
+              ) : (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+                  <path d="M19 10v1a7 7 0 0 1-14 0v-1" />
+                  <line x1="12" x2="12" y1="19" y2="22" />
+                </svg>
+              )}
             </button>
 
             {/* Send */}

@@ -210,6 +210,47 @@ exports.getPredict = async (req, res) => {
   }
 };
 
+function distributeRequiredSGPA(requiredSGPA, remaining, completed, adjustedCredits) {
+  if (remaining <= 0) return [];
+  if (remaining === 1) {
+    return [{ semester: completed + 1, suggestedSGPA: requiredSGPA }];
+  }
+
+  let offsets = [];
+  if (remaining === 2) {
+    offsets = [-0.15, 0.15];
+  } else if (remaining === 3) {
+    offsets = [-0.20, 0.0, 0.20];
+  } else if (remaining === 4) {
+    offsets = [-0.25, -0.05, 0.10, 0.20];
+  } else {
+    for (let i = 0; i < remaining; i++) {
+      offsets.push(-0.30 + (0.60 * i) / (remaining - 1));
+    }
+  }
+
+  const futureCredits = adjustedCredits.slice(completed);
+  const sumFutureCredits = futureCredits.reduce((a, b) => a + b, 0);
+
+  let sumWeightedOffsets = 0;
+  for (let i = 0; i < remaining; i++) {
+    sumWeightedOffsets += offsets[i] * (futureCredits[i] || 20);
+  }
+  const delta = sumFutureCredits > 0 ? -sumWeightedOffsets / sumFutureCredits : 0;
+
+  const roadmap = [];
+  for (let i = 0; i < remaining; i++) {
+    const val = requiredSGPA + offsets[i] + delta;
+    const clampedVal = Math.min(10, Math.max(0, Math.round(val * 100) / 100));
+    roadmap.push({
+      semester: completed + i + 1,
+      suggestedSGPA: clampedVal
+    });
+  }
+
+  return roadmap;
+}
+
 exports.getAIAnalysis = async (req, res) => {
   try {
     const { currentCGPA: manualCGPA, completed: manualCompleted, targetCGPA, totalSemesters, totalDegreeCredits, semesterCredits: rawSemCredits } = req.query;
@@ -332,12 +373,55 @@ exports.getAIAnalysis = async (req, res) => {
       };
     }
 
+    if (isNaN(target)) {
+      return res.json({
+        feasibility: 'Medium',
+        feasibilityReason: 'Specify a Target CGPA above to analyze trajectory feasibility.',
+        analysis: `You have completed ${completed} semesters with a cumulative CGPA of ${currentCGPA || '—'}. To start your StudentAI planning and generate custom semester-by-semester SGPA target roadmaps, enter a Target CGPA and click Calculate.`,
+        bottlenecks: [
+          ...lowAttendance.map(la => ({
+            subject: la.subject,
+            issue: `Attendance is low at ${la.attendance}.`,
+            impact: 'Potential risk of losing internal assessment marks.'
+          })),
+          ...lowGrades.map(lg => ({
+            subject: lg.subject,
+            issue: `Grade point is ${lg.gradePoint} in ${lg.exam} (${lg.score}).`,
+            impact: 'Negatively impacts cumulative CGPA.'
+          }))
+        ].slice(0, 3),
+        roadmap: [],
+        strategies: [
+          'Set a Target CGPA in the calculator above and click Calculate to run a custom strategic roadmap.',
+          'Focus heavily on courses with higher credit weights to optimize your future GPA shifts.',
+          'Keep class attendance above 75% across all active subjects to remain eligible for exams.'
+        ]
+      });
+    }
+
+    let roadmapTargets = [];
+    if (remaining > 0) {
+      if (!isNaN(target)) {
+        const futureCredits = adjustedCredits.slice(completed).reduce((a, b) => a + b, 0);
+        if (futureCredits > 0) {
+          const raw = (target * sumCredits - currentWeightedSum) / futureCredits;
+          const baselineSGPA = raw > 10 ? 9.8 : clamp(raw, 0, 10);
+          roadmapTargets = distributeRequiredSGPA(baselineSGPA, remaining, completed, adjustedCredits);
+        }
+      } else {
+        const lastSGPA = sgpaList.length > 0 ? sgpaList[sgpaList.length - 1] : 8.5;
+        const baselineSGPA = clamp(lastSGPA, 5.0, 10);
+        roadmapTargets = distributeRequiredSGPA(baselineSGPA, remaining, completed, adjustedCredits);
+      }
+    }
+
     const analysisPayload = {
       completedSemesters: completed,
       remainingSemesters: remaining,
       currentCGPA,
       targetCGPA: isNaN(target) ? 'None' : target,
       requiredSGPA: requiredSGPA ?? 'None',
+      suggestedRoadmap: roadmapTargets,
       creditDistribution: adjustedCredits,
       subjectsCount: subjects.length,
       lowAttendanceSubjects: lowAttendance,
@@ -441,9 +525,11 @@ Instructions:
    - "Low" if requiredSGPA is very high (e.g., > 9.2) and recent performance is significantly lower.
    - "Challenging" if requiredSGPA is between 8.2 and 9.2.
    - "High" / "Medium" if requiredSGPA is realistic (< 8.2).
+   - In "feasibilityReason", refer to the EXACT number of remaining semesters from the payload (remainingSemesters key). Do NOT confuse remaining semesters with total semesters or completed semesters.
 2. Roadmap:
-   - Provide a target suggestedSGPA for each remaining semester (semester completed + 1, completed + 2, up to totalSemesters).
-   - Ensure the suggestedSGPAs mathematically average out to the requiredSGPA needed to hit targetCGPA.
+   - The roadmap array MUST contain exactly the same number of entries as 'suggestedRoadmap' in the payload.
+   - For each entry, you MUST use the exact 'semester' and 'suggestedSGPA' values provided in the payload's 'suggestedRoadmap' array. Do NOT modify or deviate from these numerical suggestedSGPA values or hallucinate different SGPAs.
+   - For each semester entry, add a highly contextual academic 'focus' string (max 10 words).
 3. Bottlenecks:
    - Extract up to 3 bottlenecks. Prioritize low attendance (< 75%) and weak grades (Grade Point <= 6). Reference subject names exactly.
 4. Strategies:

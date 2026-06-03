@@ -977,18 +977,20 @@ export default function Career() {
                       >
                         {isListening ? (
                           <>
-                            <span style={{
-                              width: 8,
-                              height: 8,
-                              borderRadius: '50%',
-                              background: '#ef4444',
-                              display: 'inline-block',
-                              animation: 'voicePulse 1.2s infinite'
-                            }}></span>
+                            <svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor" style={{ display: 'inline-block', verticalAlign: 'middle', animation: 'voicePulse 1.2s infinite' }}>
+                              <rect x="4" y="4" width="16" height="16" rx="2" />
+                            </svg>
                             Stop Listening
                           </>
                         ) : (
-                          <>🎤 Speak Answer</>
+                          <>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block', verticalAlign: 'middle' }}>
+                              <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+                              <path d="M19 10v1a7 7 0 0 1-14 0v-1" />
+                              <line x1="12" x2="12" y1="19" y2="22" />
+                            </svg>
+                            &nbsp;Speak Answer
+                          </>
                         )}
                       </button>
                     )}
