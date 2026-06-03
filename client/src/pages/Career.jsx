@@ -125,6 +125,8 @@ export default function Career() {
 
   const handleEvaluateAnswer = async () => {
     if (!userAnswer.trim()) return;
+    voiceRecogRef.current?.stop();
+    setIsListening(false);
     setEvaluating(true);
     setEvaluationResult(null);
     setShowModelAnswer(false);
@@ -160,14 +162,15 @@ export default function Career() {
     const recognition = new SpeechRecognition();
     voiceRecogRef.current = recognition;
     recognition.lang = 'en-US';
-    recognition.continuous = true;
+    recognition.continuous = false; // Single-shot like AI Assistant
     recognition.interimResults = true;
 
     const baseText = userAnswer ? userAnswer.trim() + ' ' : '';
+    let currentText = '';
 
     recognition.onstart = () => {
       setIsListening(true);
-      toast('🎙️ Listening... Speak your answer.', { icon: '🎤', duration: 3000 });
+      toast('🎙️ Listening... Speak your answer.', { icon: '🎤', duration: 2000 });
     };
 
     recognition.onend = () => {
@@ -183,17 +186,20 @@ export default function Career() {
     };
 
     recognition.onresult = (event) => {
-      let sessionText = '';
+      let resultText = '';
       for (let i = 0; i < event.results.length; ++i) {
-        sessionText += event.results[i][0].transcript;
+        resultText += event.results[i][0].transcript;
       }
-      setUserAnswer(baseText + sessionText);
+      currentText = resultText;
+      setUserAnswer(baseText + resultText);
     };
 
     recognition.start();
   };
 
   const handleNavQuestion = async (newIndex) => {
+    voiceRecogRef.current?.stop();
+    setIsListening(false);
     setActiveQuestionIndex(newIndex);
     try {
       await careerService.updateActiveIndex(newIndex);
@@ -203,6 +209,8 @@ export default function Career() {
   };
 
   const handleResetInterview = async () => {
+    voiceRecogRef.current?.stop();
+    setIsListening(false);
     if (!window.confirm('Are you sure you want to reset this interview session? This will clear the active questions and answers.')) return;
     try {
       const { data } = await careerService.resetActiveInterview();
