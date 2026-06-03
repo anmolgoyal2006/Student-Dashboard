@@ -25,6 +25,8 @@ export default function Career() {
   const [activeTab, setActiveTab] = useState('dsa');
 
   // Resume Scanner State
+  const [scanMethod, setScanMethod] = useState('pdf'); // 'pdf' | 'text'
+  const [resumeFile, setResumeFile] = useState(null);
   const [resumeText, setResumeText] = useState('');
   const [resumeLoading, setResumeLoading] = useState(false);
   const [resumeAnalysis, setResumeAnalysis] = useState(null);
@@ -50,6 +52,24 @@ export default function Career() {
       setCareer(prev => ({ ...prev, resumeScore: data.score }));
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to analyze resume');
+    } finally {
+      setResumeLoading(false);
+    }
+  };
+
+  const handleUploadResume = async () => {
+    if (!resumeFile) return;
+    setResumeLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', resumeFile);
+
+      const { data } = await careerService.uploadResume(formData);
+      setResumeAnalysis(data);
+      toast.success('Resume PDF scanned and analyzed successfully!');
+      setCareer(prev => ({ ...prev, resumeScore: data.score }));
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to analyze resume PDF');
     } finally {
       setResumeLoading(false);
     }
@@ -528,28 +548,93 @@ export default function Career() {
         <>
           {/* AI Career Prep View */}
           <div className="grid-2 mb-4">
-            {/* Resume Paste Card */}
+            {/* Resume Upload / Paste Card */}
             <div className="card">
               <div className="card-title">🔍 Resume Scanner & Keyword Checker</div>
-              <p className="text-muted" style={{ marginBottom: 12 }}>
-                Paste your resume plain text below to evaluate keyword matching and get optimization tips for {career.targetCompany} and {career.targetRole || 'Software Engineer'}.
+              <p className="text-muted" style={{ marginBottom: 16 }}>
+                Submit your resume to evaluate keyword matching and get optimization tips for {career.targetCompany} and {career.targetRole || 'Software Engineer'}.
               </p>
-              <div className="form-group">
-                <textarea
-                  className="form-input"
-                  style={{ minHeight: 180, resize: 'vertical', fontFamily: 'inherit', fontSize: 13, lineHeight: 1.5 }}
-                  placeholder="Paste your plain text resume content here..."
-                  value={resumeText}
-                  onChange={e => setResumeText(e.target.value)}
-                />
+
+              {/* Method Switcher */}
+              <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+                <button
+                  type="button"
+                  className={`btn btn-sm ${scanMethod === 'pdf' ? 'btn-primary' : 'btn-outline'}`}
+                  onClick={() => setScanMethod('pdf')}
+                  style={{ minHeight: 'auto', height: 32 }}
+                >
+                  📄 Upload PDF
+                </button>
+                <button
+                  type="button"
+                  className={`btn btn-sm ${scanMethod === 'text' ? 'btn-primary' : 'btn-outline'}`}
+                  onClick={() => setScanMethod('text')}
+                  style={{ minHeight: 'auto', height: 32 }}
+                >
+                  ✏️ Paste Text
+                </button>
               </div>
-              <button
-                className="btn btn-primary"
-                disabled={resumeLoading || !resumeText.trim()}
-                onClick={handleAnalyzeResume}
-              >
-                {resumeLoading ? 'Scanning Resume...' : '⚡ Scan & Analyze'}
-              </button>
+
+              {scanMethod === 'pdf' ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  <div style={{
+                    border: '2px dashed var(--border)',
+                    borderRadius: 10,
+                    padding: '24px 16px',
+                    textAlign: 'center',
+                    background: 'rgba(255,255,255,0.01)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: 8,
+                    cursor: 'pointer'
+                  }}
+                  onClick={() => document.getElementById('resume-pdf-input').click()}
+                  >
+                    <span style={{ fontSize: 24 }}>📤</span>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>
+                      {resumeFile ? resumeFile.name : 'Select your Resume PDF'}
+                    </span>
+                    <span style={{ fontSize: 11, color: 'var(--muted)' }}>Supports PDF formats up to 5MB</span>
+                    <input
+                      id="resume-pdf-input"
+                      type="file"
+                      accept=".pdf"
+                      style={{ display: 'none' }}
+                      onChange={e => {
+                        const file = e.target.files[0];
+                        if (file) setResumeFile(file);
+                      }}
+                    />
+                  </div>
+                  <button
+                    className="btn btn-primary"
+                    disabled={resumeLoading || !resumeFile}
+                    onClick={handleUploadResume}
+                  >
+                    {resumeLoading ? 'Scanning PDF...' : '⚡ Scan PDF Resume'}
+                  </button>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <textarea
+                      className="form-input"
+                      style={{ minHeight: 140, resize: 'vertical', fontFamily: 'inherit', fontSize: 13, lineHeight: 1.5 }}
+                      placeholder="Paste your plain text resume content here..."
+                      value={resumeText}
+                      onChange={e => setResumeText(e.target.value)}
+                    />
+                  </div>
+                  <button
+                    className="btn btn-primary"
+                    disabled={resumeLoading || !resumeText.trim()}
+                    onClick={handleAnalyzeResume}
+                  >
+                    {resumeLoading ? 'Scanning Text...' : '⚡ Scan Plain Text'}
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Resume Score and Feedback Card */}

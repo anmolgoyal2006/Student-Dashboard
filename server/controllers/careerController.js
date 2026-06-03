@@ -253,3 +253,77 @@ Target Company: ${targetCompany}`;
   }
 };
 
+const pdfParse = require('pdf-parse');
+
+// POST /api/career/upload-resume
+exports.uploadResume = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: 'No file uploaded.' });
+    }
+
+    // Parse the PDF buffer
+    const pdfData = await pdfParse(req.file.buffer);
+    const resumeText = pdfData.text;
+
+    if (!resumeText || !resumeText.trim()) {
+      return res.status(422).json({ message: 'Failed to extract text from the PDF.' });
+    }
+
+    // Run AI analysis
+    const career = await CareerProgress.findOne({ userId: req.user.id });
+    if (!career) return res.status(404).json({ message: 'Setup your career progress first.' });
+
+    const targetCompany = career.targetCompany || 'Other';
+    const targetRole = career.targetRole || 'Software Engineer';
+    const skills = (career.skills || []).join(', ');
+
+    const systemPrompt = `You are an expert technical recruiter and resume analyzer. Return a JSON object with:
+- score (integer, 0 to 100) based on target company, target role, and resume text
+- feedback (array of strings, max 4 items, constructive feedback)
+- missingKeywords (array of strings, key technical skills/technologies missing for target role/company)
+
+Strictly return RAW JSON matching:
+{ "score": 85, "feedback": ["Improve DSA examples"], "missingKeywords": ["Redis"] }
+No markdown, no fences.`;
+
+    const userPrompt = `Analyze this resume:
+${resumeText}
+
+For Target Role: ${targetRole}
+Target Company: ${targetCompany}
+Current Skills Listed: ${skills}`;
+
+    const completion = await groq.chat.completions.create({
+      model: 'llama-3.1-8b-instant',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+      temperature: 0.1,
+      max_tokens: 600,
+    });
+
+    const content = completion.choices[0]?.message?.content?.trim();
+    const parsed = extractJSON(content);
+    if (!parsed || typeof parsed.score !== 'number') {
+      console.error('[UploadResume] Llama returned invalid JSON:', content);
+      return res.status(500).json({ message: 'Failed to analyze resume structure.' });
+    }
+
+    // Save score in DB
+    career.resumeScore = parsed.score;
+    await career.save();
+
+    res.json({
+      score: parsed.score,
+      feedback: parsed.feedback || [],
+      missingKeywords: parsed.missingKeywords || []
+    });
+
+  } catch (err) {
+    console.error('[UploadResume]', err.message);
+    res.status(500).json({ message: err.message });
+  }
+};
+

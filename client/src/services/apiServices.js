@@ -82,6 +82,10 @@ export const careerService = {
   analyzeResume: (resumeText) => apiRequest('post', '/career/analyze-resume', { resumeText }),
   getMockQuestions: (topic) => apiRequest('post', '/career/mock-questions', { topic }),
   evaluateAnswer: (question, userAnswer) => apiRequest('post', '/career/evaluate-answer', { question, userAnswer }),
+  uploadResume: (formData) =>
+    API.post('/career/upload-resume', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
 };
 
 // ─── AI Recommendations ───────────────────────────────────────────────────
