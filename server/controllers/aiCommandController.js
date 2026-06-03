@@ -46,7 +46,7 @@ ENTITIES AND FIELDS:
 - marks      : { subjectName (string), examType ("midterm"|"final"|"quiz"|"assignment"|"practical"),
                  marksObtained (number), maxMarks (number), examDate (ISO YYYY-MM-DD) }
 - task       : { title (string), description (string), dueDate (ISO YYYY-MM-DD),
-                 priority ("low"|"medium"|"high"), category (string) }
+                 priority ("low"|"medium"|"high"), subject (string) }
 - semester   : { semesterNumber (number), semesterName (string), sgpa (number),
                  subjects: [{ name, credits, grade }] }
 
@@ -174,6 +174,33 @@ User: "set semester 1 SGPA to 8.5 and semester 2 to 9.0"
 
 User: "delete semester 1"
 → {"action":"delete","entity":"semester","data":{"semesterNumber":1},"message":"Deleting Semester 1."}
+
+User: "How many classes can I skip in Physics?"
+→ {"action":"answer","entity":"attendance","data":{"subjectName":"Physics","query":"bunk_planner"},"message":"Calculating how many classes you can skip in Physics."}
+
+User: "What will my attendance be in Maths if I miss 3 classes?"
+→ {"action":"answer","entity":"attendance","data":{"subjectName":"Maths","query":"bunk_planner","skipClasses":3},"message":"Calculating attendance impact."}
+
+User: "What is my busiest day of the week?"
+→ {"action":"answer","entity":"subject","data":{"query":"schedule_analytics"},"message":"Analyzing your schedule to find your busiest day."}
+
+User: "Which day has the most classes?"
+→ {"action":"answer","entity":"subject","data":{"query":"schedule_analytics"},"message":"Analyzing your schedule to find your busiest day."}
+
+User: "How many hours of class do I have on Mondays?"
+→ {"action":"answer","entity":"subject","data":{"query":"schedule_analytics","day":"Mon"},"message":"Analyzing Monday schedule."}
+
+User: "Tell me about my progress in Chemistry"
+→ {"action":"answer","entity":"subject","data":{"query":"subject_report","subjectName":"Chemistry"},"message":"Generating progress report for Chemistry."}
+
+User: "Give me a progress report for Maths"
+→ {"action":"answer","entity":"subject","data":{"query":"subject_report","subjectName":"Maths"},"message":"Generating progress report for Maths."}
+
+User: "Create a detailed study plan for today"
+→ {"action":"answer","entity":"none","data":{"query":"study_suggestion","optimize":true},"message":"Creating a custom study schedule for you."}
+
+User: "Suggest a study routine for this week"
+→ {"action":"answer","entity":"none","data":{"query":"study_suggestion","optimize":true},"message":"Creating a custom study schedule for you."}
 `;
 
 
@@ -526,8 +553,235 @@ let result   = null;
     }
   }
 
-    // Add this INSIDE the answer block, after the attendance_status handler:
+  // 2b. Bunk Planner & Attendance Impact Calculator
+  if (parsed.data?.query === 'bunk_planner' && parsed.data?.subjectName) {
+    const subjectName = parsed.data.subjectName;
+    const subject = await Subject.findOne({ userId, name: new RegExp(`^${subjectName}$`, 'i') });
+    if (!subject) {
+      const allSubjects = await Subject.find({ userId });
+      if (allSubjects.length === 0) {
+        return res.json({
+          success: true, action: 'answer', entity: 'none',
+          message: "You haven't added any subjects to your timetable yet. Say 'Add subject Physics' to get started!",
+          data: {}
+        });
+      }
+      const names = allSubjects.map(s => s.name).join(', ');
+      return res.json({
+        success: true, action: 'answer', entity: 'none',
+        message: `Subject "${subjectName}" not found. Your current subjects are: ${names}. Which one would you like to check?`,
+        data: {}
+      });
+    }
+    const records = await Attendance.find({ userId, subjectId: subject._id, status: { $ne: 'cancelled' } });
+    const total = records.length;
+    const present = records.filter(r => r.status === 'present').length;
+    const pct = total ? (present / total * 100).toFixed(1) : 0;
 
+    if (total === 0) {
+      return res.json({ success: true, action: 'answer', entity: 'none', message: `No attendance records found for "${subject.name}" yet.`, data: {} });
+    }
+
+    if (parsed.data.skipClasses !== undefined) {
+      const skipCount = Math.max(1, parseInt(parsed.data.skipClasses, 10) || 1);
+      const projectedTotal = total + skipCount;
+      const projectedPct = (present / projectedTotal * 100).toFixed(1);
+      
+      let msg = "";
+      if (projectedPct >= 75) {
+        msg = `✅ If you miss ${skipCount} classes in ${subject.name}, your attendance will drop from ${pct}% to ${projectedPct}%. You will still be safe (above 75%).`;
+      } else {
+        msg = `⚠️ Warning: If you miss ${skipCount} classes in ${subject.name}, your attendance will drop from ${pct}% to ${projectedPct}%, falling below the 75% requirement!`;
+      }
+      return res.json({
+        success: true, action: 'answer', entity: 'none',
+        message: msg,
+        data: { total, present, currentPct: parseFloat(pct), projectedPct: parseFloat(projectedPct), skipCount }
+      });
+    } else {
+      const maxBunks = Math.floor((4 * present - 3 * total) / 3);
+      let msg = "";
+      if (maxBunks > 0) {
+        const nextPct = (present / (total + maxBunks) * 100).toFixed(1);
+        msg = `😊 You have ${pct}% attendance in ${subject.name} (${present}/${total}). You can safely skip up to ${maxBunks} classes without falling below 75% (projected: ${nextPct}%).`;
+      } else if (maxBunks === 0) {
+        msg = `ℹ️ You have exactly ${pct}% attendance in ${subject.name} (${present}/${total}). You cannot afford to skip any classes. Bunking even 1 class will drop you to ${(present / (total + 1) * 100).toFixed(1)}%.`;
+      } else {
+        const needed = 3 * total - 4 * present;
+        msg = `⚠️ Your attendance in ${subject.name} is currently ${pct}% (${present}/${total}). You cannot skip classes. You must attend the next ${needed} classes consecutively to reach 75%.`;
+      }
+      return res.json({
+        success: true, action: 'answer', entity: 'none',
+        message: msg,
+        data: { total, present, currentPct: parseFloat(pct), maxBunks: Math.max(0, maxBunks), classesNeeded: Math.max(0, -maxBunks) }
+      });
+    }
+  }
+
+  // 2c. Timetable Workload Analytics
+  if (parsed.data?.query === 'schedule_analytics') {
+    const subjects = await Subject.find({ userId });
+    const dayNames = {
+      'Mon': 'Monday', 'Tue': 'Tuesday', 'Wed': 'Wednesday',
+      'Thu': 'Thursday', 'Fri': 'Friday', 'Sat': 'Saturday'
+    };
+    const dayStats = {
+      'Mon': { hours: 0, count: 0, classes: [] },
+      'Tue': { hours: 0, count: 0, classes: [] },
+      'Wed': { hours: 0, count: 0, classes: [] },
+      'Thu': { hours: 0, count: 0, classes: [] },
+      'Fri': { hours: 0, count: 0, classes: [] },
+      'Sat': { hours: 0, count: 0, classes: [] }
+    };
+
+    subjects.forEach(sub => {
+      if (sub.schedule && Array.isArray(sub.schedule)) {
+        sub.schedule.forEach(slot => {
+          if (dayStats[slot.day]) {
+            const [sh, sm] = slot.startTime.split(':').map(Number);
+            const [eh, em] = slot.endTime.split(':').map(Number);
+            const durationHours = (eh * 60 + em - (sh * 60 + sm)) / 60;
+            
+            dayStats[slot.day].hours += durationHours;
+            dayStats[slot.day].count++;
+            dayStats[slot.day].classes.push({
+              name: sub.name,
+              time: `${slot.startTime}–${slot.endTime}`,
+              room: slot.room || 'N/A',
+              duration: durationHours
+            });
+          }
+        });
+      }
+    });
+
+    const dayQuery = parsed.data?.day;
+    let targetDayKey = null;
+    if (dayQuery) {
+      const q = dayQuery.trim().toLowerCase();
+      Object.entries(dayNames).forEach(([k, v]) => {
+        if (k.toLowerCase() === q || v.toLowerCase() === q) {
+          targetDayKey = k;
+        }
+      });
+    }
+
+    if (targetDayKey) {
+      const stats = dayStats[targetDayKey];
+      const dayName = dayNames[targetDayKey];
+      if (stats.count === 0) {
+        return res.json({
+          success: true, action: 'answer', entity: 'none',
+          message: `You have no classes scheduled on ${dayName}. Enjoy your day off! 🌟`
+        });
+      }
+      const classDetails = stats.classes.map(c => `• ${c.name} (${c.time}) in ${c.room}`).join('\n');
+      return res.json({
+        success: true, action: 'answer', entity: 'none',
+        message: `📅 On ${dayName}, you have ${stats.count} classes totaling ${stats.hours.toFixed(1)} hours:\n${classDetails}`,
+        data: { day: dayName, hours: stats.hours, classCount: stats.count, classes: stats.classes }
+      });
+    }
+
+    let busiestDay = null;
+    let maxHours = 0;
+    let maxCount = 0;
+    
+    Object.entries(dayStats).forEach(([day, stats]) => {
+      if (stats.hours > maxHours || (stats.hours === maxHours && stats.count > maxCount)) {
+        maxHours = stats.hours;
+        maxCount = stats.count;
+        busiestDay = day;
+      }
+    });
+
+    if (!busiestDay || maxCount === 0) {
+      return res.json({
+        success: true, action: 'answer', entity: 'none',
+        message: "You don't have any classes in your timetable yet. Add some subjects with schedules!",
+        data: {}
+      });
+    }
+
+    const busiestDayName = dayNames[busiestDay];
+    const details = dayStats[busiestDay].classes.map(c => `• ${c.name} (${c.time})`).join('\n');
+
+    return res.json({
+      success: true, action: 'answer', entity: 'none',
+      message: `🔥 Your busiest day is ${busiestDayName} with ${maxCount} classes totaling ${maxHours.toFixed(1)} hours:\n${details}`,
+      data: { busiestDay: busiestDayName, maxHours, maxCount, dayStats }
+    });
+  }
+
+  // 2d. Subject Progress Report Card Aggregator
+  if (parsed.data?.query === 'subject_report' && parsed.data?.subjectName) {
+    const subjectName = parsed.data.subjectName;
+    const subject = await Subject.findOne({ userId, name: new RegExp(`^${subjectName}$`, 'i') });
+    if (!subject) {
+      const allSubjects = await Subject.find({ userId });
+      if (allSubjects.length === 0) {
+        return res.json({
+          success: true, action: 'answer', entity: 'none',
+          message: "You haven't added any subjects to your timetable yet. Say 'Add subject Chemistry' to get started!",
+          data: {}
+        });
+      }
+      const names = allSubjects.map(s => s.name).join(', ');
+      return res.json({
+        success: true, action: 'answer', entity: 'none',
+        message: `Subject "${subjectName}" not found. Your current subjects are: ${names}.`,
+        data: {}
+      });
+    }
+
+    const [attendanceRecords, marksRecords, pendingTasks] = await Promise.all([
+      Attendance.find({ userId, subjectId: subject._id, status: { $ne: 'cancelled' } }),
+      Marks.find({ userId, subjectId: subject._id }),
+      Task.find({ user: userId, subject: new RegExp(`^${subject.name}$`, 'i'), status: { $ne: 'completed' } }).sort({ dueDate: 1 })
+    ]);
+
+    const totalAtt = attendanceRecords.length;
+    const presentAtt = attendanceRecords.filter(r => r.status === 'present').length;
+    const attPct = totalAtt ? (presentAtt / totalAtt * 100).toFixed(1) : 0;
+    
+    let marksSummary = "  No exams logged yet.";
+    if (marksRecords.length > 0) {
+      marksSummary = marksRecords.map(m => {
+        const pct = ((m.marksObtained / m.maxMarks) * 100).toFixed(1);
+        return `  • ${m.examType}: ${m.marksObtained}/${m.maxMarks} (${pct}%) [Grade Point: ${m.gradePoint}]`;
+      }).join('\n');
+    }
+
+    let tasksSummary = "  No pending tasks for this subject.";
+    if (pendingTasks.length > 0) {
+      tasksSummary = pendingTasks.map(t => {
+        const due = t.dueDate ? new Date(t.dueDate).toLocaleDateString() : 'no due date';
+        return `  • [${t.priority.toUpperCase()}] ${t.title} (due ${due})`;
+      }).join('\n');
+    }
+
+    const report = 
+`📊 Progress Report Card for ${subject.name} (${subject.code || 'N/A'}):
+• 👨‍🏫 Instructor: ${subject.instructor || 'Not assigned'}
+• 🎓 Credits: ${subject.credits || 'N/A'}
+• 📅 Timetable: ${subject.schedule?.length ? subject.schedule.map(s => `${s.day} ${s.startTime}–${s.endTime}`).join(', ') : 'None'}
+• ✅ Attendance: ${totalAtt ? `${attPct}% (${presentAtt}/${totalAtt} classes)` : 'No records yet'}
+• 📝 Exam Marks:
+${marksSummary}
+• 📋 Pending Tasks:
+${tasksSummary}`;
+
+    return res.json({
+      success: true, action: 'answer', entity: 'none',
+      message: report,
+      data: {
+        subject: { name: subject.name, code: subject.code, instructor: subject.instructor },
+        attendance: { total: totalAtt, present: presentAtt, pct: parseFloat(attPct) },
+        marks: marksRecords,
+        tasks: pendingTasks
+      }
+    });
+  }
 // 3. Marks query for specific subject
 if (parsed.data?.query === 'marks_status' || parsed.entity === 'marks') {
   const subjectName = parsed.data?.subjectName;
@@ -610,6 +864,54 @@ if (parsed.data?.query === 'marks_status' || parsed.entity === 'marks') {
       const pct = v.max ? (v.total / v.max) * 100 : 100;
       if (pct < lowestPctMarks) { lowestPctMarks = pct; lowestMarksSubject = name; }
     });
+
+    if (parsed.data?.optimize === true) {
+      const routine = [
+        `🧠 Dynamic AI Optimized Study Plan for Today:`,
+        `Based on your performance and urgency, here is a custom schedule:`,
+        ``
+      ];
+
+      let timeIndex = 0;
+      const timeSlots = ["09:00 AM - 10:30 AM", "11:00 AM - 12:30 PM", "02:00 PM - 03:30 PM", "04:00 PM - 05:30 PM"];
+
+      if (lowestMarksSubject) {
+        routine.push(`⏰ ${timeSlots[timeIndex++]} | 📖 Study Session (Weak Area)`);
+        routine.push(`  • Subject: ${lowestMarksSubject}`);
+        routine.push(`  • Goal: Review exam material. Current test average is ${lowestPctMarks.toFixed(1)}%.`);
+        routine.push(``);
+      }
+
+      if (tasks.length > 0) {
+        const nextTask = tasks[0];
+        routine.push(`⏰ ${timeSlots[timeIndex++]} | ✍️ Task Execution (Urgent Deadline)`);
+        routine.push(`  • Task: "${nextTask.title}"`);
+        routine.push(`  • Subject: ${nextTask.subject || 'General'} | Priority: ${nextTask.priority.toUpperCase()}`);
+        routine.push(`  • Goal: Work on this pending task. Due by ${nextTask.dueDate ? new Date(nextTask.dueDate).toLocaleDateString() : 'N/A'}.`);
+        routine.push(``);
+      }
+
+      if (lowestAttSubject && lowestAttSubject !== lowestMarksSubject) {
+        routine.push(`⏰ ${timeSlots[timeIndex++]} | 🔄 Attendance Revision`);
+        routine.push(`  • Subject: ${lowestAttSubject}`);
+        routine.push(`  • Goal: Prepare lecture topics for next class. Current attendance is low at ${lowestPct.toFixed(1)}%.`);
+        routine.push(``);
+      }
+
+      if (timeIndex < timeSlots.length) {
+        routine.push(`⏰ ${timeSlots[timeIndex]} | 📝 Quick Prep & Review`);
+        routine.push(`  • Goal: Review today's topics and organize notes for tomorrow.`);
+        routine.push(``);
+      }
+
+      routine.push(`💡 Tip: Follow this plan and take short 10-minute breaks every 45 minutes to maximize focus!`);
+
+      return res.json({
+        success: true, action: 'answer', entity: 'none',
+        message: routine.join('\n'),
+        data: { lowestAttSubject, lowestMarksSubject, upcomingTask: tasks[0]?.title }
+      });
+    }
 
     const lines = ['📚 Here\'s what you should focus on today:\n'];
     if (lowestAttSubject) lines.push(`• ⚠️ Attend ${lowestAttSubject} — attendance is ${lowestPct.toFixed(1)}%`);

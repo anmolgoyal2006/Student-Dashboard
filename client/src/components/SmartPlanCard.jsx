@@ -254,7 +254,28 @@ export default function SmartPlanCard() {
   const [plan, setPlan]       = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState(false);
-  const [checked, setChecked] = useState(new Set());
+  // Load checked items from localStorage on mount, keyed by today's date
+  const [checked, setChecked] = useState(() => {
+    try {
+      const d = new Date();
+      const dateKey = `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+      const saved = localStorage.getItem(`ssp_checked_${dateKey}`);
+      return saved ? new Set(JSON.parse(saved)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
+
+  // Sync checked items to localStorage when it changes
+  useEffect(() => {
+    try {
+      const d = new Date();
+      const dateKey = `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+      localStorage.setItem(`ssp_checked_${dateKey}`, JSON.stringify(Array.from(checked)));
+    } catch (err) {
+      console.error(err);
+    }
+  }, [checked]);
 
   // Load scheduled items from localStorage on mount, keyed by today's date
   const [scheduled, setScheduled] = useState(() => {

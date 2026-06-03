@@ -1,6 +1,11 @@
 const Attendance     = require('../models/Attendance');
 const Marks          = require('../models/Marks');
 const CareerProgress = require('../models/CareerProgress');
+const Subject        = require('../models/Subject');
+const Task           = require('../models/Task');
+const Groq           = require('groq-sdk');
+
+const groq = new Groq({ apiKey: process.env.GROQ_CHAT_KEY || process.env.GROQ_API_KEY });
 
 const COMPANY_ROADMAPS = {
   Amazon: [
@@ -51,6 +56,7 @@ const COMPANY_ROADMAPS = {
   ],
 };
 
+// ── Traditional Rule-Based Fallback Suggestions ──────────────────────────────
 const getAttendanceSuggestions = async (userId) => {
   const records = await Attendance.find({ userId }).populate('subjectId', 'name');
   const map = {};
@@ -167,18 +173,139 @@ const getCareerSuggestions = async (userId) => {
   return suggestions;
 };
 
-exports.getRecommendations = async (userId) => {
+// Fallback logic aggregator
+async function getFallbackRecommendations(userId) {
   const [attendanceSuggestions, cgpaSuggestions, careerSuggestions] = await Promise.all([
     getAttendanceSuggestions(userId),
     getCGPASuggestions(userId),
     getCareerSuggestions(userId),
   ]);
-
   const all = [...attendanceSuggestions, ...cgpaSuggestions, ...careerSuggestions];
-
-  // Sort by priority
   const order = { high: 0, medium: 1, info: 2 };
   all.sort((a, b) => order[a.priority] - order[b.priority]);
-
   return all;
+}
+
+// Helper to safely extract JSON array from Groq output
+function extractJSONArray(raw) {
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch { /* fall through */ }
+  const match = raw.match(/\[\s*\{[\s\S]*\}\s*\]/);
+  if (match) {
+    try { return JSON.parse(match[0]); } catch { /* fall through */ }
+  }
+  return null;
+}
+
+// ── Main Recommendation Exporter (Calls Groq, falls back to Rules) ───────────
+exports.getRecommendations = async (userId) => {
+  try {
+    // 1. Gather all student datasets from Database
+    const [subjects, attendanceRecords, marksRecords, pendingTasks, careerProgress] = await Promise.all([
+      Subject.find({ userId }),
+      Attendance.find({ userId }).populate('subjectId', 'name'),
+      Marks.find({ userId }).populate('subjectId', 'name'),
+      Task.find({ user: userId, status: { $ne: 'completed' } }),
+      CareerProgress.findOne({ userId }),
+    ]);
+
+    // Format Attendance Summary
+    const attMap = {};
+    attendanceRecords.forEach(r => {
+      if (!r.subjectId) return;
+      const name = r.subjectId.name;
+      if (!attMap[name]) attMap[name] = { total: 0, present: 0 };
+      if (r.status !== 'cancelled') {
+        attMap[name].total++;
+        if (r.status === 'present') attMap[name].present++;
+      }
+    });
+    const attendanceSummary = Object.entries(attMap).map(([name, data]) => {
+      const pct = data.total ? (data.present / data.total * 100).toFixed(1) : 0;
+      return `${name}: ${pct}% (${data.present}/${data.total} classes)`;
+    });
+
+    // Format Marks Summary
+    const marksSummary = marksRecords.map(m => {
+      const pct = ((m.marksObtained / m.maxMarks) * 100).toFixed(1);
+      return `${m.subjectId?.name || 'Unknown'} — ${m.examType}: ${m.marksObtained}/${m.maxMarks} (${pct}%) [Grade Point: ${m.gradePoint}]`;
+    });
+
+    // Format Tasks Summary
+    const tasksSummary = pendingTasks.map(t => {
+      const due = t.dueDate ? new Date(t.dueDate).toISOString().slice(0, 10) : 'None';
+      return `• [${t.priority.toUpperCase()}] ${t.title} (due ${due}) - subject: ${t.subject || 'General'}`;
+    });
+
+    // Format Career Progress
+    let careerSummary = "No placement profile set yet.";
+    if (careerProgress) {
+      const incompleteTopics = careerProgress.dsaTopics.filter(t => !t.completed).map(t => t.name).slice(0, 3).join(', ');
+      careerSummary = `Target Company: ${careerProgress.targetCompany}, LeetCode Solved: ${careerProgress.problemsSolved}, Placement Readiness: ${careerProgress.readiness}, Incomplete DSA Topics: ${incompleteTopics}`;
+    }
+
+    // Build the payload
+    const studentData = {
+      subjectsCount: subjects.length,
+      attendance: attendanceSummary,
+      examMarks: marksSummary,
+      pendingTasks: tasksSummary,
+      careerProfile: careerSummary
+    };
+
+    const systemPrompt = `
+You are an advanced, intelligent Academic & Placement Advisor for a Student Dashboard app.
+Given the student's current database statistics, analyze their status and output exactly 3 to 4 personalized, highly specific, and actionable recommendations.
+
+YOUR ENTIRE OUTPUT MUST BE A RAW JSON ARRAY. NO EXPLANATIONS, NO MARKDOWN CODE FENCES, NO EXTRA TEXT.
+
+Output format should be exactly this JSON structure:
+[
+  {
+    "type": "warning" | "study" | "dsa" | "career" | "readiness",
+    "priority": "high" | "medium" | "info",
+    "icon": "emoji",
+    "title": "short title (max 5 words)",
+    "message": "highly specific actionable advice tailored to the data (max 20 words)"
+  }
+]
+
+Critical Analysis Rules:
+1. If any subject's attendance is under 75%, add a "warning" item with high priority. Mention the subject and tell them they need to attend classes.
+2. If the student has low exam marks (e.g. under 60% or Grade Point <= 6) in any subject, add a "study" recommendation. Mention the subject.
+3. If they have outstanding tasks near deadlines, recommend working on them.
+4. If their LeetCode problem count is low (under 150), add a "dsa" recommendation. Mention specific incomplete topics to work on.
+5. Reference actual names of subjects, exam types, task titles, and target companies from the data. Do not make up mock data.
+`;
+
+    // 2. Call Groq
+    console.log('[AI Recommendation] Requesting Groq...');
+    const completion = await groq.chat.completions.create({
+      model: 'llama-3.1-8b-instant',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: JSON.stringify(studentData) }
+      ],
+      temperature: 0.2,
+      max_tokens: 600,
+    });
+
+    const raw = completion.choices[0]?.message?.content?.trim() ?? '';
+    console.log('[AI Recommendation Raw]:', raw);
+
+    const parsed = extractJSONArray(raw);
+    if (parsed && Array.isArray(parsed) && parsed.length > 0) {
+      console.log('[AI Recommendation] Groq suggestions parsed successfully.');
+      return parsed;
+    } else {
+      console.warn('[AI Recommendation] Unparseable Groq output. Falling back to rule-based suggestions.');
+    }
+
+  } catch (err) {
+    console.error('[AI Recommendation] Groq error:', err.message);
+  }
+
+  // Fallback if Groq fails or errors out
+  console.log('[AI Recommendation] Using rule-based fallback recommendations.');
+  return getFallbackRecommendations(userId);
 };
