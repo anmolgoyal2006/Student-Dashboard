@@ -153,7 +153,11 @@ User: "set semester 1 SGPA to 8.5"
 
 User: "set semester 1 SGPA to 8.5 and semester 2 to 9.0"
 → {"action":"update","entity":"semester","data":{"items":[{"semesterNumber":1,"sgpa":8.5},{"semesterNumber":2,"sgpa":9.0}]},"message":"Updating GPAs for Semester 1 and Semester 2."}
+
+User: "delete semester 1"
+→ {"action":"delete","entity":"semester","data":{"semesterNumber":1},"message":"Deleting Semester 1."}
 `;
+
 
 
 // ← single backtick here, closing the template literal
@@ -815,6 +819,27 @@ if (userForNotif?.fcmToken) {
           });
         }
         result = await upsertSemester(parsed.data, userId);
+      } else if (parsed.action === 'delete') {
+        if (!parsed.data.semesterNumber) {
+          return res.json({ success: false, message: 'Please specify which semester to delete.' });
+        }
+        const semesterNumber = Number(parsed.data.semesterNumber);
+        const s = await Semester.findOne({ student: userId, semesterNumber });
+        if (s) {
+          if (req.body.confirmed !== true) {
+            return res.json({
+              success: true,
+              action: 'confirm',
+              entity: 'semester',
+              data: { originalAction: 'delete', semesterNumber: s.semesterNumber },
+              message: `Are you sure you want to delete Semester ${s.semesterNumber}? This will remove its SGPA and grade records.`
+            });
+          }
+          await Semester.findByIdAndDelete(s._id);
+          return res.json({ success: true, action: 'delete', entity: 'semester', message: `Semester ${s.semesterNumber} deleted.`, data: s });
+        } else {
+          return res.json({ success: false, message: `Semester ${parsed.data.semesterNumber} not found.` });
+        }
       } else if (parsed.action === 'get') {
         const semesters = await Semester.find({ student: userId }).sort({ semesterNumber: 1 });
         const lines = semesters.map(s => `• Semester ${s.semesterNumber}: SGPA ${s.sgpa}`);
