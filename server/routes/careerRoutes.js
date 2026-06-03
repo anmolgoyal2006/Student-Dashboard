@@ -10,7 +10,9 @@ const {
   analyzeResume,
   generateMockQuestions,
   evaluateInterviewAnswer,
-  uploadResume
+  uploadResume,
+  updateActiveIndex,
+  resetActiveInterview
 } = require('../controllers/careerController');
 const { getCareerPlan }                        = require('../controllers/careerPlanController');
 const { protect }                              = require('../middleware/authMiddleware');
@@ -26,5 +28,7 @@ router.post('/analyze-resume',   analyzeResume);
 router.post('/mock-questions',   generateMockQuestions);
 router.post('/evaluate-answer',  evaluateInterviewAnswer);
 router.post('/upload-resume',    upload.single('file'), uploadResume);
+router.patch('/active-interview/index', updateActiveIndex);
+router.delete('/active-interview',      resetActiveInterview);
 
 module.exports = router;

@@ -128,14 +128,22 @@ Current Skills Listed: ${skills}`;
     });
 
     const content = completion.choices[0]?.message?.content?.trim();
-    const parsed = extractJSON(content);
+    let parsed = extractJSON(content);
     if (!parsed || typeof parsed.score !== 'number') {
-      console.error('[AnalyzeResume] Llama returned invalid JSON:', content);
-      return res.status(500).json({ message: 'Failed to analyze resume structure.' });
+      console.warn('[AnalyzeResume] Llama returned invalid JSON, using regex fallback:', content);
+      const scoreMatch = content.match(/"score"\s*:\s*(\d+)/);
+      const score = scoreMatch ? parseInt(scoreMatch[1]) : 70;
+      const feedbackMatch = content.match(/"feedback"\s*:\s*\[([\s\S]*?)\]/);
+      const feedback = feedbackMatch ? feedbackMatch[1].split(',').map(s => s.replace(/"/g, '').trim()).filter(Boolean) : ["Review DSA examples and formatting."];
+      const kwMatch = content.match(/"missingKeywords"\s*:\s*\[([\s\S]*?)\]/);
+      const missingKeywords = kwMatch ? kwMatch[1].split(',').map(s => s.replace(/"/g, '').trim()).filter(Boolean) : [];
+      parsed = { score, feedback, missingKeywords };
     }
 
-    // Save score in DB
+    // Save score, feedback and keywords in DB
     career.resumeScore = parsed.score;
+    career.resumeFeedback = parsed.feedback || [];
+    career.resumeKeywords = parsed.missingKeywords || [];
     await career.save();
 
     res.json({
@@ -190,7 +198,28 @@ DSA topics completed: ${completedTopics || 'None'}`;
       return res.status(500).json({ message: 'Failed to generate interview questions.' });
     }
 
-    res.json({ questions: parsed.questions });
+    // Save active interview session in DB
+    career.activeInterview = {
+      topic,
+      activeIndex: 0,
+      questions: parsed.questions.map(q => ({
+        id: q.id,
+        question: q.question,
+        type: q.type,
+        userAnswer: '',
+        score: 0,
+        feedback: '',
+        modelAnswer: '',
+        isEvaluated: false
+      }))
+    };
+    career.markModified('activeInterview');
+    await career.save();
+
+    res.json({
+      activeInterview: career.activeInterview,
+      questions: parsed.questions
+    });
 
   } catch (err) {
     console.error('[GenerateQuestions]', err.message);
@@ -201,7 +230,7 @@ DSA topics completed: ${completedTopics || 'None'}`;
 // POST /api/career/evaluate-answer
 exports.evaluateInterviewAnswer = async (req, res) => {
   try {
-    const { question, userAnswer } = req.body;
+    const { question, userAnswer, topic } = req.body;
     if (!question || !userAnswer) {
       return res.status(400).json({ message: 'Question and answer are required.' });
     }
@@ -241,10 +270,48 @@ Target Company: ${targetCompany}`;
       return res.status(500).json({ message: 'Failed to evaluate your answer.' });
     }
 
+    if (career) {
+      // Find matching question in active session
+      if (career.activeInterview && Array.isArray(career.activeInterview.questions)) {
+        const qIndex = career.activeInterview.questions.findIndex(
+          q => q.question.trim().toLowerCase() === question.trim().toLowerCase()
+        );
+        if (qIndex !== -1) {
+          career.activeInterview.questions[qIndex].userAnswer = userAnswer;
+          career.activeInterview.questions[qIndex].score = parsed.score;
+          career.activeInterview.questions[qIndex].feedback = parsed.feedback || '';
+          career.activeInterview.questions[qIndex].modelAnswer = parsed.modelAnswer || '';
+          career.activeInterview.questions[qIndex].isEvaluated = true;
+        }
+      }
+
+      // Add to historical mockInterviews log
+      if (!career.mockInterviews) career.mockInterviews = [];
+      career.mockInterviews.unshift({
+        topic: topic || career.activeInterview?.topic || 'General',
+        question,
+        userAnswer,
+        score: parsed.score,
+        feedback: parsed.feedback || '',
+        modelAnswer: parsed.modelAnswer || '',
+        createdAt: new Date()
+      });
+
+      // Cap at 10 items
+      if (career.mockInterviews.length > 10) {
+        career.mockInterviews = career.mockInterviews.slice(0, 10);
+      }
+
+      career.markModified('activeInterview');
+      career.markModified('mockInterviews');
+      await career.save();
+    }
+
     res.json({
       score: parsed.score,
       feedback: parsed.feedback || '',
-      modelAnswer: parsed.modelAnswer || ''
+      modelAnswer: parsed.modelAnswer || '',
+      career
     });
 
   } catch (err) {
@@ -255,6 +322,52 @@ Target Company: ${targetCompany}`;
 
 const pdfParse = require('pdf-parse');
 
+async function extractPDFText(buffer) {
+  try {
+    const data = await pdfParse(buffer);
+    if (data?.text?.trim()) return data.text.trim();
+    throw new Error('Empty text');
+  } catch (e1) {
+    try {
+      const mod = require('pdf-parse');
+      const fn = mod.default || mod.PDF || mod.parse;
+      const data = await fn(buffer);
+      if (data?.text?.trim()) return data.text.trim();
+      throw new Error('Empty text');
+    } catch (e2) {
+      try {
+        const { PdfReader } = require('pdfreader');
+        return await new Promise((resolve, reject) => {
+          const reader = new PdfReader();
+          const lines = {};
+          reader.parseBuffer(buffer, (err, item) => {
+            if (err) return reject(err);
+            if (!item) {
+              const text = Object.keys(lines)
+                .sort((a, b) => a - b)
+                .map(y => lines[y].join(' '))
+                .join('\n');
+              return resolve(text.trim());
+            }
+            if (item.text) {
+              if (!lines[item.y]) lines[item.y] = [];
+              lines[item.y].push(item.text);
+            }
+          });
+        });
+      } catch (e3) {
+        throw new Error('All PDF extraction methods failed: ' + e3.message);
+      }
+    }
+  }
+}
+
+async function extractImageText(buffer) {
+  const Tesseract = require('tesseract.js');
+  const { data: { text } } = await Tesseract.recognize(buffer, 'eng');
+  return text.trim();
+}
+
 // POST /api/career/upload-resume
 exports.uploadResume = async (req, res) => {
   try {
@@ -262,12 +375,28 @@ exports.uploadResume = async (req, res) => {
       return res.status(400).json({ message: 'No file uploaded.' });
     }
 
-    // Parse the PDF buffer
-    const pdfData = await pdfParse(req.file.buffer);
-    const resumeText = pdfData.text;
+    // Size limit check (5MB)
+    if (req.file.size > 5 * 1024 * 1024) {
+      return res.status(400).json({ message: 'File size exceeds the 5MB limit.' });
+    }
+
+    // Support PDF and common image formats
+    const isPdf = req.file.mimetype === 'application/pdf' || req.file.originalname.toLowerCase().endsWith('.pdf');
+    const isImage = req.file.mimetype.startsWith('image/') || /\.(png|jpe?g)$/i.test(req.file.originalname);
+
+    if (!isPdf && !isImage) {
+      return res.status(400).json({ message: 'Only PDF and image formats (PNG, JPG, JPEG) are supported.' });
+    }
+
+    let resumeText = '';
+    if (isPdf) {
+      resumeText = await extractPDFText(req.file.buffer);
+    } else {
+      resumeText = await extractImageText(req.file.buffer);
+    }
 
     if (!resumeText || !resumeText.trim()) {
-      return res.status(422).json({ message: 'Failed to extract text from the PDF.' });
+      return res.status(422).json({ message: 'Failed to extract text from the file.' });
     }
 
     // Run AI analysis
@@ -305,14 +434,22 @@ Current Skills Listed: ${skills}`;
     });
 
     const content = completion.choices[0]?.message?.content?.trim();
-    const parsed = extractJSON(content);
+    let parsed = extractJSON(content);
     if (!parsed || typeof parsed.score !== 'number') {
-      console.error('[UploadResume] Llama returned invalid JSON:', content);
-      return res.status(500).json({ message: 'Failed to analyze resume structure.' });
+      console.warn('[UploadResume] Llama returned invalid JSON, using regex fallback:', content);
+      const scoreMatch = content.match(/"score"\s*:\s*(\d+)/);
+      const score = scoreMatch ? parseInt(scoreMatch[1]) : 70;
+      const feedbackMatch = content.match(/"feedback"\s*:\s*\[([\s\S]*?)\]/);
+      const feedback = feedbackMatch ? feedbackMatch[1].split(',').map(s => s.replace(/"/g, '').trim()).filter(Boolean) : ["Review DSA examples and formatting."];
+      const kwMatch = content.match(/"missingKeywords"\s*:\s*\[([\s\S]*?)\]/);
+      const missingKeywords = kwMatch ? kwMatch[1].split(',').map(s => s.replace(/"/g, '').trim()).filter(Boolean) : [];
+      parsed = { score, feedback, missingKeywords };
     }
 
-    // Save score in DB
+    // Save score, feedback and keywords in DB
     career.resumeScore = parsed.score;
+    career.resumeFeedback = parsed.feedback || [];
+    career.resumeKeywords = parsed.missingKeywords || [];
     await career.save();
 
     res.json({
@@ -323,6 +460,51 @@ Current Skills Listed: ${skills}`;
 
   } catch (err) {
     console.error('[UploadResume]', err.message);
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// PATCH /api/career/active-interview/index
+exports.updateActiveIndex = async (req, res) => {
+  try {
+    const { index } = req.body;
+    if (typeof index !== 'number') {
+      return res.status(400).json({ message: 'Index must be a number.' });
+    }
+
+    const career = await CareerProgress.findOne({ userId: req.user.id });
+    if (!career) return res.status(404).json({ message: 'Setup your career progress first.' });
+
+    if (career.activeInterview) {
+      career.activeInterview.activeIndex = index;
+      career.markModified('activeInterview');
+      await career.save();
+    }
+
+    res.json({ message: 'Active index updated', activeIndex: index });
+  } catch (err) {
+    console.error('[UpdateActiveIndex]', err.message);
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// DELETE /api/career/active-interview
+exports.resetActiveInterview = async (req, res) => {
+  try {
+    const career = await CareerProgress.findOne({ userId: req.user.id });
+    if (!career) return res.status(404).json({ message: 'Setup your career progress first.' });
+
+    career.activeInterview = {
+      topic: '',
+      activeIndex: 0,
+      questions: []
+    };
+    career.markModified('activeInterview');
+    await career.save();
+
+    res.json({ message: 'Active interview reset', career });
+  } catch (err) {
+    console.error('[ResetActiveInterview]', err.message);
     res.status(500).json({ message: err.message });
   }
 };

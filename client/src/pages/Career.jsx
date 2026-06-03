@@ -30,6 +30,7 @@ export default function Career() {
   const [resumeText, setResumeText] = useState('');
   const [resumeLoading, setResumeLoading] = useState(false);
   const [resumeAnalysis, setResumeAnalysis] = useState(null);
+  const [isDragging, setIsDragging] = useState(false); // Drag-and-drop state
 
   // Interview Prep State
   const [interviewTopic, setInterviewTopic] = useState('Arrays');
@@ -40,6 +41,7 @@ export default function Career() {
   const [evaluating, setEvaluating] = useState(false);
   const [evaluationResult, setEvaluationResult] = useState(null);
   const [showModelAnswer, setShowModelAnswer] = useState(false);
+  const [selectedHistoryItem, setSelectedHistoryItem] = useState(null); // Selected past interview details
 
   const handleAnalyzeResume = async () => {
     if (!resumeText.trim()) return;
@@ -48,7 +50,6 @@ export default function Career() {
       const { data } = await careerService.analyzeResume(resumeText);
       setResumeAnalysis(data);
       toast.success('Resume analyzed successfully!');
-      // Update overall settings' local state for resumeScore
       setCareer(prev => ({ ...prev, resumeScore: data.score }));
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to analyze resume');
@@ -66,12 +67,37 @@ export default function Career() {
 
       const { data } = await careerService.uploadResume(formData);
       setResumeAnalysis(data);
-      toast.success('Resume PDF scanned and analyzed successfully!');
+      toast.success('Resume file scanned and analyzed successfully!');
       setCareer(prev => ({ ...prev, resumeScore: data.score }));
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to analyze resume PDF');
+      toast.error(err.response?.data?.message || 'Failed to analyze resume file');
     } finally {
       setResumeLoading(false);
+    }
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = () => {
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files[0];
+    if (file) {
+      const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+      const isImage = file.type.startsWith('image/') || /\.(png|jpe?g)$/i.test(file.name);
+      if (!isPdf && !isImage) {
+        toast.error('Only PDF and image formats (PNG, JPG, JPEG) are supported.');
+        return;
+      }
+      setResumeFile(file);
+      toast.success(`Selected file: ${file.name}`);
     }
   };
 
@@ -83,9 +109,11 @@ export default function Career() {
     setShowModelAnswer(false);
     try {
       const { data } = await careerService.getMockQuestions(interviewTopic);
-      setQuestions(data.questions || []);
+      const activeInt = data.activeInterview;
+      setQuestions(activeInt.questions || []);
       setActiveQuestionIndex(0);
       toast.success('Generated mock interview questions!');
+      setCareer(prev => ({ ...prev, activeInterview: activeInt }));
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to generate questions');
     } finally {
@@ -100,9 +128,13 @@ export default function Career() {
     setShowModelAnswer(false);
     try {
       const questionText = questions[activeQuestionIndex]?.question;
-      const { data } = await careerService.evaluateAnswer(questionText, userAnswer);
+      const { data } = await careerService.evaluateAnswer(questionText, userAnswer, interviewTopic);
       setEvaluationResult(data);
       toast.success('Response evaluated!');
+      if (data.career) {
+        setCareer(data.career);
+        setQuestions(data.career.activeInterview?.questions || []);
+      }
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to evaluate response');
     } finally {
@@ -110,10 +142,58 @@ export default function Career() {
     }
   };
 
+  const handleNavQuestion = async (newIndex) => {
+    setActiveQuestionIndex(newIndex);
+    try {
+      await careerService.updateActiveIndex(newIndex);
+    } catch (err) {
+      console.error('Failed to sync active index:', err.message);
+    }
+  };
+
+  const handleResetInterview = async () => {
+    if (!window.confirm('Are you sure you want to reset this interview session? This will clear the active questions and answers.')) return;
+    try {
+      const { data } = await careerService.resetActiveInterview();
+      setCareer(data.career);
+      setQuestions([]);
+      setActiveQuestionIndex(0);
+      setUserAnswer('');
+      setEvaluationResult(null);
+      toast.success('Interview session reset!');
+    } catch (err) {
+      toast.error('Failed to reset interview session');
+    }
+  };
+
+  const handleResetScanner = () => {
+    setResumeFile(null);
+    setResumeText('');
+    setResumeAnalysis(null);
+    toast.success('Scanner reset!');
+  };
+
   const load = async () => {
     try {
       const { data } = await careerService.get();
       setCareer(data.career);
+
+      // Restore Resume Analysis from DB if present
+      if (data.career.resumeScore > 0) {
+        setResumeAnalysis({
+          score: data.career.resumeScore,
+          feedback: data.career.resumeFeedback || [],
+          missingKeywords: data.career.resumeKeywords || []
+        });
+      }
+
+      // Restore active interview from DB if present
+      const activeInt = data.career.activeInterview;
+      if (activeInt && activeInt.questions && activeInt.questions.length > 0) {
+        setInterviewTopic(activeInt.topic || 'Arrays');
+        setQuestions(activeInt.questions);
+        setActiveQuestionIndex(activeInt.activeIndex || 0);
+      }
     } finally { setLoading(false); }
   };
 
@@ -127,14 +207,34 @@ export default function Career() {
 
   useEffect(() => { load(); loadPlan(); }, []);
 
+  // Bind active question details reactively when navigating
   useEffect(() => {
-  if (!plan) return;
+    if (questions.length > 0 && questions[activeQuestionIndex]) {
+      const q = questions[activeQuestionIndex];
+      setUserAnswer(q.userAnswer || '');
+      if (q.isEvaluated) {
+        setEvaluationResult({
+          score: q.score,
+          feedback: q.feedback,
+          modelAnswer: q.modelAnswer
+        });
+      } else {
+        setEvaluationResult(null);
+      }
+      setShowModelAnswer(false);
+    } else {
+      setUserAnswer('');
+      setEvaluationResult(null);
+      setShowModelAnswer(false);
+    }
+  }, [activeQuestionIndex, questions]);
 
-  const done = plan.dailyTasks.filter(t => t.done >= t.count).length;
-  const remaining = plan.dailyTasks.length - done;
-
-  setTodayProgress({ done, remaining });
-}, [plan]);
+  useEffect(() => {
+    if (!plan) return;
+    const done = plan.dailyTasks.filter(t => t.done >= t.count).length;
+    const remaining = plan.dailyTasks.length - done;
+    setTodayProgress({ done, remaining });
+  }, [plan]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -548,9 +648,19 @@ export default function Career() {
         <>
           {/* AI Career Prep View */}
           <div className="grid-2 mb-4">
-            {/* Resume Upload / Paste Card */}
-            <div className="card">
-              <div className="card-title">🔍 Resume Scanner & Keyword Checker</div>
+            <div className="card" style={{ display: 'flex', flexDirection: 'column' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                <div className="card-title" style={{ margin: 0 }}>🔍 Resume Scanner & Keyword Checker</div>
+                {(resumeFile || resumeText.trim() || resumeAnalysis) && (
+                  <button
+                    className="btn btn-outline btn-sm"
+                    style={{ minHeight: 'auto', height: 28, padding: '4px 10px', fontSize: 11 }}
+                    onClick={handleResetScanner}
+                  >
+                    🔄 Reset Scanner
+                  </button>
+                )}
+              </div>
               <p className="text-muted" style={{ marginBottom: 16 }}>
                 Submit your resume to evaluate keyword matching and get optimization tips for {career.targetCompany} and {career.targetRole || 'Software Engineer'}.
               </p>
@@ -563,7 +673,7 @@ export default function Career() {
                   onClick={() => setScanMethod('pdf')}
                   style={{ minHeight: 'auto', height: 32 }}
                 >
-                  📄 Upload PDF
+                  📄 Upload File (PDF/Image)
                 </button>
                 <button
                   type="button"
@@ -577,29 +687,34 @@ export default function Career() {
 
               {scanMethod === 'pdf' ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                  <div style={{
-                    border: '2px dashed var(--border)',
-                    borderRadius: 10,
-                    padding: '24px 16px',
-                    textAlign: 'center',
-                    background: 'rgba(255,255,255,0.01)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: 8,
-                    cursor: 'pointer'
-                  }}
-                  onClick={() => document.getElementById('resume-pdf-input').click()}
+                  <div
+                    style={{
+                      border: isDragging ? '2px dashed var(--primary)' : '2px dashed var(--border)',
+                      borderRadius: 10,
+                      padding: '24px 16px',
+                      textAlign: 'center',
+                      background: isDragging ? 'rgba(129,140,248,0.05)' : 'rgba(255,255,255,0.01)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: 8,
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onClick={() => document.getElementById('resume-pdf-input').click()}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
                   >
                     <span style={{ fontSize: 24 }}>📤</span>
                     <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>
-                      {resumeFile ? resumeFile.name : 'Select your Resume PDF'}
+                      {resumeFile ? resumeFile.name : 'Select or Drop your Resume PDF/Image'}
                     </span>
-                    <span style={{ fontSize: 11, color: 'var(--muted)' }}>Supports PDF formats up to 5MB</span>
+                    <span style={{ fontSize: 11, color: 'var(--muted)' }}>Supports PDF, PNG, JPG formats up to 5MB</span>
                     <input
                       id="resume-pdf-input"
                       type="file"
-                      accept=".pdf"
+                      accept=".pdf,.png,.jpg,.jpeg"
                       style={{ display: 'none' }}
                       onChange={e => {
                         const file = e.target.files[0];
@@ -612,7 +727,7 @@ export default function Career() {
                     disabled={resumeLoading || !resumeFile}
                     onClick={handleUploadResume}
                   >
-                    {resumeLoading ? 'Scanning PDF...' : '⚡ Scan PDF Resume'}
+                    {resumeLoading ? 'Scanning File...' : '⚡ Scan Resume'}
                   </button>
                 </div>
               ) : (
@@ -704,7 +819,18 @@ export default function Career() {
           </div>
 
           <div className="card">
-            <div className="card-title">🤖 AI Mock Interview Simulator</div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+              <div className="card-title" style={{ margin: 0 }}>🤖 AI Mock Interview Simulator</div>
+              {questions.length > 0 && (
+                <button
+                  className="btn btn-outline btn-sm"
+                  style={{ minHeight: 'auto', height: 28, padding: '4px 10px', fontSize: 11 }}
+                  onClick={handleResetInterview}
+                >
+                  🔄 Reset Session
+                </button>
+              )}
+            </div>
             <p className="text-muted" style={{ marginBottom: 16 }}>
               Practice custom technical coding and behavioral interview questions generated specifically for you.
             </p>
@@ -717,6 +843,7 @@ export default function Career() {
                   className="form-select"
                   value={interviewTopic}
                   onChange={e => setInterviewTopic(e.target.value)}
+                  disabled={questions.length > 0}
                 >
                   <option value="Arrays">Arrays & Strings</option>
                   <option value="Trees">Trees & Graphs</option>
@@ -725,13 +852,15 @@ export default function Career() {
                   <option value="Behavioral">Behavioral (STAR method)</option>
                 </select>
               </div>
-              <button
-                className="btn btn-primary"
-                onClick={handleGenerateQuestions}
-                disabled={questionsLoading}
-              >
-                {questionsLoading ? 'Generating Questions...' : '🎲 Generate 3 Questions'}
-              </button>
+              {questions.length === 0 && (
+                <button
+                  className="btn btn-primary"
+                  onClick={handleGenerateQuestions}
+                  disabled={questionsLoading}
+                >
+                  {questionsLoading ? 'Generating Questions...' : '🎲 Generate 3 Questions'}
+                </button>
+              )}
             </div>
 
             {/* Active Question Simulator */}
@@ -775,6 +904,7 @@ export default function Career() {
                     placeholder="Write your explanation or code solution here..."
                     value={userAnswer}
                     onChange={e => setUserAnswer(e.target.value)}
+                    disabled={questions[activeQuestionIndex].isEvaluated}
                   />
                 </div>
 
@@ -784,36 +914,28 @@ export default function Career() {
                     <button
                       className="btn btn-outline btn-sm"
                       disabled={activeQuestionIndex === 0}
-                      onClick={() => {
-                        setActiveQuestionIndex(p => p - 1);
-                        setUserAnswer('');
-                        setEvaluationResult(null);
-                        setShowModelAnswer(false);
-                      }}
+                      onClick={() => handleNavQuestion(activeQuestionIndex - 1)}
                     >
                       ◀ Prev
                     </button>
                     <button
                       className="btn btn-outline btn-sm"
                       disabled={activeQuestionIndex === questions.length - 1}
-                      onClick={() => {
-                        setActiveQuestionIndex(p => p + 1);
-                        setUserAnswer('');
-                        setEvaluationResult(null);
-                        setShowModelAnswer(false);
-                      }}
+                      onClick={() => handleNavQuestion(activeQuestionIndex + 1)}
                     >
                       Next ▶
                     </button>
                   </div>
 
-                  <button
-                    className="btn btn-primary"
-                    disabled={evaluating || !userAnswer.trim()}
-                    onClick={handleEvaluateAnswer}
-                  >
-                    {evaluating ? 'Evaluating Answer...' : '✨ Submit Answer for AI Review'}
-                  </button>
+                  {!questions[activeQuestionIndex].isEvaluated && (
+                    <button
+                      className="btn btn-primary"
+                      disabled={evaluating || !userAnswer.trim()}
+                      onClick={handleEvaluateAnswer}
+                    >
+                      {evaluating ? 'Evaluating Answer...' : '✨ Submit Answer for AI Review'}
+                    </button>
+                  )}
                 </div>
 
                 {/* AI Evaluation feedback */}
@@ -883,6 +1005,149 @@ export default function Career() {
               </div>
             )}
           </div>
+
+          {/* Past Mock Interviews Log */}
+          {career.mockInterviews && career.mockInterviews.length > 0 && (
+            <div className="card" style={{ marginTop: 24 }}>
+              <div className="card-title">📜 Mock Interview Performance History Logs</div>
+              <p className="text-muted" style={{ marginBottom: 16 }}>
+                Review feedback and reference model answers from your previous mock interviews.
+              </p>
+              <div style={{ overflowX: 'auto' }}>
+                <table className="table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid var(--border)', textAlign: 'left' }}>
+                      <th style={{ padding: '10px 8px', fontSize: 12, color: 'var(--muted)', fontWeight: 600 }}>TOPIC</th>
+                      <th style={{ padding: '10px 8px', fontSize: 12, color: 'var(--muted)', fontWeight: 600 }}>QUESTION</th>
+                      <th style={{ padding: '10px 8px', fontSize: 12, color: 'var(--muted)', fontWeight: 600 }}>AI SCORE</th>
+                      <th style={{ padding: '10px 8px', fontSize: 12, color: 'var(--muted)', fontWeight: 600 }}>DATE</th>
+                      <th style={{ padding: '10px 8px', fontSize: 12, color: 'var(--muted)', fontWeight: 600 }}>ACTION</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {career.mockInterviews.map((item, idx) => (
+                      <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                        <td style={{ padding: '12px 8px', fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{item.topic}</td>
+                        <td style={{ padding: '12px 8px', fontSize: 13, color: 'var(--text-2)', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {item.question}
+                        </td>
+                        <td style={{ padding: '12px 8px' }}>
+                          <span className="badge" style={{
+                            background: item.score >= 8 ? 'rgba(52,211,153,0.15)' : item.score >= 5 ? 'rgba(251,191,36,0.15)' : 'rgba(248,113,113,0.15)',
+                            color: item.score >= 8 ? '#34d399' : item.score >= 5 ? '#fbbf24' : '#f87171'
+                          }}>
+                            {item.score}/10
+                          </span>
+                        </td>
+                        <td style={{ padding: '12px 8px', fontSize: 12, color: 'var(--muted)' }}>
+                          {new Date(item.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        </td>
+                        <td style={{ padding: '12px 8px' }}>
+                          <button
+                            className="btn btn-outline btn-sm"
+                            style={{ minHeight: 'auto', height: 26, padding: '2px 8px', fontSize: 11 }}
+                            onClick={() => setSelectedHistoryItem(item)}
+                          >
+                            🔍 Review
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Details Modal overlay */}
+          {selectedHistoryItem && (
+            <div style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0,0,0,0.6)',
+              backdropFilter: 'blur(4px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 999,
+              padding: 16
+            }}
+            onClick={() => setSelectedHistoryItem(null)}
+            >
+              <div style={{
+                background: 'var(--card)',
+                border: '1px solid var(--card-border)',
+                borderRadius: 'var(--radius)',
+                padding: 24,
+                maxWidth: 600,
+                width: '100%',
+                maxHeight: '90vh',
+                overflowY: 'auto',
+                boxShadow: '0 20px 25px -5px rgba(0,0,0,0.3)',
+                position: 'relative'
+              }}
+              onClick={e => e.stopPropagation()}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+                  <div>
+                    <span className="badge badge-primary" style={{ marginBottom: 6 }}>{selectedHistoryItem.topic}</span>
+                    <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>Mock Interview Response Review</h3>
+                  </div>
+                  <button
+                    className="btn btn-outline btn-sm"
+                    style={{ minWidth: 'auto', padding: '4px 8px', height: 28 }}
+                    onClick={() => setSelectedHistoryItem(null)}
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', marginBottom: 4 }}>QUESTION</div>
+                    <div style={{ background: 'rgba(255,255,255,0.02)', padding: 12, borderRadius: 6, fontSize: 13, border: '1px solid var(--border)' }}>
+                      {selectedHistoryItem.question}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', marginBottom: 4 }}>YOUR RESPONSE</div>
+                    <div style={{ background: 'rgba(255,255,255,0.01)', padding: 12, borderRadius: 6, fontSize: 13, border: '1px solid var(--border)', whiteSpace: 'pre-wrap' }}>
+                      {selectedHistoryItem.userAnswer}
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)' }}>AI RATING:</div>
+                    <span className="badge" style={{
+                      fontSize: 13,
+                      fontWeight: 800,
+                      background: selectedHistoryItem.score >= 8 ? 'rgba(52,211,153,0.15)' : selectedHistoryItem.score >= 5 ? 'rgba(251,191,36,0.15)' : 'rgba(248,113,113,0.15)',
+                      color: selectedHistoryItem.score >= 8 ? '#34d399' : selectedHistoryItem.score >= 5 ? '#fbbf24' : '#f87171'
+                    }}>
+                      {selectedHistoryItem.score}/10
+                    </span>
+                  </div>
+
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', marginBottom: 4 }}>AI FEEDBACK</div>
+                    <p style={{ margin: 0, fontSize: 13, color: 'var(--text-2)', lineHeight: 1.5 }}>
+                      {selectedHistoryItem.feedback}
+                    </p>
+                  </div>
+
+                  {selectedHistoryItem.modelAnswer && (
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', marginBottom: 4 }}>REFERENCE MODEL ANSWER</div>
+                      <div style={{ background: '#0d1117', padding: 12, borderRadius: 6, fontSize: 12, color: 'var(--text-2)', border: '1px solid rgba(255,255,255,0.06)', lineHeight: 1.5 }}>
+                        {selectedHistoryItem.modelAnswer}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </>
       )}
 
