@@ -2,6 +2,16 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import API from "../api/axios";
 import toast from "react-hot-toast";
+import { Doughnut } from "react-chartjs-2";
+import {
+  Chart as ChartJS,
+  ArcElement,
+  Tooltip,
+  Legend
+} from "chart.js";
+
+ChartJS.register(ArcElement, Tooltip, Legend);
+
 
 
 
@@ -70,9 +80,51 @@ const StudentAttendanceView = ({ sid }) => {
     if (!data) return {};
     const present    = data.records.filter((r) => r.status === "present").length;
     const absent     = data.records.filter((r) => r.status === "absent").length;
-    const total      = data.total;
+    const total      = present + absent;
     const percentage = total > 0 ? ((present / total) * 100).toFixed(1) : 0;
     return { present, absent, total, percentage };
+  };
+
+  const getSubjectStreak = (subjectCode) => {
+    if (!data || !data.records) return 0;
+    const subRecords = data.records
+      .filter((r) => r.code === subjectCode && r.status !== "cancelled")
+      .sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    let streak = 0;
+    for (let i = subRecords.length - 1; i >= 0; i--) {
+      if (subRecords[i].status === "present") {
+        streak++;
+      } else {
+        break;
+      }
+    }
+    return streak;
+  };
+
+  const getSmartInsight = (present, total) => {
+    if (total === 0) return { status: 'no_data', text: 'No attendance records yet.' };
+    const percentage = (present / total) * 100;
+    if (percentage >= 75) {
+      const maxMiss = Math.floor(present / 0.75 - total);
+      if (maxMiss > 0) {
+        return {
+          status: 'safe',
+          text: `✅ Safe. You can miss up to ${maxMiss} class${maxMiss > 1 ? 'es' : ''} without dropping below 75%.`
+        };
+      } else {
+        return {
+          status: 'warning',
+          text: `⚡ Safe, but tight. You cannot miss any upcoming classes without dropping below 75%.`
+        };
+      }
+    } else {
+      const needed = Math.ceil((0.75 * total - present) / 0.25);
+      return {
+        status: 'danger',
+        text: `⚠️ Critical. Attend the next ${needed} consecutive class${needed > 1 ? 'es' : ''} to reach 75%.`
+      };
+    }
   };
 
   const filteredRecords = data?.records.filter((r) =>
@@ -124,6 +176,32 @@ const StudentAttendanceView = ({ sid }) => {
   );
 
   const stats = getOverallStats();
+
+  const doughnutData = {
+    labels: ["Present", "Absent"],
+    datasets: [
+      {
+        data: [stats.present || 0, stats.absent || 0],
+        backgroundColor: ["#10b981", "#ef4444"],
+        borderWidth: 0,
+        hoverBackgroundColor: ["#34d399", "#f87171"],
+        cutout: "75%",
+      },
+    ],
+  };
+
+  const doughnutOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        display: false,
+      },
+      tooltip: {
+        enabled: true,
+      },
+    },
+  };
 
   const statCards = [
     { label: "Total Classes", value: stats.total,      icon: "📅", color: "#3b82f6" },
@@ -179,99 +257,144 @@ const StudentAttendanceView = ({ sid }) => {
         ))}
       </div>
 
-      {/* ── Mark attendance ── */}
-      <div className="card mb-4">
-        <div className="card-title">✏️ Mark Today's Attendance</div>
-        <form onSubmit={handleMark}>
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr 1fr auto",
-            gap: "0.85rem",
-            alignItems: "end",
-          }}>
-            {/* Subject */}
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.3rem" }}>
-              <label style={{
-                fontSize: "0.68rem", color: "var(--muted)",
-                fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px",
-              }}>Subject</label>
-              <select
-                style={{
-                  background: "#161b22",
-                  border: "1px solid var(--border)",
-                  borderRadius: 8, padding: "0.52rem 0.75rem",
-                  color: "var(--text)", fontSize: "0.85rem", width: "100%", outline: "none",
-                  colorScheme: "dark",
-                }}
-                value={markForm.subjectId}
-                onChange={(e) => setMarkForm((p) => ({ ...p, subjectId: e.target.value }))}
-                required
-              >
-                <option value="">Select subject…</option>
-                {subjects.map((s) => (
-                  <option key={s._id} value={s._id}>{s.name} ({s.code})</option>
-                ))}
-              </select>
-            </div>
+      {/* ── Mark attendance & Overall Doughnut ── */}
+      <div className="grid-2 mb-4">
+        {/* Mark Attendance */}
+        <div className="card" style={{ display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+          <div>
+            <div className="card-title">✏️ Mark Today's Attendance</div>
+            <form onSubmit={handleMark}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
+                {/* Subject */}
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.3rem" }}>
+                  <label style={{
+                    fontSize: "0.68rem", color: "var(--muted)",
+                    fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px",
+                  }}>Subject</label>
+                  <select
+                    style={{
+                      background: "#161b22",
+                      border: "1px solid var(--border)",
+                      borderRadius: 8, padding: "0.52rem 0.75rem",
+                      color: "var(--text)", fontSize: "0.85rem", width: "100%", outline: "none",
+                      colorScheme: "dark",
+                    }}
+                    value={markForm.subjectId}
+                    onChange={(e) => setMarkForm((p) => ({ ...p, subjectId: e.target.value }))}
+                    required
+                  >
+                    <option value="">Select subject…</option>
+                    {subjects.map((s) => (
+                      <option key={s._id} value={s._id}>{s.name} ({s.code})</option>
+                    ))}
+                  </select>
+                </div>
 
-            {/* Date */}
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.3rem" }}>
-              <label style={{
-                fontSize: "0.68rem", color: "var(--muted)",
-                fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px",
-              }}>Date</label>
-              <input
-                type="date"
-                style={{
-                  background: "#161b22",
-                  border: "1px solid var(--border)",
-                  borderRadius: 8, padding: "0.52rem 0.75rem",
-                  color: "var(--text)", fontSize: "0.85rem", width: "100%", outline: "none",
-                  colorScheme: "dark",
-                }}
-                value={markForm.date}
-                onChange={(e) => setMarkForm((p) => ({ ...p, date: e.target.value }))}
-              />
-            </div>
+                {/* Date & Status Row */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.85rem" }}>
+                  {/* Date */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.3rem" }}>
+                    <label style={{
+                      fontSize: "0.68rem", color: "var(--muted)",
+                      fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px",
+                    }}>Date</label>
+                    <input
+                      type="date"
+                      style={{
+                        background: "#161b22",
+                        border: "1px solid var(--border)",
+                        borderRadius: 8, padding: "0.52rem 0.75rem",
+                        color: "var(--text)", fontSize: "0.85rem", width: "100%", outline: "none",
+                        colorScheme: "dark",
+                      }}
+                      value={markForm.date}
+                      onChange={(e) => setMarkForm((p) => ({ ...p, date: e.target.value }))}
+                    />
+                  </div>
 
-            {/* Status */}
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.3rem" }}>
-              <label style={{
-                fontSize: "0.68rem", color: "var(--muted)",
-                fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px",
-              }}>Status</label>
-              <select
-                style={{
-                  background: "#161b22",
-                  border: "1px solid var(--border)",
-                  borderRadius: 8, padding: "0.52rem 0.75rem",
-                  color: "var(--text)", fontSize: "0.85rem", width: "100%", outline: "none",
-                  colorScheme: "dark",
-                }}
-                value={markForm.status}
-                onChange={(e) => setMarkForm((p) => ({ ...p, status: e.target.value }))}
-              >
-                <option value="present">Present</option>
-                <option value="absent">Absent</option>
-                <option value="cancelled">Cancelled</option>
-              </select>
-            </div>
+                  {/* Status */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.3rem" }}>
+                    <label style={{
+                      fontSize: "0.68rem", color: "var(--muted)",
+                      fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px",
+                    }}>Status</label>
+                    <select
+                      style={{
+                        background: "#161b22",
+                        border: "1px solid var(--border)",
+                        borderRadius: 8, padding: "0.52rem 0.75rem",
+                        color: "var(--text)", fontSize: "0.85rem", width: "100%", outline: "none",
+                        colorScheme: "dark",
+                      }}
+                      value={markForm.status}
+                      onChange={(e) => setMarkForm((p) => ({ ...p, status: e.target.value }))}
+                    >
+                      <option value="present">Present</option>
+                      <option value="absent">Absent</option>
+                      <option value="cancelled">Cancelled</option>
+                    </select>
+                  </div>
+                </div>
 
-            <button
-              type="submit"
-              disabled={marking}
-              style={{
-                background: "var(--primary)", color: "#fff", border: "none",
-                borderRadius: 8, padding: "0.52rem 1.4rem",
-                fontSize: "0.85rem", fontWeight: 700, cursor: "pointer",
-                height: 36, opacity: marking ? 0.5 : 1,
-                transition: "opacity 0.15s",
-              }}
-            >
-              {marking ? "Saving…" : "Mark"}
-            </button>
+                <button
+                  type="submit"
+                  disabled={marking}
+                  style={{
+                    background: "var(--primary)", color: "#fff", border: "none",
+                    borderRadius: 8, padding: "0.52rem 1.4rem",
+                    fontSize: "0.85rem", fontWeight: 700, cursor: "pointer",
+                    height: 38, opacity: marking ? 0.5 : 1,
+                    transition: "opacity 0.15s",
+                    marginTop: "0.4rem",
+                  }}
+                >
+                  {marking ? "Saving…" : "Mark Attendance"}
+                </button>
+              </div>
+            </form>
           </div>
-        </form>
+        </div>
+
+        {/* Overall Doughnut Chart */}
+        <div className="card" style={{ display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center" }}>
+          <div className="card-title" style={{ width: "100%", alignSelf: "flex-start", marginBottom: "1rem" }}>📊 Overall Attendance</div>
+          {stats.total > 0 ? (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: "100%" }}>
+              <div style={{ position: "relative", height: 150, width: 150, display: "flex", justifyContent: "center", alignItems: "center" }}>
+                <Doughnut data={doughnutData} options={doughnutOptions} />
+                <div style={{
+                  position: "absolute",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center"
+                }}>
+                  <span style={{ fontSize: "1.5rem", fontWeight: 800, color: "var(--text)" }}>
+                    {stats.percentage}%
+                  </span>
+                  <span style={{ fontSize: "0.62rem", color: "var(--muted)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                    Attendance
+                  </span>
+                </div>
+              </div>
+              <div style={{ display: "flex", justifyContent: "center", gap: "1.2rem", marginTop: "1.2rem", width: "100%" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                  <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#10b981" }} />
+                  <span style={{ fontSize: "0.78rem", color: "var(--muted)" }}>Present: <strong>{stats.present}</strong></span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                  <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#ef4444" }} />
+                  <span style={{ fontSize: "0.78rem", color: "var(--muted)" }}>Absent: <strong>{stats.absent}</strong></span>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5rem", padding: "2rem 0" }}>
+              <span style={{ fontSize: "2rem" }}>📈</span>
+              <span style={{ fontSize: "0.85rem", color: "var(--muted)", textAlign: "center" }}>No attendance records to visualize yet.</span>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ── Two-column: breakdown + records ── */}
@@ -283,50 +406,78 @@ const StudentAttendanceView = ({ sid }) => {
           <div style={{ display: "flex", flexDirection: "column", gap: "1rem", marginTop: "0.25rem" }}>
             {data.summary
               .filter((s) => s.subject && s.subject !== "Unknown")
-              .map((subject) => (
-                <div key={subject.code || subject.subject}>
-                  <div style={{
-                    display: "flex", justifyContent: "space-between",
-                    alignItems: "center", marginBottom: "0.4rem",
-                  }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
-                      <span style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text)" }}>
-                        {subject.subject}
-                      </span>
-                      <span style={{
-                        fontSize: "0.68rem", color: "var(--muted)",
-                        background: "rgba(255,255,255,0.06)",
-                        padding: "2px 7px", borderRadius: 5,
-                      }}>
-                        {subject.code}
-                      </span>
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                      <span className="text-muted" style={{ fontSize: "0.73rem" }}>
-                        {subject.present}/{subject.total}
-                      </span>
-                      <span style={{
-                        fontSize: "0.82rem", fontWeight: 700, minWidth: 36,
-                        textAlign: "right", color: barColor(subject.percentage),
-                      }}>
-                        {subject.percentage}%
-                      </span>
-                    </div>
-                  </div>
-                  <div style={{
-                    width: "100%", height: 6,
-                    background: "rgba(255,255,255,0.06)",
-                    borderRadius: 99, overflow: "hidden",
-                  }}>
+              .map((subject) => {
+                const streak = getSubjectStreak(subject.code);
+                const insight = getSmartInsight(subject.present, subject.total);
+                return (
+                  <div key={subject.code || subject.subject} style={{ marginBottom: "0.5rem" }}>
                     <div style={{
-                      height: "100%", borderRadius: 99,
-                      width: `${subject.percentage}%`,
-                      background: barBg(subject.percentage),
-                      transition: "width 0.6s cubic-bezier(.4,0,.2,1)",
-                    }} />
+                      display: "flex", justifyContent: "space-between",
+                      alignItems: "center", marginBottom: "0.4rem",
+                    }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                        <span style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text)" }}>
+                          {subject.subject}
+                        </span>
+                        <span style={{
+                          fontSize: "0.68rem", color: "var(--muted)",
+                          background: "rgba(255,255,255,0.06)",
+                          padding: "2px 7px", borderRadius: 5,
+                        }}>
+                          {subject.code}
+                        </span>
+                        {streak >= 2 && (
+                          <span style={{
+                            fontSize: "0.68rem",
+                            background: "rgba(249,115,22,0.15)",
+                            color: "#ff7a00",
+                            padding: "2px 7px",
+                            borderRadius: 5,
+                            fontWeight: 700,
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "2px"
+                          }}>
+                            🔥 {streak} Streak
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                        <span className="text-muted" style={{ fontSize: "0.73rem" }}>
+                          {subject.present}/{subject.total}
+                        </span>
+                        <span style={{
+                          fontSize: "0.82rem", fontWeight: 700, minWidth: 36,
+                          textAlign: "right", color: barColor(subject.percentage),
+                        }}>
+                          {subject.percentage}%
+                        </span>
+                      </div>
+                    </div>
+                    <div style={{
+                      width: "100%", height: 6,
+                      background: "rgba(255,255,255,0.06)",
+                      borderRadius: 99, overflow: "hidden",
+                      marginBottom: "0.3rem"
+                    }}>
+                      <div style={{
+                        height: "100%", borderRadius: 99,
+                        width: `${subject.percentage}%`,
+                        background: barBg(subject.percentage),
+                        transition: "width 0.6s cubic-bezier(.4,0,.2,1)",
+                      }} />
+                    </div>
+                    <div style={{
+                      fontSize: "0.72rem",
+                      color: insight.status === 'safe' ? "#10b981" : insight.status === 'warning' ? "#f59e0b" : "#ef4444",
+                      fontWeight: 500,
+                      marginTop: "2px"
+                    }}>
+                      {insight.text}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
           </div>
         </div>
 
