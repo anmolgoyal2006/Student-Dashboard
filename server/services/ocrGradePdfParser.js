@@ -1,384 +1,261 @@
-const fs = require('fs');
-const os = require('os');
+'use strict';
+
+/**
+ * ocrGradePdfParser.js
+ *
+ * Calls the Python extractGradeCells.py script which:
+ *   1. Detects table grid lines with OpenCV
+ *   2. Crops each cell individually
+ *   3. Runs Tesseract on each cell
+ *   4. Returns JSON array of { sid, name, grade }
+ *
+ * This module just spawns the script, receives the JSON,
+ * adds gradePoints, and returns rows ready for your existing pipeline.
+ */
+
+const fs   = require('fs');
+const os   = require('os');
 const path = require('path');
 const { spawn } = require('child_process');
+
 require('dotenv').config({ path: path.join(__dirname, '../.env') });
-const { createWorker, PSM } = require('tesseract.js');
+
+// ── Constants ─────────────────────────────────────────────────────────────
 
 const EXTRACT_SCRIPT = path.join(__dirname, '../scripts/extractGradeCells.py');
-const VALID_GRADES = ['A+', 'A', 'B+', 'B', 'C+', 'C', 'D', 'F'];
 
-function cleanup(dir) {
-  try {
-    fs.rmSync(dir, { recursive: true, force: true });
-  } catch (_) {}
-}
+const VALID_GRADES = ['A+', 'A', 'B+', 'B', 'C+', 'C', 'D', 'F', 'F(UMC)'];
+
+const GRADE_POINTS = {
+  'A+': 10, 'A': 9, 'B+': 8, 'B': 7,
+  'C+': 6,  'C': 5, 'D':  4, 'F': 0, 'F(UMC)': 0,
+};
+
+// ── Python resolver ───────────────────────────────────────────────────────
 
 function resolvePython() {
   if (process.env.PYTHON_PATH) return process.env.PYTHON_PATH;
   if (process.platform !== 'win32') return 'python3';
+
   const { execSync } = require('child_process');
+
   try {
-    const paths = execSync('where.exe python', { encoding: 'utf8' })
-      .split(/\r?\n/)
-      .map(s => s.trim())
-      .filter(Boolean);
-    const real = paths.find(p => !p.includes('WindowsApps'));
+    const lines = execSync('where.exe python', { encoding: 'utf8' })
+      .split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+    const real = lines.find(p => !p.includes('WindowsApps'));
     if (real) return real;
   } catch (_) {}
+
   try {
     execSync('py -3 --version', { stdio: 'ignore' });
-    return 'py -3';
+    return 'py';
   } catch (_) {}
+
   return 'python';
 }
 
-function childEnv() {
+function buildChildEnv() {
   const env = { ...process.env };
   if (process.platform !== 'win32') return env;
+
   const { execSync } = require('child_process');
   try {
-    const popplerDir = execSync(
+    const out = execSync(
       'where.exe pdftoppm 2>nul | findstr /v WindowsApps',
       { encoding: 'utf8', shell: true }
-    ).split(/\r?\n/).map(s => s.trim()).filter(Boolean)[0];
-    if (popplerDir) {
-      const binDir = path.dirname(popplerDir);
-      env.PATH = binDir + path.delimiter + (env.PATH || '');
+    );
+    const popplerExe = out.split(/\r?\n/).map(s => s.trim()).filter(Boolean)[0];
+    if (popplerExe) {
+      env.PATH = path.dirname(popplerExe) + path.delimiter + (env.PATH || '');
     }
   } catch (_) {}
+
   return env;
 }
 
-function runCellExtractor(pdfPath, outputDir) {
+// ── Grade helpers ─────────────────────────────────────────────────────────
+
+/**
+ * Normalize a raw OCR grade string to a valid grade.
+ * Handles common handwriting OCR mistakes.
+ */
+function normalizeGrade(raw) {
+  if (!raw) return '';
+  let t = String(raw).trim().toUpperCase();
+
+  // F(UMC) check first
+  if (/UMC/i.test(t)) return 'F(UMC)';
+
+  // Strip annotations
+  t = t.replace(/\([^)]*\)/g, '').trim();
+  // Remove internal spaces: "B +" -> "B+"
+  t = t.replace(/^([ABC])\s+\+$/, '$1+').replace(/\s/g, '');
+
+  // Explicit confusion map
+  const MAP = {
+    'R': 'B', '8': 'B', '2': 'B', '6': 'B',
+    '0': 'D', 'Q': 'D',
+    'AT': 'A+', 'BT': 'B+', 'CT': 'C+',
+    'AF': 'A+', 'BF': 'B+', 'CF': 'C+',
+    'ND': 'D', 'E': 'F',
+  };
+  if (MAP[t]) return MAP[t];
+
+  // Direct match
+  if (VALID_GRADES.includes(t)) return t;
+
+  // Cursive t/f = +
+  const cursive = t.match(/^([ABC])[TF]$/);
+  if (cursive) return cursive[1] + '+';
+
+  // Strip leading noise
+  const stripped = t.replace(/^[^ABCDF(]+/, '');
+  if (VALID_GRADES.includes(stripped)) return stripped;
+
+  // Single letter
+  if (stripped.length === 1 && 'ABCDF'.includes(stripped)) return stripped;
+
+  // Letter + plus-like char
+  if (stripped.length >= 2 && 'ABC'.includes(stripped[0]) && '+TF'.includes(stripped[1])) {
+    return stripped[0] + '+';
+  }
+
+  // Take first valid letter
+  if (stripped && 'ABCDF'.includes(stripped[0])) return stripped[0];
+
+  return '';
+}
+
+function normalizeGradeWithConfidence(raw) {
+  const grade = normalizeGrade(raw);
+  if (!grade) return { grade: '', confidence: 0, matches: [] };
+  const exact = VALID_GRADES.includes(String(raw).trim().toUpperCase());
+  return { grade, confidence: exact ? 95 : 70, matches: [grade] };
+}
+
+// ── Python subprocess runner ──────────────────────────────────────────────
+
+/**
+ * Runs extractGradeCells.py on a PDF file path.
+ * Returns Promise<Array<{sid, name, grade}>>
+ */
+function runPythonExtractor(pdfPath) {
   return new Promise((resolve, reject) => {
-    const pythonBin = resolvePython();
-    const proc = spawn(pythonBin, [EXTRACT_SCRIPT, pdfPath, outputDir], { env: childEnv() });
+    const python = resolvePython();
+    const args   = python === 'py' ? ['-3', EXTRACT_SCRIPT, pdfPath] : [EXTRACT_SCRIPT, pdfPath];
+    const env    = buildChildEnv();
+
+    const proc = spawn(python, args, { env });
+
     let stdout = '';
     let stderr = '';
 
-    proc.stdout.on('data', (chunk) => { stdout += chunk.toString(); });
-    proc.stderr.on('data', (chunk) => { stderr += chunk.toString(); });
-    proc.on('close', (code) => {
+    proc.stdout.on('data', chunk => { stdout += chunk.toString(); });
+    proc.stderr.on('data', chunk => {
+      stderr += chunk.toString();
+      process.stdout.write(chunk.toString());
+    });
+
+    proc.on('error', err => {
+      reject(new Error(`Failed to start Python: ${err.message}. Is Python installed?`));
+    });
+
+    proc.on('close', code => {
       if (code !== 0) {
-        return reject(new Error(stderr || `OCR cell extraction failed with exit ${code}.`));
+        return reject(new Error(
+          `extractGradeCells.py exited with code ${code}.\n${stderr.slice(-500)}`
+        ));
       }
+
+      const raw = stdout.trim();
+      if (!raw) {
+        return reject(new Error('extractGradeCells.py produced no output.'));
+      }
+
       try {
-        const parsed = JSON.parse(stdout.trim() || '[]');
-        if (parsed?.error) return reject(new Error(parsed.error));
+        const parsed = JSON.parse(raw);
+
+        if (parsed && parsed.error) {
+          return reject(new Error(`Python error: ${parsed.error}`));
+        }
+
+        if (!Array.isArray(parsed)) {
+          return reject(new Error(`Unexpected Python output type: ${typeof parsed}`));
+        }
+
         resolve(parsed);
       } catch (err) {
-        reject(new Error(`Could not parse OCR cell extraction output: ${err.message}`));
+        reject(new Error(
+          `Failed to parse Python output as JSON: ${err.message}\nOutput: ${raw.slice(0, 200)}`
+        ));
       }
     });
-    proc.on('error', reject);
   });
 }
 
-function cleanText(text) {
-  return String(text || '')
-    .replace(/[|_—~]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
+// ── Main exported function ────────────────────────────────────────────────
 
-function levenshtein(a, b) {
-  const m = a.length, n = b.length;
-  const dp = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
-  for (let i = 0; i <= m; i++) dp[i][0] = i;
-  for (let j = 0; j <= n; j++) dp[0][j] = j;
-  for (let i = 1; i <= m; i++) {
-    for (let j = 1; j <= n; j++) {
-      dp[i][j] = a[i - 1] === b[j - 1]
-        ? dp[i - 1][j - 1]
-        : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
-    }
-  }
-  return dp[m][n];
-}
-
-function fuzzyMatchGrade(text) {
-  let raw = String(text || '').toUpperCase().replace(/\s+/g, '');
-  if (!raw) return { grade: '', confidence: 0, matches: [] };
-
-  // Strip annotations like (UMC), (I), etc.
-  raw = raw.replace(/\([^)]*\)/g, '').replace(/\[[^\]]*\]/g, '').trim();
-
-  // Cursive "t" at end means "+"
-  raw = raw.replace(/^([ABC])T$/, '$1+');
-
-  // Common OCR confusions
-  raw = raw
-    .replace(/^APLUS$/, 'A+')
-    .replace(/^BPLUS$/, 'B+')
-    .replace(/^CPLUS$/, 'C+')
-    .replace(/^A\+?PLUS$/, 'A+')
-    .replace(/^([ABC])\+\+$/, '$1+')
-    .replace(/^([ABCDF])[)\]|]+$/, '$1')
-    .replace(/^[)\]|]+([ABCDF])$/, '$1');
-
-  const candidates = [];
-  for (const grade of VALID_GRADES) {
-    const stripped = grade.replace('+', '');
-    const dist = levenshtein(raw, grade);
-    const distStripped = levenshtein(raw, stripped);
-    const bestDist = Math.min(dist, distStripped);
-    const maxLen = Math.max(raw.length, grade.length);
-    const similarity = maxLen > 0 ? 1 - bestDist / maxLen : 0;
-    candidates.push({ grade, distance: bestDist, similarity });
-  }
-
-  candidates.sort((a, b) => b.similarity - a.similarity);
-  const best = candidates[0];
-
-  return {
-    grade: best.similarity > 0.35 ? best.grade : '',
-    confidence: Math.round(best.similarity * 100),
-    matches: candidates.filter(c => c.similarity > 0.2).map(c => c.grade),
-  };
-}
-
-function normalizeGrade(text) {
-  const result = fuzzyMatchGrade(text);
-  return result.grade;
-}
-
-function normalizeGradeWithConfidence(text) {
-  return fuzzyMatchGrade(text);
-}
-
-function extractSid(text) {
-  return cleanText(text).match(/\b\d{5,12}\b/)?.[0] || '';
-}
-
-function extractSidFuzzy(text) {
-  const cleaned = cleanText(text);
-  const strict = cleaned.match(/\b\d{5,12}\b/)?.[0];
-  if (strict) return strict;
-  const digitsOnly = cleaned
-    .replace(/[OoD]/g, '0')
-    .replace(/[IilL]/g, '1')
-    .replace(/[Ss]/g, '5')
-    .replace(/[Bb]/g, '8');
-  const digitMatch = digitsOnly.match(/\b\d{4,12}\b/);
-  return digitMatch ? digitMatch[0] : '';
-}
-
-function extractUnits(text) {
-  const match = cleanText(text).match(/\d+(?:\.\d+)?/);
-  return match ? Number(match[0]) : '';
-}
-
-function cleanName(text) {
-  const value = cleanText(text)
-    .replace(/[^a-zA-Z .'-]/g, ' ')
-    .replace(/\b(Student|Name|Units|Grade|SID|Sr|No)\b/gi, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-  return value.length >= 2 ? value.replace(/\s+[a-zA-Z]$/, '').trim() : '';
-}
-
-function confidenceLevel(score) {
-  if (score >= 80) return 'high';
-  if (score >= 50) return 'medium';
-  return 'low';
-}
-
-function repairSid(sid, pagePrefix) {
-  if (!sid) return '';
-  if (/^\d{8,12}$/.test(sid)) return sid;
-  if (/^\d{5,7}$/.test(sid) && pagePrefix) return `${pagePrefix}${sid}`;
-  return sid;
-}
-
-function extractGradeFromLine(line) {
-  if (!line) return '';
-  const afterUnits = String(line).match(/\b4\b\s+(.+)$/);
-  return normalizeGrade(afterUnits ? afterUnits[1] : line);
-}
-
-function parseFullPageOcr(text) {
-  const map = new Map();
-  for (const rawLine of String(text || '').split(/\r?\n/)) {
-    const line = cleanText(rawLine);
-    const sid = extractSid(line);
-    if (!sid) continue;
-    const grade = extractGradeFromLine(line);
-    if (grade) map.set(sid, grade);
-  }
-  return map;
-}
-
-function parseFullPageRows(text) {
-  const map = new Map();
-  for (const rawLine of String(text || '').split(/\r?\n/)) {
-    const line = cleanText(rawLine);
-    const sid = extractSid(line);
-    if (!sid) continue;
-
-    const afterSid = line.slice(line.indexOf(sid) + sid.length);
-    const beforeUnits = afterSid.split(/\b4\b/)[0] || afterSid;
-    const name = cleanName(beforeUnits);
-    const grade = extractGradeFromLine(line);
-
-    map.set(sid, { name, grade });
-  }
-  return map;
-}
-
-async function recognizeCell(worker, filePath, mode = PSM.SINGLE_LINE, whitelist = '') {
-  if (!filePath || !fs.existsSync(filePath)) return { text: '', confidence: 0 };
-  const params = { tessedit_pageseg_mode: mode };
-  if (whitelist) params.tessedit_char_whitelist = whitelist;
-  await worker.setParameters(params);
-  const result = await worker.recognize(filePath);
-  const text = result.data.text || '';
-  const confidence = result.data.confidence || 0;
-  return { text, confidence };
-}
-
-async function parseScannedGradePdf(buffer) {
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'grade_ocr_'));
+/**
+ * Parse a scanned/handwritten grade-list PDF.
+ *
+ * @param {Buffer} pdfBuffer - PDF file contents
+ * @returns {Promise<Array>} rows compatible with your existing pipeline:
+ *   { name, roll, grade, gradePoints, marks, source, ocrWarning }
+ */
+async function parseScannedGradePdf(pdfBuffer) {
+  const tmpDir  = fs.mkdtempSync(path.join(os.tmpdir(), 'grade_ocr_'));
   const pdfPath = path.join(tmpDir, 'input.pdf');
-  const cellDir = path.join(tmpDir, 'cells');
-  fs.writeFileSync(pdfPath, buffer);
 
-  let worker;
   try {
-    const pages = await runCellExtractor(pdfPath, cellDir);
-    worker = await createWorker('eng');
-    const rows = [];
+    fs.writeFileSync(pdfPath, pdfBuffer);
+
+    const rawRows = await runPythonExtractor(pdfPath);
+
     const seen = new Set();
+    const rows = [];
 
-    for (const page of pages) {
-      let pagePrefix = '';
-      let lastSidNumber = 0;
-      let pageGradeMap = new Map();
-      let pageTextRows = new Map();
-      if (page.pageImage) {
-        const fullPageResult = await recognizeCell(worker, page.pageImage, PSM.AUTO);
-        const fullPageText = fullPageResult.text;
-        pageGradeMap = parseFullPageOcr(fullPageText);
-        pageTextRows = parseFullPageRows(fullPageText);
-      }
-      for (let rowIdx = 0; rowIdx < (page.rows || []).length; rowIdx++) {
-        const row = page.rows[rowIdx];
-        const sidResult = await recognizeCell(worker, row.sid, PSM.SINGLE_LINE, '0123456789');
-        let sid = extractSid(sidResult.text);
-        if (!sid) {
-          const sidNoWhitelist = await recognizeCell(worker, row.sid, PSM.SINGLE_LINE, '');
-          sid = extractSidFuzzy(sidNoWhitelist.text);
-        }
-        const nameResult = await recognizeCell(
-          worker,
-          row.name,
-          PSM.SINGLE_LINE,
-          'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz .-'
-        );
-        const unitsResult = await recognizeCell(worker, row.units, PSM.SINGLE_LINE, '0123456789.');
-        const gradeResult = await recognizeCell(worker, row.grade, PSM.SINGLE_LINE, 'ABCDF+abcdf');
+    for (const raw of rawRows) {
+      const sid   = String(raw.sid  || '').trim();
+      const name  = String(raw.name || '').trim() || 'Unknown Student';
+      const grade = normalizeGrade(raw.grade) || raw.grade || '';
 
-        let name = cleanName(nameResult.text);
-        sid = repairSid(sid, pagePrefix);
-        if (!sid && lastSidNumber && String(lastSidNumber).startsWith('241') && name) {
-          sid = String(lastSidNumber + 1);
-        }
-        if (!sid) {
-          sid = name
-            ? `ocr_${page.page}_${rowIdx}_${name.replace(/\s+/g, '_').toLowerCase().slice(0, 20)}`
-            : `ocr_${page.page}_${rowIdx}`;
-        }
-        if (seen.has(sid)) continue;
-        if (/^\d{8}$/.test(sid)) {
-          pagePrefix = sid.slice(0, 3);
-          lastSidNumber = Number(sid);
-        }
+      // FIX: relaxed SID length threshold from 7 to 5 to match Python change.
+      if (!sid || sid.length < 5) continue;
 
-        const gradeWithConfidence = normalizeGradeWithConfidence(gradeResult.text);
-        const grade = gradeWithConfidence.grade;
-        const ocrConfidence = gradeWithConfidence.confidence;
-        const units = extractUnits(unitsResult.text);
-        const pageTextRow = pageTextRows.get(sid) || {};
-        if (!name && pageTextRow.name) name = pageTextRow.name;
-        const gradeFromPage = pageTextRow.grade || pageGradeMap.get(sid) || '';
-        const finalGrade = gradeFromPage || grade;
-        const displayName = name || 'Unknown Student';
-        seen.add(sid);
+      if (seen.has(sid)) continue;
+      seen.add(sid);
 
-        let sidImage = '';
-        let gradeImage = '';
-        try {
-          if (row.sid && fs.existsSync(row.sid)) {
-            sidImage = 'data:image/png;base64,' + fs.readFileSync(row.sid).toString('base64');
-          }
-          if (row.grade && fs.existsSync(row.grade)) {
-            gradeImage = 'data:image/png;base64,' + fs.readFileSync(row.grade).toString('base64');
-          }
-        } catch (err) {
-          console.error('[OCR Parser] Failed to read cell images:', err);
-        }
+      const gp = GRADE_POINTS[grade] ?? 0;
 
-        const rowConfidence = Math.round(
-          (sidResult.confidence + nameResult.confidence + gradeResult.confidence) / 3
-        );
-
-        rows.push({
-          name: displayName,
-          roll: sid,
-          grade: finalGrade,
-          sidImage,
-          gradeImage,
-          gradeCellPath: row.grade || '',
-          ocrGradeRaw: gradeResult.text.trim(),
-          ocrConfidence,
-          ocrConfidenceLevel: confidenceLevel(ocrConfidence),
-          overallConfidence: rowConfidence,
-          marks: {
-            Units: units || 4,
-            Grade: finalGrade,
-          },
-          ocrWarning: finalGrade ? '' : 'Grade could not be read confidently from scanned PDF.',
-          source: 'ocr',
-        });
-      }
-
-      for (const [sid, row] of pageTextRows.entries()) {
-        if (seen.has(sid)) continue;
-        seen.add(sid);
-        rows.push({
-          name: row.name || 'Unknown Student',
-          roll: sid,
-          grade: row.grade || '',
-          sidImage: '',
-          gradeImage: '',
-          gradeCellPath: '',
-          ocrGradeRaw: '',
-          ocrConfidence: 0,
-          ocrConfidenceLevel: 'low',
-          overallConfidence: 0,
-          marks: {
-            Units: 4,
-            Grade: row.grade || '',
-          },
-          ocrWarning: row.grade ? '' : 'Grade could not be read confidently from scanned PDF.',
-          source: 'ocr',
-        });
-      }
+      rows.push({
+        name,
+        roll:        sid,
+        grade,
+        gradePoints: gp,
+        marks: {
+          'Grade Points': gp,
+        },
+        source:     'ocr',
+        ocrWarning: grade ? '' : 'Grade could not be read from scanned PDF.',
+      });
     }
 
+    console.log(`[OCR] Parsed ${rows.length} students from scanned PDF.`);
     return rows;
+
   } finally {
-    if (worker) await worker.terminate();
-    cleanup(tmpDir);
+    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch (_) {}
   }
 }
+
+// ── Exports ───────────────────────────────────────────────────────────────
 
 module.exports = {
   parseScannedGradePdf,
   normalizeGrade,
   normalizeGradeWithConfidence,
-  fuzzyMatchGrade,
   VALID_GRADES,
+  GRADE_POINTS,
   resolvePython,
-  childEnv,
+  buildChildEnv,
 };

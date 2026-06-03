@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
-import axios from "axios";
+import { Link } from "react-router-dom";
+import API from "../api/axios";
 import toast from "react-hot-toast";
 
-const API = process.env.REACT_APP_API_URL;
+
 
 const StudentAttendanceView = ({ sid }) => {
   const [data,     setData]     = useState(null);
@@ -17,16 +18,15 @@ const StudentAttendanceView = ({ sid }) => {
   });
   const [marking, setMarking] = useState(false);
 
-  const token      = localStorage.getItem("token");
-  const authHeader = { Authorization: `Bearer ${token}` };
+
 
   const fetchAttendance = async () => {
     try {
       setLoading(true);
       setError(null);
       const [attendanceRes, subjectsRes] = await Promise.all([
-        axios.get(`${API}/attendance/student/${sid}`, { headers: authHeader }),
-        axios.get(`${API}/timetable`,                 { headers: authHeader }),
+        API.get(`/attendance/student/${sid}`),
+        API.get(`/timetable`),
       ]);
       setData(attendanceRes.data);
       setSubjects(subjectsRes.data.subjects || []);
@@ -37,14 +37,21 @@ const StudentAttendanceView = ({ sid }) => {
     }
   };
 
-  useEffect(() => { if (sid) fetchAttendance(); }, [sid]);
+  useEffect(() => {
+    if (sid) {
+      fetchAttendance();
+    } else {
+      setLoading(false);
+      setError("Please update your Student ID (SID) in Profile Settings to track your attendance.");
+    }
+  }, [sid]);
 
   const handleMark = async (e) => {
     e.preventDefault();
     if (!markForm.subjectId) { toast.error("Please select a subject."); return; }
     setMarking(true);
     try {
-      await axios.post(`${API}/attendance`, markForm, { headers: authHeader });
+      await API.post(`/attendance`, markForm);
       toast.success("Attendance marked!");
       fetchAttendance();
     } catch (err) {
@@ -96,7 +103,23 @@ const StudentAttendanceView = ({ sid }) => {
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center",
       justifyContent: "center", height: "60vh", gap: "1rem" }}>
       <span style={{ fontSize: "2rem", color: "#f87171" }}>⚠</span>
-      <p style={{ color: "#f87171", fontSize: "0.9rem" }}>{error}</p>
+      <p style={{ color: "#f87171", fontSize: "0.95rem", textAlign: "center", maxWidth: "400px", lineHeight: "1.4" }}>{error}</p>
+      {!sid && (
+        <Link to="/profile" style={{
+          marginTop: "0.5rem",
+          padding: "0.6rem 1.2rem",
+          background: "var(--primary)",
+          color: "#fff",
+          borderRadius: "8px",
+          textDecoration: "none",
+          fontWeight: 600,
+          fontSize: "0.85rem",
+          boxShadow: "0 4px 12px rgba(99, 102, 241, 0.2)",
+          transition: "transform 0.2s, opacity 0.2s"
+        }}>
+          Go to Profile Settings
+        </Link>
+      )}
     </div>
   );
 

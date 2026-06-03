@@ -1,14 +1,20 @@
 #!/usr/bin/env python3
-"""Render scanned grade-list PDFs, crop student table cells via OpenCV, OCR each with Tesseract.
-Outputs JSON array of {sid, name, grade} to stdout."""
+"""
+Extract student grades from scanned grade-list PDFs.
+Strategy: detect table grid lines with OpenCV, crop each cell,
+run Tesseract on individual cells. Falls back to full-page OCR if needed.
+Outputs JSON array of {sid, name, grade} to stdout.
+"""
 
-import json, os, re, sys
+import json
+import os
+import re
+import sys
+import tempfile
 
-# Ensure poppler is on PATH before pdf2image import
+# ── Windows: ensure poppler is on PATH ───────────────────────────────────
 if sys.platform == 'win32':
-    winget_root = os.path.expanduser(
-        r'~\AppData\Local\Microsoft\WinGet\Packages'
-    )
+    winget_root = os.path.expanduser(r'~\AppData\Local\Microsoft\WinGet\Packages')
     if os.path.isdir(winget_root):
         for root, dirs, files in os.walk(winget_root):
             if 'pdftoppm.exe' in files:
@@ -19,12 +25,8 @@ import cv2
 import numpy as np
 import pytesseract
 from pdf2image import convert_from_path
-import tempfile
 
-DEBUG_DIR = os.path.join(tempfile.gettempdir(), 'grade_debug')
-os.makedirs(DEBUG_DIR, exist_ok=True)
-
-# Point pytesseract at the Tesseract binary on Windows
+# ── Windows: find tesseract binary ───────────────────────────────────────
 if sys.platform == 'win32':
     for p in [
         r'C:\Program Files\Tesseract-OCR\tesseract.exe',
@@ -34,38 +36,78 @@ if sys.platform == 'win32':
             pytesseract.pytesseract.tesseract_cmd = p
             break
 
-# ── helpers ──────────────────────────────────────────────────────────────
+DEBUG_DIR = os.path.join(tempfile.gettempdir(), 'grade_debug')
+os.makedirs(DEBUG_DIR, exist_ok=True)
 
-VALID_GRADES = {'A+','A','B+','B','C+','C','D','F','F(UMC)'}
+VALID_GRADES = {'A+', 'A', 'B+', 'B', 'C+', 'C', 'D', 'F', 'F(UMC)'}
+
+# ── Grade normalization ───────────────────────────────────────────────────
+
+EXPLICIT_MAP = {
+    'R': 'B', '8': 'B', '2': 'B', '6': 'B',
+    '0': 'D', 'Q': 'D',
+    'AT': 'A+', 'BT': 'B+', 'CT': 'C+',
+    'AF': 'A+', 'BF': 'B+', 'CF': 'C+',
+    'At': 'A+', 'Bt': 'B+', 'Ct': 'C+',
+    'ND': 'D', 'NO': 'D',
+    'E': 'F', 'P': 'F',
+}
 
 
 def normalize_grade(raw):
     if not raw:
         return ''
-    t = raw.strip().upper()
+    t = raw.strip()
+
+    # Check for F(UMC) first
+    if re.search(r'UMC', t, re.IGNORECASE):
+        return 'F(UMC)'
+
+    t = t.upper()
+
+    # Strip leading noise
     t = re.sub(r'^[^A-DF-Z0-9(]+', '', t).strip()
-    t = re.sub(r'\([^)]*UMC[^)]*\)', '(UMC)', t, flags=re.IGNORECASE)
+
+    # Strip parenthetical annotations (except UMC already handled)
     t = re.sub(r'\([^)]*\)', '', t).strip()
-    t = re.sub(r'^N\s*D$', 'D', t)
-    t = re.sub(r'^[28]\s*\+?$', 'B+', t)
-    t = re.sub(r'^[28]$', 'B', t)
-    t = re.sub(r'^R$', 'B', t)
-    t = re.sub(r'^0$', 'D', t)
+
+    # Remove internal spaces: "B +" -> "B+"
     t = re.sub(r'^([ABC])\s+\+$', r'\1+', t)
-    t = re.sub(r'^[^ABCDF(]+([ABCDF].*)$', r'\1', t).strip()
-    t = re.sub(r'^([ABC])[TF]$', r'\1+', t)
+    t = t.replace(' ', '')
+
+    # Explicit OCR confusion map
+    if t in EXPLICIT_MAP:
+        return EXPLICIT_MAP[t]
+
+    # Direct match
     if t in VALID_GRADES:
         return t
+
+    # Cursive t/f at end = +
+    m = re.match(r'^([ABC])[TF]$', t)
+    if m:
+        return m.group(1) + '+'
+
+    # Strip leading noise chars
+    m = re.match(r'^[^ABCDF(]*([ABCDF].*)$', t)
+    if m:
+        t = m.group(1)
+
+    if t in VALID_GRADES:
+        return t
+
+    # Single letter
     if len(t) == 1 and t in 'ABCDF':
         return t
-    if len(t) >= 1 and t[0] in 'ABCDF':
-        c = t[0]
-        if len(t) > 1 and t[1] in '+TF' and c in 'ABC':
-            g = c + '+'
-            if g in VALID_GRADES:
-                return g
-        if c in VALID_GRADES:
-            return c
+
+    # Letter + plus-like
+    if len(t) >= 2 and t[0] in 'ABC' and t[1] in '+TF':
+        return t[0] + '+'
+
+    # Just take first valid letter
+    if t and t[0] in 'ABCDF':
+        return t[0]
+
     return ''
 
 
@@ -73,314 +115,386 @@ def clean_sid(raw):
     s = raw.strip()
     s = re.sub(r'[lL]', '1', s)
     s = re.sub(r'[oO]', '0', s)
-    s = re.sub(r'I', '1', s)
-    s = re.sub(r'\s', '', s)
+    s = re.sub(r'[I]', '1', s)
+    s = re.sub(r'[S]', '5', s)
+    s = re.sub(r'[^0-9]', '', s)
     return s
 
 
 def clean_name(raw):
-    return re.sub(r'[^A-Za-z\s]', '', raw).strip()
+    name = re.sub(r'[^A-Za-z\s\-\']', ' ', raw)
+    name = re.sub(r'\s+', ' ', name).strip().upper()
+    # Remove single character words (OCR noise)
+    words = [w for w in name.split() if len(w) > 1]
+    return ' '.join(words)
 
 
-def ocr_cell(gray_img, psm=7, whitelist=''):
-    if gray_img.size == 0:
-        return ''
-    resized = cv2.resize(gray_img, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
-    _, thresh = cv2.threshold(resized, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+# ── OCR helpers ───────────────────────────────────────────────────────────
+
+def prepare_cell(gray_cell, scale_to_height=80):
+    """Upscale, denoise, binarize a cell image for best OCR."""
+    if gray_cell is None or gray_cell.size == 0:
+        return None
+    h, w = gray_cell.shape[:2]
+    if h == 0 or w == 0:
+        return None
+
+    # Scale up so height is at least scale_to_height
+    if h < scale_to_height:
+        factor = scale_to_height / h
+        new_w = max(1, int(w * factor))
+        new_h = scale_to_height
+        gray_cell = cv2.resize(gray_cell, (new_w, new_h), interpolation=cv2.INTER_CUBIC)
+
+    # Denoise
+    denoised = cv2.fastNlMeansDenoising(gray_cell, h=15)
+
+    # Binarize with Otsu
+    _, binary = cv2.threshold(denoised, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+    return binary
+
+
+def remove_horizontal_lines(binary):
+    """Remove horizontal table lines from a binarized cell image."""
+    h, w = binary.shape
+    inv = cv2.bitwise_not(binary)
+    kw = max(20, w // 3)
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (kw, 1))
+    lines = cv2.morphologyEx(inv, cv2.MORPH_OPEN, kernel)
+    cleaned_inv = cv2.subtract(inv, lines)
+    return cv2.bitwise_not(cleaned_inv)
+
+
+def ocr_text(binary, psm, whitelist=''):
+    """Run Tesseract on a prepared binary image."""
+    config = f'--psm {psm} --oem 3'
+    if whitelist:
+        config += f' -c tessedit_char_whitelist={whitelist}'
     try:
-        config = f'--psm {psm} --oem 3'
-        if whitelist:
-            config += f' -c tessedit_char_whitelist={whitelist}'
-        text = pytesseract.image_to_string(thresh, config=config)
-        return text.strip()
+        return pytesseract.image_to_string(binary, config=config).strip()
     except Exception:
         return ''
 
 
-def ocr_grade_cell(cell):
-    # Try PSM 8 (single word), PSM 7 (single line), PSM 6 (block)
-    for psm in [8, 7, 6]:
-        raw = ocr_cell(cell, psm=psm, whitelist='ABCDFabcdf+()')
+def read_sid(gray_cell):
+    cell = prepare_cell(gray_cell, scale_to_height=60)
+    if cell is None:
+        return ''
+    cell = remove_horizontal_lines(cell)
+    raw = ocr_text(cell, psm=7, whitelist='0123456789IlLoO')
+    return clean_sid(raw)
+
+
+def read_name(gray_cell):
+    cell = prepare_cell(gray_cell, scale_to_height=60)
+    if cell is None:
+        return ''
+    cell = remove_horizontal_lines(cell)
+    raw = ocr_text(cell, psm=7,
+                   whitelist='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz .-\'')
+    return clean_name(raw)
+
+
+def read_grade(gray_cell, debug_path=None):
+    """Try multiple strategies to read a handwritten grade."""
+    cell = prepare_cell(gray_cell, scale_to_height=80)
+    if cell is None:
+        return ''
+
+    cell = remove_horizontal_lines(cell)
+
+    if debug_path:
+        cv2.imwrite(debug_path, cell)
+
+    whitelist = 'ABCDFabcdf+()'
+
+    # Try each PSM mode
+    for psm in [8, 7, 13, 6]:
+        raw = ocr_text(cell, psm=psm, whitelist=whitelist)
         if 'UMC' in raw.upper():
             return 'F(UMC)'
         grade = normalize_grade(raw)
         if grade:
             return grade
-    # Fix 5: log raw outputs when all PSM modes fail
-    sys.stderr.write(f'[Grade] All PSM failed, raw outputs: '
-                     f'{[ocr_cell(cell, psm=p, whitelist="ABCDFabcdf+()") for p in [8,7,6]]}\n')
+
+    # Last resort: no whitelist
+    for psm in [8, 7]:
+        raw = ocr_text(cell, psm=psm, whitelist='')
+        grade = normalize_grade(raw)
+        if grade:
+            return grade
+
+    sys.stderr.write(f'[Grade] Failed all strategies. '
+                     f'Raw PSM8={ocr_text(cell, 8, whitelist)!r} '
+                     f'PSM7={ocr_text(cell, 7, whitelist)!r}\n')
     return ''
 
 
-# ── image preprocessing ──────────────────────────────────────────────────
+# ── Table grid detection ──────────────────────────────────────────────────
 
-
-def preprocess(bgr):
-    gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
-    denoised = cv2.fastNlMeansDenoising(gray, h=10)
-    return denoised
-
-
-# ── row detection via horizontal projection ──────────────────────────────
-
-
-def detect_row_lines(gray):
+def detect_horizontal_lines(gray):
+    """Find Y coordinates of horizontal table grid lines."""
     h, w = gray.shape
-    _, binary = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
-    # Horizontal projection
-    proj = np.sum(binary, axis=1) // 255
-    # Smooth
-    kernel = np.ones(7)
-    proj_smooth = np.convolve(proj, kernel, mode='same')
-    median = np.median(proj_smooth[proj_smooth > 0]) if np.any(proj_smooth > 0) else 0
-    threshold = max(median * 0.12, 3)
-    # Find row bands
-    rows = []
-    in_row = False
-    start = 0
-    for y in range(h):
-        if proj_smooth[y] > threshold and not in_row:
-            start = y
-            in_row = True
-        elif proj_smooth[y] <= threshold and in_row:
-            if y - start >= 12:
-                rows.append((start, y))
-            in_row = False
-    if in_row and h - start >= 12:
-        rows.append((start, h))
-    return rows
+    _, binary = cv2.threshold(gray, 180, 255, cv2.THRESH_BINARY_INV)
+
+    kw = max(50, w // 3)
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (kw, 1))
+    horiz = cv2.morphologyEx(binary, cv2.MORPH_OPEN, kernel)
+
+    row_sums = horiz.sum(axis=1)
+    min_sum = 255 * max(30, w // 5)
+    strong_rows = np.where(row_sums > min_sum)[0]
+
+    if len(strong_rows) == 0:
+        return []
+
+    lines = []
+    cluster = [strong_rows[0]]
+    for y in strong_rows[1:]:
+        if y - cluster[-1] <= 4:
+            cluster.append(y)
+        else:
+            lines.append(int(np.mean(cluster)))
+            cluster = [y]
+    lines.append(int(np.mean(cluster)))
+
+    return lines
 
 
-def detect_rows_by_text(gray):
-    h, w = gray.shape
-    _, binary = cv2.threshold(gray, 0, 255,
-                              cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
-    proj = binary.sum(axis=1) / 255
-    threshold = max(proj.max() * 0.15, w * 0.02)
-    rows = []
-    in_row = False
-    start = 0
-    for y in range(h):
-        if proj[y] > threshold and not in_row:
-            start = y
-            in_row = True
-        elif proj[y] <= threshold and in_row:
-            mid = (start + y) // 2
-            height = y - start
-            if 15 <= height <= 80:
-                rows.append(mid)
-            in_row = False
-    return rows
-
-
-# ── column detection via vertical projection within row bands ────────────
-
-
-def detect_col_lines(gray):
-    """Find X positions separating table columns using vertical projection."""
-    _, binary = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
-    h, w = gray.shape
-    proj = np.sum(binary, axis=0) // 255
-    kernel = np.ones(5)
-    proj_smooth = np.convolve(proj, kernel, mode='same')
-    median = np.median(proj_smooth[proj_smooth > 0]) if np.any(proj_smooth > 0) else 0
-    threshold = max(median * 0.08, 2)
-    cols = []
-    in_col = False
-    start = 0
-    for x in range(w):
-        if proj_smooth[x] > threshold and not in_col:
-            start = x
-            in_col = True
-        elif proj_smooth[x] <= threshold and in_col:
-            if x - start >= 8:
-                cols.append((start, x))
-            in_col = False
-    if in_col and w - start >= 8:
-        cols.append((start, w))
-    return cols
-
-
-def get_col_regions(col_bands, img_w):
-    """Map detected column bands to sid/name/grade regions.
-    Expects at least 3 columns: SID (leftmost), Grade (rightmost), Name (middle)."""
-    if len(col_bands) < 3:
-        return None
-    regions = {
-        'sid': col_bands[0],
-        'grade': col_bands[-1],
+# FIX 1: Corrected column percentages to match actual document layout.
+# Previously grade col started at 80% — grade is written in the last ~15%
+# of the page. SID occupies roughly 8–26%, name 26–72%, grade 82–99%.
+# Extended grade region right edge to 100% and added extra padding below
+# to catch the cursive "+" which often extends below the cell boundary.
+def map_columns(vert_lines, page_w):
+    return {
+        'sid':   (int(page_w * 0.08), int(page_w * 0.26)),
+        'name':  (int(page_w * 0.26), int(page_w * 0.72)),
+        'grade': (int(page_w * 0.82), int(page_w * 1.00)),
     }
-    if len(col_bands) == 3:
-        regions['name'] = col_bands[1]
-    else:
-        regions['name'] = (col_bands[1][0], col_bands[-2][1])
-    return regions
 
 
-# ── per-page extraction ──────────────────────────────────────────────────
+# ── Text-projection row fallback ─────────────────────────────────────────
 
-
-def extract_page(bgr_img, page_num=0):
-    gray = preprocess(bgr_img)
+def detect_rows_by_projection(gray):
+    """Detect data row Y bands using horizontal text projection."""
     h, w = gray.shape
-    row_bands = detect_row_lines(gray)
-    # Fix 4: sparse page handling — fall back to text-projection method
-    if len(row_bands) < 2:
-        row_ys = detect_rows_by_text(gray)
-        row_bands = [(max(0, y - 12), min(h, y + 12)) for y in row_ys]
-    # Get global column regions from the whole page
-    col_bands = detect_col_lines(gray)
-    col_regions = get_col_regions(col_bands, w)
-    if col_regions is None:
-        # Fallback: percentage-based
-        col_regions = {
-            'sid': (int(w * 0.05), int(w * 0.25)),
-            'name': (int(w * 0.25), int(w * 0.72)),
-            'grade': (int(w * 0.78), int(w * 0.96)),
-        }
+    _, binary = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+    proj = binary.sum(axis=1) / 255
+
+    threshold = max(proj.max() * 0.10, w * 0.01)
+    if threshold == 0:
+        return []
+
+    bands = []
+    in_band = False
+    start = 0
+    for y in range(h):
+        if proj[y] > threshold and not in_band:
+            start = y
+            in_band = True
+        elif proj[y] <= threshold and in_band:
+            band_h = y - start
+            if 12 <= band_h <= h * 0.10:
+                bands.append((start, y))
+            in_band = False
+    if in_band and h - start >= 12:
+        bands.append((start, h))
+
+    return bands
+
+
+# FIX 2: Merge nearby row bands that belong to the same data row.
+# Handwritten text sometimes breaks into two projection bands (e.g. the
+# ascender of a letter separated from its body). Merging bands < 8px apart
+# prevents double-counting and missed cells.
+def merge_nearby_bands(bands, gap=8):
+    if not bands:
+        return []
+    merged = [list(bands[0])]
+    for y1, y2 in bands[1:]:
+        if y1 - merged[-1][1] <= gap:
+            merged[-1][1] = max(merged[-1][1], y2)
+        else:
+            merged.append([y1, y2])
+    return [tuple(b) for b in merged]
+
+
+# ── Per-page extraction ───────────────────────────────────────────────────
+
+def extract_page(pil_image, page_num):
+    """Extract student rows from one page image."""
+    bgr = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
+    gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
+    h, w = gray.shape
+
+    horiz_lines = detect_horizontal_lines(gray)
+    sys.stderr.write(f'[Python] Page {page_num}: {len(horiz_lines)} horizontal lines detected\n')
+
+    col_map = map_columns([], w)
+    sys.stderr.write(f'[Python] Page {page_num}: columns={col_map}\n')
+
+    if len(horiz_lines) >= 2:
+        row_bands = []
+        for i in range(len(horiz_lines) - 1):
+            y1 = horiz_lines[i]
+            y2 = horiz_lines[i + 1]
+            row_h = y2 - y1
+            if 15 <= row_h <= h * 0.10:
+                row_bands.append((y1, y2))
+    else:
+        raw_bands = detect_rows_by_projection(gray)
+        row_bands = merge_nearby_bands(raw_bands, gap=8)   # FIX 2 applied here
+        sys.stderr.write(f'[Python] Page {page_num}: using text projection, {len(row_bands)} bands\n')
+
+    sys.stderr.write(f'[Python] Page {page_num}: {len(row_bands)} data row bands\n')
+
     rows = []
+    seen_sids = set()
+
     for row_idx, (y1, y2) in enumerate(row_bands):
         row_h = y2 - y1
-        if row_h < 14 or row_h > h * 0.08:
+
+        pad = max(2, int(row_h * 0.05))
+        gy1 = max(0, y1 + pad)
+        gy2 = min(h, y2 - pad)
+
+        # SID cell
+        sx1, sx2 = col_map['sid']
+        sid_crop = gray[gy1:gy2, max(0, sx1 + 4):min(w, sx2 - 4)]
+        sid = read_sid(sid_crop)
+
+        # FIX 3: Accept SIDs of length >= 5 (not 6). Your 2022/2023 batch
+        # SIDs are 8 digits (e.g. 22103049) but OCR noise can drop one digit.
+        # Rejecting anything < 5 still filters out header/signature rows.
+        if len(sid) < 5:
+            sys.stderr.write(f'[Python] Page {page_num} row {row_idx}: rejected sid={sid!r}\n')
             continue
-        margin = int(row_h * 0.1)
-        cy1 = max(0, y1 + margin)
-        cy2 = min(h, y2 - margin)
-        if cy2 - cy1 < 8:
+
+        if sid in seen_sids:
             continue
 
-        # OCR each cell
-        sid_text = ''
-        name_text = ''
-        grade_text = ''
+        # Name cell
+        nx1, nx2 = col_map['name']
+        name_crop = gray[gy1:gy2, max(0, nx1 + 4):min(w, nx2 - 4)]
+        name = read_name(name_crop)
 
-        for key, (x1, x2) in col_regions.items():
-            if key == 'grade':
-                # Fix 1: aggressively widen grade crop to catch handwritten "+"
-                cx1 = max(0, x1 - 10)
-                cx2 = min(w, x2 + 80)
-            else:
-                # Fix 1: tighter crop for sid/name — pad inward
-                cx1 = max(0, x1 + 4)
-                cx2 = min(w, x2 - 4)
-            if cx2 <= cx1:
-                continue
-            if key == 'sid':
-                cell = gray[cy1:cy2, cx1:cx2]
-                sid_text = clean_sid(ocr_cell(cell, whitelist='0123456789'))
-            elif key == 'name':
-                cell = gray[cy1:cy2, cx1:cx2]
-                name_text = clean_name(ocr_cell(cell, whitelist='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz .-'))
-            elif key == 'grade':
-                cell = gray[cy1:cy2, cx1:cx2]
-                # Fix 3: scale up small grade cells before OCR
-                gh, gw = cell.shape[:2]
-                if gh < 40:
-                    scale = max(3, 60 // gh)
-                    cell = cv2.resize(cell, (gw * scale, gh * scale),
-                                      interpolation=cv2.INTER_CUBIC)
-                # Fix 4: save grade cell for debugging
-                debug_path = os.path.join(DEBUG_DIR, f'p{page_num}_r{row_idx}_grade.png')
-                cv2.imwrite(debug_path, cell)
-                # Fix 2: try multiple PSM modes for grade
-                grade_text = ocr_grade_cell(cell)
+        # FIX 4: Grade cell — extended vertical padding significantly.
+        # Cursive A+/B+ strokes often extend 30–40% above/below the row band.
+        # Previously only 15% padding was used; bumped to 30% above and 40% below.
+        gx1, gx2 = col_map['grade']
+        grade_y1 = max(0, y1 - int(row_h * 0.30))
+        grade_y2 = min(h, y2 + int(row_h * 0.40))
+        grade_crop = gray[grade_y1:grade_y2, max(0, gx1):min(w, gx2)]
 
-        if sid_text or grade_text:
-            rows.append({
-                'sid': sid_text if len(sid_text) >= 7 else '',
-                'name': name_text,
-                'grade': grade_text,
-            })
+        debug_path = os.path.join(DEBUG_DIR, f'p{page_num}_r{row_idx}_grade.png')
+        grade = read_grade(grade_crop, debug_path=debug_path)
+
+        seen_sids.add(sid)
+        rows.append({
+            'sid': sid,
+            'name': name,
+            'grade': grade,
+        })
+
     return rows
 
 
-# ── full-page OCR fallback ─────────────────────────────────────────────
+# ── Full-page OCR fallback ────────────────────────────────────────────────
 
-
-def full_page_ocr_fallback(bgr_img):
-    """Use Tesseract full-page OCR and regex to find student rows.
-
-    Handles grade-list layout where table column boundaries are unclear.
+def extract_page_fullpage_ocr(pil_image, page_num):
     """
-    import pytesseract as tsrt
-    gray = cv2.cvtColor(bgr_img, cv2.COLOR_BGR2GRAY)
-    _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    Fallback: run Tesseract on the full page and extract rows by regex.
+    Used when grid detection finds no rows.
+    """
+    bgr = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
+    gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
+
+    scale = 2
+    gray_up = cv2.resize(gray, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
+    _, binary = cv2.threshold(gray_up, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
     try:
-        text = tsrt.image_to_string(thresh, config='--psm 4 --oem 3')
-    except Exception:
+        text = pytesseract.image_to_string(binary, config='--psm 6 --oem 3')
+    except Exception as e:
+        sys.stderr.write(f'[Python] Full-page OCR failed: {e}\n')
         return []
+
     rows = []
-    sid_pattern = re.compile(r'\b(\d{7,12})\b')
-    # Grade-like token pattern (case-insensitive, allows trailing junk)
-    grade_pattern = re.compile(
-        r'(?<![A-Za-z0-9])([A-F][+]?)(?:\s|$|[^A-Za-z0-9+])',
-        re.IGNORECASE
-    )
+    seen = set()
+
     for line in text.split('\n'):
         line = line.strip()
         if not line:
             continue
-        sid_match = sid_pattern.search(line)
+
+        # FIX 5: Accept SIDs from 5 to 12 digits to match relaxed threshold above.
+        sid_match = re.search(r'\b(\d{5,12})\b', line)
         if not sid_match:
             continue
+
         sid = clean_sid(sid_match.group(1))
-        after_sid = line[sid_match.end():].strip()
-        # Strategy 1: split on last "4" (units column)
+        if len(sid) < 5 or sid in seen:
+            continue
+
+        after = line[sid_match.end():].strip()
+
         grade = ''
-        end_idx = after_sid.rfind('4')
-        if end_idx >= 0:
-            grade = normalize_grade(after_sid[end_idx + 1:])
-            name = clean_name(after_sid[:end_idx])
-        # Strategy 2: if no grade yet, search for a grade pattern in the tail
-        if not grade:
-            grade_match = grade_pattern.search(after_sid)
-            if grade_match:
-                g = normalize_grade(grade_match.group(1))
-                if g:
-                    grade = g
-                    gi = grade_match.start()
-                    name = clean_name(after_sid[:gi])
-                else:
-                    name = clean_name(after_sid)
-            else:
-                name = clean_name(after_sid)
+        name = ''
+
+        grade_match = re.search(
+            r'\b(A\+|A|B\+|B|C\+|C|D|F(?:\(UMC\))?|[AB][TtFf])\s*$',
+            after, re.IGNORECASE
+        )
+        if grade_match:
+            grade = normalize_grade(grade_match.group(1))
+            name = clean_name(after[:grade_match.start()])
         else:
-            # Clean pipe chars from name
-            name = name.lstrip('|[').strip()
+            name = clean_name(after)
+
+        seen.add(sid)
         rows.append({'sid': sid, 'name': name, 'grade': grade})
+
     return rows
 
 
-# ── main ─────────────────────────────────────────────────────────────────
-
+# ── Main ─────────────────────────────────────────────────────────────────
 
 def main():
     if len(sys.argv) < 2:
         print(json.dumps({'error': 'Usage: extractGradeCells.py <pdf_path>'}))
         sys.exit(1)
+
     pdf_path = sys.argv[1]
     if not os.path.exists(pdf_path):
         print(json.dumps({'error': f'File not found: {pdf_path}'}))
         sys.exit(1)
+
     try:
-        images = convert_from_path(pdf_path, dpi=200, fmt='jpeg')
+        images = convert_from_path(pdf_path, dpi=300, fmt='jpeg')
     except Exception as e:
         print(json.dumps({'error': f'pdf2image failed: {str(e)}'}))
         sys.exit(1)
+
     all_rows = []
+
     for page_num, pil_img in enumerate(images, 1):
-        bgr = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
-        # Try full-page OCR fallback first (better for scanned grade lists)
-        fallback = full_page_ocr_fallback(bgr)
-        if fallback:
-            page_rows = fallback
-        else:
-            page_rows = extract_page(bgr, page_num)
+        page_rows = extract_page(pil_img, page_num)
+
+        if not page_rows:
+            sys.stderr.write(f'[Python] Page {page_num}: no rows from grid, trying full-page OCR\n')
+            page_rows = extract_page_fullpage_ocr(pil_img, page_num)
+
+        sys.stderr.write(
+            f'[Python] Page {page_num}: {len(page_rows)} rows, '
+            f'grades: {[r["grade"] for r in page_rows]}\n'
+        )
         all_rows.extend(page_rows)
-        # Fix 5: debug per-page output
-        sys.stderr.write(f'[Python] Page {page_num}: {len(page_rows)} rows, '
-                         f'grades: {[r["grade"] for r in page_rows]}\n')
-    sys.stderr.write(f'[Debug] Grade cell images saved to {DEBUG_DIR}\n')
+
+    sys.stderr.write(f'[Debug] Total rows: {len(all_rows)}\n')
+    sys.stderr.write(f'[Debug] Grade debug images: {DEBUG_DIR}\n')
+
     print(json.dumps(all_rows))
 
 

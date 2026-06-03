@@ -1,6 +1,6 @@
 const Groq = require('groq-sdk');
 const fs = require('fs');
-const { fuzzyMatchGrade, VALID_GRADES } = require('./ocrGradePdfParser');
+const { normalizeGrade, VALID_GRADES } = require('./ocrGradePdfParser');
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
@@ -89,9 +89,8 @@ function parseVisionGrade(raw) {
   // Direct match
   if (VALID_GRADES.includes(text)) return { grade: text, confidence: 95 };
 
-  // Fuzzy fallback
-  const fuzzy = fuzzyMatchGrade(text);
-  if (fuzzy.grade) return { grade: fuzzy.grade, confidence: fuzzy.confidence };
+  const grade = normalizeGrade(text);
+  if (grade) return { grade, confidence: 70 };
 
   return { grade: '', confidence: 0 };
 }
@@ -200,8 +199,7 @@ async function aiCorrectGradesFromText(students) {
       if (!Array.isArray(result)) continue;
 
       result.forEach((c) => {
-        const fuzzy = fuzzyMatchGrade(c.correctedGrade || '');
-        const grade = fuzzy.grade || c.correctedGrade || '';
+        const grade = normalizeGrade(c.correctedGrade || '') || c.correctedGrade || '';
         if (grade) {
           allCorrections.push({
             index: i + c.index,  // offset by chunk start
