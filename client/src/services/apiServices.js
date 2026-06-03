@@ -79,6 +79,9 @@ export const careerService = {
   getPlan:     ()        => apiRequest('get',   '/career/plan'),
   update:      (data)    => apiRequest('put',   '/career',               data),
   updateTopic: (name, d) => apiRequest('patch', `/career/topic/${name}`, d),
+  analyzeResume: (resumeText) => apiRequest('post', '/career/analyze-resume', { resumeText }),
+  getMockQuestions: (topic) => apiRequest('post', '/career/mock-questions', { topic }),
+  evaluateAnswer: (question, userAnswer) => apiRequest('post', '/career/evaluate-answer', { question, userAnswer }),
 };
 
 // ─── AI Recommendations ───────────────────────────────────────────────────

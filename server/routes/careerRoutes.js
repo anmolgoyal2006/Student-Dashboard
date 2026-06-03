@@ -1,6 +1,13 @@
 const express  = require('express');
 const router   = express.Router();
-const { getCareer, updateCareer, updateTopic } = require('../controllers/careerController');
+const {
+  getCareer,
+  updateCareer,
+  updateTopic,
+  analyzeResume,
+  generateMockQuestions,
+  evaluateInterviewAnswer
+} = require('../controllers/careerController');
 const { getCareerPlan }                        = require('../controllers/careerPlanController');
 const { protect }                              = require('../middleware/authMiddleware');
 
@@ -10,5 +17,9 @@ router.get('/plan',               getCareerPlan);   // ← MUST be first
 router.get('/',                   getCareer);
 router.put('/',                   updateCareer);
 router.patch('/topic/:topicName', updateTopic);
+
+router.post('/analyze-resume',   analyzeResume);
+router.post('/mock-questions',   generateMockQuestions);
+router.post('/evaluate-answer',  evaluateInterviewAnswer);
 
 module.exports = router;
