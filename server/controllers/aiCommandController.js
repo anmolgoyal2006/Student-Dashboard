@@ -147,7 +147,14 @@ User: "change Maths class instructor to Dr. Smith"
 
 User: "complete task Submit Project"
 → {"action":"update","entity":"task","data":{"title":"Submit Project","status":"completed"},"message":"Task completed."}
-`;  
+
+User: "set semester 1 SGPA to 8.5"
+→ {"action":"update","entity":"semester","data":{"semesterNumber":1,"sgpa":8.5},"message":"Updating Semester 1 SGPA to 8.5."}
+
+User: "set semester 1 SGPA to 8.5 and semester 2 to 9.0"
+→ {"action":"update","entity":"semester","data":{"items":[{"semesterNumber":1,"sgpa":8.5},{"semesterNumber":2,"sgpa":9.0}]},"message":"Updating GPAs for Semester 1 and Semester 2."}
+`;
+
 
 // ← single backtick here, closing the template literal
 }    // ← closing the buildPrompt function
@@ -222,6 +229,55 @@ async function createSubject(data, userId) {
   const exists = await Subject.findOne({ userId, name: new RegExp(`^${data.name}$`, 'i') });
   if (exists) return { skipped: true, name: data.name };
   return Subject.create({ ...data, userId });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// upsertSemester helper — handles single upsert of a manual semester SGPA
+// ─────────────────────────────────────────────────────────────────────────────
+async function upsertSemester(data, userId) {
+  const semesterNumber = Number(data.semesterNumber);
+  if (isNaN(semesterNumber)) {
+    throw new Error('Semester number must be a valid number.');
+  }
+
+  // Find existing semester
+  let semester = await Semester.findOne({ student: userId, semesterNumber });
+
+  const sgpaVal = data.sgpa !== undefined ? Number(data.sgpa) : (data.directSGPA !== undefined ? Number(data.directSGPA) : null);
+
+  if (semester) {
+    // Update existing
+    if (data.semesterName !== undefined) semester.semesterName = data.semesterName;
+    if (sgpaVal !== null && !isNaN(sgpaVal)) {
+      semester.isManual = true;
+      semester.directSGPA = sgpaVal;
+      semester.sgpa = sgpaVal;
+    }
+    if (data.subjects !== undefined) {
+      semester.subjects = data.subjects;
+      if (sgpaVal === null) {
+        semester.isManual = false;
+        semester.directSGPA = null;
+      }
+    }
+    if (data.totalCredits !== undefined) semester.totalCredits = Number(data.totalCredits);
+    await semester.save();
+    return semester;
+  } else {
+    // Create new
+    const isManual = sgpaVal !== null && !isNaN(sgpaVal);
+    semester = new Semester({
+      student: userId,
+      semesterNumber,
+      semesterName: data.semesterName || `Semester ${semesterNumber}`,
+      isManual,
+      directSGPA: isManual ? sgpaVal : null,
+      subjects: data.subjects || [],
+      totalCredits: data.totalCredits !== undefined ? Number(data.totalCredits) : null,
+    });
+    await semester.save();
+    return semester;
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -743,8 +799,22 @@ if (userForNotif?.fcmToken) {
 
     // ── SEMESTER ──────────────────────────────────────────────────────────
     else if (parsed.entity === 'semester') {
-      if (parsed.action === 'add') {
-        result = await Semester.create({ ...parsed.data, student: userId });
+      if (parsed.action === 'add' || parsed.action === 'update') {
+        if (parsed.data.items && Array.isArray(parsed.data.items)) {
+          const results = await Promise.all(
+            parsed.data.items.map(async (item) => {
+              return await upsertSemester(item, userId);
+            })
+          );
+          return res.json({
+            success: true,
+            action: parsed.action,
+            entity: 'semester',
+            message: parsed.message,
+            data: results,
+          });
+        }
+        result = await upsertSemester(parsed.data, userId);
       } else if (parsed.action === 'get') {
         const semesters = await Semester.find({ student: userId }).sort({ semesterNumber: 1 });
         const lines = semesters.map(s => `• Semester ${s.semesterNumber}: SGPA ${s.sgpa}`);
