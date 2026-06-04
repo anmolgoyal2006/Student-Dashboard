@@ -1,6 +1,7 @@
 // controllers/attendanceUploadController.js
 const XLSX      = require('xlsx');
 const mongoose  = require('mongoose');
+const axios     = require('axios');
 const User      = require('../models/User');
 const Attendance = require('../models/Attendance');
 
@@ -23,9 +24,210 @@ function parseDate(raw) {
 function normalizeStatus(raw) {
   if (!raw) return null;
   const s = String(raw).trim().toLowerCase();
-  if (s === 'present') return 'present';
-  if (s === 'absent')  return 'absent';
+  if (s === 'present' || s === 'p') return 'present';
+  if (s === 'absent' || s === 'a')  return 'absent';
   return null;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ─── Helper: Process Excel buffer and record attendance ──────────────────────
+const processExcelBuffer = async (buffer) => {
+  const workbook  = XLSX.read(buffer, { type: 'buffer', cellDates: true });
+  const sheetName = workbook.SheetNames[0];
+  const sheet     = workbook.Sheets[sheetName];
+  const rows      = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+
+  if (!rows.length) {
+    throw new Error('Excel file is empty.');
+  }
+
+  const errors   = [];
+  const ops      = []; // valid upsert operations
+  let inserted   = 0;
+  let updated    = 0;
+
+  for (let i = 0; i < rows.length; i++) {
+    const row     = rows[i];
+    const rowNum  = i + 2; // Excel row number (1 = header)
+
+    const sid     = String(row['SID']     || '').trim();
+    const subject = String(row['Subject'] || '').trim();
+    const rawDate = row['Date'];
+    const rawStatus = row['Status'];
+
+    // ── Validate SID ──
+    if (!sid) {
+      errors.push({ row: rowNum, reason: 'SID is missing' });
+      continue;
+    }
+
+    // ── Validate Date ──
+    const date = parseDate(rawDate);
+    if (!date) {
+      errors.push({ row: rowNum, sid, reason: 'Invalid or missing Date' });
+      continue;
+    }
+
+    // ── Validate Status ──
+    const status = normalizeStatus(rawStatus);
+    if (!status) {
+      errors.push({ row: rowNum, sid, reason: `Invalid status "${rawStatus}" — must be Present or Absent` });
+      continue;
+    }
+
+    // ── Look up user by SID ──
+    const user = await User.findOne({ sid }).select('_id');
+    if (!user) {
+      errors.push({ row: rowNum, sid, reason: `No user found with SID "${sid}"` });
+      continue;
+    }
+
+    // ── Look up subject by name (case-insensitive) ──
+    let subjectId = null;
+    if (subject) {
+      try {
+        const Subject = require('../models/Subject');
+        const subjectDoc = await Subject.findOne({
+          name: { $regex: new RegExp(`^${subject}$`, 'i') },
+        }).select('_id userId');
+
+        if (!subjectDoc) {
+          errors.push({ row: rowNum, sid, reason: `Subject "${subject}" not found in database` });
+          continue;
+        }
+        subjectId = subjectDoc._id;
+      } catch {
+        errors.push({ row: rowNum, sid, reason: 'Subject model not available' });
+        continue;
+      }
+    } else {
+      errors.push({ row: rowNum, sid, reason: 'Subject is required' });
+      continue;
+    }
+
+    // ── Normalize date to midnight UTC ──
+    const normalizedDate = new Date(date);
+    normalizedDate.setHours(0, 0, 0, 0);
+
+    ops.push({
+      userId:    user._id,
+      subjectId,
+      date:      normalizedDate,
+      status,
+    });
+  }
+
+  // ── Upsert valid records ──
+  for (const op of ops) {
+    const filter = {
+      userId:    op.userId,
+      subjectId: op.subjectId,
+      date:      op.date,
+    };
+
+    const result = await Attendance.findOneAndUpdate(
+      filter,
+      { $set: { status: op.status } },
+      { upsert: true, new: true, rawResult: true }
+    );
+
+    if (result.lastErrorObject?.updatedExisting) {
+      updated++;
+    } else {
+      inserted++;
+    }
+  }
+
+  return {
+    inserted,
+    updated,
+    skipped: errors.length,
+    errors,
+  };
+};
+
+// ─── Helper: Follow redirects and resolve direct download url for OneDrive ───
+function parseCookies(cookieHeaders) {
+  if (!cookieHeaders) return {};
+  const cookies = {};
+  cookieHeaders.forEach(header => {
+    const parts = header.split(';');
+    const mainPart = parts[0];
+    const eqIdx = mainPart.indexOf('=');
+    if (eqIdx > -1) {
+      const key = mainPart.slice(0, eqIdx).trim();
+      const val = mainPart.slice(eqIdx + 1).trim();
+      cookies[key] = val;
+    }
+  });
+  return cookies;
+}
+
+function serializeCookies(cookieMap) {
+  return Object.entries(cookieMap)
+    .map(([k, v]) => `${k}=${v}`)
+    .join('; ');
+}
+
+async function resolveOneDriveLink(shareUrl) {
+  let currentUrl = shareUrl;
+  let cookieMap = {};
+
+  for (let i = 0; i < 5; i++) {
+    const headers = {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    };
+
+    const cookieStr = serializeCookies(cookieMap);
+    if (cookieStr) {
+      headers['Cookie'] = cookieStr;
+    }
+
+    const res = await axios.get(currentUrl, {
+      maxRedirects: 0,
+      validateStatus: () => true,
+      headers: headers
+    });
+
+    const setCookie = res.headers['set-cookie'];
+    if (setCookie) {
+      const newCookies = parseCookies(setCookie);
+      cookieMap = { ...cookieMap, ...newCookies };
+    }
+
+    if (!res.headers.location) {
+      const html = res.data;
+      const match = html.match(/"FileGetUrl"\s*:\s*"([^"]+)"/);
+      if (match) {
+        return match[1].replace(/\\u0026/g, '&');
+      }
+
+      const matchFallback = html.match(/https?:\/\/[^\s"'`<>]+download\.aspx\?[^\s"'`<>\\]+(?:\\u0026[^\s"'`<>\\]+)+/gi);
+      if (matchFallback && matchFallback.length > 0) {
+        return matchFallback[0].replace(/\\u0026/g, '&');
+      }
+
+      throw new Error('Could not find download URL in the OneDrive page HTML.');
+    }
+
+    currentUrl = new URL(res.headers.location, currentUrl).toString();
+  }
+  throw new Error('Too many redirects without reaching target page.');
+}
+
+async function downloadExcelFromUrl(url) {
+  let downloadUrl = url;
+  if (/1drv\.ms/i.test(url) || /onedrive\.live\.com/i.test(url)) {
+    downloadUrl = await resolveOneDriveLink(url);
+  }
+
+  const res = await axios.get(downloadUrl, {
+    responseType: 'arraybuffer',
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    }
+  });
+  return res.data;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -34,139 +236,51 @@ function normalizeStatus(raw) {
 // ─────────────────────────────────────────────────────────────────────────────
 const uploadBulkAttendance = async (req, res) => {
   try {
-    // ── 1. Role check ──────────────────────────────────────────────────────
     if (req.user.role !== 'teacher') {
       return res.status(403).json({ message: 'Only teachers can upload attendance.' });
     }
 
-    // ── 2. File check ──────────────────────────────────────────────────────
     if (!req.file) {
       return res.status(400).json({ message: 'No file uploaded.' });
     }
 
-    // ── 3. Parse Excel ─────────────────────────────────────────────────────
-    const workbook  = XLSX.read(req.file.buffer, { type: 'buffer', cellDates: true });
-    const sheetName = workbook.SheetNames[0];
-    const sheet     = workbook.Sheets[sheetName];
-    const rows      = XLSX.utils.sheet_to_json(sheet, { defval: '' });
-
-    if (!rows.length) {
-      return res.status(400).json({ message: 'Excel file is empty.' });
-    }
-
-    // ── 4. Process rows ────────────────────────────────────────────────────
-    const errors   = [];
-    const ops      = []; // valid upsert operations
-    let inserted   = 0;
-    let updated    = 0;
-
-    for (let i = 0; i < rows.length; i++) {
-      const row     = rows[i];
-      const rowNum  = i + 2; // Excel row number (1 = header)
-
-      const sid     = String(row['SID']     || '').trim();
-      const subject = String(row['Subject'] || '').trim();
-      const rawDate = row['Date'];
-      const rawStatus = row['Status'];
-
-      // ── Validate SID ──
-      if (!sid) {
-        errors.push({ row: rowNum, reason: 'SID is missing' });
-        continue;
-      }
-
-      // ── Validate Date ──
-      const date = parseDate(rawDate);
-      if (!date) {
-        errors.push({ row: rowNum, sid, reason: 'Invalid or missing Date' });
-        continue;
-      }
-
-      // ── Validate Status ──
-      const status = normalizeStatus(rawStatus);
-      if (!status) {
-        errors.push({ row: rowNum, sid, reason: `Invalid status "${rawStatus}" — must be Present or Absent` });
-        continue;
-      }
-
-      // ── Look up user by SID ──
-      const user = await User.findOne({ sid }).select('_id');
-      if (!user) {
-        errors.push({ row: rowNum, sid, reason: `No user found with SID "${sid}"` });
-        continue;
-      }
-
-      // ── Look up subject by name (case-insensitive) ──
-      // We use the Subject model if it exists, else store subject as string
-      let subjectId = null;
-      if (subject) {
-        try {
-          const Subject = require('../models/Subject');
-         const subjectDoc = await Subject.findOne({
-            name: { $regex: new RegExp(`^${subject}$`, 'i') },
-          }).select('_id userId');
-
-          if (!subjectDoc) {
-            errors.push({ row: rowNum, sid, reason: `Subject "${subject}" not found in database` });
-            continue;
-          }
-          subjectId = subjectDoc._id;
-        } catch {
-          // Subject model doesn't exist — skip subject lookup
-          errors.push({ row: rowNum, sid, reason: 'Subject model not available' });
-          continue;
-        }
-      } else {
-        errors.push({ row: rowNum, sid, reason: 'Subject is required' });
-        continue;
-      }
-
-      // ── Normalize date to midnight UTC ──
-      const normalizedDate = new Date(date);
-      normalizedDate.setHours(0, 0, 0, 0);
-
-      ops.push({
-        userId:    user._id,
-        subjectId,
-        date:      normalizedDate,
-        status,
-      });
-    }
-
-    // ── 5. Upsert valid records ────────────────────────────────────────────
-    for (const op of ops) {
-      const filter = {
-        userId:    op.userId,
-        subjectId: op.subjectId,
-        date:      op.date,
-      };
-
-      const result = await Attendance.findOneAndUpdate(
-        filter,
-        { $set: { status: op.status } },
-        { upsert: true, new: true, rawResult: true }
-      );
-
-      // rawResult.lastErrorObject.updatedExisting = true means it was updated
-      if (result.lastErrorObject?.updatedExisting) {
-        updated++;
-      } else {
-        inserted++;
-      }
-    }
-
-    // ── 6. Response ───────────────────────────────────────────────────────
+    const result = await processExcelBuffer(req.file.buffer);
     return res.status(200).json({
-      message:  'Bulk attendance upload complete.',
-      inserted,
-      updated,
-      skipped:  errors.length,
-      errors,
+      message: 'Bulk attendance upload complete.',
+      ...result,
     });
-
   } catch (err) {
     console.error('[uploadBulkAttendance]', err.message);
     return res.status(500).json({ message: 'Server error during upload.', error: err.message });
+  }
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/attendance/upload-url
+// Teacher only — download Excel file from URL and process bulk attendance
+// ─────────────────────────────────────────────────────────────────────────────
+const uploadBulkAttendanceFromUrl = async (req, res) => {
+  try {
+    if (req.user.role !== 'teacher') {
+      return res.status(403).json({ message: 'Only teachers can upload attendance.' });
+    }
+
+    const { url } = req.body;
+    if (!url) {
+      return res.status(400).json({ message: 'URL link is required.' });
+    }
+
+    console.log(`[uploadBulkAttendanceFromUrl] Downloading Excel from URL: ${url}`);
+    const buffer = await downloadExcelFromUrl(url);
+    const result = await processExcelBuffer(buffer);
+
+    return res.status(200).json({
+      message: 'Bulk attendance upload from URL complete.',
+      ...result,
+    });
+  } catch (err) {
+    console.error('[uploadBulkAttendanceFromUrl]', err.message);
+    return res.status(500).json({ message: 'Failed to download or process Excel file from link.', error: err.message });
   }
 };
 
@@ -335,6 +449,7 @@ const getClassSummary = async (req, res) => {
 
 module.exports = {
   uploadBulkAttendance,
+  uploadBulkAttendanceFromUrl,
   getAttendanceBySid,
   getClassSummary,
   downloadTemplate,

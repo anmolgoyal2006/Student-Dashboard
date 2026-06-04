@@ -6,6 +6,7 @@ const upload  = require('../middleware/uploadMiddleware');
 const { protect } = require('../middleware/authMiddleware');
 const {
   uploadBulkAttendance,
+  uploadBulkAttendanceFromUrl,
   getAttendanceBySid,
   getClassSummary,
   downloadTemplate,
@@ -16,6 +17,9 @@ router.use(protect);
 
 // POST /api/attendance/upload  — teacher uploads Excel
 router.post('/upload', upload.single('file'), uploadBulkAttendance);
+
+// POST /api/attendance/upload-url — teacher imports Excel from URL link
+router.post('/upload-url', uploadBulkAttendanceFromUrl);
 
 // GET  /api/attendance/student/:sid  — fetch attendance by SID
 router.get('/student/:sid', getAttendanceBySid);

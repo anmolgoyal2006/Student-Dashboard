@@ -22,6 +22,21 @@ const styles = {
   tag:         { display: 'inline-block', padding: '2px 8px', borderRadius: 4, fontSize: 12, fontWeight: 600 },
   tagPresent:  { background: '#1a3a2a', color: '#4caf7d' },
   tagAbsent:   { background: '#3a1a1a', color: '#f44336' },
+  dividerContainer: { display: 'flex', alignItems: 'center', margin: '24px 0', gap: 12 },
+  dividerLine: { flex: 1, height: 1, background: '#333' },
+  dividerText: { fontSize: 13, color: '#666', fontWeight: 600 },
+  inputGroup: { display: 'flex', gap: 8, marginBottom: 16 },
+  urlInput: {
+    flex: 1,
+    padding: '12px 16px',
+    background: '#141421',
+    border: '1px solid #333',
+    borderRadius: 8,
+    color: '#fff',
+    fontSize: 14,
+    outline: 'none',
+    transition: 'border-color 0.2s',
+  },
 };
 
 export default function BulkAttendanceUpload() {
@@ -31,6 +46,8 @@ export default function BulkAttendanceUpload() {
   const [loading,   setLoading]   = useState(false);
   const [dragging,  setDragging]  = useState(false);
   const [error,     setError]     = useState('');
+  const [url,       setUrl]       = useState('');
+  const [urlLoading, setUrlLoading] = useState(false);
   const inputRef = useRef();
 
   // ── Parse Excel for preview ──────────────────────────────────────────────
@@ -81,6 +98,31 @@ export default function BulkAttendanceUpload() {
       setError(err.response?.data?.message || 'Upload failed. Please try again.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleUrlUpload = async () => {
+    if (!url.trim()) return;
+    setUrlLoading(true);
+    setError('');
+    setResult(null);
+
+    try {
+      const token = localStorage.getItem('token');
+      const res = await axios.post(`${process.env.REACT_APP_API_URL}/attendance/upload-url`, {
+        url: url.trim()
+      }, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      setResult(res.data);
+      setUrl('');
+    } catch (err) {
+      setError(err.response?.data?.message || err.response?.data?.error || 'Failed to process Excel sheet from the provided link. Ensure it is publicly accessible.');
+    } finally {
+      setUrlLoading(false);
     }
   };
 
@@ -149,6 +191,31 @@ const downloadTemplate = async () => {
           )}
         </div>
 
+        {/* ── URL Link Section ── */}
+        <div style={styles.dividerContainer}>
+          <div style={styles.dividerLine} />
+          <div style={styles.dividerText}>OR PASTE EXCEL LINK</div>
+          <div style={styles.dividerLine} />
+        </div>
+
+        <div style={styles.inputGroup}>
+          <input
+            style={styles.urlInput}
+            type="text"
+            placeholder="Paste OneDrive or direct Excel link (e.g. https://1drv.ms/...)"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            disabled={loading || urlLoading}
+          />
+          <button
+            style={{ ...styles.btn, ...((!url.trim() || loading || urlLoading) ? styles.btnDisabled : {}) }}
+            onClick={handleUrlUpload}
+            disabled={!url.trim() || loading || urlLoading}
+          >
+            {urlLoading ? '⏳ Fetching...' : '🔗 Fetch & Upload'}
+          </button>
+        </div>
+
         {/* ── Preview ── */}
         {preview.length > 0 && (
           <div style={{ marginBottom: 16 }}>
@@ -167,13 +234,18 @@ const downloadTemplate = async () => {
                 <tbody>
                   {preview.map((row, i) => (
                     <tr key={i}>
-                      {Object.values(row).map((v, j) => (
-                        <td key={j} style={styles.td}>
-                          {String(v) === 'Present' && <span style={{ ...styles.tag, ...styles.tagPresent }}>Present</span>}
-                          {String(v) === 'Absent'  && <span style={{ ...styles.tag, ...styles.tagAbsent  }}>Absent</span>}
-                          {String(v) !== 'Present' && String(v) !== 'Absent' && String(v)}
-                        </td>
-                      ))}
+                      {Object.values(row).map((v, j) => {
+                        const val = String(v).trim().toLowerCase();
+                        const isPresent = val === 'present' || val === 'p';
+                        const isAbsent = val === 'absent' || val === 'a';
+                        return (
+                          <td key={j} style={styles.td}>
+                            {isPresent && <span style={{ ...styles.tag, ...styles.tagPresent }}>Present</span>}
+                            {isAbsent  && <span style={{ ...styles.tag, ...styles.tagAbsent  }}>Absent</span>}
+                            {!isPresent && !isAbsent && String(v)}
+                          </td>
+                        );
+                      })}
                     </tr>
                   ))}
                 </tbody>

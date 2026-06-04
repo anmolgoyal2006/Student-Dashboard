@@ -6,7 +6,7 @@ const axios  = require('axios');
 
 const generateToken = (user) =>
   jwt.sign(
-    { id: user._id, email: user.email, name: user.name },
+    { id: user._id, email: user.email, name: user.name, role: user.role },
     process.env.JWT_SECRET,
     { expiresIn: '7d' }
   );
@@ -77,7 +77,7 @@ exports.updateProfile = async (req, res) => {
     const newToken = generateToken(updated);
     res.json({
       message: 'Profile updated successfully.',
-      user:  { id: updated._id, name: updated.name, email: updated.email, college: updated.college, semester: updated.semester },
+      user:  { id: updated._id, name: updated.name, email: updated.email, college: updated.college, semester: updated.semester, role: updated.role },
       token: newToken,
     });
   } catch (err) { res.status(500).json({ message: err.message }); }
