@@ -572,6 +572,92 @@ async function ocrReviewGenerateHandler(req, res) {
 
 // ── Exports ───────────────────────────────────────────────────────────────
 
+const SavedPdf = require('../models/SavedPdf');
+
+async function parseSavedPdfById(req, res) {
+  try {
+    const pdf = await SavedPdf.findOne({ _id: req.params.id, userId: req.user.id });
+    if (!pdf) {
+      return res.status(404).json({ message: 'Saved PDF not found.' });
+    }
+
+    const tmpPath = writeTempPdf(pdf.fileData);
+    let rawRows;
+
+    try {
+      const scanned = await isScannedPdf(tmpPath);
+      if (scanned) {
+        rawRows = await parseScannedPdf(pdf.fileData);
+      } else {
+        rawRows = await parsePdfWithPython(pdf.fileData);
+        if (!rawRows.length) {
+          rawRows = await parseScannedPdf(pdf.fileData);
+        }
+      }
+    } catch (err) {
+      return res.status(422).json({
+        message: `Failed to extract data from "${pdf.fileName}".`,
+        detail: err.message,
+      });
+    } finally {
+      removeTempFile(tmpPath);
+    }
+
+    const parsed = studentsFromRawRows(rawRows);
+    if (!parsed.studentRows.length) {
+      return res.status(422).json({
+        message: `No students found in "${pdf.fileName}".`,
+        hint: 'Ensure the PDF is a tabular marks sheet.',
+      });
+    }
+
+    let { studentRows } = parsed;
+    const hasOcr = studentRows.some(r => r.source === 'ocr' || r.ocrGradeRaw);
+    if (hasOcr) {
+      try {
+        const corrections = await aiCorrectGrades(
+          studentRows.map(r => ({
+            name: r.name,
+            roll: r.roll,
+            ocrGradeRaw: r.ocrGradeRaw || '',
+            grade: r.grade || '',
+            ocrConfidence: r.ocrConfidence || 0,
+            gradeCellPath: r.gradeCellPath || '',
+          }))
+        );
+        const corrMap = new Map(corrections.map(c => [c.index, c.correctedGrade]));
+        studentRows = studentRows.map((r, idx) => {
+          const corrected = corrMap.get(idx);
+          return corrected
+            ? { ...r, grade: corrected, marks: { ...r.marks, Grade: corrected } }
+            : r;
+        });
+      } catch (err) {
+        console.error('[parseSavedPdf] AI correction failed (non-fatal):', err.message);
+      }
+    }
+
+    const source = {
+      id             : `pdf_${Date.now()}_0_${Math.random().toString(36).slice(2, 8)}`,
+      fileName       : pdf.fileName,
+      label          : pdf.name,
+      credits        : DEFAULT_CREDITS,
+      columns        : parsed.columns.map(c => ({ name: c.name, max: c.max })),
+      studentRows,
+      columnWeights  : parsed.columnWeights,
+      selectedColumns: parsed.selectedColumns,
+      studentCount   : studentRows.length,
+      isSaved        : true,
+      dbId           : pdf._id,
+    };
+
+    return res.json({ source });
+  } catch (err) {
+    console.error('[parse-saved-pdf]', err);
+    return res.status(500).json({ message: err.message || 'Unexpected server error.' });
+  }
+}
+
 module.exports = {
   uploadPdfHandler,
   parsePdfsHandler,
@@ -580,4 +666,5 @@ module.exports = {
   ocrAiCorrectHandler,
   ocrReviewGenerateHandler,
   parsePdfWithPython,
+  parseSavedPdfById,
 };

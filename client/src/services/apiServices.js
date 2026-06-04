@@ -68,9 +68,21 @@ export const marksService = {
 
   // OCR review & AI correction
   ocrAiCorrect: (payload) =>
-    apiRequest('post', '/marks/ocr-ai-correct', payload),
+    apiRequest('post', '/ocr-ai-correct', payload),
   ocrReviewGenerate: (payload) =>
-    apiRequest('post', '/marks/ocr-review-generate', payload),
+    apiRequest('post', '/ocr-review-generate', payload),
+
+  // Saved PDFs
+  savePdf: (formData) =>
+    API.post('/marks/saved-pdfs', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
+  getSavedPdfs: () =>
+    apiRequest('get', '/marks/saved-pdfs'),
+  deleteSavedPdf: (id) =>
+    apiRequest('delete', `/marks/saved-pdfs/${id}`),
+  parseSavedPdf: (id) =>
+    apiRequest('post', `/marks/saved-pdfs/${id}/parse`),
 };
 
 // ─── Career ───────────────────────────────────────────────────────────────

@@ -41,8 +41,16 @@ export default function UploadMarks({ onResult }) {
   const [showOcrReview, setShowOcrReview] = useState(false);
   const [sgpaLeaderboard, setSgpaLeaderboard] = useState(null);
   const [sgpaLoading, setSgpaLoading] = useState(false);
-const [ocrCorrectedGrades, setOcrCorrectedGrades] = useState(null);
+  const [ocrCorrectedGrades, setOcrCorrectedGrades] = useState(null);
+  const [rawFiles, setRawFiles] = useState({});
+  const [pdfSavingStates, setPdfSavingStates] = useState({});
   const [sgpaSearch, setSgpaSearch] = useState('');
+  const [showSavePromptModal, setShowSavePromptModal] = useState(false);
+  const [pendingGenerateAction, setPendingGenerateAction] = useState(null);
+  const [savePromptFiles, setSavePromptFiles] = useState([]);
+  const [showSavedPdfsSelectorModal, setShowSavedPdfsSelectorModal] = useState(false);
+  const [availableSavedPdfs, setAvailableSavedPdfs] = useState([]);
+  const [savedPdfsSelectorLoading, setSavedPdfsSelectorLoading] = useState(false);
 
   const hasOcrSources = useMemo(
     () => sources.some((src) =>
@@ -121,28 +129,100 @@ const [ocrCorrectedGrades, setOcrCorrectedGrades] = useState(null);
       const res = await marksService.parsePdfs(form);
       const incoming = (res.data.sources || []).map(formatParsedSource);
 
-      let addedCount = 0;
-      setSources((prev) => {
-        const existingFiles = new Set(
-          prev.map((p) => (p.fileName || '').toLowerCase())
-        );
-        const novel = incoming.filter(
-          (s) => !existingFiles.has((s.fileName || '').toLowerCase())
-        );
-        addedCount = novel.length;
-        return novel.length ? [...prev, ...novel] : prev;
+      setSources((prev) => [...prev, ...incoming]);
+
+      setRawFiles((prev) => {
+        const next = { ...prev };
+        incoming.forEach((src) => {
+          const matchingFile = files.find((f) => f.name === src.fileName);
+          if (matchingFile) {
+            next[src.id] = matchingFile;
+          }
+        });
+        return next;
       });
 
-      if (addedCount) {
-        setLeaderboard(null);
-        onResult?.(null);
-      } else if (incoming.length) {
-        toast.error('Those PDF(s) are already in the list.');
-      }
+      setLeaderboard(null);
+      onResult?.(null);
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to parse PDFs.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleOpenSavedPdfsSelector = async () => {
+    setSavedPdfsSelectorLoading(true);
+    setShowSavedPdfsSelectorModal(true);
+    try {
+      const res = await marksService.getSavedPdfs();
+      setAvailableSavedPdfs(res.data.pdfs || []);
+    } catch (err) {
+      toast.error('Failed to load saved PDFs.');
+    } finally {
+      setSavedPdfsSelectorLoading(false);
+    }
+  };
+
+  const handleLoadSavedPdf = async (pdfId) => {
+    setLoading(true);
+    setShowSavedPdfsSelectorModal(false);
+    try {
+      const res = await marksService.parseSavedPdf(pdfId);
+      const incoming = formatParsedSource(res.data.source);
+      
+      setSources((prev) => [...prev, incoming]);
+      toast.success(`"${incoming.label}" loaded from library!`);
+      
+      setLeaderboard(null);
+      onResult?.(null);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to load saved PDF.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSavePdf = async (srcId, customName) => {
+    const rawFile = rawFiles[srcId];
+    if (!rawFile) {
+      toast.error('Original PDF file is missing.');
+      return;
+    }
+    if (!customName || !customName.trim()) {
+      toast.error('Please enter a name to save the PDF.');
+      return;
+    }
+
+    setPdfSavingStates(prev => ({ ...prev, [srcId]: true }));
+    try {
+      const formData = new FormData();
+      formData.append('file', rawFile);
+      formData.append('name', customName.trim());
+
+      const res = await marksService.savePdf(formData);
+      toast.success(`"${customName}" saved to your library!`);
+      updateSourceNested(srcId, { isSaved: true, dbId: res.data.pdf.id });
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to save PDF.');
+    } finally {
+      setPdfSavingStates(prev => ({ ...prev, [srcId]: false }));
+    }
+  };
+
+  const handleDeleteSavedPdf = async (srcId, dbId) => {
+    if (!dbId) return;
+    if (!window.confirm('Are you sure you want to delete this PDF from your saved library?')) return;
+    
+    setPdfSavingStates(prev => ({ ...prev, [srcId]: true }));
+    try {
+      await marksService.deleteSavedPdf(dbId);
+      toast.success('PDF deleted from your library.');
+      updateSourceNested(srcId, { isSaved: false, dbId: null });
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to delete saved PDF.');
+    } finally {
+      setPdfSavingStates(prev => ({ ...prev, [srcId]: false }));
     }
   };
 
@@ -217,6 +297,79 @@ const [ocrCorrectedGrades, setOcrCorrectedGrades] = useState(null);
     );
   };
 
+  const runGenerateStandard = async () => {
+    // ── Compute best-of column map (used for validations + payload) ──
+    const bestOfColsBySource = new Map();
+    for (const g of bestOfGroups) {
+      for (const item of (g.items || [])) {
+        if (!bestOfColsBySource.has(item.sourceId)) {
+          bestOfColsBySource.set(item.sourceId, new Set());
+        }
+        bestOfColsBySource.get(item.sourceId).add(item.columnName);
+      }
+    }
+
+    const isSourceCoveredByBestOf = (s) => {
+      const cols = bestOfColsBySource.get(s.id);
+      if (!cols || cols.size === 0) return false;
+      const allSourceCols = new Set((s.columns || []).map((c) => c.name));
+      return [...cols].every((c) => allSourceCols.has(c));
+    };
+
+    setLoading(true);
+
+    try {
+      const bestOfConfigs = bestOfGroups
+        .filter((g) => (g.items || []).length >= 1)
+        .map((g) => ({
+          items: (g.items || []).map((item) => {
+            const outOf = parseFloat(item.outOf);
+            return {
+              sourceId: item.sourceId,
+              columnName: item.columnName,
+              ...(isFinite(outOf) && outOf > 0 ? { outOf } : {}),
+            };
+          }),
+          bestOf: Math.max(1, parseInt(g.bestOf, 10) || 2),
+        }));
+
+      const payload = {
+        sources: sources.map((s) => {
+          // Auto-include best-of columns so breakdown data is available
+          const bestOfCols = bestOfColsBySource.get(s.id);
+          let selectedColumns = s.selectedColumns || [];
+          if (bestOfCols) {
+            const merged = new Set(selectedColumns);
+            for (const col of bestOfCols) merged.add(col);
+            selectedColumns = [...merged];
+          }
+          return {
+            id              : s.id,
+            label           : s.label.trim(),
+            weight          : isSourceCoveredByBestOf(s) ? 0 : getSourceFileWeight(s),
+            columns         : s.columns,
+            studentRows     : s.studentLimit ? s.studentRows.slice(0, s.studentLimit) : s.studentRows,
+            selectedColumns,
+            columnWeights   : s.columnWeights,
+            studentLimit    : s.studentLimit || s.studentRows.length,
+          };
+        }),
+        bestOfConfigs,
+        relativeGradingEnabled,
+        gradeCounts,
+      };
+
+      const res = await marksService.generateLeaderboard(payload);
+
+      setLeaderboard(res.data);
+      onResult?.(res.data);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to generate leaderboard.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleGenerate = async () => {
     if (!sources.length) {
       toast.error('Upload at least one PDF first.');
@@ -266,62 +419,96 @@ const [ocrCorrectedGrades, setOcrCorrectedGrades] = useState(null);
       return;
     }
 
-    setLoading(true);
-
-    try {
-      const bestOfConfigs = bestOfGroups
-        .filter((g) => (g.items || []).length >= 1)
-        .map((g) => ({
-          items: (g.items || []).map((item) => {
-            const outOf = parseFloat(item.outOf);
-            return {
-              sourceId: item.sourceId,
-              columnName: item.columnName,
-              ...(isFinite(outOf) && outOf > 0 ? { outOf } : {}),
-            };
-          }),
-          bestOf: Math.max(1, parseInt(g.bestOf, 10) || 2),
-        }));
-
-      const groupedIds = new Set(
-        bestOfConfigs.flatMap((c) => c.items.map((i) => i.sourceId))
-      );
-
-      const payload = {
-        sources: sources.map((s) => {
-          // Auto-include best-of columns so breakdown data is available
-          const bestOfCols = bestOfColsBySource.get(s.id);
-          let selectedColumns = s.selectedColumns || [];
-          if (bestOfCols) {
-            const merged = new Set(selectedColumns);
-            for (const col of bestOfCols) merged.add(col);
-            selectedColumns = [...merged];
-          }
-          return {
-            id              : s.id,
-            label           : s.label.trim(),
-            weight          : isSourceCoveredByBestOf(s) ? 0 : getSourceFileWeight(s),
-            columns         : s.columns,
-            studentRows     : s.studentLimit ? s.studentRows.slice(0, s.studentLimit) : s.studentRows,
-            selectedColumns,
-            columnWeights   : s.columnWeights,
-            studentLimit    : s.studentLimit || s.studentRows.length,
-          };
-        }),
-        bestOfConfigs,
-        relativeGradingEnabled,
-        gradeCounts,
-      };
-
-      const res = await marksService.generateLeaderboard(payload);
-
-      setLeaderboard(res.data);
-      onResult?.(res.data);
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to generate leaderboard.');
-    } finally {
-      setLoading(false);
+    // Intercept check for unsaved PDFs
+    const unsaved = sources.filter(s => !s.isSaved);
+    if (unsaved.length > 0) {
+      setSavePromptFiles(unsaved.map(s => ({
+        id: s.id,
+        fileName: s.fileName,
+        label: s.label,
+        saveName: s.saveName || s.label || s.fileName.replace(/\.pdf$/i, ''),
+        checked: true
+      })));
+      setPendingGenerateAction('standard');
+      setShowSavePromptModal(true);
+      return;
     }
+
+    await runGenerateStandard();
+  };
+
+  const handleSaveAllSelectedPdfs = async () => {
+    const toSave = savePromptFiles.filter(f => f.checked);
+    const newSavingStates = { ...pdfSavingStates };
+    toSave.forEach(f => { newSavingStates[f.id] = true; });
+    setPdfSavingStates(newSavingStates);
+    
+    let savedCount = 0;
+    for (const f of toSave) {
+      const rawFile = rawFiles[f.id];
+      if (!rawFile) {
+        toast.error(`Original PDF file for "${f.fileName}" is missing.`);
+        continue;
+      }
+      if (!f.saveName || !f.saveName.trim()) {
+        toast.error(`Please enter a custom name for "${f.fileName}".`);
+        continue;
+      }
+      
+      try {
+        const formData = new FormData();
+        formData.append('file', rawFile);
+        formData.append('name', f.saveName.trim());
+
+        const res = await marksService.savePdf(formData);
+        updateSourceNested(f.id, { isSaved: true, saveToAccount: true, saveName: f.saveName.trim(), dbId: res.data.pdf.id });
+        savedCount++;
+      } catch (err) {
+        toast.error(`Failed to save "${f.fileName}": ${err.response?.data?.message || err.message}`);
+      }
+    }
+    
+    setPdfSavingStates(prev => {
+      const copy = { ...prev };
+      toSave.forEach(f => { delete copy[f.id]; });
+      return copy;
+    });
+
+    if (savedCount > 0) {
+      toast.success(`Successfully saved ${savedCount} PDF(s) to library.`);
+    }
+    setShowSavePromptModal(false);
+    runPendingGeneration();
+  };
+
+  const runPendingGeneration = () => {
+    const action = pendingGenerateAction;
+    setPendingGenerateAction(null);
+    if (action === 'standard') {
+      runGenerateStandard();
+    } else if (action === 'sgpa') {
+      runGenerateSgpaDirect();
+    } else if (action === 'sgpa_ocr') {
+      runGenerateSgpa();
+    }
+  };
+
+  const handleSkipSaving = () => {
+    const action = pendingGenerateAction;
+    setPendingGenerateAction(null);
+    setShowSavePromptModal(false);
+    if (action === 'standard') {
+      runGenerateStandard();
+    } else if (action === 'sgpa') {
+      runGenerateSgpaDirect();
+    } else if (action === 'sgpa_ocr') {
+      runGenerateSgpa();
+    }
+  };
+
+  const handleCancelModal = () => {
+    setPendingGenerateAction(null);
+    setShowSavePromptModal(false);
   };
 
   const handleDownloadExcel = () => {
@@ -370,11 +557,7 @@ const [ocrCorrectedGrades, setOcrCorrectedGrades] = useState(null);
     setShowOcrReview(false);
   };
 
-  const handleGenerateSgpa = async () => {
-    if (!ocrCorrectedGrades) {
-      toast.error('Please review and save OCR corrections first.');
-      return;
-    }
+  const runGenerateSgpa = async () => {
     setSgpaLoading(true);
     setLeaderboard(null);
     try {
@@ -400,7 +583,30 @@ const [ocrCorrectedGrades, setOcrCorrectedGrades] = useState(null);
     }
   };
 
-  const handleGenerateSgpaDirect = async () => {
+  const handleGenerateSgpa = async () => {
+    if (!ocrCorrectedGrades) {
+      toast.error('Please review and save OCR corrections first.');
+      return;
+    }
+
+    const unsaved = sources.filter(s => !s.isSaved);
+    if (unsaved.length > 0) {
+      setSavePromptFiles(unsaved.map(s => ({
+        id: s.id,
+        fileName: s.fileName,
+        label: s.label,
+        saveName: s.saveName || s.label || s.fileName.replace(/\.pdf$/i, ''),
+        checked: true
+      })));
+      setPendingGenerateAction('sgpa_ocr');
+      setShowSavePromptModal(true);
+      return;
+    }
+
+    await runGenerateSgpa();
+  };
+
+  const runGenerateSgpaDirect = async () => {
     setSgpaLoading(true);
     setLeaderboard(null);
     try {
@@ -423,6 +629,24 @@ const [ocrCorrectedGrades, setOcrCorrectedGrades] = useState(null);
     } finally {
       setSgpaLoading(false);
     }
+  };
+
+  const handleGenerateSgpaDirect = async () => {
+    const unsaved = sources.filter(s => !s.isSaved);
+    if (unsaved.length > 0) {
+      setSavePromptFiles(unsaved.map(s => ({
+        id: s.id,
+        fileName: s.fileName,
+        label: s.label,
+        saveName: s.saveName || s.label || s.fileName.replace(/\.pdf$/i, ''),
+        checked: true
+      })));
+      setPendingGenerateAction('sgpa');
+      setShowSavePromptModal(true);
+      return;
+    }
+
+    await runGenerateSgpaDirect();
   };
 
   const handleSgpaDownloadExcel = () => {
@@ -535,6 +759,16 @@ const [ocrCorrectedGrades, setOcrCorrectedGrades] = useState(null);
           />
         </div>
 
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 20 }}>
+          <button
+            type="button"
+            className="btn btn-outline btn-sm"
+            onClick={handleOpenSavedPdfsSelector}
+          >
+            📂 Choose from Saved PDFs
+          </button>
+        </div>
+
         {sources.length > 0 && (
           <>
             <div style={{ marginBottom: 12, fontSize: 13, color: 'var(--muted)' }}>
@@ -604,6 +838,73 @@ const [ocrCorrectedGrades, setOcrCorrectedGrades] = useState(null);
                       <span style={{ marginLeft: 8, color: '#a5b4fc' }}>
                         · {normalizedPreview[src.id] ?? 0}% of total
                       </span>
+                    )}
+                  </div>
+
+                  {/* Save PDF section */}
+                  <div style={{
+                    marginTop: 12,
+                    borderTop: '1px solid var(--border)',
+                    paddingTop: 12,
+                  }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, fontWeight: 500, cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={src.saveToAccount || false}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          updateSourceNested(src.id, {
+                            saveToAccount: checked,
+                            saveName: src.saveName || src.label || src.fileName.replace(/\.pdf$/i, '')
+                          });
+                        }}
+                      />
+                      <span>💾 Save this PDF to my account</span>
+                    </label>
+
+                    {src.saveToAccount && (
+                      <div style={{ display: 'flex', gap: 8, marginTop: 8, alignItems: 'center' }}>
+                        <input
+                          className="form-input"
+                          style={{ flex: 1, fontSize: 12, padding: '7px 12px', margin: 0 }}
+                          type="text"
+                          placeholder="Enter a custom name for this PDF..."
+                          value={src.saveName || ''}
+                          disabled={src.isSaved}
+                          onChange={(e) => updateSource(src.id, 'saveName', e.target.value)}
+                        />
+                        {src.isSaved ? (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <span style={{ fontSize: 12, fontWeight: 600, color: '#10b981', display: 'flex', alignItems: 'center', gap: 4 }}>
+                              <span>✓</span> Saved
+                            </span>
+                            <button
+                              type="button"
+                              className="btn btn-outline btn-sm"
+                              style={{
+                                fontSize: 11,
+                                padding: '5px 10px',
+                                borderColor: 'rgba(239,68,68,0.3)',
+                                color: '#ef4444',
+                              }}
+                              onClick={() => handleDeleteSavedPdf(src.id, src.dbId)}
+                              disabled={pdfSavingStates[src.id]}
+                            >
+                              {pdfSavingStates[src.id] ? 'Deleting...' : '🗑 Delete from Account'}
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            className="btn btn-primary btn-sm"
+                            style={{ fontSize: 11, padding: '7px 14px' }}
+                            onClick={() => handleSavePdf(src.id, src.saveName)}
+                            disabled={pdfSavingStates[src.id] || !src.saveName?.trim()}
+                          >
+                            {pdfSavingStates[src.id] ? 'Saving...' : 'Save PDF'}
+                          </button>
+                        )}
+                      </div>
                     )}
                   </div>
 
@@ -1022,6 +1323,234 @@ const [ocrCorrectedGrades, setOcrCorrectedGrades] = useState(null);
                 })}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+      {/* ── Save PDF Prompt Modal ── */}
+      {showSavePromptModal && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.7)',
+          backdropFilter: 'blur(8px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          padding: 16
+        }}>
+          <div style={{
+            background: 'var(--card, #111b27)',
+            border: '1px solid var(--card-border, rgba(255,255,255,0.08))',
+            borderRadius: '12px',
+            padding: 24,
+            maxWidth: 550,
+            width: '100%',
+            maxHeight: '95vh',
+            overflowY: 'auto',
+            boxShadow: '0 20px 25px -5px rgba(0,0,0,0.5)',
+            position: 'relative'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+              <div>
+                <h3 style={{ fontSize: 18, fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span>💾</span> Save PDFs to your account?
+                </h3>
+                <p className="text-muted" style={{ fontSize: 13, margin: '6px 0 0' }}>
+                  You can save these uploaded PDFs to access them at any time from the Saved PDFs Library.
+                </p>
+              </div>
+              <button
+                className="btn btn-outline btn-sm"
+                style={{ minWidth: 'auto', padding: '4px 8px', height: 28, border: 'none', fontSize: 16 }}
+                onClick={handleCancelModal}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 20 }}>
+              {savePromptFiles.map((file, idx) => (
+                <div key={file.id} style={{
+                  background: 'rgba(255,255,255,0.02)',
+                  border: '1px solid rgba(255,255,255,0.05)',
+                  borderRadius: 8,
+                  padding: 12,
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                    <input
+                      type="checkbox"
+                      id={`modal-pdf-chk-${file.id}`}
+                      checked={file.checked}
+                      style={{ cursor: 'pointer', width: 15, height: 15 }}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setSavePromptFiles(prev => prev.map((f, i) => i === idx ? { ...f, checked } : f));
+                      }}
+                    />
+                    <label
+                      htmlFor={`modal-pdf-chk-${file.id}`}
+                      style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', cursor: 'pointer', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                    >
+                      📄 {file.fileName}
+                    </label>
+                  </div>
+                  {file.checked && (
+                    <div style={{ marginLeft: 25 }}>
+                      <input
+                        className="form-input"
+                        type="text"
+                        style={{ fontSize: 12, padding: '6px 12px', margin: 0 }}
+                        placeholder="Enter custom save name..."
+                        value={file.saveName}
+                        onChange={(e) => {
+                          const saveName = e.target.value;
+                          setSavePromptFiles(prev => prev.map((f, i) => i === idx ? { ...f, saveName } : f));
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={handleCancelModal}
+                style={{ fontSize: 13, padding: '8px 16px' }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-outline"
+                style={{
+                  fontSize: 13,
+                  padding: '8px 16px',
+                  borderColor: 'rgba(239,68,68,0.3)',
+                  color: '#ef4444',
+                }}
+                onClick={handleSkipSaving}
+              >
+                Don't Save & Proceed
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                style={{
+                  fontSize: 13,
+                  padding: '8px 18px',
+                  background: 'linear-gradient(135deg, var(--primary) 0%, #6366f1 100%)',
+                }}
+                onClick={handleSaveAllSelectedPdfs}
+                disabled={savePromptFiles.some(f => f.checked && !f.saveName.trim())}
+              >
+                Save Selected & Proceed
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ── Saved PDFs Selector Modal ── */}
+      {showSavedPdfsSelectorModal && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.7)',
+          backdropFilter: 'blur(8px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          padding: 16
+        }}>
+          <div style={{
+            background: 'var(--card, #111b27)',
+            border: '1px solid var(--card-border, rgba(255,255,255,0.08))',
+            borderRadius: '12px',
+            padding: 24,
+            maxWidth: 550,
+            width: '100%',
+            maxHeight: '80vh',
+            overflowY: 'auto',
+            boxShadow: '0 20px 25px -5px rgba(0,0,0,0.5)',
+            position: 'relative'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+              <div>
+                <h3 style={{ fontSize: 18, fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span>📂</span> Choose from Saved PDFs
+                </h3>
+                <p className="text-muted" style={{ fontSize: 13, margin: '6px 0 0' }}>
+                  Select a marksheet or grade list PDF saved in your library to load it into the workspace.
+                </p>
+              </div>
+              <button
+                className="btn btn-outline btn-sm"
+                style={{ minWidth: 'auto', padding: '4px 8px', height: 28, border: 'none', fontSize: 16 }}
+                onClick={() => setShowSavedPdfsSelectorModal(false)}
+              >
+                ✕
+              </button>
+            </div>
+
+            {savedPdfsSelectorLoading ? (
+              <div style={{ textAlign: 'center', padding: '30px 0' }}>
+                <div className="spinner" />
+                <p style={{ marginTop: 10, fontSize: 13, color: 'var(--muted)' }}>Loading your saved library...</p>
+              </div>
+            ) : availableSavedPdfs.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '30px 10px', color: 'var(--muted)' }}>
+                <span style={{ fontSize: 32 }}>📁</span>
+                <p style={{ marginTop: 10, fontSize: 13, fontWeight: 500 }}>No saved PDFs found in your library.</p>
+                <p style={{ fontSize: 12, marginTop: 4 }}>Save PDFs from your account after uploading them.</p>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
+                {availableSavedPdfs.map((pdf) => (
+                  <div key={pdf._id} style={{
+                    background: 'rgba(255,255,255,0.02)',
+                    border: '1px solid rgba(255,255,255,0.05)',
+                    borderRadius: 8,
+                    padding: 12,
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    gap: 12,
+                  }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {pdf.name}
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        File: {pdf.fileName}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-sm"
+                      style={{ fontSize: 12, padding: '5px 12px', flexShrink: 0 }}
+                      onClick={() => handleLoadSavedPdf(pdf._id)}
+                    >
+                      ➕ Load PDF
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={() => setShowSavedPdfsSelectorModal(false)}
+                style={{ fontSize: 13, padding: '8px 16px' }}
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}

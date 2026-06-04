@@ -11,6 +11,7 @@ const EMPTY = { subjectId: '', examType: 'midterm', marksObtained: '', maxMarks:
 
 const TABS = [
   { id: 'upload',   label: '📄 Upload PDF & Rank Students'    },
+  { id: 'saved-pdfs', label: '📂 Saved PDFs Library' },
   { id: 'marks',    label: '📝 Marks & CGPA' },
   { id: 'semester', label: '🎓 Semesters'     },
 ];
@@ -22,6 +23,7 @@ export default function Marks() {
   const [cgpaData,     setCgpaData]     = useState(null);
   const [form,         setForm]         = useState(EMPTY);
   const [loading,      setLoading]      = useState(true);
+  const [savedPdfs,    setSavedPdfs]    = useState([]);
 
   const [semesters,    setSemesters]    = useState([]);
   const [gradeOptions, setGradeOptions] = useState([]);
@@ -46,6 +48,7 @@ export default function Marks() {
       const sems   = await marksService.getSemesters();
       const grades = await marksService.getGradeOptions();
       const cgpas  = await marksService.getCGPAbySemester();
+      const pdfs   = await marksService.getSavedPdfs();
 
       setMarks(m.data.marks || []);
       setSubjects(s.data.subjects || []);
@@ -53,6 +56,7 @@ export default function Marks() {
       setSemesters(sems.data.semesters || []);
       setGradeOptions(grades.data.gradeOptions || []);
       setCgpaSem(cgpas.data);
+      setSavedPdfs(pdfs.data.pdfs || []);
       setLoading(false);
     } catch (err) {
       console.error('❌ FAILED API:', err.config?.url, err);
@@ -142,6 +146,37 @@ export default function Marks() {
     await marksService.deleteSemester(id);
     toast.success('Semester deleted');
     load();
+  };
+
+  const handleDownloadSavedPdf = async (id, fileName) => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${process.env.REACT_APP_API_URL}/marks/saved-pdfs/${id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error('Download failed');
+      const blob = await res.blob();
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href     = url;
+      a.download = fileName;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      toast.error('Failed to download PDF.');
+    }
+  };
+
+  const handleDeleteSavedPdf = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this saved PDF?')) return;
+    try {
+      await marksService.deleteSavedPdf(id);
+      toast.success('Saved PDF deleted.');
+      const res = await marksService.getSavedPdfs();
+      setSavedPdfs(res.data.pdfs || []);
+    } catch (err) {
+      toast.error('Failed to delete saved PDF.');
+    }
   };
 
   const chartData = {
@@ -524,6 +559,89 @@ export default function Marks() {
             </div>
           </div>
         </>
+      )}
+
+      {/* ══════════════════════════════════════════
+          TAB 4 — Saved PDFs Library
+      ══════════════════════════════════════════ */}
+      {activeTab === 'saved-pdfs' && (
+        <div className="card">
+          <div className="card-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <div>
+              <h3 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>📂 Saved PDFs Library</h3>
+              <p className="text-muted" style={{ fontSize: 13, fontWeight: 'normal', marginTop: 4 }}>
+                Access and download your saved exam or scorecard PDFs at any time
+              </p>
+            </div>
+            <button className="btn btn-outline btn-sm" onClick={async () => {
+              const res = await marksService.getSavedPdfs();
+              setSavedPdfs(res.data.pdfs || []);
+              toast.success('Refreshed library');
+            }}>
+              🔄 Refresh
+            </button>
+          </div>
+
+          {savedPdfs.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--muted)' }}>
+              <span style={{ fontSize: 40 }}>📁</span>
+              <p style={{ marginTop: 12, fontWeight: 500 }}>Your saved PDF library is empty.</p>
+              <p style={{ fontSize: 12, marginTop: 4 }}>
+                You can save PDFs while uploading them in the "Upload PDF & Rank Students" tab.
+              </p>
+            </div>
+          ) : (
+            <div className="table-wrap">
+              <table style={{ width: '100%', fontSize: 13 }}>
+                <thead>
+                  <tr style={{ background: 'rgba(255,255,255,0.02)' }}>
+                    <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 600 }}>Document Name</th>
+                    <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 600 }}>Original Filename</th>
+                    <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 600 }}>Uploaded Date</th>
+                    <th style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 600 }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {savedPdfs.map((pdf) => (
+                    <tr key={pdf._id} style={{ borderBottom: '1px solid var(--card-border)' }}>
+                      <td style={{ padding: '10px 12px' }}>
+                        <strong>{pdf.name}</strong>
+                      </td>
+                      <td style={{ padding: '10px 12px', color: 'var(--muted)', fontSize: 12.5 }}>
+                        {pdf.fileName}
+                      </td>
+                      <td style={{ padding: '10px 12px', color: 'var(--muted)', fontSize: 12.5 }}>
+                        {new Date(pdf.createdAt).toLocaleDateString(undefined, {
+                          year: 'numeric',
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </td>
+                      <td style={{ padding: '10px 12px', textAlign: 'right' }}>
+                        <button
+                          className="btn btn-primary btn-sm"
+                          style={{ marginRight: 8, padding: '5px 12px' }}
+                          onClick={() => handleDownloadSavedPdf(pdf._id, pdf.fileName)}
+                        >
+                          ⬇ Download
+                        </button>
+                        <button
+                          className="btn btn-danger btn-sm"
+                          style={{ padding: '5px 12px' }}
+                          onClick={() => handleDeleteSavedPdf(pdf._id)}
+                        >
+                          ✕ Delete
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       )}
     </div>
   );

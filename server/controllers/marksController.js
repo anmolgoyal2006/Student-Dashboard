@@ -203,3 +203,79 @@ exports.deleteSemester = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
+
+const SavedPdf = require('../models/SavedPdf');
+
+// POST /api/marks/saved-pdfs — Save a PDF document
+exports.savePdf = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: 'No PDF file uploaded.' });
+    }
+    const { name } = req.body;
+    if (!name || !name.trim()) {
+      return res.status(400).json({ message: 'Custom save name is required.' });
+    }
+
+    const saved = await SavedPdf.create({
+      userId: req.user.id,
+      name: name.trim(),
+      fileName: req.file.originalname,
+      fileData: req.file.buffer,
+      contentType: req.file.mimetype || 'application/pdf',
+    });
+
+    res.status(201).json({
+      message: 'PDF saved successfully.',
+      pdf: {
+        id: saved._id,
+        name: saved.name,
+        fileName: saved.fileName,
+        createdAt: saved.createdAt,
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// GET /api/marks/saved-pdfs — Get all saved PDFs (excluding binary data)
+exports.getSavedPdfs = async (req, res) => {
+  try {
+    const pdfs = await SavedPdf.find({ userId: req.user.id })
+      .select('-fileData')
+      .sort({ createdAt: -1 });
+    res.json({ pdfs });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// GET /api/marks/saved-pdfs/:id — Download a saved PDF
+exports.downloadSavedPdf = async (req, res) => {
+  try {
+    const pdf = await SavedPdf.findOne({ _id: req.params.id, userId: req.user.id });
+    if (!pdf) {
+      return res.status(404).json({ message: 'Saved PDF not found.' });
+    }
+
+    res.setHeader('Content-Type', pdf.contentType || 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${pdf.fileName}"`);
+    res.send(pdf.fileData);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// DELETE /api/marks/saved-pdfs/:id — Delete a saved PDF
+exports.deleteSavedPdf = async (req, res) => {
+  try {
+    const deleted = await SavedPdf.findOneAndDelete({ _id: req.params.id, userId: req.user.id });
+    if (!deleted) {
+      return res.status(404).json({ message: 'Saved PDF not found.' });
+    }
+    res.json({ message: 'Saved PDF deleted.' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};

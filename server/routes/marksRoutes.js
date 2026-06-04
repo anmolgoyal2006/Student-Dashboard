@@ -12,6 +12,10 @@ const {
   updateSemester,
   deleteSemester,
   addManualSGPA,
+  savePdf,
+  getSavedPdfs,
+  downloadSavedPdf,
+  deleteSavedPdf,
 } = require('../controllers/marksController');
 
 const { protect } = require('../middleware/authMiddleware');
@@ -24,11 +28,18 @@ const {
   generateSgpaLeaderboardHandler,
   ocrAiCorrectHandler,
   ocrReviewGenerateHandler,
+  parseSavedPdfById,
 } = require('../controllers/marksUploadController');
 const multer = require('multer');
 const upload = multer({ storage: multer.memoryStorage() });
 
 router.use(protect);
+
+// Saved PDFs routes
+router.post('/saved-pdfs',     upload.single('file'), savePdf);
+router.get('/saved-pdfs',      getSavedPdfs);
+router.get('/saved-pdfs/:id',  downloadSavedPdf);
+router.delete('/saved-pdfs/:id', deleteSavedPdf);
 
 // existing routes
 router.post('/',          addMarks);
@@ -48,6 +59,7 @@ router.delete('/semester/:id',   deleteSemester);
 // PDF leaderboard
 router.post('/upload-pdf', upload.single('file'), uploadPdfHandler);
 router.post('/parse-pdfs', upload.array('files', 20), parsePdfsHandler);
+router.post('/saved-pdfs/:id/parse', parseSavedPdfById);
 router.post('/generate-leaderboard', generateLeaderboardHandler);
 router.post('/generate-sgpa-leaderboard', generateSgpaLeaderboardHandler);
 
