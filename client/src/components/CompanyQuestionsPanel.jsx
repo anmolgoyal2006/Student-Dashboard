@@ -228,21 +228,23 @@ export default function CompanyQuestionsPanel({ career }) {
         ) : questions.length === 0 ? (
           <div style={{ textAlign: 'center', padding: 40, color: 'var(--muted)' }}>
             <div style={{ fontSize: 48, marginBottom: 12 }}>🎉</div>
-            <p>No unsolved questions found with current filters.</p>
+            <p>No questions found with current filters.</p>
             <p style={{ fontSize: 12 }}>Try adjusting filters or sync your LeetCode account.</p>
           </div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
             {questions.map((problem, index) => {
               const freqStyle = FREQ_STYLE[problem.frequency] || FREQ_STYLE.medium;
+              const solved = problem.isSolved;
               return (
                 <div
                   key={index}
                   style={{
                     padding: 14, borderRadius: 10,
-                    border: `1px solid ${problem.isCompanySpecific ? 'rgba(99,102,241,0.35)' : 'var(--border)'}`,
-                    background: problem.isCompanySpecific ? 'rgba(99,102,241,0.05)' : 'rgba(255,255,255,0.02)',
+                    border: `1px solid ${solved ? 'rgba(34,197,94,0.35)' : problem.isCompanySpecific ? 'rgba(99,102,241,0.35)' : 'var(--border)'}`,
+                    background: solved ? 'rgba(34,197,94,0.05)' : problem.isCompanySpecific ? 'rgba(99,102,241,0.05)' : 'rgba(255,255,255,0.02)',
                     transition: 'transform 0.2s, box-shadow 0.2s',
+                    opacity: solved ? 0.7 : 1,
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.transform = 'translateY(-2px)';
@@ -273,6 +275,16 @@ export default function CompanyQuestionsPanel({ career }) {
                     </span>
                     <span style={{ color: 'var(--muted)' }}>•</span>
                     <span style={{ color: '#818cf8' }}>{problem.topic}</span>
+                    <span style={{ color: 'var(--muted)' }}>•</span>
+                    <span style={{ 
+                      color: solved ? '#34d399' : '#f87171', 
+                      fontWeight: 600,
+                      padding: '2px 6px',
+                      borderRadius: 4,
+                      background: solved ? 'rgba(34,197,94,0.12)' : 'rgba(248,113,113,0.12)',
+                    }}>
+                      {solved ? '✅ Solved' : '❌ Not Solved'}
+                    </span>
                   </div>
 
                   {problem.isCompanySpecific && (
@@ -293,7 +305,7 @@ export default function CompanyQuestionsPanel({ career }) {
                       className="btn btn-primary btn-sm"
                       style={{ flex: 1, fontSize: 11, textDecoration: 'none', textAlign: 'center' }}
                     >
-                      Solve on LeetCode ↗
+                      {solved ? 'View on LeetCode ↗' : 'Solve on LeetCode ↗'}
                     </a>
                     <button
                       type="button"

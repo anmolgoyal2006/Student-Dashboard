@@ -252,8 +252,8 @@ exports.getCompanyQuestions = async (req, res) => {
 
     // Get solved slugs if LeetCode is linked
     let solvedSlugs = new Set();
-    if (career.leetcodeSync?.solvedSlugs) {
-      solvedSlugs = new Set(career.leetcodeSync.solvedSlugs);
+    if (career.leetcodeSync?.solvedSlugs && Array.isArray(career.leetcodeSync.solvedSlugs)) {
+      solvedSlugs = new Set(career.leetcodeSync.solvedSlugs.map(s => s.toLowerCase().trim()));
     }
 
     // Use target company if not specified
@@ -276,15 +276,13 @@ exports.getCompanyQuestions = async (req, res) => {
       if (!topicProblems) continue;
 
       for (const problem of topicProblems) {
-        // Skip if already solved
-        if (solvedSlugs.has(problem.slug)) continue;
-
         // Filter by difficulty if specified
         if (difficulty && problem.difficulty !== difficulty) continue;
 
         // Filter by frequency if specified
         if (frequency && problem.frequency !== frequency) continue;
 
+        const problemSlug = problem.slug.toLowerCase().trim();
         filteredProblems.push({
           title: problem.title,
           slug: problem.slug,
@@ -293,7 +291,7 @@ exports.getCompanyQuestions = async (req, res) => {
           frequency: problem.frequency || 'medium',
           company: targetCompany,
           leetcodeUrl: `https://leetcode.com/problems/${problem.slug}/`,
-          isSolved: false,
+          isSolved: solvedSlugs.has(problemSlug),
         });
       }
     }
@@ -314,7 +312,7 @@ exports.getCompanyQuestions = async (req, res) => {
 
     // Calculate statistics
     const totalProblemsInCompany = Object.values(companyProblems).flat().length;
-    const solvedInCompany = Object.values(companyProblems).flat().filter(p => solvedSlugs.has(p.slug)).length;
+    const solvedInCompany = Object.values(companyProblems).flat().filter(p => solvedSlugs.has(p.slug.toLowerCase().trim())).length;
     const unsolvedInCompany = totalProblemsInCompany - solvedInCompany;
 
     res.json({
