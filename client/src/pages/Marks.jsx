@@ -10,13 +10,13 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend);
 const EMPTY = { subjectId: '', examType: 'midterm', marksObtained: '', maxMarks: 100, examDate: '' };
 
 const TABS = [
-  { id: 'marks',    label: '📝 Marks & CGPA' },
   { id: 'upload',   label: '📄 Upload PDF & Rank Students'    },
+  { id: 'marks',    label: '📝 Marks & CGPA' },
   { id: 'semester', label: '🎓 Semesters'     },
 ];
 
 export default function Marks() {
-  const [activeTab,    setActiveTab]    = useState('marks');
+  const [activeTab,    setActiveTab]    = useState('upload');
   const [marks,        setMarks]        = useState([]);
   const [subjects,     setSubjects]     = useState([]);
   const [cgpaData,     setCgpaData]     = useState(null);

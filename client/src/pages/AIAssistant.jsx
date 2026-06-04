@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import { useSearchParams } from 'react-router-dom';
 import { aiChatService, aiCommandService } from '../services/apiServices';
 import { useGlobalData } from '../context/GlobalDataContext';
 import toast from 'react-hot-toast';
@@ -345,9 +346,10 @@ function CommandChip({ icon, label, example, onClick }) {
   );
 }
 
-// ─── Main Component ───────────────────────────────────────────────────────────
 export default function AIAssistant() {
-  const [mode, setMode]               = useState('notes');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialMode = searchParams.get('mode') === 'notes' ? 'notes' : 'assistant';
+  const [mode, setMode]               = useState(initialMode);
   const [listening, setListening]     = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(false);
   const recognitionRef                = useRef(null);
@@ -376,6 +378,12 @@ export default function AIAssistant() {
   const inputRef     = useRef();
   const { refreshByEntity } = useGlobalData();
 
+  useEffect(() => {
+    const qMode = searchParams.get('mode') || 'assistant';
+    if (qMode === 'assistant' || qMode === 'notes') {
+      setMode(qMode);
+    }
+  }, [searchParams]);
   useEffect(() => {
     try {
       localStorage.setItem("ai_assistant_chat_history_notes", JSON.stringify(messages.notes));
@@ -415,8 +423,12 @@ export default function AIAssistant() {
   const switchMode = useCallback((newMode) => {
     if (newMode === mode) return;
     setSwitchAnim(true);
-    setTimeout(() => { setMode(newMode); setSwitchAnim(false); }, 180);
-  }, [mode]);
+    setTimeout(() => {
+      setMode(newMode);
+      setSearchParams({ mode: newMode });
+      setSwitchAnim(false);
+    }, 180);
+  }, [mode, setSearchParams]);
 
   const addMessage = (modeKey, msg) => {
     setMessages(prev => ({ ...prev, [modeKey]: [...prev[modeKey], msg] }));
@@ -675,8 +687,8 @@ export default function AIAssistant() {
           borderBottom: '1px solid var(--border)', padding: '6px 6px 0', gap: 4,
         }}>
           {[
-            { key: 'notes',     label: 'Notes AI',     icon: <BookIcon />, color: '#10b981'        },
             { key: 'assistant', label: 'Dashboard AI', icon: <BotIcon />,  color: 'var(--primary)' },
+            { key: 'notes',     label: 'Notes AI',     icon: <BookIcon />, color: '#10b981'        },
           ].map(tab => {
             const active = mode === tab.key;
             return (
@@ -685,23 +697,43 @@ export default function AIAssistant() {
                 onClick={() => switchMode(tab.key)}
                 style={{
                   flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  gap: 8, padding: '9px 16px',
-                  background: active ? 'var(--bg-3)' : 'transparent',
-                  color: active ? tab.color : 'var(--muted)',
+                  gap: 8, padding: '10px 16px',
+                  background: active 
+                    ? 'var(--bg-3)' 
+                    : (tab.key === 'assistant' ? 'rgba(129, 140, 248, 0.04)' : 'rgba(16, 185, 129, 0.04)'),
+                  color: active 
+                    ? tab.color 
+                    : (tab.key === 'assistant' ? 'rgba(129, 140, 248, 0.8)' : 'rgba(16, 185, 129, 0.8)'),
                   borderRadius: '8px 8px 0 0', border: 'none', cursor: 'pointer',
-                  fontFamily: 'inherit', fontSize: 13.5, fontWeight: active ? 600 : 400,
+                  fontFamily: 'inherit', fontSize: 13.5, fontWeight: active ? 600 : 500,
                   transition: 'all 0.2s ease',
-                  borderBottom: active ? `2px solid ${tab.color}` : '2px solid transparent',
+                  borderBottom: active 
+                    ? `2.5px solid ${tab.color}` 
+                    : (tab.key === 'assistant' ? '1px solid rgba(129, 140, 248, 0.2)' : '1px solid rgba(16, 185, 129, 0.2)'),
                   position: 'relative',
+                  boxShadow: !active ? `inset 0 0 6px ${tab.key === 'assistant' ? 'rgba(129,140,248,0.03)' : 'rgba(16,185,129,0.03)'}` : 'none',
                 }}
               >
                 {tab.icon}
                 {tab.label}
                 {tab.key === 'assistant' && (
                   <span className="ai-pulse" style={{
-                    width: 6, height: 6, borderRadius: '50%', background: 'var(--primary)',
-                    position: 'absolute', top: 8, right: 10, display: 'inline-block',
-                  }} />
+                    fontSize: 9.5,
+                    background: active ? 'rgba(129,140,248,0.22)' : 'rgba(129,140,248,0.12)',
+                    color: '#c7d2fe',
+                    padding: '2px 6px',
+                    borderRadius: 4,
+                    marginLeft: 6,
+                    fontWeight: 700,
+                    letterSpacing: '0.05em',
+                    border: '1px solid rgba(129,140,248,0.3)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 3,
+                  }}>
+                    <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#34d399', display: 'inline-block', boxShadow: '0 0 6px #34d399' }} />
+                    GROQ
+                  </span>
                 )}
               </button>
             );

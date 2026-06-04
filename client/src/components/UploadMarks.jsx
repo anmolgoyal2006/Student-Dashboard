@@ -461,11 +461,55 @@ const [ocrCorrectedGrades, setOcrCorrectedGrades] = useState(null);
   return (
     <>
       <div className="card">
-        <div className="card-title">📄 Upload Marks PDFs</div>
-        <p className="text-muted" style={{ marginBottom: 16 }}>
-          Upload PDFs one batch or use &quot;+ Add more PDFs&quot; to keep earlier files. Students are
-          matched by name across PDFs. Set weights on each score — file weight is calculated automatically.
-        </p>
+        <div className="card-title" style={{ marginBottom: 16 }}>📄 Upload PDFs & Rank Students</div>
+
+        {/* Visual Guide Banner */}
+        <div style={{
+          background: 'linear-gradient(135deg, rgba(99,102,241,0.08) 0%, rgba(165,180,252,0.03) 100%)',
+          border: '1px solid rgba(129,140,248,0.2)',
+          borderRadius: 12,
+          padding: '20px 24px',
+          marginBottom: 20,
+        }}>
+          <h3 style={{ margin: '0 0 12px', fontSize: 16, fontWeight: 700, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span>📊</span> Multi-PDF Student Ranking System
+          </h3>
+          <p style={{ margin: '0 0 18px', fontSize: 13, color: 'var(--muted)', lineHeight: 1.5 }}>
+            Easily merge separate test or exam PDF files to generate a unified leaderboard, compute weighted grades, and track student performance.
+          </p>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <span style={{ fontSize: 20, marginTop: 2 }}>📂</span>
+              <div>
+                <h4 style={{ margin: '0 0 4px', fontSize: 13.5, fontWeight: 600, color: 'var(--text)' }}>1. Upload PDFs</h4>
+                <p style={{ margin: 0, fontSize: 12, color: 'var(--muted)', lineHeight: 1.4 }}>
+                  Drag & drop PDFs containing student marks. They are automatically matched by name.
+                </p>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 10 }}>
+              <span style={{ fontSize: 20, marginTop: 2 }}>⚙️</span>
+              <div>
+                <h4 style={{ margin: '0 0 4px', fontSize: 13.5, fontWeight: 600, color: 'var(--text)' }}>2. Customize Weights</h4>
+                <p style={{ margin: 0, fontSize: 12, color: 'var(--muted)', lineHeight: 1.4 }}>
+                  Set weight multipliers for each score column or group them for "Best N of M" evaluation.
+                </p>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 10 }}>
+              <span style={{ fontSize: 20, marginTop: 2 }}>🏆</span>
+              <div>
+                <h4 style={{ margin: '0 0 4px', fontSize: 13.5, fontWeight: 600, color: 'var(--text)' }}>3. Rank & Export</h4>
+                <p style={{ margin: 0, fontSize: 12, color: 'var(--muted)', lineHeight: 1.4 }}>
+                  Generate ranked leaderboards, configure relative grading limits, and download report Excel.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
 
         <div
           style={{

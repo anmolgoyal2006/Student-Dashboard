@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Bar, Doughnut } from 'react-chartjs-2';
+import { Link } from 'react-router-dom';
 import {
   Chart as ChartJS, CategoryScale, LinearScale,
   BarElement, ArcElement, Tooltip, Legend
@@ -182,10 +183,67 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Dashboard AI Promo Banner */}
+      <div className="card mb-4" style={{
+        background: 'linear-gradient(135deg, rgba(99,102,241,0.15) 0%, rgba(129,140,248,0.05) 100%)',
+        border: '1px solid rgba(129,140,248,0.25)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexWrap: 'wrap',
+        gap: 16,
+        padding: '18px 22px',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div style={{
+            fontSize: 24,
+            background: 'linear-gradient(135deg, var(--primary-dark), var(--primary))',
+            borderRadius: 12,
+            width: 46,
+            height: 46,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#fff',
+            boxShadow: '0 0 12px rgba(129,140,248,0.4)',
+          }}>
+            🤖
+          </div>
+          <div>
+            <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>Talk to Dashboard AI</h3>
+            <p style={{ margin: '3px 0 0', fontSize: 12.5, color: 'var(--muted)', lineHeight: 1.4 }}>
+              Ask questions, predict CGPA, add subjects or marks with natural language commands.
+            </p>
+          </div>
+        </div>
+        <Link to="/ai-assistant?mode=assistant" className="btn btn-primary" style={{ padding: '8px 16px', textDecoration: 'none' }}>
+          Open Dashboard AI ➔
+        </Link>
+      </div>
+
       {/* Bottom row */}
       <div className="grid-2">
         <div className="card">
-          <div className="card-title">🤖 AI Recommendations</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <div className="card-title" style={{ margin: 0 }}>🤖 AI Recommendations</div>
+            <Link
+              to="/ai-assistant?mode=assistant"
+              style={{
+                fontSize: 12,
+                color: 'var(--primary)',
+                textDecoration: 'none',
+                fontWeight: 600,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
+                transition: 'opacity 0.2s',
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.opacity = 0.8}
+              onMouseLeave={(e) => e.currentTarget.style.opacity = 1}
+            >
+              Ask Dashboard AI ➔
+            </Link>
+          </div>
           {recs.length > 0
             ? recs.map((r, i) => (
                 <div key={i} className={`suggestion ${r.priority}`}>

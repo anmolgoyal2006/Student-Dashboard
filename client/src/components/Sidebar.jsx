@@ -27,7 +27,6 @@ function SettingsIcon() {
 }
 
 // ── All icons now use the same format (strings or JSX) ───
-// Changed: Profile entry now uses '⚙️' emoji to stay
 // consistent with the rest of the links array format.
 // This avoids JSX-in-object-literal issues.
 const baseLinks = [
