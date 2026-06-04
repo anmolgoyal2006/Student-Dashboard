@@ -21,6 +21,11 @@ const {
   logPractice,
   getHint,
 } = require('../controllers/dsaCoachController');
+const {
+  linkLeetcode,
+  unlinkLeetcode,
+  syncLeetcode,
+} = require('../controllers/leetcodeController');
 const { protect }                              = require('../middleware/authMiddleware');
 
 router.use(protect);
@@ -30,6 +35,9 @@ router.post('/dsa/coach',         getDsaCoach);
 router.post('/dsa/topic-guide',   getTopicGuide);
 router.post('/dsa/log-practice',  logPractice);
 router.post('/dsa/hint',          getHint);
+router.put('/leetcode',           linkLeetcode);
+router.delete('/leetcode',        unlinkLeetcode);
+router.post('/leetcode/sync',     syncLeetcode);
 router.get('/',                   getCareer);
 router.put('/',                   updateCareer);
 router.patch('/topic/:topicName', updateTopic);

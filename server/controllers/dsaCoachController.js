@@ -22,13 +22,20 @@ exports.getDsaCoach = async (req, res) => {
     const force = req.body?.refresh === true;
     const cacheMs = 4 * 60 * 60 * 1000;
     const cached = career.dsaCoach?.generatedAt;
-    const fresh = cached && Date.now() - new Date(cached).getTime() < cacheMs;
+    const lcSyncAt = career.leetcodeSync?.lastSyncAt
+      ? new Date(career.leetcodeSync.lastSyncAt).getTime()
+      : 0;
+    const coachAt = cached ? new Date(cached).getTime() : 0;
+    const lcNewerThanCoach = lcSyncAt > coachAt;
+    const fresh = cached && Date.now() - coachAt < cacheMs && !lcNewerThanCoach;
 
     if (fresh && !force && career.dsaCoach?.dailyMission?.length) {
       return res.json({ coach: career.dsaCoach, cached: true, career });
     }
 
-    const coach = await generateCoachPlan(career);
+    const coach = await generateCoachPlan(career, {
+      liveLeetcode: force || lcNewerThanCoach || !cached,
+    });
     coach.generatedAt = new Date();
 
     career.dsaCoach = coach;

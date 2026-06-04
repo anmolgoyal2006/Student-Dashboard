@@ -26,17 +26,21 @@ exports.getCareer = async (req, res) => {
 // PUT /api/career
 exports.updateCareer = async (req, res) => {
   try {
-    const { targetCompany, targetRole, skills, dsaTopics, problemsSolved } = req.body;
+    const { targetCompany, targetRole, skills, dsaTopics, problemsSolved, leetcodeUsername } = req.body;
 
-    // Recalculate readiness
     const problems = problemsSolved ?? 0;
     let readiness = 'Beginner';
     if (problems >= 200) readiness = 'Ready';
     else if (problems >= 100) readiness = 'Intermediate';
 
+    const $set = { targetCompany, targetRole, skills, dsaTopics, problemsSolved, readiness };
+    if (leetcodeUsername !== undefined) {
+      $set.leetcodeUsername = String(leetcodeUsername).trim().toLowerCase();
+    }
+
     const career = await CareerProgress.findOneAndUpdate(
       { userId: req.user.id },
-      { $set: { targetCompany, targetRole, skills, dsaTopics, problemsSolved, readiness } },
+      { $set },
       { new: true, upsert: true, runValidators: true }
     );
     res.json({ message: 'Career progress updated', career });

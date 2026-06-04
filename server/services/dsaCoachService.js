@@ -3,6 +3,10 @@
  */
 
 const Groq = require('groq-sdk');
+const {
+  buildLeetcodeInsights,
+  buildLeetcodeProblemPicks,
+} = require('./leetcodeService');
 
 const groq = new Groq({ apiKey: process.env.GROQ_CHAT_KEY || process.env.GROQ_API_KEY });
 const MODEL = 'llama-3.1-8b-instant';
@@ -85,84 +89,203 @@ function buildProfile(career) {
   };
 }
 
-function ruleBasedCoach(profile) {
+function ruleBasedCoach(profile, lc) {
   const focus = profile.weakTopics[0];
-  return {
-    readinessInsight: `You have solved ${profile.problemsSolved} problems (${profile.readiness}). ${
-      focus ? `Biggest gap: ${focus.name} (${focus.problems}/${focus.target}).` : 'Great topic coverage!'
-    }`,
-    companyFocus: profile.companyFocus,
-    dailyMission: profile.weakTopics.slice(0, 3).map((t, i) => ({
+  const lcPicks = buildLeetcodeProblemPicks(lc, profile);
+
+  let dailyMission;
+  if (lc?.topicRoadmap?.length) {
+    const priorities = lc.topicRoadmap
+      .filter((r) => r.status === 'not_covered' || r.status === 'weak')
+      .slice(0, 3);
+    dailyMission = priorities.map((r, i) => ({
+      task: r.status === 'not_covered'
+        ? `Solve ${Math.min(2, r.toSolveThisWeek)} ${r.startWith} ${r.topic} problems on LeetCode (topic not covered yet)`
+        : `Solve ${r.toSolveThisWeek} ${r.topic} problems (${r.startWith} first)`,
+      topic: r.topic,
+      priority: i === 0 ? 'high' : 'medium',
+      minutes: r.status === 'not_covered' ? 50 : 45,
+      problemsCount: r.status === 'not_covered' ? 2 : r.toSolveThisWeek,
+    }));
+  } else {
+    dailyMission = profile.weakTopics.slice(0, 3).map((t, i) => ({
       task: `Solve ${t.gap >= 15 ? 3 : 2} ${t.name} problems`,
       topic: t.name,
       priority: i === 0 ? 'high' : 'medium',
       minutes: 45,
-    })),
-    weeklyFocus: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day, i) => {
-      const t = profile.weakTopics[i % Math.max(1, profile.weakTopics.length)] || profile.topics[i % profile.topics.length];
-      return { day, topic: t?.name || 'Arrays', goal: `Solve 3–5 ${t?.name || 'Arrays'} problems` };
-    }),
-    recommendedProblems: profile.weakTopics.slice(0, 4).flatMap((t) => [
-      { title: `${t.name} — Pattern Review`, topic: t.name, difficulty: 'Medium', pattern: 'Core patterns', why: `Close ${t.gap} problem gap`, companyRelevance: profile.targetCompany },
-    ]),
-    weakTopics: profile.weakTopics.map((t) => t.name),
+      problemsCount: t.gap >= 15 ? 3 : 2,
+    }));
+  }
+
+  const weeklyFocus = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day, i) => {
+    const r = lc?.topicRoadmap?.[i % (lc.topicRoadmap.length || 1)]
+      || profile.weakTopics[i % Math.max(1, profile.weakTopics.length)]
+      || profile.topics[i % profile.topics.length];
+    const topic = r?.topic || r?.name || 'Arrays';
+    const count = r?.toSolveThisWeek || 3;
+    const diff = r?.startWith || 'Easy';
+    return {
+      day,
+      topic,
+      goal: `Solve ${count} problems — ${diff} first on LeetCode`,
+    };
+  });
+
+  const lcInsight = lc
+    ? `LeetCode @${lc.username}: ${lc.totalSolved} solved (E${lc.easy}/M${lc.medium}/H${lc.hard}). ${
+        lc.uncoveredTopics.length
+          ? `Topics not covered yet: ${lc.uncoveredTopics.join(', ')} — start with Easy.`
+          : 'Good topic spread — push Medium on weak areas.'
+      } ${lc.difficultyAdvice}`
+    : null;
+
+  return {
+    readinessInsight: lc
+      ? `${lcInsight} Dashboard: ${profile.problemsSolved} total (${profile.readiness}).`
+      : `You have solved ${profile.problemsSolved} problems (${profile.readiness}). ${
+          focus ? `Biggest gap: ${focus.name} (${focus.problems}/${focus.target}).` : 'Great topic coverage!'
+        }`,
+    leetcodeInsight: lcInsight,
+    companyFocus: profile.companyFocus,
+    dailyMission,
+    weeklyFocus,
+    topicRoadmap: lc?.topicRoadmap || [],
+    recommendedProblems: lcPicks.length
+      ? lcPicks
+      : profile.weakTopics.slice(0, 4).map((t) => ({
+          title: `${t.name} — Pattern Review`,
+          topic: t.name,
+          difficulty: 'Medium',
+          pattern: 'Core patterns',
+          why: `Close ${t.gap} problem gap`,
+          companyRelevance: profile.targetCompany,
+          problemsToSolve: Math.min(5, t.gap),
+        })),
+    weakTopics: lc?.uncoveredTopics?.length
+      ? [...lc.uncoveredTopics, ...lc.weakTopics]
+      : profile.weakTopics.map((t) => t.name),
     strongTopics: profile.strongTopics,
+    uncoveredTopics: lc?.uncoveredTopics || [],
     nextMilestone: profile.problemsSolved < 50 ? '50 problems (Beginner)' : profile.problemsSolved < 100 ? '100 problems (Intermediate)' : '200 problems (Ready)',
-    studyTip: 'Consistency beats cramming — 2 quality problems daily with review notes.',
+    studyTip: lc?.difficultyAdvice || 'Consistency beats cramming — 2 quality problems daily with review notes.',
+    dailyProblemTarget: lc?.dailyProblemTarget || 2,
     placementScore: Math.min(100, Math.round((profile.problemsSolved / 200) * 100)),
+    leetcodeLinked: !!lc,
   };
 }
 
-async function generateCoachPlan(career) {
+async function generateCoachPlan(career, options = {}) {
   const profile = buildProfile(career);
+  const lc = await buildLeetcodeInsights(career, {
+    live: options.liveLeetcode !== false && !!career.leetcodeUsername,
+    topicTargets: TOPIC_TARGETS,
+  });
+  const base = ruleBasedCoach(profile, lc);
 
-  const system = `You are an expert placement DSA coach for Indian college students targeting ${profile.targetCompany}.
+  if (!lc) {
+    const system = `You are an expert placement DSA coach for Indian college students targeting ${profile.targetCompany}.
 Return ONLY valid JSON, no markdown. Be specific, actionable, and encouraging.`;
-
-  const user = `Student profile:
+    const user = `Student profile (no LeetCode linked — tell them to link LeetCode for better picks):
 - Target: ${profile.targetCompany} — ${profile.targetRole}
-- Skills: ${profile.skills}
 - Problems solved: ${profile.problemsSolved} (${profile.readiness})
 - Company expects: ${profile.companyFocus}
 
 Topic progress (done/target):
 ${profile.topics.map((t) => `- ${t.name}: ${t.problems}/${t.target} (${t.pct}%)`).join('\n')}
 
+Return JSON with dailyMission, weeklyFocus, recommendedProblems (5), weakTopics, strongTopics, readinessInsight, studyTip, placementScore, nextMilestone, companyFocus.
+For uncovered topics (0-2 problems), recommend starting with Easy LeetCode classics by name.`;
+
+    try {
+      const raw = await callGroq(system, user, 2000);
+      const parsed = extractJSON(raw);
+      if (parsed?.dailyMission?.length) {
+        return { ...base, ...parsed, source: 'ai', leetcodeLinked: false };
+      }
+    } catch (err) {
+      console.error('[DSA Coach]', err.message);
+    }
+    return { ...base, source: 'rules', leetcodeLinked: false };
+  }
+
+  const system = `You are an expert placement DSA coach. The student linked LeetCode — use their REAL stats below.
+Return ONLY valid JSON. Recommend real LeetCode-style problem titles. For topics marked not_covered, insist on Easy first.
+Include problemsToSolve count per recommendation. Include leetcodeUrl when you know the slug (e.g. two-sum).`;
+
+  const user = `Target: ${profile.targetCompany} — ${profile.targetRole}
+LeetCode @${lc.username}: ${lc.totalSolved} total | Easy ${lc.easy} | Medium ${lc.medium} | Hard ${lc.hard} (${lc.easyRatio}% easy)
+Advice: ${lc.difficultyAdvice}
+Daily target: ${lc.dailyProblemTarget} problems/day
+
+Topics NOT covered on LeetCode tracker (<3 problems): ${lc.uncoveredTopics.join(', ') || 'none'}
+Weak topics: ${lc.weakTopics.join(', ') || 'none'}
+Recent LeetCode solves: ${lc.recentSolves.map((s) => s.title).join(', ') || 'none fetched'}
+
+Per-topic roadmap:
+${lc.topicRoadmap.map((r) => `- ${r.topic}: ${r.solved}/${r.target}, status=${r.status}, solve ${r.toSolveThisWeek}/week, start ${r.startWith}`).join('\n')}
+
+Dashboard topic progress:
+${profile.topics.map((t) => `- ${t.name}: ${t.problems}/${t.target}`).join('\n')}
+
 Return JSON:
 {
-  "readinessInsight": "2-3 sentences on current state",
-  "companyFocus": "what ${profile.targetCompany} interviews emphasize",
-  "placementScore": 0-100 estimate for ${profile.targetCompany} readiness,
-  "dailyMission": [{"task":"specific action","topic":"topic name","priority":"high|medium|low","minutes":45}],
-  "weeklyFocus": [{"day":"Mon","topic":"...","goal":"..."}],
-  "recommendedProblems": [{"title":"problem style name","topic":"...","difficulty":"Easy|Medium|Hard","pattern":"e.g. Two Pointers","why":"why now","companyRelevance":"${profile.targetCompany}"}],
+  "readinessInsight": "2-3 sentences referencing LeetCode stats",
+  "leetcodeInsight": "1 sentence on what to fix on LeetCode",
+  "companyFocus": "...",
+  "placementScore": 0-100,
+  "dailyProblemTarget": ${lc.dailyProblemTarget},
+  "dailyMission": [{"task":"...","topic":"...","priority":"high|medium|low","minutes":45,"problemsCount":2}],
+  "weeklyFocus": [{"day":"Mon","topic":"...","goal":"solve N Easy/Medium on LeetCode"}],
+  "topicRoadmap": [{"topic":"...","status":"not_covered|weak|building|strong","solved":0,"target":30,"toSolveThisWeek":5,"startWith":"Easy|Medium"}],
+  "recommendedProblems": [{"title":"Two Sum","topic":"Arrays","difficulty":"Easy","pattern":"...","why":"...","companyRelevance":"${profile.targetCompany}","leetcodeUrl":"https://leetcode.com/problems/two-sum/","problemsToSolve":3}],
+  "uncoveredTopics": ["..."],
   "weakTopics": ["..."],
   "strongTopics": ["..."],
-  "nextMilestone": "clear numeric goal",
-  "studyTip": "one powerful tip"
+  "nextMilestone": "...",
+  "studyTip": "..."
 }
-Give 3 dailyMission items, 7 weeklyFocus days, 5 recommendedProblems.`;
+3 dailyMission items, 7 weeklyFocus days, 6 recommendedProblems prioritizing uncovered topics with Easy first.`;
 
   try {
-    const raw = await callGroq(system, user, 2000);
+    const raw = await callGroq(system, user, 2400);
     const parsed = extractJSON(raw);
     if (parsed?.dailyMission?.length) {
-      return { ...ruleBasedCoach(profile), ...parsed, source: 'ai' };
+      const merged = {
+        ...base,
+        ...parsed,
+        source: 'ai+leetcode',
+        leetcodeLinked: true,
+        topicRoadmap: parsed.topicRoadmap?.length ? parsed.topicRoadmap : base.topicRoadmap,
+        recommendedProblems: parsed.recommendedProblems?.length
+          ? parsed.recommendedProblems.map((p) => ({
+              ...p,
+              leetcodeUrl: p.leetcodeUrl || (p.titleSlug ? `https://leetcode.com/problems/${p.titleSlug}/` : undefined),
+            }))
+          : base.recommendedProblems,
+        uncoveredTopics: parsed.uncoveredTopics || base.uncoveredTopics,
+      };
+      return merged;
     }
   } catch (err) {
     console.error('[DSA Coach]', err.message);
   }
 
-  return { ...ruleBasedCoach(profile), source: 'rules' };
+  return { ...base, source: 'rules+leetcode', leetcodeLinked: true };
 }
 
 async function generateTopicGuide(career, topicName) {
   const profile = buildProfile(career);
+  const lc = await buildLeetcodeInsights(career, { live: false, topicTargets: TOPIC_TARGETS });
   const topic = profile.topics.find((t) => t.name === topicName) || { name: topicName, problems: 0, target: 30, gap: 30 };
+  const road = lc?.topicRoadmap?.find((r) => r.topic === topicName);
+  const startDiff = road?.startWith || (topic.problems < 3 ? 'Easy' : 'Medium');
 
   const system = 'You are a DSA mentor. Return ONLY valid JSON.';
   const user = `Topic: ${topicName}
 Student: ${profile.problemsSolved} total problems, ${topic.problems}/${topic.target} on this topic
+LeetCode: ${lc ? `@${lc.username}, ${lc.totalSolved} total, topic status: ${road?.status || 'unknown'}` : 'not linked'}
+${road?.status === 'not_covered' ? 'IMPORTANT: Topic barely started — give 3 Easy LeetCode problems first with real titles and leetcode slugs in url field.' : ''}
+Start difficulty: ${startDiff}
 Target company: ${profile.targetCompany}
 
 Return JSON:
@@ -172,11 +295,11 @@ Return JSON:
   "studyOrder": ["step1", "step2", "step3"],
   "commonMistakes": ["mistake1", "mistake2"],
   "problems": [
-    {"title":"classic problem name","difficulty":"Easy|Medium|Hard","pattern":"...","approach":"1-2 sentence approach hint","timeMins":25}
+    {"title":"classic LeetCode name","difficulty":"Easy|Medium|Hard","pattern":"...","approach":"1-2 sentence hint","timeMins":25,"leetcodeUrl":"https://leetcode.com/problems/slug/"}
   ],
-  "weekPlan": "how many problems to solve this week on this topic"
+  "weekPlan": "how many ${startDiff} problems to solve this week (${road?.toSolveThisWeek || 5} recommended)"
 }
-Include exactly 4 problems from easy to hard.`;
+Include exactly 4 problems; if topic not covered, all 4 should be Easy with real LeetCode titles.`;
 
   try {
     const raw = await callGroq(system, user, 1500);

@@ -95,6 +95,10 @@ export const careerService = {
   logDsaPractice: (text) => apiRequest('post', '/career/dsa/log-practice', { text }),
   getDsaHint: (topic, problemTitle, attempt) =>
     apiRequest('post', '/career/dsa/hint', { topic, problemTitle, attempt }),
+
+  linkLeetcode: (username) => apiRequest('put', '/career/leetcode', { username }),
+  unlinkLeetcode: () => apiRequest('delete', '/career/leetcode'),
+  syncLeetcode: (username) => apiRequest('post', '/career/leetcode/sync', username ? { username } : {}),
 };
 
 // ─── AI Recommendations ───────────────────────────────────────────────────

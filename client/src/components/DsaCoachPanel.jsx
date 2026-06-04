@@ -25,20 +25,88 @@ export default function DsaCoachPanel({ career, onCareerUpdate, plan }) {
   const [hintAttempt, setHintAttempt] = useState('');
   const [hint, setHint]             = useState(null);
   const [hintLoad, setHintLoad]     = useState(false);
+  const [lcUsername, setLcUsername] = useState(career?.leetcodeUsername || '');
+  const [lcSyncing, setLcSyncing]   = useState(false);
+  const [lcLinking, setLcLinking]   = useState(false);
+  const lcAutoSynced                = useRef(false);
 
-  const loadCoach = useCallback(async (refresh = false) => {
+  useEffect(() => {
+    setLcUsername(career?.leetcodeUsername || '');
+  }, [career?.leetcodeUsername]);
+
+  const loadCoach = useCallback(async (refresh = false, silent = false) => {
     setLoading(true);
     try {
       const { data } = await careerService.getDsaCoach(refresh);
       setCoach(data.coach);
       if (data.career) onCareerUpdate?.(data.career);
-      if (refresh) toast.success('AI coach plan refreshed');
+      if (refresh && !silent) toast.success('AI coach plan refreshed');
     } catch (err) {
       toast.error(err.response?.data?.message || 'Could not load AI coach');
     } finally {
       setLoading(false);
     }
   }, [onCareerUpdate]);
+
+  const handleSyncLeetcode = useCallback(async (silent = false) => {
+    const user = (lcUsername || career?.leetcodeUsername || '').trim();
+    if (!user) {
+      if (!silent) toast.error('Enter your LeetCode username first');
+      return;
+    }
+    setLcSyncing(true);
+    try {
+      const { data } = await careerService.syncLeetcode(user);
+      if (data.career) onCareerUpdate?.(data.career);
+      if (!silent || (data.sync?.newCount > 0)) {
+        toast.success(data.message || 'Synced with LeetCode');
+      }
+      if (data.career?.leetcodeUsername) {
+        await loadCoach(true, silent);
+      }
+    } catch (err) {
+      if (!silent) toast.error(err.response?.data?.message || 'LeetCode sync failed');
+    } finally {
+      setLcSyncing(false);
+    }
+  }, [lcUsername, career?.leetcodeUsername, onCareerUpdate, loadCoach]);
+
+  const handleLinkLeetcode = async () => {
+    const user = lcUsername.trim();
+    if (!user) return toast.error('Enter your LeetCode username');
+    setLcLinking(true);
+    try {
+      const { data } = await careerService.linkLeetcode(user);
+      if (data.career) onCareerUpdate?.(data.career);
+      toast.success('LeetCode account linked');
+      await handleSyncLeetcode(false);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Could not link LeetCode');
+    } finally {
+      setLcLinking(false);
+    }
+  };
+
+  const handleUnlinkLeetcode = async () => {
+    try {
+      const { data } = await careerService.unlinkLeetcode();
+      setLcUsername('');
+      if (data.career) onCareerUpdate?.(data.career);
+      toast.success('LeetCode disconnected');
+    } catch {
+      toast.error('Could not disconnect');
+    }
+  };
+
+  useEffect(() => {
+    if (!career?.leetcodeUsername || lcAutoSynced.current) return;
+    const last = career.leetcodeSync?.lastSyncAt;
+    const stale = !last || Date.now() - new Date(last).getTime() > 30 * 60 * 1000;
+    if (stale) {
+      lcAutoSynced.current = true;
+      handleSyncLeetcode(true);
+    }
+  }, [career?.leetcodeUsername, career?.leetcodeSync?.lastSyncAt, handleSyncLeetcode]);
 
   const coachBootstrapped = useRef(false);
 
@@ -102,9 +170,75 @@ export default function DsaCoachPanel({ career, onCareerUpdate, plan }) {
 
   const placementScore = coach?.placementScore ?? 0;
   const scoreColor = placementScore >= 70 ? '#34d399' : placementScore >= 40 ? '#fbbf24' : '#f87171';
+  const lcSync = career?.leetcodeSync;
+  const lcLinked = Boolean(career?.leetcodeUsername);
+  const lastSyncLabel = lcSync?.lastSyncAt
+    ? new Date(lcSync.lastSyncAt).toLocaleString()
+    : 'Never';
 
   return (
     <div style={{ marginBottom: 20 }}>
+      {/* ── LeetCode sync ── */}
+      <div className="card mb-4" style={{
+        border: '1px solid rgba(255, 161, 22, 0.35)',
+        background: 'linear-gradient(135deg, rgba(255,161,22,0.08) 0%, rgba(255,255,255,0.02) 100%)',
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
+          <div>
+            <div className="card-title" style={{ marginBottom: 4 }}>🟠 LeetCode sync</div>
+            <p className="text-muted" style={{ fontSize: 13, maxWidth: 520 }}>
+              Link your public LeetCode profile. New accepted solutions update your problem count and topic tracker.
+            </p>
+          </div>
+          {lcLinked && (
+            <a
+              href={`https://leetcode.com/u/${career.leetcodeUsername}/`}
+              target="_blank"
+              rel="noreferrer"
+              className="btn btn-outline btn-sm"
+              style={{ textDecoration: 'none' }}
+            >
+              Open profile ↗
+            </a>
+          )}
+        </div>
+
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 12, alignItems: 'center' }}>
+          <input
+            className="form-input"
+            style={{ maxWidth: 220, flex: '1 1 160px' }}
+            placeholder="LeetCode username"
+            value={lcUsername}
+            onChange={(e) => setLcUsername(e.target.value.replace(/\s/g, ''))}
+            disabled={lcSyncing || lcLinking}
+          />
+          {!lcLinked ? (
+            <button type="button" className="btn btn-primary btn-sm" onClick={handleLinkLeetcode} disabled={lcLinking || lcSyncing}>
+              {lcLinking ? '⏳…' : 'Link account'}
+            </button>
+          ) : (
+            <>
+              <button type="button" className="btn btn-primary btn-sm" onClick={() => handleSyncLeetcode(false)} disabled={lcSyncing}>
+                {lcSyncing ? '⏳ Syncing…' : '🔄 Sync now'}
+              </button>
+              <button type="button" className="btn btn-outline btn-sm" onClick={handleUnlinkLeetcode} disabled={lcSyncing}>
+                Disconnect
+              </button>
+            </>
+          )}
+        </div>
+
+        {lcLinked && lcSync?.totalOnLeetcode != null && (
+          <div style={{ marginTop: 14, display: 'flex', flexWrap: 'wrap', gap: 16, fontSize: 13 }}>
+            <span><strong>{lcSync.totalOnLeetcode}</strong> total solved</span>
+            <span style={{ color: '#34d399' }}>Easy {lcSync.easy ?? 0}</span>
+            <span style={{ color: '#fbbf24' }}>Med {lcSync.medium ?? 0}</span>
+            <span style={{ color: '#f87171' }}>Hard {lcSync.hard ?? 0}</span>
+            <span className="text-muted">Last sync: {lastSyncLabel}</span>
+          </div>
+        )}
+      </div>
+
       {/* ── AI Coach header ── */}
       <div className="card mb-4" style={{
         background: 'linear-gradient(135deg, rgba(99,102,241,0.12) 0%, rgba(129,140,248,0.06) 100%)',
@@ -114,8 +248,9 @@ export default function DsaCoachPanel({ career, onCareerUpdate, plan }) {
           <div>
             <div className="card-title" style={{ marginBottom: 4 }}>🤖 AI DSA Coach</div>
             <p className="text-muted" style={{ fontSize: 13, maxWidth: 520 }}>
-              Personalized for {career?.targetCompany || 'your target'} · powered by Groq.
-              Log practice in plain English — AI updates your tracker.
+              {coach?.leetcodeLinked
+                ? `Plan based on your LeetCode (@${career?.leetcodeUsername}) — gaps, Easy-first topics, and problem counts.`
+                : `Personalized for ${career?.targetCompany || 'your target'}. Link LeetCode above for topic-aware picks.`}
             </p>
           </div>
           <button className="btn btn-primary btn-sm" onClick={() => loadCoach(true)} disabled={loading}>
@@ -130,6 +265,55 @@ export default function DsaCoachPanel({ career, onCareerUpdate, plan }) {
           </div>
         ) : coach ? (
           <>
+            {coach.leetcodeInsight && (
+              <div style={{
+                marginTop: 14, padding: 12, borderRadius: 10,
+                background: 'rgba(255,161,22,0.1)', border: '1px solid rgba(255,161,22,0.3)',
+                fontSize: 13, lineHeight: 1.5,
+              }}>
+                <strong>🟠 LeetCode plan:</strong> {coach.leetcodeInsight}
+                {coach.dailyProblemTarget > 0 && (
+                  <span className="text-muted" style={{ display: 'block', marginTop: 6, fontSize: 12 }}>
+                    Target: <strong>{coach.dailyProblemTarget}</strong> problems/day on LeetCode
+                  </span>
+                )}
+              </div>
+            )}
+
+            {(coach.uncoveredTopics?.length > 0) && (
+              <div style={{ marginTop: 12, fontSize: 13 }}>
+                <span style={{ fontWeight: 600, color: '#f87171' }}>Topics not covered yet: </span>
+                {coach.uncoveredTopics.join(', ')}
+                <span className="text-muted" style={{ marginLeft: 6 }}>— start with Easy</span>
+              </div>
+            )}
+
+            {(coach.topicRoadmap?.length > 0) && (
+              <div style={{ marginTop: 16 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>📊 Topic roadmap (from LeetCode)</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 8 }}>
+                  {coach.topicRoadmap
+                    .filter((r) => r.status === 'not_covered' || r.status === 'weak')
+                    .slice(0, 6)
+                    .map((r) => (
+                      <div key={r.topic} style={{
+                        padding: 10, borderRadius: 8, fontSize: 12,
+                        border: `1px solid ${r.status === 'not_covered' ? 'rgba(248,113,113,0.4)' : 'rgba(251,191,36,0.35)'}`,
+                        background: r.status === 'not_covered' ? 'rgba(248,113,113,0.08)' : 'rgba(251,191,36,0.06)',
+                      }}>
+                        <div style={{ fontWeight: 600 }}>{r.topic}</div>
+                        <div style={{ color: 'var(--muted)', marginTop: 4 }}>
+                          {r.solved}/{r.target} · solve <strong>{r.toSolveThisWeek}</strong>/week
+                        </div>
+                        <div style={{ marginTop: 4, color: '#818cf8' }}>
+                          Start: {r.startWith || 'Easy'}
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
+
             <div className="grid-2" style={{ marginTop: 16, gap: 12 }}>
               <div style={{
                 padding: 14, borderRadius: 10,
@@ -182,6 +366,7 @@ export default function DsaCoachPanel({ career, onCareerUpdate, plan }) {
                         <div style={{ fontWeight: 600, fontSize: 13 }}>{m.task}</div>
                         <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
                           {m.topic} · ~{m.minutes || 45} min
+                          {m.problemsCount ? ` · ${m.problemsCount} problem(s)` : ''}
                         </div>
                       </div>
                       <span style={{ fontSize: 10, fontWeight: 600 }}>{ps.label}</span>
@@ -194,7 +379,14 @@ export default function DsaCoachPanel({ career, onCareerUpdate, plan }) {
             {/* Recommended problems */}
             {(coach.recommendedProblems?.length > 0) && (
               <div style={{ marginTop: 16 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>📌 AI problem picks</div>
+                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>
+                  📌 LeetCode problem picks
+                  {coach.leetcodeLinked && (
+                    <span className="text-muted" style={{ fontWeight: 400, marginLeft: 8, fontSize: 11 }}>
+                      Easy first on uncovered topics
+                    </span>
+                  )}
+                </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 10 }}>
                   {coach.recommendedProblems.map((p, i) => (
                     <div key={i} style={{
@@ -213,14 +405,33 @@ export default function DsaCoachPanel({ career, onCareerUpdate, plan }) {
                         {p.difficulty} · {p.pattern}
                       </div>
                       <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6 }}>{p.why}</div>
-                      <button
-                        type="button"
-                        className="btn btn-outline btn-sm"
-                        style={{ marginTop: 8, fontSize: 10 }}
-                        onClick={(e) => { e.stopPropagation(); loadTopicGuide(p.topic); }}
-                      >
-                        Study {p.topic}
-                      </button>
+                      {p.problemsToSolve > 0 && (
+                        <div style={{ fontSize: 11, color: '#a5b4fc', marginTop: 6 }}>
+                          Solve <strong>{p.problemsToSolve}</strong> this week
+                        </div>
+                      )}
+                      <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+                        {p.leetcodeUrl && (
+                          <a
+                            href={p.leetcodeUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="btn btn-primary btn-sm"
+                            style={{ fontSize: 10, textDecoration: 'none' }}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            Open on LeetCode ↗
+                          </a>
+                        )}
+                        <button
+                          type="button"
+                          className="btn btn-outline btn-sm"
+                          style={{ fontSize: 10 }}
+                          onClick={(e) => { e.stopPropagation(); loadTopicGuide(p.topic); }}
+                        >
+                          Study {p.topic}
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
