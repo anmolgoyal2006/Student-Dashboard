@@ -3,9 +3,10 @@ import { careerService }   from '../services/apiServices';
 import FocusMode           from '../components/FocusMode';
 import CareerProgressBar   from '../components/CareerProgressBar';
 import DsaCoachPanel       from '../components/DsaCoachPanel';
+import CompanyQuestionsPanel from '../components/CompanyQuestionsPanel';
 import toast from 'react-hot-toast';
 
-const COMPANIES = ['Amazon', 'Microsoft', 'Google', 'Flipkart', 'Adobe', 'Infosys', 'TCS', 'Other'];
+const COMPANIES = ['Amazon', 'Microsoft', 'Google', 'Meta', 'Apple', 'Netflix', 'Flipkart', 'Adobe', 'Uber', 'LinkedIn', 'Salesforce', 'Oracle', 'Infosys', 'TCS', 'Wipro', 'HCL Technologies', 'Other'];
 
 const READINESS_CONFIG = {
   Beginner:     { color: '#f59e0b', bg: 'rgba(245,158,11,0.1)',  label: '🌱 Beginner',     desc: 'Focus on DSA fundamentals and build projects.' },
@@ -401,6 +402,8 @@ export default function Career() {
               careerService.getPlan().then(({ data }) => setPlan(data)).catch(() => {});
             }}
           />
+
+          <CompanyQuestionsPanel career={career} />
 
           {/* ── Readiness banner ── */}
           {/* ── Readiness + Overall Goal ── */}

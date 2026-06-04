@@ -8,7 +8,7 @@ const dsaTopicSchema = new mongoose.Schema({
 
 const careerSchema = new mongoose.Schema({
   userId:          { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, unique: true },
-  targetCompany:   { type: String, enum: ['Amazon','Microsoft','Google','Flipkart','Adobe','Infosys','TCS','Other'], default: 'Other' },
+  targetCompany:   { type: String, enum: ['Amazon','Microsoft','Google','Meta','Apple','Netflix','Flipkart','Adobe','Uber','LinkedIn','Salesforce','Oracle','Infosys','TCS','Wipro','HCL Technologies','Other'], default: 'Other' },
   targetRole:      { type: String, default: 'Software Engineer' },
   problemsSolved:  { type: Number, default: 0 },
   leetcodeUsername: { type: String, default: '' },
@@ -22,6 +22,7 @@ const careerSchema = new mongoose.Schema({
     topicCounts:     { type: mongoose.Schema.Types.Mixed, default: {} },
     solvedSlugs:     [{ type: String }],
     solvedCount:     { type: Number, default: 0 },
+    companyProgress: { type: mongoose.Schema.Types.Mixed, default: {} }, // Track progress per company
   },
   readiness:       { type: String, enum: ['Beginner','Intermediate','Ready'], default: 'Beginner' },
   dsaTopics: [dsaTopicSchema],

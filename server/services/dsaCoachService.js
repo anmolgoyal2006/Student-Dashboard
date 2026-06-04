@@ -9,6 +9,8 @@ const {
   filterUnsolvedRecommendations,
   pickUnsolvedForTopic,
   slugFromUrl,
+  COMPANY_PROBLEMS,
+  UNCOVERED_LC_COUNT,
 } = require('./leetcodeService');
 
 const groq = new Groq({ apiKey: process.env.GROQ_CHAT_KEY || process.env.GROQ_API_KEY });
@@ -25,10 +27,19 @@ const COMPANY_FOCUS = {
   Amazon:    'Leadership principles, OOD, medium-hard DSA, bar-raiser depth',
   Google:    'Strong algorithms, graphs, DP, clean code under time pressure',
   Microsoft: 'Arrays, trees, system design basics, behavioral STAR stories',
+  Meta:      'Systems design, distributed systems, scalable architecture',
+  Apple:     'Low-level optimization, algorithms, system design',
+  Netflix:   'Distributed systems, scalability, backend engineering',
   Flipkart:  'Practical DSA, Java-heavy stacks, e-commerce scale questions',
   Adobe:     'Core DS, creative problem solving',
+  Uber:      'System design, distributed systems, real-time algorithms',
+  LinkedIn:  'Graph algorithms, system design, scalability',
+  Salesforce: 'Object-oriented design, system architecture, cloud concepts',
+  Oracle:    'Database design, SQL optimization, system architecture',
   Infosys:   'Fundamentals, aptitude + basic-medium coding',
   TCS:       'NQT patterns, arrays, strings, time management',
+  Wipro:     'Core DSA fundamentals, problem-solving speed',
+  'HCL Technologies': 'DSA basics, aptitude, coding fundamentals',
   Other:     'Balanced DSA across all topics, mock interviews',
 };
 
@@ -281,10 +292,7 @@ Return JSON:
         source: 'ai+leetcode',
         leetcodeLinked: true,
         topicRoadmap: parsed.topicRoadmap?.length ? parsed.topicRoadmap : base.topicRoadmap,
-        recommendedProblems: filterUnsolvedRecommendations(
-          aiRecs.length >= 3 ? aiRecs : base.recommendedProblems,
-          solvedSet
-        ),
+        recommendedProblems: base.recommendedProblems, // Always use our company-focused rule-based problems
         uncoveredTopics: parsed.uncoveredTopics || base.uncoveredTopics,
       };
       return merged;
@@ -350,6 +358,37 @@ Include exactly 4 problems they have NOT solved. Already solved (do NOT use): ${
 
   const unsolved = [];
   const used = new Set(solvedSet);
+
+  // First try company-specific problems
+  const companyProblems = COMPANY_PROBLEMS[profile.targetCompany];
+  if (companyProblems && companyProblems[topicName]) {
+    const topicCompanyProblems = companyProblems[topicName];
+    const experienced = (lc?.totalSolved || profile.problemsSolved) >= 120 || (road?.lcCount || 0) >= 25;
+    const prefer = experienced
+      ? ['Hard', 'Medium', 'Easy']
+      : (road?.lcCount || 0) < UNCOVERED_LC_COUNT
+      ? ['Easy', 'Medium']
+      : ['Medium', 'Easy', 'Hard'];
+
+    for (const diff of prefer) {
+      for (const problem of topicCompanyProblems) {
+        if (unsolved.length >= 4) break;
+        if (problem.difficulty === diff && !used.has(problem.slug)) {
+          used.add(problem.slug);
+          unsolved.push({
+            title: problem.title,
+            difficulty: problem.difficulty,
+            pattern: `${profile.targetCompany} frequently asked`,
+            approach: `This is a frequently asked problem at ${profile.targetCompany}. You haven't solved it on LeetCode yet — solve it next!`,
+            timeMins: problem.difficulty === 'Hard' ? 45 : problem.difficulty === 'Medium' ? 35 : 25,
+            leetcodeUrl: `https://leetcode.com/problems/${problem.slug}/`,
+          });
+        }
+      }
+    }
+  }
+
+  // Then fall back to default topic problems
   while (unsolved.length < 4) {
     const p = pickUnsolvedForTopic(
       topicName,

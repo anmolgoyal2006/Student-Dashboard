@@ -7,8 +7,42 @@ const {
   aggregateTagsToDashboardTopics,
   applyLeetcodeTopicsToDsaTopics,
   fetchSolvedSlugs,
+  buildLeetcodeInsights,
+  buildLeetcodeProblemPicks,
+  COMPANY_PROBLEMS,
 } = require('../services/leetcodeService');
 const { TOPIC_TARGETS } = require('../services/dsaCoachService');
+
+/**
+ * Calculate company-specific progress based on solved slugs
+ */
+function calculateCompanyProgress(solvedSlugs) {
+  const solvedSet = new Set(solvedSlugs || []);
+  const progress = {};
+
+  for (const [company, topics] of Object.entries(COMPANY_PROBLEMS)) {
+    let total = 0;
+    let solved = 0;
+
+    for (const [topicName, problems] of Object.entries(topics)) {
+      for (const problem of problems) {
+        total++;
+        if (solvedSet.has(problem.slug)) {
+          solved++;
+        }
+      }
+    }
+
+    progress[company] = {
+      total,
+      solved,
+      unsolved: total - solved,
+      completionRate: total > 0 ? Math.round((solved / total) * 100) : 0,
+    };
+  }
+
+  return progress;
+}
 
 const TOPIC_COMPLETE_THRESHOLD = 15;
 
@@ -125,6 +159,9 @@ exports.syncLeetcode = async (req, res) => {
     const problemsSolved = stats.totalSolved;
     const readiness = calcReadiness(problemsSolved);
 
+    // Calculate company-specific progress
+    const companyProgress = calculateCompanyProgress(solvedSlugs);
+
     const syncMeta = {
       lastSyncAt: new Date(),
       lastSeenIds: mergedSeen,
@@ -135,6 +172,7 @@ exports.syncLeetcode = async (req, res) => {
       topicCounts: lcByTopic,
       solvedSlugs,
       solvedCount: solvedSlugs.length,
+      companyProgress,
     };
 
     const update = {
@@ -198,5 +236,107 @@ exports.syncLeetcode = async (req, res) => {
     res.status(502).json({
       message: err.message || 'Failed to sync with LeetCode. Try again in a minute.',
     });
+  }
+};
+
+// GET /api/career/leetcode/company-questions - Get company-specific questions
+exports.getCompanyQuestions = async (req, res) => {
+  try {
+    const { company, topic, difficulty, frequency, limit = 20 } = req.query;
+    
+    // Get user's career profile
+    const career = await CareerProgress.findOne({ userId: req.user.id });
+    if (!career) {
+      return res.status(404).json({ message: 'Career profile not found.' });
+    }
+
+    // Get solved slugs if LeetCode is linked
+    let solvedSlugs = new Set();
+    if (career.leetcodeSync?.solvedSlugs) {
+      solvedSlugs = new Set(career.leetcodeSync.solvedSlugs);
+    }
+
+    // Use target company if not specified
+    const targetCompany = company || career.targetCompany || 'Amazon';
+    
+    // Check if company exists in our database
+    const companyProblems = COMPANY_PROBLEMS[targetCompany];
+    if (!companyProblems) {
+      return res.status(400).json({ 
+        message: `Company '${targetCompany}' not found. Available companies: ${Object.keys(COMPANY_PROBLEMS).join(', ')}` 
+      });
+    }
+
+    // Filter and collect problems
+    let filteredProblems = [];
+    const topicsToInclude = topic ? [topic] : Object.keys(companyProblems);
+    
+    for (const topicName of topicsToInclude) {
+      const topicProblems = companyProblems[topicName];
+      if (!topicProblems) continue;
+
+      for (const problem of topicProblems) {
+        // Skip if already solved
+        if (solvedSlugs.has(problem.slug)) continue;
+
+        // Filter by difficulty if specified
+        if (difficulty && problem.difficulty !== difficulty) continue;
+
+        // Filter by frequency if specified
+        if (frequency && problem.frequency !== frequency) continue;
+
+        filteredProblems.push({
+          title: problem.title,
+          slug: problem.slug,
+          topic: topicName,
+          difficulty: problem.difficulty,
+          frequency: problem.frequency || 'medium',
+          company: targetCompany,
+          leetcodeUrl: `https://leetcode.com/problems/${problem.slug}/`,
+          isSolved: false,
+        });
+      }
+    }
+
+    // Sort by frequency (high first) then by difficulty
+    const frequencyOrder = { high: 0, medium: 1, low: 2 };
+    const difficultyOrder = { Easy: 0, Medium: 1, Hard: 2 };
+    
+    filteredProblems.sort((a, b) => {
+      if (frequencyOrder[a.frequency] !== frequencyOrder[b.frequency]) {
+        return frequencyOrder[a.frequency] - frequencyOrder[b.frequency];
+      }
+      return difficultyOrder[a.difficulty] - difficultyOrder[b.difficulty];
+    });
+
+    // Apply limit
+    const limitedProblems = filteredProblems.slice(0, parseInt(limit));
+
+    // Calculate statistics
+    const totalProblemsInCompany = Object.values(companyProblems).flat().length;
+    const solvedInCompany = Object.values(companyProblems).flat().filter(p => solvedSlugs.has(p.slug)).length;
+    const unsolvedInCompany = totalProblemsInCompany - solvedInCompany;
+
+    res.json({
+      company: targetCompany,
+      problems: limitedProblems,
+      stats: {
+        total: totalProblemsInCompany,
+        solved: solvedInCompany,
+        unsolved: unsolvedInCompany,
+        completionRate: totalProblemsInCompany > 0 ? Math.round((solvedInCompany / totalProblemsInCompany) * 100) : 0,
+      },
+      filters: {
+        topic,
+        difficulty,
+        frequency,
+        limit: parseInt(limit),
+      },
+      availableTopics: Object.keys(companyProblems),
+      availableCompanies: Object.keys(COMPANY_PROBLEMS),
+    });
+  } catch (err) {
+    console.error('Company questions error:', err.message);
+    res.status(500).json({ message: err.message || 'Failed to fetch company questions.' });
   }
 };

@@ -99,6 +99,7 @@ export const careerService = {
   linkLeetcode: (username) => apiRequest('put', '/career/leetcode', { username }),
   unlinkLeetcode: () => apiRequest('delete', '/career/leetcode'),
   syncLeetcode: (username) => apiRequest('post', '/career/leetcode/sync', username ? { username } : {}),
+  getCompanyQuestions: (params = {}) => apiRequest('get', '/career/leetcode/company-questions', null, { params }),
 };
 
 // ─── AI Recommendations ───────────────────────────────────────────────────

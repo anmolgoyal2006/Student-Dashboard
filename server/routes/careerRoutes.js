@@ -25,6 +25,7 @@ const {
   linkLeetcode,
   unlinkLeetcode,
   syncLeetcode,
+  getCompanyQuestions,
 } = require('../controllers/leetcodeController');
 const { protect }                              = require('../middleware/authMiddleware');
 
@@ -38,6 +39,7 @@ router.post('/dsa/hint',          getHint);
 router.put('/leetcode',           linkLeetcode);
 router.delete('/leetcode',        unlinkLeetcode);
 router.post('/leetcode/sync',     syncLeetcode);
+router.get('/leetcode/company-questions', getCompanyQuestions);
 router.get('/',                   getCareer);
 router.put('/',                   updateCareer);
 router.patch('/topic/:topicName', updateTopic);
