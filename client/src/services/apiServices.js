@@ -88,6 +88,13 @@ export const careerService = {
     }),
   updateActiveIndex: (index) => apiRequest('patch', '/career/active-interview/index', { index }),
   resetActiveInterview: () => apiRequest('delete', '/career/active-interview'),
+
+  // AI DSA Coach
+  getDsaCoach: (refresh = false) => apiRequest('post', '/career/dsa/coach', { refresh }),
+  getDsaTopicGuide: (topic) => apiRequest('post', '/career/dsa/topic-guide', { topic }),
+  logDsaPractice: (text) => apiRequest('post', '/career/dsa/log-practice', { text }),
+  getDsaHint: (topic, problemTitle, attempt) =>
+    apiRequest('post', '/career/dsa/hint', { topic, problemTitle, attempt }),
 };
 
 // ─── AI Recommendations ───────────────────────────────────────────────────

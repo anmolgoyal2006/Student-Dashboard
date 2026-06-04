@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { careerService }   from '../services/apiServices';
 import FocusMode           from '../components/FocusMode';
 import CareerProgressBar   from '../components/CareerProgressBar';
+import DsaCoachPanel       from '../components/DsaCoachPanel';
 import toast from 'react-hot-toast';
 
 const COMPANIES = ['Amazon', 'Microsoft', 'Google', 'Flipkart', 'Adobe', 'Infosys', 'TCS', 'Other'];
@@ -20,6 +21,7 @@ export default function Career() {
   const [planLoad,  setPlanLoad]  = useState(true);
   const [activeDay, setActiveDay] = useState(0);
   const [todayProgress, setTodayProgress] = useState({ done: 0, remaining: 0 });
+  const [manualDsaOpen, setManualDsaOpen] = useState(false);
 
   // Tab switching
   const [activeTab, setActiveTab] = useState('dsa');
@@ -334,6 +336,9 @@ export default function Career() {
   const totalTopics     = career.dsaTopics.length;
   const progressPct     = totalTopics ? Math.round((completedTopics / totalTopics) * 100) : 0;
   const rc              = READINESS_CONFIG[career.readiness] || READINESS_CONFIG.Beginner;
+  const hasAiCoach      = Boolean(
+    career.dsaCoach?.dailyMission?.length || career.dsaCoach?.weeklyFocus?.length
+  );
   const TABS = [
     { id: 'dsa',    label: '📊 DSA Tracker' },
     { id: 'prep',   label: '🤖 AI Career Prep' },
@@ -388,6 +393,15 @@ export default function Career() {
 
       {activeTab === 'dsa' ? (
         <>
+          <DsaCoachPanel
+            career={career}
+            plan={plan}
+            onCareerUpdate={(updated) => {
+              setCareer(updated);
+              careerService.getPlan().then(({ data }) => setPlan(data)).catch(() => {});
+            }}
+          />
+
           {/* ── Readiness banner ── */}
           {/* ── Readiness + Overall Goal ── */}
           <div className="grid-2 mb-4">
@@ -432,113 +446,143 @@ export default function Career() {
                   </span>
                 </div>
 
-                {/* Today's Progress — improvement 4 */}
-                <div style={{
-                  marginTop: 14, paddingTop: 12,
-                  borderTop: '1px solid var(--border)',
-                  display: 'flex', gap: 16,
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ fontSize: 16 }}>✅</span>
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: '#34d399' }}>
-                        {todayProgress.done}
+                {!hasAiCoach && (
+                  <div style={{
+                    marginTop: 14, paddingTop: 12,
+                    borderTop: '1px solid var(--border)',
+                    display: 'flex', gap: 16,
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontSize: 16 }}>✅</span>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: '#34d399' }}>
+                          {todayProgress.done}
+                        </div>
+                        <div style={{ fontSize: 11, color: 'var(--muted)' }}>done today</div>
                       </div>
-                      <div style={{ fontSize: 11, color: 'var(--muted)' }}>done today</div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontSize: 16 }}>⏳</span>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: '#fbbf24' }}>
+                          {todayProgress.remaining}
+                        </div>
+                        <div style={{ fontSize: 11, color: 'var(--muted)' }}>remaining</div>
+                      </div>
                     </div>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ fontSize: 16 }}>⏳</span>
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: '#fbbf24' }}>
-                        {todayProgress.remaining}
-                      </div>
-                      <div style={{ fontSize: 11, color: 'var(--muted)' }}>remaining</div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* ── Manual tracker & settings (accordion) ── */}
+          <div className="card mb-4" style={{ padding: 0, overflow: 'hidden' }}>
+            <button
+              type="button"
+              onClick={() => setManualDsaOpen(o => !o)}
+              style={{
+                width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '14px 16px', border: 'none', background: 'transparent', cursor: 'pointer',
+                color: 'var(--text)', textAlign: 'left',
+              }}
+            >
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 600 }}>⚙️ Manual tracker &amp; settings</div>
+                <div className="text-muted" style={{ fontSize: 12, marginTop: 4 }}>
+                  {hasAiCoach
+                    ? 'AI coach handles daily & weekly plans — expand to edit targets or topics'
+                    : 'Target company, problem counts, and topic checklist'}
+                </div>
+              </div>
+              <span style={{ fontSize: 18, color: 'var(--muted)', flexShrink: 0 }}>
+                {manualDsaOpen ? '▾' : '▸'}
+              </span>
+            </button>
+            {manualDsaOpen && (
+              <div style={{ padding: '0 16px 16px', borderTop: '1px solid var(--border)' }}>
+                <div className="grid-2 mb-4" style={{ marginTop: 16 }}>
+                  <div className="card" style={{ marginBottom: 0 }}>
+                    <div className="card-title">🎯 Target Settings</div>
+                    <div className="form-group">
+                      <label className="form-label">Target Company</label>
+                      <select className="form-select" value={career.targetCompany} onChange={e => setCareer(p => ({ ...p, targetCompany: e.target.value }))}>
+                        {COMPANIES.map(c => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Target Role</label>
+                      <input className="form-input" value={career.targetRole} onChange={e => setCareer(p => ({ ...p, targetRole: e.target.value }))} placeholder="Software Engineer" />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Total Problems Solved</label>
+                      <input className="form-input" type="number" min="0" value={career.problemsSolved} onChange={e => setCareer(p => ({ ...p, problemsSolved: parseInt(e.target.value) || 0 }))} />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Skills (comma-separated)</label>
+                      <input className="form-input" value={(career.skills || []).join(', ')} onChange={e => setCareer(p => ({ ...p, skills: e.target.value.split(',').map(s => s.trim()).filter(Boolean) }))} placeholder="React, Node.js, MongoDB" />
+                    </div>
+                    <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                      {(career.skills || []).map(s => <span key={s} className="badge badge-primary">{s}</span>)}
                     </div>
                   </div>
+
+                  <div className="card" style={{ marginBottom: 0 }}>
+                    <div className="card-title">📊 DSA Progress Overview</div>
+                    <div style={{ marginBottom: 16 }}>
+                      <div className="flex justify-between" style={{ marginBottom: 6 }}>
+                        <span style={{ fontSize: 14 }}>{completedTopics} / {totalTopics} topics completed</span>
+                        <strong>{progressPct}%</strong>
+                      </div>
+                      <div className="progress">
+                        <div className={`progress-bar ${progressPct >= 75 ? 'success' : progressPct >= 40 ? 'warning' : 'danger'}`} style={{ width: `${progressPct}%` }} />
+                      </div>
+                    </div>
+                    {[
+                      { label: 'Beginner',        threshold: 50,  reached: career.problemsSolved >= 50  },
+                      { label: 'Intermediate',    threshold: 100, reached: career.problemsSolved >= 100 },
+                      { label: 'Placement Ready', threshold: 200, reached: career.problemsSolved >= 200 },
+                    ].map(m => (
+                      <div key={m.label} className="flex items-center gap-2" style={{ marginBottom: 10 }}>
+                        <span style={{ fontSize: 18 }}>{m.reached ? '✅' : '⬜'}</span>
+                        <div>
+                          <span style={{ fontSize: 14, fontWeight: 500 }}>{m.label}</span>
+                          <span className="text-muted" style={{ marginLeft: 8 }}>{m.threshold}+ problems</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="card" style={{ marginBottom: 0 }}>
+                  <div className="card-title">📋 DSA Topic Tracker</div>
+                  <div className="grid-2">
+                    {career.dsaTopics.map(topic => (
+                      <div key={topic.name} style={{
+                        display: 'flex', alignItems: 'center', gap: 12,
+                        padding: '10px 12px', borderRadius: 8, marginBottom: 8,
+                        background: topic.completed ? 'rgba(34,197,94,0.08)' : 'rgba(255,255,255,0.02)',
+                        border: `1px solid ${topic.completed ? 'rgba(34,197,94,0.3)' : 'var(--border)'}`,
+                      }}>
+                        <input type="checkbox" checked={topic.completed} onChange={e => toggleTopic(topic.name, e.target.checked)}
+                          style={{ width: 16, height: 16, cursor: 'pointer', accentColor: 'var(--primary)' }} />
+                        <div style={{ flex: 1, fontSize: 14, fontWeight: 500 }}>{topic.name}</div>
+                        <input type="number" min="0" value={topic.problems} onChange={e => updateProblems(topic.name, e.target.value)}
+                          style={{ width: 60, padding: '4px 8px', border: '1px solid var(--border)', borderRadius: 6, fontSize: 13, textAlign: 'center', background: 'rgba(255,255,255,0.04)', color: 'var(--text)' }} />
+                        <span className="text-muted" style={{ fontSize: 12 }}>probs</span>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-muted" style={{ fontSize: 12, marginTop: 12, marginBottom: 0 }}>
+                    Changes apply after you click <strong>Save Progress</strong> in the page header.
+                  </p>
                 </div>
               </div>
             )}
           </div>
 
-          {/* ── Target settings + DSA overview ── */}
-          <div className="grid-2 mb-4">
-            <div className="card">
-              <div className="card-title">🎯 Target Settings</div>
-              <div className="form-group">
-                <label className="form-label">Target Company</label>
-                <select className="form-select" value={career.targetCompany} onChange={e => setCareer(p => ({ ...p, targetCompany: e.target.value }))}>
-                  {COMPANIES.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-              </div>
-              <div className="form-group">
-                <label className="form-label">Target Role</label>
-                <input className="form-input" value={career.targetRole} onChange={e => setCareer(p => ({ ...p, targetRole: e.target.value }))} placeholder="Software Engineer" />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Total Problems Solved</label>
-                <input className="form-input" type="number" min="0" value={career.problemsSolved} onChange={e => setCareer(p => ({ ...p, problemsSolved: parseInt(e.target.value) || 0 }))} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Skills (comma-separated)</label>
-                <input className="form-input" value={(career.skills || []).join(', ')} onChange={e => setCareer(p => ({ ...p, skills: e.target.value.split(',').map(s => s.trim()).filter(Boolean) }))} placeholder="React, Node.js, MongoDB" />
-              </div>
-              <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                {(career.skills || []).map(s => <span key={s} className="badge badge-primary">{s}</span>)}
-              </div>
-            </div>
-
-            <div className="card">
-              <div className="card-title">📊 DSA Progress Overview</div>
-              <div style={{ marginBottom: 16 }}>
-                <div className="flex justify-between" style={{ marginBottom: 6 }}>
-                  <span style={{ fontSize: 14 }}>{completedTopics} / {totalTopics} topics completed</span>
-                  <strong>{progressPct}%</strong>
-                </div>
-                <div className="progress">
-                  <div className={`progress-bar ${progressPct >= 75 ? 'success' : progressPct >= 40 ? 'warning' : 'danger'}`} style={{ width: `${progressPct}%` }} />
-                </div>
-              </div>
-              {[
-                { label: 'Beginner',        threshold: 50,  reached: career.problemsSolved >= 50  },
-                { label: 'Intermediate',    threshold: 100, reached: career.problemsSolved >= 100 },
-                { label: 'Placement Ready', threshold: 200, reached: career.problemsSolved >= 200 },
-              ].map(m => (
-                <div key={m.label} className="flex items-center gap-2" style={{ marginBottom: 10 }}>
-                  <span style={{ fontSize: 18 }}>{m.reached ? '✅' : '⬜'}</span>
-                  <div>
-                    <span style={{ fontSize: 14, fontWeight: 500 }}>{m.label}</span>
-                    <span className="text-muted" style={{ marginLeft: 8 }}>{m.threshold}+ problems</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* ── DSA Topic Tracker ── */}
-          <div className="card mb-4">
-            <div className="card-title">📋 DSA Topic Tracker</div>
-            <div className="grid-2">
-              {career.dsaTopics.map(topic => (
-                <div key={topic.name} style={{
-                  display: 'flex', alignItems: 'center', gap: 12,
-                  padding: '10px 12px', borderRadius: 8, marginBottom: 8,
-                  background: topic.completed ? 'rgba(34,197,94,0.08)' : 'rgba(255,255,255,0.02)',
-                  border: `1px solid ${topic.completed ? 'rgba(34,197,94,0.3)' : 'var(--border)'}`,
-                }}>
-                  <input type="checkbox" checked={topic.completed} onChange={e => toggleTopic(topic.name, e.target.checked)}
-                    style={{ width: 16, height: 16, cursor: 'pointer', accentColor: 'var(--primary)' }} />
-                  <div style={{ flex: 1, fontSize: 14, fontWeight: 500 }}>{topic.name}</div>
-                  <input type="number" min="0" value={topic.problems} onChange={e => updateProblems(topic.name, e.target.value)}
-                    style={{ width: 60, padding: '4px 8px', border: '1px solid var(--border)', borderRadius: 6, fontSize: 13, textAlign: 'center', background: 'rgba(255,255,255,0.04)', color: 'var(--text)' }} />
-                  <span className="text-muted" style={{ fontSize: 12 }}>probs</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* ── Daily Action Plan ── */}
-          {plan && (
+          {/* ── Daily Action Plan (rule-based; hidden when AI coach active) ── */}
+          {plan && !hasAiCoach && (
             <div className="card mb-4">
               <div className="card-title">📅 Today's Action Plan</div>
               {plan.dailyTasks.length === 0 ? (
@@ -639,8 +683,8 @@ export default function Career() {
             </div>
           )}
 
-          {/* ── Weekly Plan ── */}
-          {plan && (
+          {/* ── Weekly Plan (rule-based; hidden when AI coach active) ── */}
+          {plan && !hasAiCoach && (
             <div className="card mb-4">
               <div className="card-title">📅 Weekly Plan</div>
               <div style={{ display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap' }}>

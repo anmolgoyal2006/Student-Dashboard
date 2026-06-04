@@ -40,6 +40,30 @@ const careerSchema = new mongoose.Schema({
     modelAnswer: { type: String },
     createdAt:   { type: Date, default: Date.now },
   }],
+  dsaCoach: {
+    generatedAt:         { type: Date },
+    source:              { type: String },
+    readinessInsight:    { type: String },
+    companyFocus:        { type: String },
+    placementScore:      { type: Number },
+    dailyMission:        [{ task: String, topic: String, priority: String, minutes: Number }],
+    weeklyFocus:         [{ day: String, topic: String, goal: String }],
+    recommendedProblems: [{
+      title: String, topic: String, difficulty: String,
+      pattern: String, why: String, companyRelevance: String,
+    }],
+    weakTopics:    [{ type: String }],
+    strongTopics:  [{ type: String }],
+    nextMilestone: { type: String },
+    studyTip:      { type: String },
+  },
+  dsaSessions: [{
+    date:          { type: Date, default: Date.now },
+    note:          { type: String },
+    problemsAdded: { type: Number, default: 0 },
+    topics:        [{ type: String }],
+    aiFeedback:    { type: String },
+  }],
 }, { timestamps: true });
 
 module.exports = mongoose.model('CareerProgress', careerSchema);
