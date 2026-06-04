@@ -253,7 +253,7 @@ exports.getCompanyQuestions = async (req, res) => {
     // Get solved slugs if LeetCode is linked
     let solvedSlugs = new Set();
     if (career.leetcodeSync?.solvedSlugs && Array.isArray(career.leetcodeSync.solvedSlugs)) {
-      solvedSlugs = new Set(career.leetcodeSync.solvedSlugs.map(s => s.toLowerCase().trim()));
+      solvedSlugs = new Set(career.leetcodeSync.solvedSlugs.map(s => String(s).toLowerCase().trim()));
     }
 
     // Use target company if not specified
@@ -282,7 +282,6 @@ exports.getCompanyQuestions = async (req, res) => {
         // Filter by frequency if specified
         if (frequency && problem.frequency !== frequency) continue;
 
-        const problemSlug = problem.slug.toLowerCase().trim();
         filteredProblems.push({
           title: problem.title,
           slug: problem.slug,
@@ -291,7 +290,6 @@ exports.getCompanyQuestions = async (req, res) => {
           frequency: problem.frequency || 'medium',
           company: targetCompany,
           leetcodeUrl: `https://leetcode.com/problems/${problem.slug}/`,
-          isSolved: solvedSlugs.has(problemSlug),
         });
       }
     }

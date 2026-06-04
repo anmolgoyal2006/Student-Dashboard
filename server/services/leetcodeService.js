@@ -115,60 +115,31 @@ async function fetchRecentAcSubmissions(username, limit = 50) {
 async function fetchSolvedSlugs(username) {
   const slugs = new Set();
 
-  const acQuery = `
-    query acSubmissionList($username: String!, $limit: Int!) {
-      matchedUser(username: $username) {
-        acSubmissionList(limit: $limit) {
-          titleSlug
-        }
+  // Try recentAcSubmissionList with higher limit (this seems to be working)
+  const recentAcQuery = `
+    query recentAcSubmissionList($username: String!, $limit: Int!) {
+      recentAcSubmissionList(username: $username, limit: $limit) {
+        titleSlug
       }
     }
   `;
   try {
-    const data = await lcQuery(acQuery, { username, limit: 500 });
-    for (const s of data?.matchedUser?.acSubmissionList || []) {
+    const data = await lcQuery(recentAcQuery, { username, limit: 500 });
+    for (const s of data?.recentAcSubmissionList || []) {
       if (s.titleSlug) slugs.add(s.titleSlug);
     }
-  } catch {
-    /* fall through */
+    console.log(`[LeetCode] Fetched ${slugs.size} solved from recentAcSubmissionList`);
+  } catch (err) {
+    console.log('[LeetCode] recentAcSubmissionList failed:', err.message);
   }
 
-  const listQuery = `
-    query submissionList($username: String!, $limit: Int!, $offset: Int!) {
-      submissionList(username: $username, limit: $limit, offset: $offset) {
-        hasNext
-        submissions {
-          titleSlug
-          statusDisplay
-        }
-      }
-    }
-  `;
-  try {
-    let offset = 0;
-    const limit = 20;
-    for (let page = 0; page < 40; page++) {
-      const data = await lcQuery(listQuery, { username, limit, offset });
-      const block = data?.submissionList;
-      const subs = block?.submissions || [];
-      for (const s of subs) {
-        if ((s.statusDisplay || '').toLowerCase() === 'accepted' && s.titleSlug) {
-          slugs.add(s.titleSlug);
-        }
-      }
-      offset += limit;
-      if (!block?.hasNext || subs.length < limit) break;
-      await new Promise((r) => setTimeout(r, 80));
-    }
-  } catch {
-    /* fall through */
-  }
-
-  const recent = await fetchRecentAcSubmissions(username, 50);
+  // Fallback to fetchRecentAcSubmissions
+  const recent = await fetchRecentAcSubmissions(username, 200);
   for (const s of recent) {
     if (s.titleSlug) slugs.add(s.titleSlug);
   }
 
+  console.log(`[LeetCode] Total solved problems found: ${slugs.size}`);
   return slugs;
 }
 
