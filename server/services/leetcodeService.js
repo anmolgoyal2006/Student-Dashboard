@@ -1008,6 +1008,29 @@ const COMPANY_PROBLEMS = {
   },
 };
 
+// Populate 'Other' dynamically with general problem pools
+COMPANY_PROBLEMS.Other = {};
+for (const [topic, problems] of Object.entries(TOPIC_STARTERS || {})) {
+  COMPANY_PROBLEMS.Other[topic] = COMPANY_PROBLEMS.Other[topic] || [];
+  COMPANY_PROBLEMS.Other[topic].push(...problems.map(p => ({ ...p, frequency: 'medium' })));
+}
+for (const [topic, problems] of Object.entries(TOPIC_MEDIUM_PICKS || {})) {
+  COMPANY_PROBLEMS.Other[topic] = COMPANY_PROBLEMS.Other[topic] || [];
+  for (const p of problems) {
+    if (!COMPANY_PROBLEMS.Other[topic].some(existing => existing.slug === p.slug)) {
+      COMPANY_PROBLEMS.Other[topic].push({ ...p, frequency: 'medium' });
+    }
+  }
+}
+for (const [topic, problems] of Object.entries(TOPIC_HARD_PICKS || {})) {
+  COMPANY_PROBLEMS.Other[topic] = COMPANY_PROBLEMS.Other[topic] || [];
+  for (const p of problems) {
+    if (!COMPANY_PROBLEMS.Other[topic].some(existing => existing.slug === p.slug)) {
+      COMPANY_PROBLEMS.Other[topic].push({ ...p, frequency: 'medium' });
+    }
+  }
+}
+
 function topicStatusFromCounts(lcCount, target, totalSolved) {
   const solved = lcCount;
   const gap = Math.max(0, target - solved);
