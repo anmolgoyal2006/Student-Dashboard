@@ -5,7 +5,7 @@ import axios from 'axios';
 
 // ─── Styles (inline for portability) ─────────────────────────────────────────
 const styles = {
-  container:   { maxWidth: 700, margin: '0 auto', padding: 24, fontFamily: 'sans-serif' },
+  container:   { maxWidth: 700, margin: '0 auto', padding: '24px 14px', fontFamily: 'sans-serif' },
   card:        { background: '#1e1e2e', borderRadius: 12, padding: 24, color: '#fff' },
   title:       { fontSize: 22, fontWeight: 700, marginBottom: 4 },
   subtitle:    { fontSize: 14, color: '#aaa', marginBottom: 24 },
@@ -16,7 +16,7 @@ const styles = {
   btnDisabled: { opacity: 0.5, cursor: 'not-allowed' },
   success:     { background: '#1a3a2a', border: '1px solid #2e7d52', borderRadius: 8, padding: 16, marginTop: 16, color: '#4caf7d' },
   error:       { background: '#3a1a1a', border: '1px solid #7d2e2e', borderRadius: 8, padding: 16, marginTop: 16, color: '#f44336' },
-  table:       { width: '100%', borderCollapse: 'collapse', marginTop: 12, fontSize: 13 },
+  table:       { width: '100%', minWidth: '500px', borderCollapse: 'collapse', marginTop: 12, fontSize: 13 },
   th:          { background: '#2a2a3e', padding: '8px 12px', textAlign: 'left', color: '#aaa' },
   td:          { padding: '8px 12px', borderBottom: '1px solid #333' },
   tag:         { display: 'inline-block', padding: '2px 8px', borderRadius: 4, fontSize: 12, fontWeight: 600 },
@@ -131,7 +131,7 @@ const downloadTemplate = async () => {
         </div>
 
         {/* ── Buttons ── */}
-        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
           <button style={styles.btnSecondary} onClick={downloadTemplate}>
             ⬇ Download Template
           </button>

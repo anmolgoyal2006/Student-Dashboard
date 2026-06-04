@@ -157,8 +157,8 @@ export default function OcrReviewPanel({ sources, onProceed }) {
             📄 {src.label || src.fileName} ({src.students.length} students)
           </div>
 
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ minWidth: '100%', fontSize: 12 }}>
+          <div className="table-wrap">
+            <table style={{ minWidth: '640px', fontSize: 12 }}>
               <thead>
                 <tr>
                   <th style={{ padding: '6px 10px', textAlign: 'left' }}>SID / Roll</th>

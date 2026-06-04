@@ -570,7 +570,7 @@ const [ocrCorrectedGrades, setOcrCorrectedGrades] = useState(null);
                     </button>
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 0 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: 12, marginBottom: 0 }}>
                     <div className="form-group" style={{ marginBottom: 0 }}>
                       <label className="form-label">Label</label>
                       <input
