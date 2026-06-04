@@ -834,7 +834,7 @@ export default function AIAssistant() {
             <p style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600 }}>
               Example Commands — or type anything naturally
             </p>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: 8 }}>
               {ASSISTANT_COMMANDS.map(cmd => (
                 <CommandChip key={cmd.label} {...cmd} onClick={handleChipClick} />
               ))}

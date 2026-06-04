@@ -582,7 +582,7 @@ const s = {
   progressBar: { height: "100%", background: "#6366f1", borderRadius: 3, transition: "width 0.3s" },
 
   tableWrapper: { overflowX: "auto", marginBottom: 12 },
-  table: { width: "100%", borderCollapse: "collapse", fontSize: 13 },
+  table: { width: "100%", minWidth: "560px", borderCollapse: "collapse", fontSize: 13 },
   th: {
     textAlign: "left", padding: "8px 8px",
     background: "rgba(255,255,255,0.05)",

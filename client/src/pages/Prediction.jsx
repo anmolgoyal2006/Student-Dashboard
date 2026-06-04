@@ -438,6 +438,67 @@ export default function Prediction() {
           flex-shrink: 0;
           margin-top: 1px;
         }
+
+        .prediction-controls {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+          gap: 16px;
+          align-items: flex-end;
+        }
+
+        .prediction-controls-btn {
+          height: 42px;
+          width: 100%;
+        }
+
+        .semester-credits-grid {
+          display: grid;
+          grid-template-columns: repeat(8, 1fr);
+          gap: 8px;
+          margin-top: 12px;
+        }
+
+        @media (max-width: 768px) {
+          .prediction-controls {
+            grid-template-columns: repeat(2, 1fr);
+          }
+          .prediction-controls-btn {
+            grid-column: span 2;
+          }
+          .semester-credits-grid {
+            grid-template-columns: repeat(4, 1fr);
+          }
+          .ai-trajectory-header {
+            padding: 16px;
+          }
+          .ai-trajectory-card > div:last-child {
+            padding: 16px !important;
+          }
+        }
+
+        @media (max-width: 480px) {
+          .prediction-controls {
+            grid-template-columns: 1fr;
+          }
+          .prediction-controls-btn {
+            grid-column: span 1;
+          }
+          .semester-credits-grid {
+            grid-template-columns: repeat(3, 1fr);
+          }
+          .bottleneck-grid {
+            grid-template-columns: 1fr;
+          }
+          .roadmap-grid {
+            grid-template-columns: repeat(2, 1fr);
+          }
+        }
+        
+        @media (max-width: 360px) {
+          .roadmap-grid {
+            grid-template-columns: 1fr;
+          }
+        }
       `}</style>
       <div className="page-header">
         <div>
@@ -447,8 +508,8 @@ export default function Prediction() {
       </div>
 
       {/* Controls */}
-      <div className="card mb-4" style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-        <div className="form-group" style={{ margin: 0, flex: 1, minWidth: 140 }}>
+      <div className="card mb-4 prediction-controls">
+        <div className="form-group" style={{ margin: 0 }}>
           <label className="form-label">Current CGPA (optional)</label>
           <input
             className="form-input"
@@ -458,7 +519,7 @@ export default function Prediction() {
             onChange={e => setManualCGPA(e.target.value)}
           />
         </div>
-        <div className="form-group" style={{ margin: 0, flex: 1, minWidth: 120 }}>
+        <div className="form-group" style={{ margin: 0 }}>
           <label className="form-label">Completed Sems</label>
           <input
             className="form-input"
@@ -468,7 +529,7 @@ export default function Prediction() {
             onChange={e => setCompletedManual(e.target.value)}
           />
         </div>
-        <div className="form-group" style={{ margin: 0, flex: 1, minWidth: 140 }}>
+        <div className="form-group" style={{ margin: 0 }}>
           <label className="form-label">Target CGPA</label>
           <input
             className="form-input"
@@ -478,7 +539,7 @@ export default function Prediction() {
             onChange={e => setTargetCGPA(e.target.value)}
           />
         </div>
-        <div className="form-group" style={{ margin: 0, flex: 1, minWidth: 120 }}>
+        <div className="form-group" style={{ margin: 0 }}>
           <label className="form-label">Total Semesters</label>
           <input
             className="form-input"
@@ -487,7 +548,7 @@ export default function Prediction() {
             onChange={e => handleTotalSemestersChange(e.target.value)}
           />
         </div>
-        <button className="btn btn-primary" onClick={fetchPredict} disabled={loading}>
+        <button className="btn btn-primary prediction-controls-btn" onClick={fetchPredict} disabled={loading}>
           {loading ? 'Calculating…' : 'Calculate'}
         </button>
       </div>
@@ -506,14 +567,14 @@ export default function Prediction() {
           </span>
         </div>
         {showCredits && (
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
+          <div className="semester-credits-grid">
             {semCredits.map((c, i) => (
-              <div key={i} className="form-group" style={{ margin: 0, width: 80 }}>
+              <div key={i} className="form-group" style={{ margin: 0 }}>
                 <label className="form-label" style={{ fontSize: 10 }}>S{i + 1}</label>
                 <input
                   className="form-input"
                   type="number" min="1" step="1"
-                  style={{ fontSize: 12, padding: '4px 8px', height: 'auto' }}
+                  style={{ fontSize: 12, padding: '4px 8px', height: 'auto', textAlign: 'center' }}
                   value={c}
                   onChange={e => updateSemCredits(i, e.target.value)}
                 />

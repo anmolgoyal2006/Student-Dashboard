@@ -385,7 +385,7 @@ export default function Scheduler() {
           {/* Calendar grid */}
           <div style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(7, 1fr)',
+            gridTemplateColumns: 'repeat(7, minmax(110px, 1fr))',
             gap: 8,
             overflowX: 'auto',
           }}>

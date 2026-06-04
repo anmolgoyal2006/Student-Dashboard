@@ -147,8 +147,8 @@ export default function AdminPanel() {
             <p className="text-muted">Try a different search or filter.</p>
           </div>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+          <div className="table-wrap">
+            <table style={{ width: '100%', minWidth: '560px', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
                 <tr style={{ background: 'rgba(255,255,255,0.04)' }}>
                   {['User', 'SID', 'Branch / Sem', 'Current Role', 'Change Role'].map(h => (

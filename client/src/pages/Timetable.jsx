@@ -122,6 +122,41 @@ export default function Timetable() {
 
   return (
     <div>
+      <style>{`
+        .timetable-slot-row {
+          display: grid;
+          grid-template-columns: 1fr 1fr 1fr 1fr auto;
+          gap: 8px;
+          margin-bottom: 12px;
+          align-items: end;
+        }
+        .timetable-slot-row label {
+          display: block;
+        }
+        @media (min-width: 601px) {
+          .timetable-slot-row-subsequent label {
+            display: none;
+          }
+        }
+        @media (max-width: 600px) {
+          .timetable-slot-row {
+            grid-template-columns: 1fr 1fr;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            background: rgba(255, 255, 255, 0.02);
+            padding: 12px;
+            border-radius: 10px;
+            gap: 10px;
+          }
+          .timetable-slot-delete-btn {
+            grid-column: span 2;
+            margin-top: 4px;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+          }
+        }
+      `}</style>
       {/* ── Page header ──────────────────────────────────── */}
       <div className="page-header">
         <div>
@@ -221,31 +256,27 @@ export default function Timetable() {
             <div style={{ marginBottom: 16 }}>
              <label className="form-label" style={{ marginBottom: 10, display: 'block' }}>Schedule Slots</label>
               {(form.schedule || []).map((slot, i) => (
-                <div key={i} style={{
-                  display: 'grid',
-                  gridTemplateColumns: '1fr 1fr 1fr 1fr auto',
-                  gap: 8, marginBottom: 8, alignItems: 'end',
-                }}>
+                <div key={i} className={`timetable-slot-row${i > 0 ? ' timetable-slot-row-subsequent' : ''}`}>
                   <div className="form-group" style={{ margin: 0 }}>
-                    {i === 0 && <label className="form-label">Day</label>}
+                    <label className="form-label">Day</label>
                     <select className="form-select" value={slot.day} onChange={e => handleSlotChange(i, 'day', e.target.value)}>
                       {DAYS.map(d => <option key={d} value={d}>{d}</option>)}
                     </select>
                   </div>
                   <div className="form-group" style={{ margin: 0 }}>
-                    {i === 0 && <label className="form-label">Start</label>}
-<input className="form-input" type="time" value={slot.startTime} onChange={e => handleSlotChange(i, 'startTime', e.target.value)} />
+                    <label className="form-label">Start</label>
+                    <input className="form-input" type="time" value={slot.startTime} onChange={e => handleSlotChange(i, 'startTime', e.target.value)} />
                   </div>
                   <div className="form-group" style={{ margin: 0 }}>
-                    {i === 0 && <label className="form-label">End</label>}
-<input className="form-input" type="time" value={slot.endTime} onChange={e => handleSlotChange(i, 'endTime', e.target.value)} />
+                    <label className="form-label">End</label>
+                    <input className="form-input" type="time" value={slot.endTime} onChange={e => handleSlotChange(i, 'endTime', e.target.value)} />
                   </div>
                   <div className="form-group" style={{ margin: 0 }}>
-                    {i === 0 && <label className="form-label">Room</label>}
+                    <label className="form-label">Room</label>
                     <input className="form-input" type="text" value={slot.room} onChange={e => handleSlotChange(i, 'room', e.target.value)} placeholder="LH-101" />
                   </div>
-                  <button type="button" onClick={() => removeSlot(i)}
-                    style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.25)', color: '#f87171', borderRadius: 8, padding: '9px 12px', cursor: 'pointer', marginTop: i === 0 ? 22 : 0 }}>
+                  <button type="button" onClick={() => removeSlot(i)} className="timetable-slot-delete-btn"
+                    style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.25)', color: '#f87171', borderRadius: 8, padding: '9px 12px', cursor: 'pointer' }}>
                     ✕
                   </button>
                 </div>

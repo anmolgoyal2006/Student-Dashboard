@@ -212,6 +212,51 @@ const StudentAttendanceView = ({ sid }) => {
 
   return (
     <div>
+      <style>{`
+        .attendance-sub-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 0.4rem;
+          gap: 12px;
+        }
+        .attendance-sub-left {
+          display: flex;
+          align-items: center;
+          gap: 0.4rem;
+          min-width: 0;
+          flex: 1;
+        }
+        .attendance-sub-name {
+          font-size: 0.85rem;
+          font-weight: 600;
+          color: var(--text);
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        @media (max-width: 480px) {
+          .attendance-sub-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 6px;
+          }
+          .attendance-sub-left {
+            width: 100%;
+            flex-wrap: wrap;
+          }
+          .attendance-sub-name {
+            white-space: normal;
+            width: 100%;
+          }
+          .attendance-sub-right {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            margin-top: 2px;
+          }
+        }
+      `}</style>
       {/* ── Page header ── */}
       <div className="page-header">
         <div>
@@ -411,12 +456,9 @@ const StudentAttendanceView = ({ sid }) => {
                 const insight = getSmartInsight(subject.present, subject.total);
                 return (
                   <div key={subject.code || subject.subject} style={{ marginBottom: "0.5rem" }}>
-                    <div style={{
-                      display: "flex", justifyContent: "space-between",
-                      alignItems: "center", marginBottom: "0.4rem",
-                    }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
-                        <span style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text)" }}>
+                    <div className="attendance-sub-header">
+                      <div className="attendance-sub-left">
+                        <span className="attendance-sub-name" title={subject.subject}>
                           {subject.subject}
                         </span>
                         <span style={{
@@ -442,7 +484,7 @@ const StudentAttendanceView = ({ sid }) => {
                           </span>
                         )}
                       </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                      <div className="attendance-sub-right" style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                         <span className="text-muted" style={{ fontSize: "0.73rem" }}>
                           {subject.present}/{subject.total}
                         </span>

@@ -774,7 +774,7 @@ export default function Career() {
               </p>
 
               {/* Method Switcher */}
-              <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
                 <button
                   type="button"
                   className={`btn btn-sm ${scanMethod === 'pdf' ? 'btn-primary' : 'btn-outline'}`}
@@ -1166,8 +1166,8 @@ export default function Career() {
               <p className="text-muted" style={{ marginBottom: 16 }}>
                 Review feedback and reference model answers from your previous mock interviews.
               </p>
-              <div style={{ overflowX: 'auto' }}>
-                <table className="table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <div className="table-wrap">
+                <table className="table" style={{ width: '100%', minWidth: '560px', borderCollapse: 'collapse' }}>
                   <thead>
                     <tr style={{ borderBottom: '1px solid var(--border)', textAlign: 'left' }}>
                       <th style={{ padding: '10px 8px', fontSize: 12, color: 'var(--muted)', fontWeight: 600 }}>TOPIC</th>

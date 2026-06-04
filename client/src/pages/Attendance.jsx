@@ -129,7 +129,52 @@ if (loading) return <div className="spinner" />;
 
   return (
     <div>
-   {/* Bulk upload — teachers only */}
+      <style>{`
+        .attendance-sub-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 8px;
+          gap: 12px;
+        }
+        .attendance-sub-left {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          min-width: 0;
+          flex: 1;
+        }
+        .attendance-sub-name {
+          font-weight: 700;
+          font-size: 14px;
+          color: var(--text);
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        @media (max-width: 480px) {
+          .attendance-sub-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 6px;
+          }
+          .attendance-sub-left {
+            width: 100%;
+            flex-wrap: wrap;
+          }
+          .attendance-sub-name {
+            white-space: normal;
+            width: 100%;
+          }
+          .attendance-sub-right {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            margin-top: 2px;
+          }
+        }
+      `}</style>
+      {/* Bulk upload — teachers only */}
       <div className="page-header">
         <div>
           <h1 className="page-title">Attendance Tracker</h1>
@@ -324,15 +369,17 @@ function SubjectRow({ data }) {
   return (
    <div className={`subject-row subject-row--${theme.bar}`}>
       {/* Header row */}
-      <div className="flex justify-between items-center" style={{ marginBottom: 8 }}>
-        <div>
-<span className="subject-name">
+      <div className="attendance-sub-header">
+        <div className="attendance-sub-left">
+          <span className="attendance-sub-name" title={subject}>
             {subject}
           </span>
-          <span className="text-muted">{present}/{total} classes attended</span>
+          <span className="text-muted" style={{ fontSize: 12, flexShrink: 0 }}>
+            {present}/{total} classes attended
+          </span>
         </div>
-        <div className="flex items-center gap-2">
-         <span className={`subject-pct subject-pct--${theme.bar}`}>{percentage}%</span>
+        <div className="attendance-sub-right" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span className={`subject-pct subject-pct--${theme.bar}`}>{percentage}%</span>
           <span className={`badge ${theme.badge}`}>{theme.tag}</span>
         </div>
       </div>

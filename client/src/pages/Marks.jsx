@@ -158,6 +158,24 @@ export default function Marks() {
 
   return (
     <div>
+      <style>{`
+        .marks-subject-row {
+          display: grid;
+          grid-template-columns: 2fr 80px 100px auto;
+          gap: 8px;
+          margin-bottom: 8px;
+          align-items: center;
+        }
+        @media (max-width: 500px) {
+          .marks-subject-row {
+            grid-template-columns: 1fr 80px auto;
+            gap: 6px;
+          }
+          .marks-subject-name {
+            grid-column: span 3;
+          }
+        }
+      `}</style>
       {/* ── Unified Page Header ── */}
       <div className="page-header" style={{ marginBottom: 0 }}>
         <div>
@@ -388,8 +406,8 @@ export default function Marks() {
                 </div>
                 <label className="form-label" style={{ marginBottom: 8 }}>Subjects *</label>
                 {semForm.subjects.map((s, i) => (
-                  <div key={`semform-subj-${i}`} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>
-                    <input className="form-input" style={{ flex: 2, minWidth: 120 }} placeholder="Subject name"
+                  <div key={`semform-subj-${i}`} className="marks-subject-row">
+                    <input className="form-input marks-subject-name" placeholder="Subject name"
                       value={s.name} onChange={e => updateSubjectRow(i, 'name', e.target.value)} />
                     <input className="form-input" style={{ width: 80 }} type="number" min="1" placeholder="Credits"
                       value={s.credits} onChange={e => updateSubjectRow(i, 'credits', e.target.value)} />
@@ -399,8 +417,10 @@ export default function Marks() {
                         <option key={grade} value={grade}>{grade} ({point})</option>
                       ))}
                     </select>
-                    {semForm.subjects.length > 1 && (
+                    {semForm.subjects.length > 1 ? (
                       <button className="btn btn-danger btn-sm" onClick={() => removeSubjectRow(i)}>✕</button>
+                    ) : (
+                      <div style={{ width: 28 }} />
                     )}
                   </div>
                 ))}
