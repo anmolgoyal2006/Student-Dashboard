@@ -8,6 +8,7 @@
  */
 import { useState, useMemo } from 'react';
 import * as XLSX from 'xlsx';
+import toast from 'react-hot-toast';
 import Leaderboard from './Leaderboard';
 import MarksFilter from './MarksFilter';
 import WeightInput from './WeightInput';
@@ -30,7 +31,6 @@ export default function UploadMarks({ onResult }) {
   const [sources, setSources]       = useState([]);
   const [leaderboard, setLeaderboard] = useState(null);
   const [loading, setLoading]       = useState(false);
-  const [error, setError]           = useState('');
 
   const [bestOfGroups, setBestOfGroups] = useState([]);
   const [relativeGradingEnabled, setRelativeGradingEnabled] = useState(false);
@@ -108,12 +108,11 @@ const [ocrCorrectedGrades, setOcrCorrectedGrades] = useState(null);
       f.name.toLowerCase().endsWith('.pdf')
     );
     if (!files.length) {
-      setError('Please select at least one PDF file.');
+      toast.error('Please select at least one PDF file.');
       return;
     }
 
     setLoading(true);
-    setError('');
 
     try {
       const form = new FormData();
@@ -137,12 +136,11 @@ const [ocrCorrectedGrades, setOcrCorrectedGrades] = useState(null);
       if (addedCount) {
         setLeaderboard(null);
         onResult?.(null);
-        setError('');
       } else if (incoming.length) {
-        setError('Those PDF(s) are already in the list.');
+        toast.error('Those PDF(s) are already in the list.');
       }
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to parse PDFs.');
+      toast.error(err.response?.data?.message || 'Failed to parse PDFs.');
     } finally {
       setLoading(false);
     }
@@ -221,7 +219,7 @@ const [ocrCorrectedGrades, setOcrCorrectedGrades] = useState(null);
 
   const handleGenerate = async () => {
     if (!sources.length) {
-      setError('Upload at least one PDF first.');
+      toast.error('Upload at least one PDF first.');
       return;
     }
 
@@ -244,11 +242,11 @@ const [ocrCorrectedGrades, setOcrCorrectedGrades] = useState(null);
     };
 
     if (totalWeight <= 0 && sources.some((s) => !isSourceCoveredByBestOf(s))) {
-      setError('Total weight must be greater than zero.');
+      toast.error('Total weight must be greater than zero.');
       return;
     }
     if (sources.some((s) => !String(s.label || '').trim())) {
-      setError('Every PDF must have a label.');
+      toast.error('Every PDF must have a label.');
       return;
     }
     // Allow 0 selected columns if source is fully covered by best-of groups
@@ -256,7 +254,7 @@ const [ocrCorrectedGrades, setOcrCorrectedGrades] = useState(null);
       if (s.selectedColumns?.length) return false;
       return !isSourceCoveredByBestOf(s);
     })) {
-      setError('Each PDF must have at least one score column selected.');
+      toast.error('Each PDF must have at least one score column selected.');
       return;
     }
     // Weight check: skip sources fully covered by best-of
@@ -264,12 +262,11 @@ const [ocrCorrectedGrades, setOcrCorrectedGrades] = useState(null);
       if (isSourceCoveredByBestOf(s)) return false;
       return getSourceFileWeight(s) <= 0;
     })) {
-      setError('Each PDF must have at least one score with a weight greater than zero.');
+      toast.error('Each PDF must have at least one score with a weight greater than zero.');
       return;
     }
 
     setLoading(true);
-    setError('');
 
     try {
       const bestOfConfigs = bestOfGroups
@@ -321,7 +318,7 @@ const [ocrCorrectedGrades, setOcrCorrectedGrades] = useState(null);
       setLeaderboard(res.data);
       onResult?.(res.data);
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to generate leaderboard.');
+      toast.error(err.response?.data?.message || 'Failed to generate leaderboard.');
     } finally {
       setLoading(false);
     }
@@ -375,11 +372,10 @@ const [ocrCorrectedGrades, setOcrCorrectedGrades] = useState(null);
 
   const handleGenerateSgpa = async () => {
     if (!ocrCorrectedGrades) {
-      setError('Please review and save OCR corrections first.');
+      toast.error('Please review and save OCR corrections first.');
       return;
     }
     setSgpaLoading(true);
-    setError('');
     setLeaderboard(null);
     try {
       const payload = {
@@ -398,7 +394,7 @@ const [ocrCorrectedGrades, setOcrCorrectedGrades] = useState(null);
       const res = await marksService.ocrReviewGenerate(payload);
       setSgpaLeaderboard(res.data);
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to generate SGPA leaderboard.');
+      toast.error(err.response?.data?.message || 'Failed to generate SGPA leaderboard.');
     } finally {
       setSgpaLoading(false);
     }
@@ -406,7 +402,6 @@ const [ocrCorrectedGrades, setOcrCorrectedGrades] = useState(null);
 
   const handleGenerateSgpaDirect = async () => {
     setSgpaLoading(true);
-    setError('');
     setLeaderboard(null);
     try {
       const payload = {
@@ -424,7 +419,7 @@ const [ocrCorrectedGrades, setOcrCorrectedGrades] = useState(null);
       const res = await marksService.generateSgpaLeaderboard(payload);
       setSgpaLeaderboard(res.data);
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to generate SGPA leaderboard.');
+      toast.error(err.response?.data?.message || 'Failed to generate SGPA leaderboard.');
     } finally {
       setSgpaLoading(false);
     }
@@ -454,7 +449,6 @@ const [ocrCorrectedGrades, setOcrCorrectedGrades] = useState(null);
     setSgpaLeaderboard(null);
     setShowOcrReview(false);
     setOcrCorrectedGrades(null);
-    setError('');
     onResult?.(null);
   };
 
@@ -856,22 +850,6 @@ const [ocrCorrectedGrades, setOcrCorrectedGrades] = useState(null);
           >
             {loading ? '⏳ Parsing PDFs…' : '🚀 Select PDFs'}
           </button>
-        )}
-
-        {error && (
-          <div
-            style={{
-              marginTop: 12,
-              padding: 12,
-              borderRadius: 8,
-              background: 'rgba(239,68,68,0.1)',
-              border: '1px solid rgba(239,68,68,0.3)',
-              color: '#f87171',
-              fontSize: 13,
-            }}
-          >
-            ❌ {error}
-          </div>
         )}
       </div>
 
