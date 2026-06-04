@@ -476,7 +476,8 @@ export default function Career() {
             )}
           </div>
 
-          {/* ── Manual tracker & settings (accordion) ── */}
+          {/* ── Manual tracker (hidden when LeetCode linked — auto-sync only) ── */}
+          {!career.leetcodeUsername && (
           <div className="card mb-4" style={{ padding: 0, overflow: 'hidden' }}>
             <button
               type="button"
@@ -580,6 +581,7 @@ export default function Career() {
               </div>
             )}
           </div>
+          )}
 
           {/* ── Daily Action Plan (rule-based; hidden when AI coach active) ── */}
           {plan && !hasAiCoach && (

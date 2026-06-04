@@ -6,6 +6,7 @@ const {
   enrichSubmissionsWithTopics,
   aggregateTagsToDashboardTopics,
   applyLeetcodeTopicsToDsaTopics,
+  fetchSolvedSlugs,
 } = require('../services/leetcodeService');
 const { TOPIC_TARGETS } = require('../services/dsaCoachService');
 
@@ -83,6 +84,8 @@ exports.syncLeetcode = async (req, res) => {
     const stats = await fetchUserStats(username);
     const tagRows = await fetchSkillTagCounts(username);
     const lcByTopic = aggregateTagsToDashboardTopics(tagRows);
+    const solvedSlugSet = await fetchSolvedSlugs(username);
+    const solvedSlugs = [...solvedSlugSet];
     const recent = await fetchRecentAcSubmissions(username, 50);
 
     const seen = new Set(career.leetcodeSync?.lastSeenIds || []);
@@ -130,6 +133,8 @@ exports.syncLeetcode = async (req, res) => {
       medium: stats.medium,
       hard: stats.hard,
       topicCounts: lcByTopic,
+      solvedSlugs,
+      solvedCount: solvedSlugs.length,
     };
 
     const update = {

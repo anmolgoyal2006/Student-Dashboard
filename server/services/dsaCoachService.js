@@ -6,6 +6,9 @@ const Groq = require('groq-sdk');
 const {
   buildLeetcodeInsights,
   buildLeetcodeProblemPicks,
+  filterUnsolvedRecommendations,
+  pickUnsolvedForTopic,
+  slugFromUrl,
 } = require('./leetcodeService');
 
 const groq = new Groq({ apiKey: process.env.GROQ_CHAT_KEY || process.env.GROQ_API_KEY });
@@ -233,7 +236,9 @@ Recent LeetCode solves: ${lc.recentSolves.map((s) => s.title).join(', ') || 'non
 Per-topic roadmap (lcCount = real LeetCode tag solves — USE THIS, not dashboard zeros):
 ${lc.topicRoadmap.map((r) => `- ${r.topic}: ${r.lcCount} on LeetCode, target ${r.target}, status=${r.status}, ${r.toSolveThisWeek}/week, start ${r.startWith}`).join('\n')}
 
-CRITICAL: Student has ${lc.totalSolved} total solves. Do NOT recommend Two Sum or beginner Easy unless lcCount < 8 on that topic. Prefer Medium/Hard for experienced topics.
+CRITICAL: ${lc.solvedCount || lc.solvedSlugs?.length || 0} problems already solved on LeetCode. ONLY recommend problems they have NOT solved.
+Do NOT recommend any title in this solved slug list: ${(lc.solvedSlugs || []).slice(0, 60).join(', ')}
+Prefer Medium/Hard for experienced topics. Never duplicate recommendations.
 
 Dashboard topic progress:
 ${profile.topics.map((t) => `- ${t.name}: ${t.problems}/${t.target}`).join('\n')}
@@ -255,24 +260,31 @@ Return JSON:
   "nextMilestone": "...",
   "studyTip": "..."
 }
-3 dailyMission items, 7 weeklyFocus days, 6 recommendedProblems prioritizing uncovered topics with Easy first.`;
+3 dailyMission items, 7 weeklyFocus days, 6 recommendedProblems — each MUST be unsolved on their LeetCode.`;
 
   try {
     const raw = await callGroq(system, user, 2400);
     const parsed = extractJSON(raw);
     if (parsed?.dailyMission?.length) {
+      const solvedSet = new Set(lc.solvedSlugs || []);
+      const aiRecs = filterUnsolvedRecommendations(
+        (parsed.recommendedProblems || []).map((p) => ({
+          ...p,
+          slug: p.slug || slugFromUrl(p.leetcodeUrl),
+          leetcodeUrl: p.leetcodeUrl || (p.slug ? `https://leetcode.com/problems/${p.slug}/` : undefined),
+        })),
+        solvedSet
+      );
       const merged = {
         ...base,
         ...parsed,
         source: 'ai+leetcode',
         leetcodeLinked: true,
         topicRoadmap: parsed.topicRoadmap?.length ? parsed.topicRoadmap : base.topicRoadmap,
-        recommendedProblems: parsed.recommendedProblems?.length
-          ? parsed.recommendedProblems.map((p) => ({
-              ...p,
-              leetcodeUrl: p.leetcodeUrl || (p.titleSlug ? `https://leetcode.com/problems/${p.titleSlug}/` : undefined),
-            }))
-          : base.recommendedProblems,
+        recommendedProblems: filterUnsolvedRecommendations(
+          aiRecs.length >= 3 ? aiRecs : base.recommendedProblems,
+          solvedSet
+        ),
         uncoveredTopics: parsed.uncoveredTopics || base.uncoveredTopics,
       };
       return merged;
@@ -310,14 +322,62 @@ Return JSON:
   ],
   "weekPlan": "how many ${startDiff} problems to solve this week (${road?.toSolveThisWeek || 5} recommended)"
 }
-Include exactly 4 problems; if topic not covered, all 4 should be Easy with real LeetCode titles.`;
+Include exactly 4 problems they have NOT solved. Already solved (do NOT use): ${(career.leetcodeSync?.solvedSlugs || []).slice(0, 50).join(', ')}`;
+
+  const solvedSet = new Set([
+    ...(career.leetcodeSync?.solvedSlugs || []),
+    ...(lc?.solvedSlugs || []),
+  ]);
 
   try {
     const raw = await callGroq(system, user, 1500);
     const parsed = extractJSON(raw);
-    if (parsed?.problems?.length) return parsed;
+    if (parsed?.problems?.length) {
+      const filtered = filterUnsolvedRecommendations(
+        parsed.problems.map((p) => ({
+          ...p,
+          slug: p.slug || slugFromUrl(p.leetcodeUrl),
+        })),
+        solvedSet
+      );
+      if (filtered.length >= 2) {
+        return { ...parsed, problems: filtered };
+      }
+    }
   } catch (err) {
     console.error('[DSA Topic Guide]', err.message);
+  }
+
+  const unsolved = [];
+  const used = new Set(solvedSet);
+  while (unsolved.length < 4) {
+    const p = pickUnsolvedForTopic(
+      topicName,
+      road?.lcCount || topic.problems || 0,
+      profile.problemsSolved,
+      used
+    );
+    if (!p) break;
+    used.add(p.slug);
+    unsolved.push({
+      title: p.title,
+      difficulty: p.difficulty,
+      pattern: p.difficulty,
+      approach: `You have not AC'd this on LeetCode yet — solve it next.`,
+      timeMins: p.difficulty === 'Hard' ? 45 : p.difficulty === 'Medium' ? 35 : 25,
+      leetcodeUrl: `https://leetcode.com/problems/${p.slug}/`,
+    });
+  }
+
+  if (unsolved.length >= 2) {
+    return {
+      summary: `${topicName} guide — only problems you have not AC'd on LeetCode yet.`,
+      keyPatterns: ['Pattern recognition', 'Template practice', 'Timed solve'],
+      studyOrder: ['Pick one unsolved problem', 'Solve without editorial', 'Review and repeat'],
+      commonMistakes: ['Repeating solved easy problems', 'Skipping edge cases'],
+      problems: unsolved,
+      weekPlan: `Solve ${Math.min(5, topic.gap || 5)} new ${topicName} problems this week on LeetCode`,
+    };
   }
 
   return {

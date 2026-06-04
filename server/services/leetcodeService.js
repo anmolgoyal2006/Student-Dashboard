@@ -111,6 +111,116 @@ async function fetchRecentAcSubmissions(username, limit = 50) {
   return data?.recentAcSubmissionList || [];
 }
 
+/** All accepted submission slugs (best-effort public API). */
+async function fetchSolvedSlugs(username) {
+  const slugs = new Set();
+
+  const acQuery = `
+    query acSubmissionList($username: String!, $limit: Int!) {
+      matchedUser(username: $username) {
+        acSubmissionList(limit: $limit) {
+          titleSlug
+        }
+      }
+    }
+  `;
+  try {
+    const data = await lcQuery(acQuery, { username, limit: 500 });
+    for (const s of data?.matchedUser?.acSubmissionList || []) {
+      if (s.titleSlug) slugs.add(s.titleSlug);
+    }
+  } catch {
+    /* fall through */
+  }
+
+  const listQuery = `
+    query submissionList($username: String!, $limit: Int!, $offset: Int!) {
+      submissionList(username: $username, limit: $limit, offset: $offset) {
+        hasNext
+        submissions {
+          titleSlug
+          statusDisplay
+        }
+      }
+    }
+  `;
+  try {
+    let offset = 0;
+    const limit = 20;
+    for (let page = 0; page < 40; page++) {
+      const data = await lcQuery(listQuery, { username, limit, offset });
+      const block = data?.submissionList;
+      const subs = block?.submissions || [];
+      for (const s of subs) {
+        if ((s.statusDisplay || '').toLowerCase() === 'accepted' && s.titleSlug) {
+          slugs.add(s.titleSlug);
+        }
+      }
+      offset += limit;
+      if (!block?.hasNext || subs.length < limit) break;
+      await new Promise((r) => setTimeout(r, 80));
+    }
+  } catch {
+    /* fall through */
+  }
+
+  const recent = await fetchRecentAcSubmissions(username, 50);
+  for (const s of recent) {
+    if (s.titleSlug) slugs.add(s.titleSlug);
+  }
+
+  return slugs;
+}
+
+function slugFromUrl(url) {
+  if (!url) return null;
+  const m = String(url).match(/leetcode\.com\/problems\/([^/]+)/);
+  return m ? m[1] : null;
+}
+
+function getTopicProblemPool(topicName) {
+  const easy = TOPIC_STARTERS[topicName] || [];
+  const med = TOPIC_MEDIUM_PICKS[topicName] || [];
+  const hard = TOPIC_HARD_PICKS[topicName] || [];
+  const seen = new Set();
+  return [...easy, ...med, ...hard].filter((p) => {
+    if (!p.slug || seen.has(p.slug)) return false;
+    seen.add(p.slug);
+    return true;
+  });
+}
+
+/** Pick first unsolved problem from curated pool for a topic. */
+function pickUnsolvedForTopic(topicName, lcCount, totalSolved, solvedSlugs) {
+  const pool = getTopicProblemPool(topicName);
+  if (!pool.length) return null;
+
+  const experienced = totalSolved >= 120 || lcCount >= 25;
+  const prefer = experienced
+    ? ['Medium', 'Hard', 'Easy']
+    : lcCount < UNCOVERED_LC_COUNT
+      ? ['Easy', 'Medium']
+      : ['Medium', 'Easy', 'Hard'];
+
+  for (const diff of prefer) {
+    const hit = pool.find((p) => p.difficulty === diff && !solvedSlugs.has(p.slug));
+    if (hit) return hit;
+  }
+  return pool.find((p) => !solvedSlugs.has(p.slug)) || null;
+}
+
+/** Dedupe and drop already-solved recommendations. */
+function filterUnsolvedRecommendations(items, solvedSlugs) {
+  const seen = new Set();
+  return (items || []).filter((p) => {
+    const slug = p.slug || slugFromUrl(p.leetcodeUrl) || null;
+    if (!slug) return true;
+    if (solvedSlugs.has(slug) || seen.has(slug)) return false;
+    seen.add(slug);
+    return true;
+  });
+}
+
 /**
  * LeetCode skill stats — problems solved per tag (fundamental / intermediate / advanced).
  */
@@ -322,21 +432,50 @@ const TOPIC_MEDIUM_PICKS = {
   ],
 };
 
-function pickProblemForTopic(topicName, lcCount, totalSolved) {
-  const experienced = totalSolved >= 120 || lcCount >= 25;
-  const intermediate = totalSolved >= 50 || lcCount >= LC_TOPIC_STARTED;
-
-  if (experienced) {
-    const picks = TOPIC_MEDIUM_PICKS[topicName] || TOPIC_STARTERS[topicName];
-    return picks?.find((p) => p.difficulty === 'Medium') || picks?.[0];
-  }
-  if (intermediate) {
-    const starters = TOPIC_STARTERS[topicName] || TOPIC_STARTERS.Arrays;
-    return starters.find((p) => p.difficulty === 'Medium') || starters[starters.length - 1];
-  }
-  const starters = TOPIC_STARTERS[topicName] || TOPIC_STARTERS.Arrays;
-  return starters.find((p) => p.difficulty === 'Easy') || starters[0];
-}
+const TOPIC_HARD_PICKS = {
+  Arrays: [
+    { title: 'Trapping Rain Water', slug: 'trapping-rain-water', difficulty: 'Hard' },
+    { title: 'First Missing Positive', slug: 'first-missing-positive', difficulty: 'Hard' },
+  ],
+  Strings: [
+    { title: 'Minimum Window Substring', slug: 'minimum-window-substring', difficulty: 'Hard' },
+    { title: 'Substring with Concatenation of All Words', slug: 'substring-with-concatenation-of-all-words', difficulty: 'Hard' },
+  ],
+  'Linked Lists': [
+    { title: 'Merge K Sorted Lists', slug: 'merge-k-sorted-lists', difficulty: 'Hard' },
+  ],
+  Trees: [
+    { title: 'Binary Tree Maximum Path Sum', slug: 'binary-tree-maximum-path-sum', difficulty: 'Hard' },
+    { title: 'Serialize and Deserialize Binary Tree', slug: 'serialize-and-deserialize-binary-tree', difficulty: 'Hard' },
+  ],
+  Graphs: [
+    { title: 'Word Ladder II', slug: 'word-ladder-ii', difficulty: 'Hard' },
+    { title: 'Alien Dictionary', slug: 'alien-dictionary', difficulty: 'Hard' },
+  ],
+  'Dynamic Programming': [
+    { title: 'Edit Distance', slug: 'edit-distance', difficulty: 'Hard' },
+    { title: 'Regular Expression Matching', slug: 'regular-expression-matching', difficulty: 'Hard' },
+  ],
+  'Recursion & Backtracking': [
+    { title: 'N-Queens', slug: 'n-queens', difficulty: 'Hard' },
+  ],
+  Hashing: [
+    { title: 'Subarray Sum Equals K', slug: 'subarray-sum-equals-k', difficulty: 'Medium' },
+    { title: 'Longest Consecutive Sequence', slug: 'longest-consecutive-sequence', difficulty: 'Hard' },
+  ],
+  Greedy: [
+    { title: 'Candy', slug: 'candy', difficulty: 'Hard' },
+  ],
+  'Sorting & Searching': [
+    { title: 'Median of Two Sorted Arrays', slug: 'median-of-two-sorted-arrays', difficulty: 'Hard' },
+  ],
+  'Stacks & Queues': [
+    { title: 'Largest Rectangle in Histogram', slug: 'largest-rectangle-in-histogram', difficulty: 'Hard' },
+  ],
+  Tries: [
+    { title: 'Word Search II', slug: 'word-search-ii', difficulty: 'Hard' },
+  ],
+};
 
 function topicStatusFromCounts(lcCount, target, totalSolved) {
   const solved = lcCount;
@@ -373,6 +512,7 @@ async function buildLeetcodeInsights(career, { live = false, topicTargets = {} }
   let hard = career.leetcodeSync?.hard ?? 0;
   let totalSolved = career.leetcodeSync?.totalOnLeetcode ?? career.problemsSolved ?? 0;
   let lcByTopic = { ...(career.leetcodeSync?.topicCounts || {}) };
+  let solvedSlugs = new Set(career.leetcodeSync?.solvedSlugs || []);
 
   let recentSolves = [];
 
@@ -385,6 +525,7 @@ async function buildLeetcodeInsights(career, { live = false, topicTargets = {} }
       totalSolved = stats.totalSolved;
       const tagRows = await fetchSkillTagCounts(username);
       lcByTopic = aggregateTagsToDashboardTopics(tagRows);
+      solvedSlugs = await fetchSolvedSlugs(username);
       const recent = await fetchRecentAcSubmissions(username, 25);
       const enriched = await enrichSubmissionsWithTopics(recent.slice(0, 8), 8);
       recentSolves = enriched.map((s) => ({
@@ -454,6 +595,8 @@ async function buildLeetcodeInsights(career, { live = false, topicTargets = {} }
     weakTopics,
     topicRoadmap,
     topicCounts: lcByTopic,
+    solvedSlugs: [...solvedSlugs],
+    solvedCount: solvedSlugs.size,
     recentSolves: recentSolves.slice(0, 8),
     recentTitles: recentSolves.map((s) => s.title),
     difficultyAdvice,
@@ -466,9 +609,10 @@ function leetcodeUrl(slug) {
   return slug ? `https://leetcode.com/problems/${slug}/` : null;
 }
 
-/** Rule-based problem picks — respects real LeetCode tag counts */
+/** Rule-based problem picks — only problems not in solvedSlugs */
 function buildLeetcodeProblemPicks(lc, profile) {
   if (!lc) return [];
+  const solvedSlugs = new Set(lc.solvedSlugs || []);
   const picks = [];
   const order = [
     ...lc.weakTopics,
@@ -479,51 +623,46 @@ function buildLeetcodeProblemPicks(lc, profile) {
       .map((r) => r.topic),
   ];
 
-  const seen = new Set();
-  const recentSlugs = new Set(
-    (lc.recentSolves || []).map((s) => s.slug).filter(Boolean)
-  );
+  const usedSlugs = new Set();
 
   for (const topicName of order) {
     if (picks.length >= 6) break;
-    if (seen.has(topicName)) continue;
-    seen.add(topicName);
 
     const road = lc.topicRoadmap.find((r) => r.topic === topicName);
     const lcCount = road?.lcCount ?? 0;
     if (road?.status === 'strong') continue;
 
-    let starter = pickProblemForTopic(topicName, lcCount, lc.totalSolved);
-    if (starter?.slug && recentSlugs.has(starter.slug)) {
-      const alt = (TOPIC_MEDIUM_PICKS[topicName] || TOPIC_STARTERS[topicName] || [])
-        .find((p) => p.slug !== starter.slug);
-      if (alt) starter = alt;
-    }
+    const starter = pickUnsolvedForTopic(
+      topicName,
+      lcCount,
+      lc.totalSolved,
+      new Set([...solvedSlugs, ...usedSlugs])
+    );
+    if (!starter) continue;
+    usedSlugs.add(starter.slug);
 
     const count = road?.toSolveThisWeek || 2;
 
     picks.push({
       title: starter.title,
+      slug: starter.slug,
       topic: topicName,
       difficulty: starter.difficulty,
-      pattern: road?.status === 'not_covered'
-        ? `Only ${lcCount} LeetCode solves on this tag — start here`
-        : `${lcCount} on LeetCode — push ${starter.difficulty}`,
-      why: road?.status === 'not_covered'
-        ? `LeetCode shows ${lcCount} problems on ${topicName}. Solve ${count} ${starter.difficulty} this week.`
-        : `You have ${lcCount} on ${topicName} vs ${road?.target} target — practice ${starter.difficulty} classics.`,
+      pattern: 'Not in your LeetCode AC list yet',
+      why: `You haven't solved this on LeetCode (${lcCount} on ${topicName} tag). ${starter.difficulty} pick for ${profile.targetCompany}.`,
       companyRelevance: profile.targetCompany,
       leetcodeUrl: leetcodeUrl(starter.slug),
       problemsToSolve: count,
     });
   }
-  return picks;
+  return filterUnsolvedRecommendations(picks, solvedSlugs);
 }
 
 module.exports = {
   fetchUserStats,
   fetchSkillTagCounts,
   fetchRecentAcSubmissions,
+  fetchSolvedSlugs,
   fetchQuestionTopics,
   mapTagsToDashboardTopics,
   aggregateTagsToDashboardTopics,
@@ -531,6 +670,9 @@ module.exports = {
   enrichSubmissionsWithTopics,
   buildLeetcodeInsights,
   buildLeetcodeProblemPicks,
+  filterUnsolvedRecommendations,
+  pickUnsolvedForTopic,
+  slugFromUrl,
   leetcodeUrl,
   TOPIC_STARTERS,
 };

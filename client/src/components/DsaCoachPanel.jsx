@@ -15,8 +15,6 @@ const DIFF_COLOR = {
 export default function DsaCoachPanel({ career, onCareerUpdate, plan }) {
   const [coach, setCoach]           = useState(career?.dsaCoach || null);
   const [loading, setLoading]       = useState(false);
-  const [logText, setLogText]         = useState('');
-  const [logging, setLogging]       = useState(false);
   const [selectedTopic, setSelectedTopic] = useState('');
   const [guide, setGuide]           = useState(null);
   const [guideLoad, setGuideLoad]   = useState(false);
@@ -137,23 +135,6 @@ export default function DsaCoachPanel({ career, onCareerUpdate, plan }) {
     }
   };
 
-  const handleLogPractice = async () => {
-    if (!logText.trim()) return;
-    setLogging(true);
-    try {
-      const { data } = await careerService.logDsaPractice(logText.trim());
-      toast.success(data.message || 'Practice logged!');
-      setLogText('');
-      if (data.career) onCareerUpdate?.(data.career);
-      if (data.result?.suggestedNext) toast(data.result.suggestedNext, { icon: '💡' });
-      loadCoach(true);
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to log practice');
-    } finally {
-      setLogging(false);
-    }
-  };
-
   const fetchHint = async () => {
     if (!hintTopic || !hintTitle.trim()) return;
     setHintLoad(true);
@@ -187,7 +168,7 @@ export default function DsaCoachPanel({ career, onCareerUpdate, plan }) {
           <div>
             <div className="card-title" style={{ marginBottom: 4 }}>🟠 LeetCode sync</div>
             <p className="text-muted" style={{ fontSize: 13, maxWidth: 520 }}>
-              Link your public LeetCode profile. New accepted solutions update your problem count and topic tracker.
+              Auto-sync from LeetCode — progress, AI plan, and problem picks (unsolved only). No manual logging.
             </p>
           </div>
           {lcLinked && (
@@ -383,10 +364,10 @@ export default function DsaCoachPanel({ career, onCareerUpdate, plan }) {
             {(coach.recommendedProblems?.length > 0) && (
               <div style={{ marginTop: 16 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>
-                  📌 LeetCode problem picks
-                  {coach.leetcodeLinked && (
+                  📌 Next problems (not solved on LeetCode yet)
+                  {career?.leetcodeSync?.solvedCount > 0 && (
                     <span className="text-muted" style={{ fontWeight: 400, marginLeft: 8, fontSize: 11 }}>
-                      Easy first on uncovered topics
+                      filtered from {career.leetcodeSync.solvedCount} AC
                     </span>
                   )}
                 </div>
@@ -444,35 +425,22 @@ export default function DsaCoachPanel({ career, onCareerUpdate, plan }) {
         ) : null}
       </div>
 
-      {/* ── Log practice ── */}
-      <div className="card mb-4">
-        <div className="card-title">✍️ Log today&apos;s practice</div>
-        <p className="text-muted" style={{ fontSize: 13, marginBottom: 12 }}>
-          Example: &quot;Solved Two Sum and Best Time to Buy Stock on LeetCode — Arrays&quot;
-        </p>
-        <textarea
-          className="form-input"
-          rows={3}
-          placeholder="What did you solve today? AI will update your topic counts…"
-          value={logText}
-          onChange={(e) => setLogText(e.target.value)}
-          style={{ resize: 'vertical', marginBottom: 10 }}
-        />
-        <button className="btn btn-primary" onClick={handleLogPractice} disabled={logging || !logText.trim()}>
-          {logging ? '⏳ Logging…' : '✅ Log practice with AI'}
-        </button>
-        {career?.dsaSessions?.length > 0 && (
-          <div style={{ marginTop: 14, borderTop: '1px solid var(--border)', paddingTop: 12 }}>
-            <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 8 }}>Recent sessions</div>
-            {career.dsaSessions.slice(0, 3).map((s, i) => (
+      {lcLinked && (career?.dsaSessions?.length > 0) && (
+        <div className="card mb-4">
+          <div className="card-title">🔄 Auto-synced from LeetCode</div>
+          <p className="text-muted" style={{ fontSize: 12, marginBottom: 10 }}>
+            New solves update your tracker automatically when you sync.
+          </p>
+          {career.dsaSessions
+            .filter((s) => s.aiFeedback === 'Synced from LeetCode' || s.note?.includes('LeetCode'))
+            .slice(0, 5)
+            .map((s, i) => (
               <div key={i} style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 6 }}>
-                <strong style={{ color: 'var(--text)' }}>+{s.problemsAdded}</strong> — {s.note?.slice(0, 80)}
-                {s.aiFeedback && <span style={{ color: '#818cf8' }}> · {s.aiFeedback}</span>}
+                <strong style={{ color: '#34d399' }}>+{s.problemsAdded}</strong> — {s.note?.slice(0, 100)}
               </div>
             ))}
-          </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* ── Topic guide + hint ── */}
       <div className="grid-2 mb-4">
@@ -512,6 +480,12 @@ export default function DsaCoachPanel({ career, onCareerUpdate, plan }) {
                   <div style={{ fontWeight: 600 }}>{p.title}</div>
                   <div style={{ fontSize: 11, color: DIFF_COLOR[p.difficulty] }}>{p.difficulty} · {p.pattern}</div>
                   <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>{p.approach}</div>
+                  {p.leetcodeUrl && (
+                    <a href={p.leetcodeUrl} target="_blank" rel="noreferrer" className="btn btn-outline btn-sm"
+                      style={{ marginTop: 8, fontSize: 10, textDecoration: 'none' }}>
+                      Open on LeetCode ↗
+                    </a>
+                  )}
                 </div>
               ))}
               <p className="text-muted" style={{ fontSize: 11 }}>{guide.weekPlan}</p>

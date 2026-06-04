@@ -20,6 +20,8 @@ const careerSchema = new mongoose.Schema({
     medium:          { type: Number, default: 0 },
     hard:            { type: Number, default: 0 },
     topicCounts:     { type: mongoose.Schema.Types.Mixed, default: {} },
+    solvedSlugs:     [{ type: String }],
+    solvedCount:     { type: Number, default: 0 },
   },
   readiness:       { type: String, enum: ['Beginner','Intermediate','Ready'], default: 'Beginner' },
   dsaTopics: [dsaTopicSchema],
