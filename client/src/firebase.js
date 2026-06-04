@@ -10,12 +10,28 @@ const firebaseConfig = {
   appId             : process.env.REACT_APP_FIREBASE_APP_ID,
 };
 
-const app       = initializeApp(firebaseConfig);
-const messaging = getMessaging(app);
-export const getMessagingInstance = () => messaging;
+let app = null;
+let messaging = null;
+
+try {
+  app = initializeApp(firebaseConfig);
+  messaging = getMessaging(app);
+} catch (err) {
+  console.warn('[Firebase] Initialization failed:', err.message);
+}
+export const getMessagingInstance = () => {
+  if (!messaging) {
+    console.warn('[Firebase] Messaging not initialized');
+  }
+  return messaging;
+};
 
 // ─── Get FCM token ────────────────────────────────────────────────────────────
 export async function getFCMToken() {
+  if (!messaging) {
+    console.warn('[FCM] Messaging not initialized');
+    return null;
+  }
   try {
     // Register service worker explicitly — required for getToken to work
     const swRegistration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
@@ -40,11 +56,15 @@ export async function getFCMToken() {
 
 // ─── Foreground message listener ─────────────────────────────────────────────
 export function onMessageListener() {
+  if (!messaging) {
+    console.warn('[Firebase] Messaging not initialized');
+    return Promise.resolve(null);
+  }
   return new Promise((resolve) => {
     onMessage(messaging, (payload) => {
       console.log("[FCM] Foreground message:", payload);
 
-      // 🔥 SHOW notification (THIS FIXES YOUR ISSUE)
+      // Show notification
       if (Notification.permission === "granted") {
         new Notification(payload.notification?.title || "Notification", {
           body: payload.notification?.body || "",
