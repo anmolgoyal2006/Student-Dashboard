@@ -19,6 +19,7 @@ const careerSchema = new mongoose.Schema({
     easy:            { type: Number, default: 0 },
     medium:          { type: Number, default: 0 },
     hard:            { type: Number, default: 0 },
+    topicCounts:     { type: mongoose.Schema.Types.Mixed, default: {} },
   },
   readiness:       { type: String, enum: ['Beginner','Intermediate','Ready'], default: 'Beginner' },
   dsaTopics: [dsaTopicSchema],
@@ -63,7 +64,7 @@ const careerSchema = new mongoose.Schema({
       leetcodeUrl: String, problemsToSolve: Number,
     }],
     topicRoadmap: [{
-      topic: String, status: String, solved: Number, target: Number,
+      topic: String, status: String, solved: Number, lcCount: Number, target: Number,
       gap: Number, toSolveThisWeek: Number, startWith: String, priority: String,
     }],
     leetcodeInsight:   { type: String },

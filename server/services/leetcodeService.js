@@ -111,6 +111,64 @@ async function fetchRecentAcSubmissions(username, limit = 50) {
   return data?.recentAcSubmissionList || [];
 }
 
+/**
+ * LeetCode skill stats — problems solved per tag (fundamental / intermediate / advanced).
+ */
+async function fetchSkillTagCounts(username) {
+  const query = `
+    query skillStats($username: String!) {
+      matchedUser(username: $username) {
+        tagProblemCounts {
+          fundamental { tagName tagSlug problemsSolved }
+          intermediate { tagName tagSlug problemsSolved }
+          advanced { tagName tagSlug problemsSolved }
+        }
+      }
+    }
+  `;
+  const data = await lcQuery(query, { username });
+  const counts = data?.matchedUser?.tagProblemCounts;
+  if (!counts) return [];
+
+  const rows = [];
+  for (const tier of ['fundamental', 'intermediate', 'advanced']) {
+    for (const row of counts[tier] || []) {
+      if (row?.tagSlug) rows.push(row);
+    }
+  }
+  return rows;
+}
+
+/** Max problems per dashboard topic from LeetCode tag rows (avoids double-counting). */
+function aggregateTagsToDashboardTopics(tagRows) {
+  const byTopic = {};
+  for (const row of tagRows) {
+    const topics = mapTagsToDashboardTopics([
+      { slug: row.tagSlug, name: row.tagName },
+    ]);
+    const n = row.problemsSolved || 0;
+    for (const topic of topics) {
+      byTopic[topic] = Math.max(byTopic[topic] || 0, n);
+    }
+  }
+  return byTopic;
+}
+
+/**
+ * Merge LeetCode tag counts into dsaTopics (source of truth when linked).
+ */
+function applyLeetcodeTopicsToDsaTopics(dsaTopics, lcByTopic, topicTargets = {}) {
+  if (!dsaTopics?.length) return dsaTopics;
+
+  return dsaTopics.map((t) => {
+    const lcCount = lcByTopic[t.name] || 0;
+    const target = topicTargets[t.name] || 30;
+    const problems = Math.max(t.problems || 0, lcCount);
+    const completed = problems >= Math.min(target, Math.ceil(target * 0.6));
+    return { ...t.toObject?.() || t, name: t.name, problems, completed };
+  });
+}
+
 async function fetchQuestionTopics(titleSlug) {
   const query = `
     query questionTopics($titleSlug: String!) {
@@ -219,7 +277,89 @@ const TOPIC_STARTERS = {
   ],
 };
 
-const UNCOVERED_THRESHOLD = 3;
+/** Min LeetCode tag count to treat a topic as "started" */
+const LC_TOPIC_STARTED = 8;
+/** Below this vs target = weak; below STARTED = not covered */
+const UNCOVERED_LC_COUNT = 5;
+
+const TOPIC_MEDIUM_PICKS = {
+  Arrays: [
+    { title: '3Sum', slug: '3sum', difficulty: 'Medium' },
+    { title: 'Product of Array Except Self', slug: 'product-of-array-except-self', difficulty: 'Medium' },
+  ],
+  Strings: [
+    { title: 'Longest Substring Without Repeating Characters', slug: 'longest-substring-without-repeating-characters', difficulty: 'Medium' },
+  ],
+  'Linked Lists': [
+    { title: 'Reorder List', slug: 'reorder-list', difficulty: 'Medium' },
+  ],
+  Trees: [
+    { title: 'Validate Binary Search Tree', slug: 'validate-binary-search-tree', difficulty: 'Medium' },
+  ],
+  Graphs: [
+    { title: 'Course Schedule', slug: 'course-schedule', difficulty: 'Medium' },
+  ],
+  'Dynamic Programming': [
+    { title: 'Longest Increasing Subsequence', slug: 'longest-increasing-subsequence', difficulty: 'Medium' },
+  ],
+  'Recursion & Backtracking': [
+    { title: 'Combination Sum', slug: 'combination-sum', difficulty: 'Medium' },
+  ],
+  Hashing: [
+    { title: 'Group Anagrams', slug: 'group-anagrams', difficulty: 'Medium' },
+  ],
+  Greedy: [
+    { title: 'Jump Game II', slug: 'jump-game-ii', difficulty: 'Medium' },
+  ],
+  Tries: [
+    { title: 'Design Add and Search Words Data Structure', slug: 'design-add-and-search-words-data-structure', difficulty: 'Medium' },
+  ],
+  'Sorting & Searching': [
+    { title: 'Find Peak Element', slug: 'find-peak-element', difficulty: 'Medium' },
+  ],
+  'Stacks & Queues': [
+    { title: 'Daily Temperatures', slug: 'daily-temperatures', difficulty: 'Medium' },
+  ],
+};
+
+function pickProblemForTopic(topicName, lcCount, totalSolved) {
+  const experienced = totalSolved >= 120 || lcCount >= 25;
+  const intermediate = totalSolved >= 50 || lcCount >= LC_TOPIC_STARTED;
+
+  if (experienced) {
+    const picks = TOPIC_MEDIUM_PICKS[topicName] || TOPIC_STARTERS[topicName];
+    return picks?.find((p) => p.difficulty === 'Medium') || picks?.[0];
+  }
+  if (intermediate) {
+    const starters = TOPIC_STARTERS[topicName] || TOPIC_STARTERS.Arrays;
+    return starters.find((p) => p.difficulty === 'Medium') || starters[starters.length - 1];
+  }
+  const starters = TOPIC_STARTERS[topicName] || TOPIC_STARTERS.Arrays;
+  return starters.find((p) => p.difficulty === 'Easy') || starters[0];
+}
+
+function topicStatusFromCounts(lcCount, target, totalSolved) {
+  const solved = lcCount;
+  const gap = Math.max(0, target - solved);
+  const pct = target > 0 ? solved / target : 0;
+
+  if (lcCount < UNCOVERED_LC_COUNT) {
+    return { status: 'not_covered', gap, startWith: 'Easy', toSolveThisWeek: 4, priority: 'high' };
+  }
+  if (pct < 0.45 || (totalSolved >= 150 && lcCount < target * 0.35)) {
+    return {
+      status: 'weak',
+      gap,
+      startWith: totalSolved >= 100 ? 'Medium' : 'Easy',
+      toSolveThisWeek: 3,
+      priority: 'medium',
+    };
+  }
+  if (pct >= 0.85) {
+    return { status: 'strong', gap, startWith: 'Hard', toSolveThisWeek: 1, priority: 'low' };
+  }
+  return { status: 'building', gap, startWith: 'Medium', toSolveThisWeek: 2, priority: 'low' };
+}
 
 /**
  * Build coach-ready insights from career + optional live LeetCode fetch.
@@ -232,6 +372,7 @@ async function buildLeetcodeInsights(career, { live = false, topicTargets = {} }
   let medium = career.leetcodeSync?.medium ?? 0;
   let hard = career.leetcodeSync?.hard ?? 0;
   let totalSolved = career.leetcodeSync?.totalOnLeetcode ?? career.problemsSolved ?? 0;
+  let lcByTopic = { ...(career.leetcodeSync?.topicCounts || {}) };
 
   let recentSolves = [];
 
@@ -242,8 +383,10 @@ async function buildLeetcodeInsights(career, { live = false, topicTargets = {} }
       medium = stats.medium;
       hard = stats.hard;
       totalSolved = stats.totalSolved;
+      const tagRows = await fetchSkillTagCounts(username);
+      lcByTopic = aggregateTagsToDashboardTopics(tagRows);
       const recent = await fetchRecentAcSubmissions(username, 25);
-      const enriched = await enrichSubmissionsWithTopics(recent.slice(0, 12), 12);
+      const enriched = await enrichSubmissionsWithTopics(recent.slice(0, 8), 8);
       recentSolves = enriched.map((s) => ({
         title: s.title,
         slug: s.titleSlug,
@@ -254,50 +397,51 @@ async function buildLeetcodeInsights(career, { live = false, topicTargets = {} }
     }
   }
 
-  const topicCountsFromRecent = {};
-  for (const s of recentSolves) {
-    for (const t of s.topics) {
-      topicCountsFromRecent[t] = (topicCountsFromRecent[t] || 0) + 1;
-    }
-  }
-
   const topicRoadmap = (career.dsaTopics || []).map((t) => {
-    const solved = t.problems || 0;
+    const lcCount = lcByTopic[t.name] ?? 0;
+    const solved = Math.max(t.problems || 0, lcCount);
     const target = topicTargets[t.name] || 30;
-    const gap = Math.max(0, target - solved);
-    const uncovered = solved < UNCOVERED_THRESHOLD;
-    const weak = !uncovered && gap > 10;
-    const status = uncovered ? 'not_covered' : weak ? 'weak' : solved >= target ? 'strong' : 'building';
-    const startDifficulty = uncovered || (easy < 40 && totalSolved < 80) ? 'Easy' : weak ? 'Easy' : 'Medium';
-    const toSolveThisWeek = uncovered ? 5 : weak ? 4 : 2;
+    const meta = topicStatusFromCounts(lcCount, target, totalSolved);
 
     return {
       topic: t.name,
-      status,
+      status: meta.status,
       solved,
+      lcCount,
       target,
-      gap,
-      toSolveThisWeek,
-      startWith: startDifficulty,
-      priority: uncovered ? 'high' : weak ? 'medium' : 'low',
-      recentOnLeetcode: topicCountsFromRecent[t.name] || 0,
+      gap: meta.gap,
+      toSolveThisWeek: meta.toSolveThisWeek,
+      startWith: meta.startWith,
+      priority: meta.priority,
+      recentOnLeetcode: lcCount,
     };
   });
 
-  const uncoveredTopics = topicRoadmap.filter((t) => t.status === 'not_covered').map((t) => t.topic);
-  const weakTopics = topicRoadmap.filter((t) => t.status === 'weak').map((t) => t.topic);
+  const uncoveredTopics = topicRoadmap
+    .filter((t) => t.status === 'not_covered')
+    .map((t) => t.topic);
+  const weakTopics = topicRoadmap
+    .filter((t) => t.status === 'weak')
+    .sort((a, b) => b.gap - a.gap)
+    .map((t) => t.topic);
   const easyRatio = totalSolved > 0 ? Math.round((easy / totalSolved) * 100) : 0;
 
   let difficultyAdvice = '';
-  if (totalSolved < 50 || easyRatio < 35) {
-    difficultyAdvice = 'Your LeetCode profile is light on Easy problems — start every new topic with 3–5 Easy problems before Medium.';
-  } else if (hard < 5 && totalSolved > 80) {
-    difficultyAdvice = 'Add 1–2 Hard problems per week on topics you already know (Trees, Graphs, DP).';
+  if (totalSolved >= 150) {
+    if (hard < 25) {
+      difficultyAdvice = `Strong profile (${totalSolved} solved). Focus on Hard problems and company-tagged Mediums — skip beginner Easy unless a topic is truly new.`;
+    } else {
+      difficultyAdvice = `Excellent volume (${totalSolved} solved). Maintain with 1–2 Medium/Hard daily on weakest tags.`;
+    }
+  } else if (totalSolved < 50 || easyRatio < 35) {
+    difficultyAdvice = 'Build foundation with Easy on topics under 5 LeetCode solves, then Medium.';
+  } else if (hard < 10 && totalSolved > 80) {
+    difficultyAdvice = 'Add 1–2 Hard problems per week on your strongest topics.';
   } else {
-    difficultyAdvice = 'Balance: 60% Medium revision, 30% new topic Easy, 10% Hard challenge.';
+    difficultyAdvice = 'Balance: mostly Medium on weak tags, occasional Hard.';
   }
 
-  const dailyProblemTarget = uncoveredTopics.length >= 4 ? 2 : uncoveredTopics.length >= 2 ? 3 : 2;
+  const dailyProblemTarget = totalSolved >= 200 ? 1 : totalSolved >= 100 ? 2 : 3;
 
   return {
     username,
@@ -309,7 +453,9 @@ async function buildLeetcodeInsights(career, { live = false, topicTargets = {} }
     uncoveredTopics,
     weakTopics,
     topicRoadmap,
+    topicCounts: lcByTopic,
     recentSolves: recentSolves.slice(0, 8),
+    recentTitles: recentSolves.map((s) => s.title),
     difficultyAdvice,
     dailyProblemTarget,
     linked: true,
@@ -320,31 +466,52 @@ function leetcodeUrl(slug) {
   return slug ? `https://leetcode.com/problems/${slug}/` : null;
 }
 
-/** Rule-based problem picks from LeetCode starters + gaps */
+/** Rule-based problem picks — respects real LeetCode tag counts */
 function buildLeetcodeProblemPicks(lc, profile) {
   if (!lc) return [];
   const picks = [];
-  const order = [...lc.uncoveredTopics, ...lc.weakTopics, ...profile.weakTopics.map((t) => t.name)];
+  const order = [
+    ...lc.weakTopics,
+    ...lc.uncoveredTopics,
+    ...lc.topicRoadmap
+      .filter((r) => r.status === 'building')
+      .sort((a, b) => b.gap - a.gap)
+      .map((r) => r.topic),
+  ];
 
   const seen = new Set();
+  const recentSlugs = new Set(
+    (lc.recentSolves || []).map((s) => s.slug).filter(Boolean)
+  );
+
   for (const topicName of order) {
     if (picks.length >= 6) break;
     if (seen.has(topicName)) continue;
     seen.add(topicName);
+
     const road = lc.topicRoadmap.find((r) => r.topic === topicName);
-    const starters = TOPIC_STARTERS[topicName] || TOPIC_STARTERS.Arrays;
-    const diff = road?.startWith || 'Easy';
-    const starter = starters.find((p) => p.difficulty === diff) || starters[0];
-    const count = road?.toSolveThisWeek || 3;
+    const lcCount = road?.lcCount ?? 0;
+    if (road?.status === 'strong') continue;
+
+    let starter = pickProblemForTopic(topicName, lcCount, lc.totalSolved);
+    if (starter?.slug && recentSlugs.has(starter.slug)) {
+      const alt = (TOPIC_MEDIUM_PICKS[topicName] || TOPIC_STARTERS[topicName] || [])
+        .find((p) => p.slug !== starter.slug);
+      if (alt) starter = alt;
+    }
+
+    const count = road?.toSolveThisWeek || 2;
 
     picks.push({
       title: starter.title,
       topic: topicName,
       difficulty: starter.difficulty,
-      pattern: road?.status === 'not_covered' ? 'Start here — topic not covered yet' : 'Close your gap',
+      pattern: road?.status === 'not_covered'
+        ? `Only ${lcCount} LeetCode solves on this tag — start here`
+        : `${lcCount} on LeetCode — push ${starter.difficulty}`,
       why: road?.status === 'not_covered'
-        ? `You have fewer than ${UNCOVERED_THRESHOLD} tracked problems on ${topicName}. Solve ${count} Easy problems this week.`
-        : `Need ~${road?.gap || 5} more on ${topicName} for placement readiness.`,
+        ? `LeetCode shows ${lcCount} problems on ${topicName}. Solve ${count} ${starter.difficulty} this week.`
+        : `You have ${lcCount} on ${topicName} vs ${road?.target} target — practice ${starter.difficulty} classics.`,
       companyRelevance: profile.targetCompany,
       leetcodeUrl: leetcodeUrl(starter.slug),
       problemsToSolve: count,
@@ -355,9 +522,12 @@ function buildLeetcodeProblemPicks(lc, profile) {
 
 module.exports = {
   fetchUserStats,
+  fetchSkillTagCounts,
   fetchRecentAcSubmissions,
   fetchQuestionTopics,
   mapTagsToDashboardTopics,
+  aggregateTagsToDashboardTopics,
+  applyLeetcodeTopicsToDsaTopics,
   enrichSubmissionsWithTopics,
   buildLeetcodeInsights,
   buildLeetcodeProblemPicks,

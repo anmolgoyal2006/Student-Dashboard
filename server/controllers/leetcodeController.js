@@ -1,9 +1,13 @@
 const CareerProgress = require('../models/CareerProgress');
 const {
   fetchUserStats,
+  fetchSkillTagCounts,
   fetchRecentAcSubmissions,
   enrichSubmissionsWithTopics,
+  aggregateTagsToDashboardTopics,
+  applyLeetcodeTopicsToDsaTopics,
 } = require('../services/leetcodeService');
+const { TOPIC_TARGETS } = require('../services/dsaCoachService');
 
 const TOPIC_COMPLETE_THRESHOLD = 15;
 
@@ -77,6 +81,8 @@ exports.syncLeetcode = async (req, res) => {
     }
 
     const stats = await fetchUserStats(username);
+    const tagRows = await fetchSkillTagCounts(username);
+    const lcByTopic = aggregateTagsToDashboardTopics(tagRows);
     const recent = await fetchRecentAcSubmissions(username, 50);
 
     const seen = new Set(career.leetcodeSync?.lastSeenIds || []);
@@ -101,11 +107,13 @@ exports.syncLeetcode = async (req, res) => {
     if (career.dsaTopics?.length) {
       for (const t of career.dsaTopics) {
         const add = topicIncrements[t.name] || 0;
-        if (add > 0) {
-          t.problems = (t.problems || 0) + add;
-          if (t.problems >= TOPIC_COMPLETE_THRESHOLD) t.completed = true;
-        }
+        if (add > 0) t.problems = (t.problems || 0) + add;
       }
+      career.dsaTopics = applyLeetcodeTopicsToDsaTopics(
+        career.dsaTopics,
+        lcByTopic,
+        TOPIC_TARGETS
+      );
     }
 
     const allIds = recent.map((s) => String(s.id)).filter(Boolean);
@@ -121,6 +129,7 @@ exports.syncLeetcode = async (req, res) => {
       easy: stats.easy,
       medium: stats.medium,
       hard: stats.hard,
+      topicCounts: lcByTopic,
     };
 
     const update = {
@@ -164,10 +173,10 @@ exports.syncLeetcode = async (req, res) => {
 
     res.json({
       message: isFirstSync
-        ? `Linked @${username}. Total ${stats.totalSolved} problems on LeetCode. New solves will update topics automatically.`
+        ? `Linked @${username}. ${stats.totalSolved} problems on LeetCode — topic counts updated from your profile.`
         : enrichedNew.length > 0
-          ? `Synced ${enrichedNew.length} new problem(s) from LeetCode.`
-          : 'Already up to date with LeetCode.',
+          ? `Synced ${enrichedNew.length} new problem(s). Coach will use your real LeetCode tags.`
+          : `Synced ${stats.totalSolved} problems — topic stats refreshed from LeetCode.`,
       career,
       sync: {
         ...syncMeta,

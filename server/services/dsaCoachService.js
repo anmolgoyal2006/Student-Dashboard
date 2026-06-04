@@ -65,14 +65,20 @@ async function callGroq(system, user, maxTokens = 1800) {
 }
 
 function buildProfile(career) {
-  const topics = (career.dsaTopics || []).map((t) => ({
-    name: t.name,
-    problems: t.problems || 0,
-    target: TOPIC_TARGETS[t.name] || 30,
-    completed: !!t.completed,
-    gap: Math.max(0, (TOPIC_TARGETS[t.name] || 30) - (t.problems || 0)),
-    pct: Math.min(100, Math.round(((t.problems || 0) / (TOPIC_TARGETS[t.name] || 30)) * 100)),
-  }));
+  const lcCounts = career.leetcodeSync?.topicCounts || {};
+  const topics = (career.dsaTopics || []).map((t) => {
+    const problems = Math.max(t.problems || 0, lcCounts[t.name] || 0);
+    const target = TOPIC_TARGETS[t.name] || 30;
+    return {
+      name: t.name,
+      problems,
+      lcCount: lcCounts[t.name] || 0,
+      target,
+      completed: !!t.completed || problems >= target * 0.6,
+      gap: Math.max(0, target - problems),
+      pct: Math.min(100, Math.round((problems / target) * 100)),
+    };
+  });
   const weak = [...topics].filter((t) => t.gap > 0).sort((a, b) => b.gap - a.gap).slice(0, 5);
   const strong = topics.filter((t) => t.pct >= 70).map((t) => t.name);
 
@@ -96,12 +102,13 @@ function ruleBasedCoach(profile, lc) {
   let dailyMission;
   if (lc?.topicRoadmap?.length) {
     const priorities = lc.topicRoadmap
-      .filter((r) => r.status === 'not_covered' || r.status === 'weak')
+      .filter((r) => r.status === 'weak' || r.status === 'not_covered')
+      .sort((a, b) => (a.status === 'not_covered' ? -1 : 1) - (b.status === 'not_covered' ? -1 : 1) || b.gap - a.gap)
       .slice(0, 3);
     dailyMission = priorities.map((r, i) => ({
       task: r.status === 'not_covered'
-        ? `Solve ${Math.min(2, r.toSolveThisWeek)} ${r.startWith} ${r.topic} problems on LeetCode (topic not covered yet)`
-        : `Solve ${r.toSolveThisWeek} ${r.topic} problems (${r.startWith} first)`,
+        ? `Only ${r.lcCount} on ${r.topic} — solve ${Math.min(2, r.toSolveThisWeek)} ${r.startWith} on LeetCode`
+        : `${r.lcCount} on ${r.topic} — ${r.toSolveThisWeek} ${r.startWith} problems to close the gap`,
       topic: r.topic,
       priority: i === 0 ? 'high' : 'medium',
       minutes: r.status === 'not_covered' ? 50 : 45,
@@ -134,8 +141,10 @@ function ruleBasedCoach(profile, lc) {
   const lcInsight = lc
     ? `LeetCode @${lc.username}: ${lc.totalSolved} solved (E${lc.easy}/M${lc.medium}/H${lc.hard}). ${
         lc.uncoveredTopics.length
-          ? `Topics not covered yet: ${lc.uncoveredTopics.join(', ')} — start with Easy.`
-          : 'Good topic spread — push Medium on weak areas.'
+          ? `Gaps (under ${5} LC tag solves): ${lc.uncoveredTopics.join(', ')}.`
+          : lc.weakTopics.length
+            ? `Focus weak tags: ${lc.weakTopics.slice(0, 4).join(', ')}.`
+            : 'Solid coverage — maintain with Medium/Hard.'
       } ${lc.difficultyAdvice}`
     : null;
 
@@ -161,8 +170,8 @@ function ruleBasedCoach(profile, lc) {
           companyRelevance: profile.targetCompany,
           problemsToSolve: Math.min(5, t.gap),
         })),
-    weakTopics: lc?.uncoveredTopics?.length
-      ? [...lc.uncoveredTopics, ...lc.weakTopics]
+    weakTopics: lc?.weakTopics?.length
+      ? lc.weakTopics
       : profile.weakTopics.map((t) => t.name),
     strongTopics: profile.strongTopics,
     uncoveredTopics: lc?.uncoveredTopics || [],
@@ -221,8 +230,10 @@ Topics NOT covered on LeetCode tracker (<3 problems): ${lc.uncoveredTopics.join(
 Weak topics: ${lc.weakTopics.join(', ') || 'none'}
 Recent LeetCode solves: ${lc.recentSolves.map((s) => s.title).join(', ') || 'none fetched'}
 
-Per-topic roadmap:
-${lc.topicRoadmap.map((r) => `- ${r.topic}: ${r.solved}/${r.target}, status=${r.status}, solve ${r.toSolveThisWeek}/week, start ${r.startWith}`).join('\n')}
+Per-topic roadmap (lcCount = real LeetCode tag solves — USE THIS, not dashboard zeros):
+${lc.topicRoadmap.map((r) => `- ${r.topic}: ${r.lcCount} on LeetCode, target ${r.target}, status=${r.status}, ${r.toSolveThisWeek}/week, start ${r.startWith}`).join('\n')}
+
+CRITICAL: Student has ${lc.totalSolved} total solves. Do NOT recommend Two Sum or beginner Easy unless lcCount < 8 on that topic. Prefer Medium/Hard for experienced topics.
 
 Dashboard topic progress:
 ${profile.topics.map((t) => `- ${t.name}: ${t.problems}/${t.target}`).join('\n')}

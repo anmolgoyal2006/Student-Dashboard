@@ -282,9 +282,8 @@ export default function DsaCoachPanel({ career, onCareerUpdate, plan }) {
 
             {(coach.uncoveredTopics?.length > 0) && (
               <div style={{ marginTop: 12, fontSize: 13 }}>
-                <span style={{ fontWeight: 600, color: '#f87171' }}>Topics not covered yet: </span>
+                <span style={{ fontWeight: 600, color: '#f87171' }}>Gaps on LeetCode (&lt;5 per tag): </span>
                 {coach.uncoveredTopics.join(', ')}
-                <span className="text-muted" style={{ marginLeft: 6 }}>— start with Easy</span>
               </div>
             )}
 
@@ -293,7 +292,8 @@ export default function DsaCoachPanel({ career, onCareerUpdate, plan }) {
                 <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>📊 Topic roadmap (from LeetCode)</div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 8 }}>
                   {coach.topicRoadmap
-                    .filter((r) => r.status === 'not_covered' || r.status === 'weak')
+                    .filter((r) => r.status === 'weak' || r.status === 'not_covered')
+                    .sort((a, b) => (b.lcCount ?? 0) - (a.lcCount ?? 0))
                     .slice(0, 6)
                     .map((r) => (
                       <div key={r.topic} style={{
@@ -303,7 +303,10 @@ export default function DsaCoachPanel({ career, onCareerUpdate, plan }) {
                       }}>
                         <div style={{ fontWeight: 600 }}>{r.topic}</div>
                         <div style={{ color: 'var(--muted)', marginTop: 4 }}>
-                          {r.solved}/{r.target} · solve <strong>{r.toSolveThisWeek}</strong>/week
+                          {r.lcCount != null ? (
+                            <><strong>{r.lcCount}</strong> on LeetCode · </>
+                          ) : null}
+                          {r.solved}/{r.target} · <strong>{r.toSolveThisWeek}</strong>/week
                         </div>
                         <div style={{ marginTop: 4, color: '#818cf8' }}>
                           Start: {r.startWith || 'Easy'}
