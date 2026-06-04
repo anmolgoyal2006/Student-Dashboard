@@ -157,8 +157,8 @@ exports.getPredict = async (req, res) => {
       if (sgpaList.length > 0) {
         const recentTrend = computeWeightedTrend(sgpaList);
         const lastSGPA    = sgpaList[sgpaList.length - 1];
-        const AVERAGE_WEIGHT = 0.70;
-        const TREND_WEIGHT   = 0.30;
+        const AVERAGE_WEIGHT = 0.30;
+        const TREND_WEIGHT   = 0.70;
         const DAMP_FACTOR    = 0.65;
 
         futureSGPAs = Array.from({ length: remaining }, (_, i) => {
@@ -167,18 +167,21 @@ exports.getPredict = async (req, res) => {
           const blended     = (AVERAGE_WEIGHT * (currentCGPA || 0)) + (TREND_WEIGHT * trendBased);
           return round2(clamp(blended));
         });
-      } else if (requiredSGPA !== null) {
-        // If fresh student (0 sems) but target is set, predict target-aligned roadmap
-        futureSGPAs = Array(remaining).fill(requiredSGPA);
+      } else {
+        // If manual CGPA override is used, or a fresh student with no SGPA list
+        const defaultFutureSGPA = currentCGPA || 8.0;
+        futureSGPAs = Array(remaining).fill(round2(clamp(defaultFutureSGPA)));
       }
 
       // Credit-weighted predicted CGPA
-      const allSGPAs = [...sgpaList, ...futureSGPAs];
-      const weightedSum = allSGPAs.reduce((sum, sgpa, i) => {
-        const cr = i < adjustedCredits.length ? adjustedCredits[i] : 0;
-        return sum + sgpa * cr;
-      }, 0);
-      predictedCGPA = round2(weightedSum / sumCredits);
+      let futureWeightedSum = 0;
+      if (futureSGPAs.length > 0) {
+        futureWeightedSum = futureSGPAs.reduce((sum, sgpa, idx) => {
+          const cr = adjustedCredits[completed + idx] || 20;
+          return sum + sgpa * cr;
+        }, 0);
+      }
+      predictedCGPA = round2((currentWeightedSum + futureWeightedSum) / sumCredits);
     }
 
     // ── 6. Response ───────────────────────────────────────────────────────
