@@ -100,7 +100,7 @@ function buildProfile(career) {
 
 function ruleBasedCoach(profile, lc) {
   const focus = profile.weakTopics[0];
-  const lcPicks = buildLeetcodeProblemPicks(lc, profile);
+  const lcPicks = buildLeetcodeProblemPicks(lc, profile, profile.targetCompany);
 
   let dailyMission;
   if (lc?.topicRoadmap?.length) {

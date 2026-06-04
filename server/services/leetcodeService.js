@@ -477,6 +477,168 @@ const TOPIC_HARD_PICKS = {
   ],
 };
 
+const COMPANY_PROBLEMS = {
+  Amazon: {
+    Arrays: [
+      { title: 'Two Sum', slug: 'two-sum', difficulty: 'Easy' },
+      { title: 'Best Time to Buy and Sell Stock', slug: 'best-time-to-buy-and-sell-stock', difficulty: 'Easy' },
+      { title: 'Product of Array Except Self', slug: 'product-of-array-except-self', difficulty: 'Medium' },
+      { title: 'Trapping Rain Water', slug: 'trapping-rain-water', difficulty: 'Hard' },
+    ],
+    Strings: [
+      { title: 'Valid Parentheses', slug: 'valid-parentheses', difficulty: 'Easy' },
+      { title: 'Longest Substring Without Repeating Characters', slug: 'longest-substring-without-repeating-characters', difficulty: 'Medium' },
+      { title: 'Minimum Window Substring', slug: 'minimum-window-substring', difficulty: 'Hard' },
+    ],
+    Trees: [
+      { title: 'Maximum Depth of Binary Tree', slug: 'maximum-depth-of-binary-tree', difficulty: 'Easy' },
+      { title: 'Binary Tree Level Order Traversal', slug: 'binary-tree-level-order-traversal', difficulty: 'Medium' },
+      { title: 'Lowest Common Ancestor of a Binary Tree', slug: 'lowest-common-ancestor-of-a-binary-tree', difficulty: 'Medium' },
+    ],
+    Graphs: [
+      { title: 'Number of Islands', slug: 'number-of-islands', difficulty: 'Medium' },
+      { title: 'Word Ladder', slug: 'word-ladder', difficulty: 'Hard' },
+    ],
+    'Dynamic Programming': [
+      { title: 'Climbing Stairs', slug: 'climbing-stairs', difficulty: 'Easy' },
+      { title: 'Longest Palindromic Substring', slug: 'longest-palindromic-substring', difficulty: 'Medium' },
+      { title: 'Coin Change', slug: 'coin-change', difficulty: 'Medium' },
+    ],
+  },
+  Google: {
+    Arrays: [
+      { title: 'Two Sum', slug: 'two-sum', difficulty: 'Easy' },
+      { title: '3Sum', slug: '3sum', difficulty: 'Medium' },
+      { title: 'Container With Most Water', slug: 'container-with-most-water', difficulty: 'Medium' },
+      { title: 'Trapping Rain Water', slug: 'trapping-rain-water', difficulty: 'Hard' },
+    ],
+    Strings: [
+      { title: 'Valid Parentheses', slug: 'valid-parentheses', difficulty: 'Easy' },
+      { title: 'Valid Anagram', slug: 'valid-anagram', difficulty: 'Easy' },
+      { title: 'Longest Palindromic Substring', slug: 'longest-palindromic-substring', difficulty: 'Medium' },
+      { title: 'Regular Expression Matching', slug: 'regular-expression-matching', difficulty: 'Hard' },
+    ],
+    Trees: [
+      { title: 'Binary Tree Inorder Traversal', slug: 'binary-tree-inorder-traversal', difficulty: 'Easy' },
+      { title: 'Maximum Depth of Binary Tree', slug: 'maximum-depth-of-binary-tree', difficulty: 'Easy' },
+      { title: 'Binary Tree Maximum Path Sum', slug: 'binary-tree-maximum-path-sum', difficulty: 'Hard' },
+    ],
+    Graphs: [
+      { title: 'Number of Islands', slug: 'number-of-islands', difficulty: 'Medium' },
+      { title: 'Course Schedule', slug: 'course-schedule', difficulty: 'Medium' },
+      { title: 'Alien Dictionary', slug: 'alien-dictionary', difficulty: 'Hard' },
+    ],
+    'Dynamic Programming': [
+      { title: 'Climbing Stairs', slug: 'climbing-stairs', difficulty: 'Easy' },
+      { title: 'Longest Increasing Subsequence', slug: 'longest-increasing-subsequence', difficulty: 'Medium' },
+      { title: 'Edit Distance', slug: 'edit-distance', difficulty: 'Hard' },
+    ],
+  },
+  Microsoft: {
+    Arrays: [
+      { title: 'Two Sum', slug: 'two-sum', difficulty: 'Easy' },
+      { title: 'Best Time to Buy and Sell Stock', slug: 'best-time-to-buy-and-sell-stock', difficulty: 'Easy' },
+      { title: 'Product of Array Except Self', slug: 'product-of-array-except-self', difficulty: 'Medium' },
+      { title: 'Spiral Matrix', slug: 'spiral-matrix', difficulty: 'Medium' },
+    ],
+    Strings: [
+      { title: 'Valid Parentheses', slug: 'valid-parentheses', difficulty: 'Easy' },
+      { title: 'Reverse String', slug: 'reverse-string', difficulty: 'Easy' },
+      { title: 'Longest Substring Without Repeating Characters', slug: 'longest-substring-without-repeating-characters', difficulty: 'Medium' },
+    ],
+    'Linked Lists': [
+      { title: 'Reverse Linked List', slug: 'reverse-linked-list', difficulty: 'Easy' },
+      { title: 'Merge Two Sorted Lists', slug: 'merge-two-sorted-lists', difficulty: 'Easy' },
+      { title: 'Add Two Numbers', slug: 'add-two-numbers', difficulty: 'Medium' },
+    ],
+    Trees: [
+      { title: 'Maximum Depth of Binary Tree', slug: 'maximum-depth-of-binary-tree', difficulty: 'Easy' },
+      { title: 'Invert Binary Tree', slug: 'invert-binary-tree', difficulty: 'Easy' },
+      { title: 'Validate Binary Search Tree', slug: 'validate-binary-search-tree', difficulty: 'Medium' },
+    ],
+    'Dynamic Programming': [
+      { title: 'Climbing Stairs', slug: 'climbing-stairs', difficulty: 'Easy' },
+      { title: 'House Robber', slug: 'house-robber', difficulty: 'Medium' },
+      { title: 'Longest Increasing Subsequence', slug: 'longest-increasing-subsequence', difficulty: 'Medium' },
+    ],
+  },
+  Flipkart: {
+    Arrays: [
+      { title: 'Two Sum', slug: 'two-sum', difficulty: 'Easy' },
+      { title: 'Best Time to Buy and Sell Stock', slug: 'best-time-to-buy-and-sell-stock', difficulty: 'Easy' },
+      { title: '3Sum', slug: '3sum', difficulty: 'Medium' },
+      { title: 'Container With Most Water', slug: 'container-with-most-water', difficulty: 'Medium' },
+    ],
+    Strings: [
+      { title: 'Valid Parentheses', slug: 'valid-parentheses', difficulty: 'Easy' },
+      { title: 'Longest Common Prefix', slug: 'longest-common-prefix', difficulty: 'Easy' },
+      { title: 'Longest Substring Without Repeating Characters', slug: 'longest-substring-without-repeating-characters', difficulty: 'Medium' },
+    ],
+    Trees: [
+      { title: 'Maximum Depth of Binary Tree', slug: 'maximum-depth-of-binary-tree', difficulty: 'Easy' },
+      { title: 'Binary Tree Level Order Traversal', slug: 'binary-tree-level-order-traversal', difficulty: 'Medium' },
+      { title: 'Binary Tree Maximum Path Sum', slug: 'binary-tree-maximum-path-sum', difficulty: 'Hard' },
+    ],
+    Graphs: [
+      { title: 'Number of Islands', slug: 'number-of-islands', difficulty: 'Medium' },
+      { title: 'Course Schedule', slug: 'course-schedule', difficulty: 'Medium' },
+    ],
+    'Dynamic Programming': [
+      { title: 'Climbing Stairs', slug: 'climbing-stairs', difficulty: 'Easy' },
+      { title: 'Coin Change', slug: 'coin-change', difficulty: 'Medium' },
+      { title: 'Longest Palindromic Substring', slug: 'longest-palindromic-substring', difficulty: 'Medium' },
+    ],
+  },
+  Adobe: {
+    Arrays: [
+      { title: 'Two Sum', slug: 'two-sum', difficulty: 'Easy' },
+      { title: 'Best Time to Buy and Sell Stock', slug: 'best-time-to-buy-and-sell-stock', difficulty: 'Easy' },
+      { title: 'Product of Array Except Self', slug: 'product-of-array-except-self', difficulty: 'Medium' },
+    ],
+    Strings: [
+      { title: 'Valid Parentheses', slug: 'valid-parentheses', difficulty: 'Easy' },
+      { title: 'Valid Palindrome', slug: 'valid-palindrome', difficulty: 'Easy' },
+      { title: 'Longest Substring Without Repeating Characters', slug: 'longest-substring-without-repeating-characters', difficulty: 'Medium' },
+    ],
+    Trees: [
+      { title: 'Maximum Depth of Binary Tree', slug: 'maximum-depth-of-binary-tree', difficulty: 'Easy' },
+      { title: 'Invert Binary Tree', slug: 'invert-binary-tree', difficulty: 'Easy' },
+      { title: 'Lowest Common Ancestor of a Binary Tree', slug: 'lowest-common-ancestor-of-a-binary-tree', difficulty: 'Medium' },
+    ],
+    'Dynamic Programming': [
+      { title: 'Climbing Stairs', slug: 'climbing-stairs', difficulty: 'Easy' },
+      { title: 'House Robber', slug: 'house-robber', difficulty: 'Medium' },
+    ],
+  },
+  Infosys: {
+    Arrays: [
+      { title: 'Two Sum', slug: 'two-sum', difficulty: 'Easy' },
+      { title: 'Contains Duplicate', slug: 'contains-duplicate', difficulty: 'Easy' },
+      { title: 'Best Time to Buy and Sell Stock', slug: 'best-time-to-buy-and-sell-stock', difficulty: 'Easy' },
+    ],
+    Strings: [
+      { title: 'Valid Anagram', slug: 'valid-anagram', difficulty: 'Easy' },
+      { title: 'Valid Parentheses', slug: 'valid-parentheses', difficulty: 'Easy' },
+      { title: 'Reverse String', slug: 'reverse-string', difficulty: 'Easy' },
+    ],
+    'Linked Lists': [
+      { title: 'Reverse Linked List', slug: 'reverse-linked-list', difficulty: 'Easy' },
+      { title: 'Merge Two Sorted Lists', slug: 'merge-two-sorted-lists', difficulty: 'Easy' },
+    ],
+  },
+  TCS: {
+    Arrays: [
+      { title: 'Two Sum', slug: 'two-sum', difficulty: 'Easy' },
+      { title: 'Contains Duplicate', slug: 'contains-duplicate', difficulty: 'Easy' },
+      { title: 'Best Time to Buy and Sell Stock', slug: 'best-time-to-buy-and-sell-stock', difficulty: 'Easy' },
+    ],
+    Strings: [
+      { title: 'Valid Anagram', slug: 'valid-anagram', difficulty: 'Easy' },
+      { title: 'Valid Parentheses', slug: 'valid-parentheses', difficulty: 'Easy' },
+    ],
+  },
+};
+
 function topicStatusFromCounts(lcCount, target, totalSolved) {
   const solved = lcCount;
   const gap = Math.max(0, target - solved);
@@ -610,7 +772,7 @@ function leetcodeUrl(slug) {
 }
 
 /** Rule-based problem picks — only problems not in solvedSlugs */
-function buildLeetcodeProblemPicks(lc, profile) {
+function buildLeetcodeProblemPicks(lc, profile, targetCompany) {
   if (!lc) return [];
   const solvedSlugs = new Set(lc.solvedSlugs || []);
   const picks = [];
@@ -625,6 +787,48 @@ function buildLeetcodeProblemPicks(lc, profile) {
 
   const usedSlugs = new Set();
 
+  // First try company-specific problems
+  const companyProblems = COMPANY_PROBLEMS[targetCompany];
+  if (companyProblems) {
+    for (const topicName of order) {
+      if (picks.length >= 6) break;
+      const topicProblems = companyProblems[topicName];
+      if (!topicProblems) continue;
+
+      const road = lc.topicRoadmap.find((r) => r.topic === topicName);
+      const lcCount = road?.lcCount ?? 0;
+      if (road?.status === 'strong') continue;
+
+      const experienced = lc.totalSolved >= 120 || lcCount >= 25;
+      const prefer = experienced
+        ? ['Hard', 'Medium', 'Easy']
+        : lcCount < UNCOVERED_LC_COUNT
+        ? ['Easy', 'Medium']
+        : ['Medium', 'Easy', 'Hard'];
+
+      for (const diff of prefer) {
+        const problem = topicProblems.find(p => p.difficulty === diff && !solvedSlugs.has(p.slug) && !usedSlugs.has(p.slug));
+        if (problem) {
+          usedSlugs.add(problem.slug);
+          const count = road?.toSolveThisWeek || 2;
+          picks.push({
+            title: problem.title,
+            slug: problem.slug,
+            topic: topicName,
+            difficulty: problem.difficulty,
+            pattern: `${targetCompany} frequently asked`,
+            why: `This is a frequently asked problem at ${targetCompany}. You haven't solved it on LeetCode yet (${lcCount} on ${topicName} tag).`,
+            companyRelevance: targetCompany,
+            leetcodeUrl: leetcodeUrl(problem.slug),
+            problemsToSolve: count,
+          });
+          break;
+        }
+      }
+    }
+  }
+
+  // Then fall back to default topic problems
   for (const topicName of order) {
     if (picks.length >= 6) break;
 
@@ -649,7 +853,7 @@ function buildLeetcodeProblemPicks(lc, profile) {
       topic: topicName,
       difficulty: starter.difficulty,
       pattern: 'Not in your LeetCode AC list yet',
-      why: `You haven't solved this on LeetCode (${lcCount} on ${topicName} tag). ${starter.difficulty} pick for ${profile.targetCompany}.`,
+      why: `You haven't solved this on LeetCode (${lcCount} on ${topicName} tag). ${starter.difficulty} pick for ${profile.targetCompany || 'placement'}.`,
       companyRelevance: profile.targetCompany,
       leetcodeUrl: leetcodeUrl(starter.slug),
       problemsToSolve: count,
