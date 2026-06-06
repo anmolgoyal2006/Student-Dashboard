@@ -22,6 +22,7 @@ export default function Attendance() {
 
   const [classSummary, setClassSummary] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState(isStudent ? 'my-attendance' : 'bulk-upload');
 
   const loadTeacherData = async () => {
     if (!isTeacher) {
@@ -44,25 +45,104 @@ export default function Attendance() {
     loadTeacherData();
   }, [user]);
 
+  const handleTabClick = (tabId) => {
+    if (isStudent && tabId === 'bulk-upload') {
+      toast.error('Bulk upload is only available for teachers.');
+      return;
+    }
+    if (isTeacher && tabId === 'my-attendance') {
+      toast.error('My attendance view is only available for students.');
+      return;
+    }
+    setActiveTab(tabId);
+  };
+
   if (loading && isTeacher) return <div className="spinner" />;
 
   return (
-    <div>
+    <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+      <style>{`
+        .main-content {
+          padding-top: 32px !important;
+          padding-left: 24px !important;
+          padding-right: 24px !important;
+        }
+      `}</style>
+
       {/* Page header */}
-      <div className="page-header">
+      <div className="page-header" style={{ marginBottom: 12, paddingBottom: 12 }}>
         <div>
           <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <ClipboardList size={22} color="var(--color-accent)" />
+            <ClipboardList size={20} color="var(--color-accent)" />
             Attendance tracker
           </h1>
           <p className="page-subtitle">Mark and monitor student and personal class attendance</p>
         </div>
       </div>
 
-      {/* Contents based on role */}
-      {isStudent && <StudentAttendanceView sid={user?.sid} />}
+      {/* Tabs switcher - visible to teachers only (students have bulk upload removed) */}
+      {!isStudent && (
+        <div style={{
+          display: 'flex',
+          borderBottom: '1px solid var(--border)',
+          marginBottom: 16,
+          gap: 24,
+          marginTop: 0
+        }}>
+          <button
+            onClick={() => handleTabClick('my-attendance')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '0 4px',
+              height: 40,
+              background: 'transparent',
+              border: 'none',
+              cursor: isTeacher ? 'not-allowed' : 'pointer',
+              color: activeTab === 'my-attendance' ? '#fff' : 'var(--color-text-secondary)',
+              borderBottom: activeTab === 'my-attendance' ? '2px solid var(--color-accent)' : '2px solid transparent',
+              fontSize: 13.5,
+              fontWeight: activeTab === 'my-attendance' ? 500 : 400,
+              transition: 'all 0.15s ease',
+              opacity: isTeacher ? 0.45 : 1
+            }}
+          >
+            <ClipboardList size={14} style={{ display: 'flex', alignItems: 'center' }} />
+            <span>My attendance</span>
+          </button>
 
-      {isTeacher && (
+          <button
+            onClick={() => handleTabClick('bulk-upload')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '0 4px',
+              height: 40,
+              background: 'transparent',
+              border: 'none',
+              cursor: isStudent ? 'not-allowed' : 'pointer',
+              color: activeTab === 'bulk-upload' ? '#fff' : 'var(--color-text-secondary)',
+              borderBottom: activeTab === 'bulk-upload' ? '2px solid var(--color-accent)' : '2px solid transparent',
+              fontSize: 13.5,
+              fontWeight: activeTab === 'bulk-upload' ? 500 : 400,
+              transition: 'all 0.15s ease',
+              opacity: isStudent ? 0.45 : 1
+            }}
+          >
+            <Upload size={14} style={{ display: 'flex', alignItems: 'center' }} />
+            <span>Bulk upload</span>
+          </button>
+        </div>
+      )}
+
+      {/* Contents based on active tab & role */}
+      {activeTab === 'my-attendance' && isStudent && (
+        <StudentAttendanceView sid={user?.sid} />
+      )}
+
+      {activeTab === 'bulk-upload' && isTeacher && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           
           <div className="card">

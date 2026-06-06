@@ -4,7 +4,8 @@ import API from "../api/axios";
 import toast from "../context/ToastContext";
 import { 
   Calendar, Check, X, Flame, BarChart2, BookOpen, Clock, 
-  ChevronLeft, ChevronRight, User, Mail, ShieldAlert, Award
+  ChevronLeft, ChevronRight, User, Mail, ShieldAlert, Award,
+  CalendarDays, CheckCircle, XCircle, TrendingUp, CalendarCheck, BarChart3
 } from "lucide-react";
 import EmptyState from "./EmptyState";
 
@@ -77,6 +78,28 @@ const StudentAttendanceView = ({ sid }) => {
     new Date(dateStr).toLocaleDateString("en-IN", {
       day: "2-digit", month: "2-digit", year: "numeric",
     });
+
+  const getStrokeGradient = (pct) => {
+    if (pct >= 75) return "url(#successGrad)";
+    if (pct >= 50) return "url(#warningGrad)";
+    return "url(#dangerGrad)";
+  };
+
+  const getThemeVars = (colorHex, rgbStr) => ({
+    '--theme-color': colorHex,
+    '--theme-bg-muted': `rgba(${rgbStr}, 0.08)`,
+    '--theme-border': `rgba(${rgbStr}, 0.15)`,
+    '--theme-border-hover': `rgba(${rgbStr}, 0.35)`,
+    '--theme-radial-color': `rgba(${rgbStr}, 0.04)`,
+    '--theme-shadow-glow': `0 8px 20px rgba(${rgbStr}, 0.1)`,
+    '--theme-color-glow': `rgba(${rgbStr}, 0.25)`
+  });
+
+  const getStudentStanding = (pct) => {
+    if (pct >= 75) return { text: "Good Standing", className: "premium-standing-excellent", icon: Award };
+    if (pct >= 50) return { text: "Needs Attention", className: "premium-standing-warning", icon: Flame };
+    return { text: "Critical Status", className: "premium-standing-critical", icon: ShieldAlert };
+  };
 
   const getOverallStats = () => {
     if (!data) return { present: 0, absent: 0, total: 0, percentage: 0 };
@@ -154,12 +177,7 @@ const StudentAttendanceView = ({ sid }) => {
   const pageRecords = filteredRecords.slice((currentPage - 1) * recordsPerPage, currentPage * recordsPerPage);
 
   const barColor = (pct) =>
-    pct >= 75 ? "#22c55e" : pct >= 50 ? "#f59e0b" : "#ef4444";
-
-  const badgeStyle = (status) =>
-    status === "present"
-      ? { background: "rgba(34,220,94,0.08)", color: "#22c55e", border: "1px solid rgba(34,220,94,0.15)" }
-      : { background: "rgba(239,68,68,0.08)", color: "#ef4444", border: "1px solid rgba(239,68,68,0.15)" };
+    pct >= 75 ? "#10b981" : pct >= 50 ? "#f59e0b" : "#ef4444";
 
   if (loading) return <div className="spinner" />;
 
@@ -189,6 +207,8 @@ const StudentAttendanceView = ({ sid }) => {
 
   const stats = getOverallStats();
   const overallStreak = getOverallStreak(data?.records);
+  const standing = getStudentStanding(stats.percentage);
+  const StandingIcon = standing.icon;
 
   // SVG Donut metrics
   const radius = 60;
@@ -197,11 +217,17 @@ const StudentAttendanceView = ({ sid }) => {
   const circ = 2 * Math.PI * r;
   const offset = circ - (stats.percentage / 100) * circ;
 
+  const getAttendanceColor = (pct) => {
+    if (pct >= 75) return "#22c55e";
+    if (pct >= 50) return "#f59e0b";
+    return "#ef4444";
+  };
+
   const statCards = [
-    { label: "Total Classes", value: stats.total, icon: Clock, color: "var(--color-accent)" },
-    { label: "Present", value: stats.present, icon: Check, color: "#22c55e" },
-    { label: "Absent", value: stats.absent, icon: X, color: "#ef4444" },
-    { label: "Attendance", value: `${stats.percentage}%`, icon: BarChart2, color: stats.percentage >= 75 ? "#22c55e" : stats.percentage >= 50 ? "#f59e0b" : "#ef4444" },
+    { label: "Total classes", value: stats.total, color: "var(--color-accent)" },
+    { label: "Present", value: stats.present, color: "#22c55e" },
+    { label: "Absent", value: stats.absent, color: "#ef4444" },
+    { label: "Attendance %", value: `${stats.percentage}%`, color: getAttendanceColor(stats.percentage) },
   ];
 
   return (
@@ -250,65 +276,231 @@ const StudentAttendanceView = ({ sid }) => {
             margin-top: 2px;
           }
         }
+
+        /* FORM INPUTS & SELECTS */
+        .form-select-premium, .form-input-premium {
+          padding: 10px 14px;
+          border: 1px solid rgba(255, 255, 255, 0.05);
+          border-radius: var(--radius-md);
+          font-size: 13px;
+          color: var(--color-text-primary);
+          background: rgba(255, 255, 255, 0.02);
+          transition: all 0.2s ease;
+          width: 100%;
+          font-family: inherit;
+        }
+        .form-select-premium:focus, .form-input-premium:focus {
+          outline: none;
+          border-color: var(--color-accent);
+          box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+          background: rgba(255, 255, 255, 0.04);
+        }
+        .form-select-premium:hover, .form-input-premium:hover {
+          border-color: rgba(255, 255, 255, 0.12);
+          background: rgba(255, 255, 255, 0.03);
+        }
+
+        /* PULSING STREAK BADGE */
+        @keyframes pulse-glow {
+          0%, 100% {
+            box-shadow: 0 0 8px rgba(245, 158, 11, 0.2);
+            transform: scale(1);
+          }
+          50% {
+            box-shadow: 0 0 16px rgba(245, 158, 11, 0.4);
+            transform: scale(1.03);
+          }
+        }
+        .pulsing-streak-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          background: rgba(245, 158, 11, 0.08);
+          border: 1px solid rgba(245, 158, 11, 0.25);
+          color: #fbbf24;
+          font-size: 12px;
+          font-weight: 600;
+          padding: 4px 10px;
+          border-radius: var(--radius-pill);
+          animation: pulse-glow 2s infinite ease-in-out;
+        }
+
+        /* SUBJECT SUMMARY CARDS & PROGRESS BARS */
+        .subject-summary-card {
+          background: rgba(255, 255, 255, 0.015);
+          border: 1px solid rgba(255, 255, 255, 0.03);
+          border-radius: var(--radius-md);
+          padding: 14px;
+          transition: all 0.2s ease;
+        }
+        .subject-summary-card:hover {
+          background: rgba(255, 255, 255, 0.025);
+          border-color: rgba(255, 255, 255, 0.06);
+        }
+        .progress-bar-gradient-success { background: linear-gradient(90deg, #10b981, #34d399); }
+        .progress-bar-gradient-warning { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+        .progress-bar-gradient-danger { background: linear-gradient(90deg, #ef4444, #f87171); }
+
+        .insight-banner-premium {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 8px 12px;
+          border-radius: var(--radius-sm);
+          font-size: 11.5px;
+          font-weight: 500;
+          margin-top: 8px;
+          border-left: 3px solid var(--insight-accent);
+          background: var(--insight-bg);
+          color: var(--insight-color);
+        }
+
+        /* TABLE STYLING */
+        .table-th-premium {
+          text-align: left;
+          padding: 10px 14px;
+          font-size: 11px;
+          font-weight: 600;
+          color: var(--color-text-secondary);
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+        }
+        .table-tr-premium {
+          border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+          transition: background-color 0.15s ease;
+        }
+        .table-tr-premium:hover {
+          background-color: rgba(255, 255, 255, 0.015);
+        }
+        .table-td-premium {
+          padding: 10px 14px;
+          font-size: 13px;
+        }
+
+        /* STATUS BADGES */
+        .record-status-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 4px 10px;
+          border-radius: var(--radius-pill);
+          font-size: 11px;
+          font-weight: 600;
+          text-transform: capitalize;
+        }
+        .record-status-badge.present {
+          background: rgba(16, 185, 129, 0.08);
+          color: #10b981;
+          border: 1px solid rgba(16, 185, 129, 0.15);
+        }
+        .record-status-badge.absent {
+          background: rgba(239, 68, 68, 0.08);
+          color: #ef4444;
+          border: 1px solid rgba(239, 68, 68, 0.15);
+        }
+        .status-dot-pulse {
+          width: 6px;
+          height: 6px;
+          border-radius: 50%;
+          display: inline-block;
+        }
+        .status-dot-pulse.present {
+          background: #10b981;
+          box-shadow: 0 0 6px #10b981;
+        }
+        .status-dot-pulse.absent {
+          background: #ef4444;
+          box-shadow: 0 0 6px #ef4444;
+        }
+
+        /* PAGINATION BUTTONS */
+        .pagination-btn-premium {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 6px 12px;
+          border-radius: var(--radius-md);
+          font-size: 12px;
+          font-weight: 500;
+          border: 1px solid rgba(255, 255, 255, 0.05);
+          background: rgba(255, 255, 255, 0.02);
+          color: var(--color-text-secondary);
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+        .pagination-btn-premium:hover:not(:disabled) {
+          background: rgba(255, 255, 255, 0.05);
+          color: var(--color-text-primary);
+          border-color: rgba(255, 255, 255, 0.12);
+          transform: translateY(-0.5px);
+        }
+        .pagination-btn-premium:disabled {
+          opacity: 0.4;
+          cursor: not-allowed;
+        }
       `}</style>
 
-      {/* Student info strip */}
-      <div className="card mb-4" style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-        <div style={{
-          width: 44, height: 44, borderRadius: "50%",
-          background: "linear-gradient(135deg,#6366f1,#a78bfa)",
-          color: "#fff", fontSize: "1.1rem", fontWeight: 700,
-          display: "flex", alignItems: "center", justifyItems: "center", justifyContent: "center",
-          flexShrink: 0,
-        }}>
-          {data.student.name?.charAt(0) || "S"}
-        </div>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontWeight: 600, fontSize: "14.5px", color: "var(--color-text-primary)" }}>
-            {data.student.name}
-          </div>
-          <div style={{ fontSize: "12px", color: "var(--color-text-secondary)", marginTop: 2 }}>
-            {data.student.email}
-          </div>
-        </div>
-        {data.student.sid && (
-          <div style={{
-            fontSize: "11px",
-            color: "var(--color-accent)",
-            fontWeight: 500,
-            background: "var(--color-accent-muted)",
-            padding: "4px 10px",
-            borderRadius: "var(--radius-pill)",
-          }}>
-            SID: {data.student.sid}
-          </div>
-        )}
-      </div>
-
       {/* Stat cards */}
-      <div className="grid-4 mb-4">
+      <div className="grid-4" style={{ marginBottom: 16 }}>
         {statCards.map((s) => {
-          const IconComp = s.icon;
           return (
-            <div className="card stat-card" key={s.label}>
-              <span className="stat-icon" style={{ background: 'var(--color-accent-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <IconComp size={16} color="var(--color-accent)" />
-              </span>
-              <div className="stat-value" style={{ color: s.color }}>{s.value}</div>
-              <div className="stat-label">{s.label}</div>
+            <div 
+              key={s.label}
+              style={{
+                background: "var(--color-surface-2)",
+                borderTop: `3px solid ${s.color}`,
+                borderLeft: "1px solid rgba(255, 255, 255, 0.04)",
+                borderRight: "1px solid rgba(255, 255, 255, 0.04)",
+                borderBottom: "1px solid rgba(255, 255, 255, 0.04)",
+                borderRadius: "var(--radius-lg)",
+                padding: "20px",
+                display: "flex",
+                flexDirection: "column",
+                gap: "8px",
+                transition: "background-color 0.2s ease, transform 0.2s ease",
+                cursor: "pointer"
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = "var(--color-surface-3)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = "var(--color-surface-2)";
+              }}
+            >
+              <div style={{
+                fontSize: "11px",
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
+                color: "var(--color-text-tertiary)",
+                fontWeight: 600
+              }}>
+                {s.label}
+              </div>
+              <div style={{
+                fontSize: "36px",
+                fontWeight: 500,
+                color: "var(--color-text-primary)",
+                lineHeight: 1
+              }}>
+                {s.value}
+              </div>
             </div>
           );
         })}
       </div>
 
+      {/* Divider line between stats and mark card */}
+      <div style={{ borderBottom: '0.5px solid rgba(255, 255, 255, 0.08)', marginBottom: 16 }} />
+
       {/* Mark attendance & Overall Ring */}
-      <div className="grid-2 mb-4">
+      <div className="grid-2 mb-4" style={{ gap: 16 }}>
         
         {/* Mark Attendance Card */}
-        <div className="card" style={{ display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+        <div className="card" style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", border: "1px solid rgba(99, 102, 241, 0.2)", padding: 20 }}>
           <div>
-            <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <Calendar size={18} color="var(--color-accent)" />
+            <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '16px', fontWeight: 500 }}>
+              <CalendarCheck size={16} color="var(--color-accent)" />
               Mark today's class
             </div>
             
@@ -320,62 +512,98 @@ const StudentAttendanceView = ({ sid }) => {
               />
             ) : (
               <form onSubmit={handleMark}>
-                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
                   {/* Subject */}
-                  <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                    <label style={{ fontSize: "11px", color: "var(--color-text-secondary)", fontWeight: 500 }}>Subject</label>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                    <label style={{ fontSize: "13px", color: "var(--color-text-secondary)", fontWeight: 500 }}>Subject</label>
                     <select
-                      className="form-select"
+                      className="form-select-premium"
                       value={markForm.subjectId}
                       onChange={(e) => setMarkForm((p) => ({ ...p, subjectId: e.target.value }))}
                       required
+                      style={{
+                        height: 44,
+                        background: "var(--color-surface-3)",
+                        border: "1px solid rgba(255,255,255,0.08)",
+                        borderRadius: "var(--radius-md)"
+                      }}
                     >
-                      <option value="">Select subject…</option>
+                      <option value="" style={{ background: 'var(--color-surface-2)' }}>Select subject…</option>
                       {subjects.map((s) => (
-                        <option key={s._id} value={s._id}>{s.name} ({s.code})</option>
+                        <option key={s._id} value={s._id} style={{ background: 'var(--color-surface-2)' }}>{s.name} ({s.code})</option>
                       ))}
                     </select>
                   </div>
 
                   {/* Date & Status Row */}
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
                     {/* Date */}
-                    <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                      <label style={{ fontSize: "11px", color: "var(--color-text-secondary)", fontWeight: 500 }}>Date</label>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                      <label style={{ fontSize: "13px", color: "var(--color-text-secondary)", fontWeight: 500 }}>Date</label>
                       <input
                         type="date"
-                        className="form-input"
+                        className="form-input-premium"
                         value={markForm.date}
                         onChange={(e) => setMarkForm((p) => ({ ...p, date: e.target.value }))}
+                        style={{
+                          height: 44,
+                          background: "var(--color-surface-3)",
+                          border: "1px solid rgba(255,255,255,0.08)",
+                          borderRadius: "var(--radius-md)"
+                        }}
                       />
                     </div>
 
-                    {/* Status radio buttons */}
-                    <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                      <label style={{ fontSize: "11px", color: "var(--color-text-secondary)", fontWeight: 500 }}>Status</label>
-                      <div style={{ display: 'flex', gap: 12, height: 38, alignItems: 'center' }}>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer', color: 'var(--color-text-primary)' }}>
-                          <input
-                            type="radio"
-                            name="mark-status"
-                            value="present"
-                            checked={markForm.status === 'present'}
-                            onChange={() => setMarkForm(p => ({ ...p, status: 'present' }))}
-                            style={{ accentColor: 'var(--color-accent)' }}
-                          />
+                    {/* Status Toggle Buttons */}
+                    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                      <label style={{ fontSize: "13px", color: "var(--color-text-secondary)", fontWeight: 500 }}>Status</label>
+                      <div style={{ display: 'flex', gap: 12 }}>
+                        <button
+                          type="button"
+                          onClick={() => setMarkForm(p => ({ ...p, status: 'present' }))}
+                          style={{
+                            width: 130,
+                            height: 44,
+                            borderRadius: 'var(--radius-md)',
+                            border: 'none',
+                            cursor: 'pointer',
+                            fontSize: 13.5,
+                            fontWeight: markForm.status === 'present' ? 500 : 400,
+                            background: markForm.status === 'present' ? '#22c55e' : 'var(--color-surface-3)',
+                            color: markForm.status === 'present' ? '#fff' : 'var(--color-text-secondary)',
+                            transition: 'all 0.15s ease',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: 6
+                          }}
+                        >
+                          <Check size={14} />
                           Present
-                        </label>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer', color: 'var(--color-text-primary)' }}>
-                          <input
-                            type="radio"
-                            name="mark-status"
-                            value="absent"
-                            checked={markForm.status === 'absent'}
-                            onChange={() => setMarkForm(p => ({ ...p, status: 'absent' }))}
-                            style={{ accentColor: 'var(--color-accent)' }}
-                          />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setMarkForm(p => ({ ...p, status: 'absent' }))}
+                          style={{
+                            width: 130,
+                            height: 44,
+                            borderRadius: 'var(--radius-md)',
+                            border: 'none',
+                            cursor: 'pointer',
+                            fontSize: 13.5,
+                            fontWeight: markForm.status === 'absent' ? 500 : 400,
+                            background: markForm.status === 'absent' ? '#ef4444' : 'var(--color-surface-3)',
+                            color: markForm.status === 'absent' ? '#fff' : 'var(--color-text-secondary)',
+                            transition: 'all 0.15s ease',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: 6
+                          }}
+                        >
+                          <X size={14} />
                           Absent
-                        </label>
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -383,13 +611,27 @@ const StudentAttendanceView = ({ sid }) => {
                   <button
                     type="submit"
                     disabled={marking}
-                    className="btn btn-primary"
+                    className="btn"
                     style={{
                       width: "100%",
-                      marginTop: 6
+                      marginTop: 8,
+                      background: "var(--color-accent)",
+                      color: "#fff",
+                      height: 48,
+                      borderRadius: "var(--radius-md)",
+                      fontSize: "15px",
+                      fontWeight: 500,
+                      boxShadow: "0 4px 16px rgba(99, 102, 241, 0.2)",
+                      border: "none",
+                      cursor: "pointer"
                     }}
                   >
-                    {marking ? "Saving…" : "Submit"}
+                    {marking ? (
+                      <>
+                        <span className="spinner-small" style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.6s linear infinite', marginRight: 6 }} />
+                        Saving…
+                      </>
+                    ) : "Submit"}
                   </button>
                 </div>
               </form>
@@ -398,28 +640,49 @@ const StudentAttendanceView = ({ sid }) => {
         </div>
 
         {/* Overall SVG Donut Chart Card */}
-        <div className="card" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", position: "relative" }}>
+        <div className="card" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", position: "relative", padding: 20 }}>
           
           {/* Top Row: Title + Streak */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', position: 'absolute', top: 18, padding: '0 20px' }}>
-            <div className="card-title" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div className="card-title" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 6, fontSize: '16px', fontWeight: 500 }}>
               <BarChart2 size={18} color="var(--color-accent)" />
               Overall attendance
             </div>
             {overallStreak >= 2 && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#fbbf24', fontSize: '13px', fontWeight: 500 }}>
-                <Flame size={15} fill="#fbbf24" />
+              <div className="pulsing-streak-badge">
+                <Flame size={13} fill="#fbbf24" style={{ filter: 'drop-shadow(0 0 2px rgba(251,191,36,0.5))' }} />
                 <span>{overallStreak}-day streak</span>
               </div>
             )}
           </div>
 
           {stats.total > 0 ? (
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginTop: 24 }}>
-              <div style={{ position: "relative", height: 120, width: 120, display: "flex", justifyContent: "center", alignItems: "center" }}>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginTop: 28 }}>
+              <div style={{ position: "relative", height: 130, width: 130, display: "flex", justifyContent: "center", alignItems: "center" }}>
                 <svg height={radius * 2} width={radius * 2} style={{ transform: 'rotate(-90deg)' }}>
+                  <defs>
+                    <linearGradient id="successGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="#10b981" />
+                      <stop offset="100%" stopColor="#34d399" />
+                    </linearGradient>
+                    <linearGradient id="warningGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="#f59e0b" />
+                      <stop offset="100%" stopColor="#fbbf24" />
+                    </linearGradient>
+                    <linearGradient id="dangerGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="#ef4444" />
+                      <stop offset="100%" stopColor="#f87171" />
+                    </linearGradient>
+                    <filter id="svgGlow" x="-20%" y="-20%" width="140%" height="140%">
+                      <feGaussianBlur stdDeviation="3" result="blur" />
+                      <feMerge>
+                        <feMergeNode in="blur" />
+                        <feMergeNode in="SourceGraphic" />
+                      </feMerge>
+                    </filter>
+                  </defs>
                   <circle
-                    stroke="rgba(255, 255, 255, 0.05)"
+                    stroke="rgba(255, 255, 255, 0.03)"
                     fill="transparent"
                     strokeWidth={strokeWidth}
                     r={r}
@@ -427,12 +690,13 @@ const StudentAttendanceView = ({ sid }) => {
                     cy={radius}
                   />
                   <circle
-                    stroke="var(--color-accent)"
+                    stroke={getStrokeGradient(stats.percentage)}
                     fill="transparent"
                     strokeWidth={strokeWidth}
                     strokeDasharray={`${circ} ${circ}`}
                     style={{ strokeDashoffset: offset, transition: 'stroke-dashoffset 0.35s' }}
                     strokeLinecap="round"
+                    filter="url(#svgGlow)"
                     r={r}
                     cx={radius}
                     cy={radius}
@@ -445,40 +709,51 @@ const StudentAttendanceView = ({ sid }) => {
                   alignItems: "center",
                   justifyContent: "center"
                 }}>
-                  <span style={{ fontSize: "24px", fontWeight: 500, color: "var(--color-text-primary)" }}>
+                  <span style={{ fontSize: "26px", fontWeight: 700, color: "var(--color-text-primary)", letterSpacing: '-0.02em', textShadow: '0 2px 10px rgba(0,0,0,0.3)' }}>
                     {stats.percentage}%
                   </span>
-                  <span style={{ fontSize: "12px", color: "var(--color-text-tertiary)", fontWeight: 500 }}>
+                  <span style={{ fontSize: "10px", color: "var(--color-text-tertiary)", fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: 2 }}>
                     Attendance
                   </span>
                 </div>
               </div>
-              <div style={{ display: "flex", justifyContent: "center", gap: "16px", marginTop: "16px" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                  <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#22c55e" }} />
-                  <span style={{ fontSize: "12px", color: "var(--color-text-secondary)" }}>Present: <strong>{stats.present}</strong></span>
+              
+              <div style={{ display: "flex", justifyContent: "center", gap: "20px", marginTop: "20px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#10b981", boxShadow: '0 0 8px rgba(16,185,129,0.5)' }} />
+                  <span style={{ fontSize: "12px", color: "var(--color-text-secondary)", fontWeight: 500 }}>Present: <strong style={{ color: 'var(--color-text-primary)' }}>{stats.present}</strong></span>
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                  <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#ef4444" }} />
-                  <span style={{ fontSize: "12px", color: "var(--color-text-secondary)" }}>Absent: <strong>{stats.absent}</strong></span>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#ef4444", boxShadow: '0 0 8px rgba(239,68,68,0.5)' }} />
+                  <span style={{ fontSize: "12px", color: "var(--color-text-secondary)", fontWeight: 500 }}>Absent: <strong style={{ color: 'var(--color-text-primary)' }}>{stats.absent}</strong></span>
                 </div>
               </div>
             </div>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px", marginTop: 24 }}>
-              <BarChart2 size={32} color="var(--color-text-tertiary)" />
-              <span style={{ fontSize: "13px", color: "var(--color-text-secondary)", textAlign: "center" }}>No attendance records to visualize yet.</span>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', minHeight: 220, padding: '24px 0', textAlign: 'center', width: '100%' }}>
+              <BarChart3 size={40} color="var(--color-accent)" style={{ opacity: 0.4, marginBottom: 12 }} />
+              <h3 style={{ fontSize: '16px', fontWeight: 500, color: 'var(--color-text-primary)', margin: '0 0 6px 0' }}>No records yet</h3>
+              <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)', margin: '0 0 20px 0', maxWidth: 260, lineHeight: 1.4 }}>
+                Mark your first class above to start tracking
+              </p>
+              
+              {/* Visual Placeholder Bars */}
+              <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', justifyContent: 'center', marginTop: 8 }}>
+                <div style={{ width: 16, height: 40, background: 'rgba(255,255,255,0.06)', borderRadius: 4 }} />
+                <div style={{ width: 16, height: 65, background: 'rgba(255,255,255,0.06)', borderRadius: 4 }} />
+                <div style={{ width: 16, height: 50, background: 'rgba(255,255,255,0.06)', borderRadius: 4 }} />
+              </div>
             </div>
           )}
         </div>
       </div>
 
       {/* Two-column: breakdown + records */}
-      <div className="grid-2">
+      <div className="grid-2" style={{ gap: 16 }}>
 
         {/* Subject breakdown */}
-        <div className="card">
-          <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <div className="card" style={{ padding: 20 }}>
+          <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '16px', fontWeight: 500 }}>
             <BookOpen size={18} color="var(--color-accent)" />
             Subject-wise summary
           </div>
@@ -496,42 +771,58 @@ const StudentAttendanceView = ({ sid }) => {
                   const streak = getSubjectStreak(subject.code);
                   const insight = getSmartInsight(subject.present, subject.total);
                   const barCol = barColor(subject.percentage);
+                  
+                  const barGradClass = subject.percentage >= 75 
+                    ? "progress-bar-gradient-success" 
+                    : subject.percentage >= 50 
+                      ? "progress-bar-gradient-warning" 
+                      : "progress-bar-gradient-danger";
+                  
+                  const insightVars = insight.status === 'safe'
+                    ? { '--insight-accent': '#10b981', '--insight-bg': 'rgba(16, 185, 129, 0.04)', '--insight-color': '#10b981', icon: Check }
+                    : insight.status === 'warning'
+                      ? { '--insight-accent': '#f59e0b', '--insight-bg': 'rgba(245, 158, 11, 0.04)', '--insight-color': '#f59e0b', icon: Flame }
+                      : { '--insight-accent': '#ef4444', '--insight-bg': 'rgba(239, 68, 68, 0.04)', '--insight-color': '#ef4444', icon: ShieldAlert };
+                  const InsightIcon = insightVars.icon;
+
                   return (
-                    <div key={subject.code || subject.subject}>
+                    <div key={subject.code || subject.subject} className="subject-summary-card">
                       <div className="attendance-sub-header">
                         <div className="attendance-sub-left">
                           <span className="attendance-sub-name" title={subject.subject}>
                             {subject.subject}
                           </span>
                           <span style={{
-                            fontSize: "11px", color: "var(--color-text-secondary)",
+                            fontSize: "10px", color: "var(--color-text-secondary)",
                             background: "rgba(255,255,255,0.04)",
                             padding: "2px 6px", borderRadius: 4,
+                            fontWeight: 600,
                           }}>
                             {subject.code}
                           </span>
                           {streak >= 2 && (
                             <span style={{
-                              fontSize: "11px",
-                              background: "rgba(245,158,11,0.1)",
-                              color: "#f59e0b",
+                              fontSize: "10px",
+                              background: "rgba(245,158,11,0.08)",
+                              color: "#fbbf24",
                               padding: "2px 6px",
                               borderRadius: 4,
                               fontWeight: 600,
                               display: "inline-flex",
                               alignItems: "center",
-                              gap: "2px"
+                              gap: "2px",
+                              border: "1px solid rgba(245,158,11,0.15)"
                             }}>
-                              <Flame size={10} fill="#f59e0b" /> {streak} Streak
+                              <Flame size={10} fill="#fbbf24" /> {streak} Streak
                             </span>
                           )}
                         </div>
                         <div className="attendance-sub-right" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                          <span style={{ fontSize: "12px", color: "var(--color-text-secondary)" }}>
+                          <span style={{ fontSize: "11.5px", color: "var(--color-text-secondary)", fontWeight: 500 }}>
                             {subject.present}/{subject.total}
                           </span>
                           <span style={{
-                            fontSize: "13.5px", fontWeight: 600, minWidth: 36,
+                            fontSize: "13.5px", fontWeight: 700, minWidth: 36,
                             textAlign: "right", color: barCol,
                           }}>
                             {subject.percentage}%
@@ -540,24 +831,26 @@ const StudentAttendanceView = ({ sid }) => {
                       </div>
                       <div style={{
                         width: "100%", height: 6,
-                        background: "rgba(255,255,255,0.04)",
+                        background: "rgba(255,255,255,0.03)",
                         borderRadius: "var(--radius-pill)", overflow: "hidden",
                         marginBottom: "4px"
                       }}>
-                        <div style={{
-                          height: "100%", borderRadius: "var(--radius-pill)",
-                          width: `${subject.percentage}%`,
-                          background: barCol,
-                          transition: "width 0.4s ease",
-                        }} />
+                        <div 
+                          className={barGradClass}
+                          style={{
+                            height: "100%", borderRadius: "var(--radius-pill)",
+                            width: `${subject.percentage}%`,
+                            transition: "width 0.4s ease",
+                          }} 
+                        />
                       </div>
-                      <div style={{
-                        fontSize: "11.5px",
-                        color: insight.status === 'safe' ? "#22c55e" : insight.status === 'warning' ? "#f59e0b" : "#ef4444",
-                        fontWeight: 500,
-                        marginTop: "2px"
+                      <div className="insight-banner-premium" style={{
+                        '--insight-accent': insightVars['--insight-accent'],
+                        '--insight-bg': insightVars['--insight-bg'],
+                        '--insight-color': insightVars['--insight-color']
                       }}>
-                        {insight.text}
+                        <InsightIcon size={12} />
+                        <span>{insight.text}</span>
                       </div>
                     </div>
                   );
@@ -567,80 +860,66 @@ const StudentAttendanceView = ({ sid }) => {
         </div>
 
         {/* Attendance records */}
-        <div className="card">
-          <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <div className="card" style={{ padding: 20 }}>
+          <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '16px', fontWeight: 500 }}>
             <Calendar size={18} color="var(--color-accent)" />
             Attendance records
           </div>
 
-          {/* Filter pills */}
-          <div style={{ display: "flex", gap: "6px", margin: "12px 0" }}>
+          {/* Underline Tab Style Filters */}
+          <div style={{ display: "flex", gap: "16px", borderBottom: "1px solid var(--border)", marginBottom: "16px", marginTop: "12px" }}>
             {["all", "present", "absent"].map((f) => (
               <button
                 key={f}
                 onClick={() => setFilter(f)}
-                className={`btn btn-sm ${filter === f ? 'btn-primary' : 'btn-outline'}`}
                 style={{
-                  padding: "4px 12px",
-                  borderRadius: "var(--radius-pill)",
-                  fontSize: "12px",
-                  fontWeight: 500,
-                  background: filter === f ? "var(--color-accent)" : "transparent",
-                  borderColor: filter === f ? "var(--color-accent)" : "var(--border)",
-                  color: filter === f ? "#fff" : "var(--color-text-secondary)"
+                  background: "transparent",
+                  border: "none",
+                  borderBottom: filter === f ? "2px solid var(--color-accent)" : "2px solid transparent",
+                  color: filter === f ? "#fff" : "var(--color-text-secondary)",
+                  padding: "8px 4px",
+                  fontSize: "13px",
+                  fontWeight: filter === f ? 500 : 400,
+                  cursor: "pointer",
+                  transition: "all 0.15s ease",
+                  textTransform: "capitalize"
                 }}
               >
-                {f.charAt(0).toUpperCase() + f.slice(1)}
+                {f}
               </button>
             ))}
           </div>
 
           <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
-                <tr style={{ background: "rgba(255,255,255,0.02)" }}>
+                <tr style={{ background: "rgba(255,255,255,0.01)" }}>
                   {["Date", "Subject", "Code", "Status"].map((h) => (
-                    <th key={h} style={{
-                      textAlign: "left", padding: "8px 10px",
-                      fontSize: "11px", fontWeight: 600, color: "var(--color-text-secondary)",
-                      textTransform: "uppercase", letterSpacing: "0.5px",
-                      borderBottom: "1px solid var(--border)",
-                    }}>{h}</th>
+                    <th key={h} className="table-th-premium">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {pageRecords.length > 0 ? (
                   pageRecords.map((record, idx) => (
-                    <tr key={idx} style={{ borderBottom: "1px solid var(--border)", transition: "background 0.1s" }}
-                      onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.01)"}
-                      onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
-                    >
-                      <td style={{
-                        padding: "8px 10px",
+                    <tr key={idx} className="table-tr-premium">
+                      <td className="table-td-premium" style={{
                         color: "var(--color-text-secondary)", fontSize: "12px",
                         whiteSpace: "nowrap",
                       }}>
                         {formatDate(record.date)}
                       </td>
-                      <td style={{ padding: "8px 10px", color: "var(--color-text-primary)", fontWeight: 500 }}>
+                      <td className="table-td-premium" style={{ color: "var(--color-text-primary)", fontWeight: 600 }}>
                         {record.subject}
                       </td>
-                      <td style={{ padding: "8px 10px", color: "var(--color-text-secondary)", fontSize: "12.5px" }}>
-                        {record.code}
+                      <td className="table-td-premium" style={{ color: "var(--color-text-secondary)", fontSize: "12px", fontWeight: 500 }}>
+                        <span style={{ background: 'rgba(255,255,255,0.03)', padding: '2px 6px', borderRadius: 4, border: '1px solid rgba(255,255,255,0.05)' }}>
+                          {record.code}
+                        </span>
                       </td>
-                      <td style={{ padding: "8px 10px" }}>
-                        <span style={{
-                          display: "inline-flex", alignItems: "center", gap: 4,
-                          padding: "2px 8px", borderRadius: "var(--radius-pill)",
-                          fontSize: "11px", fontWeight: 600,
-                          ...badgeStyle(record.status),
-                        }}>
-                          <span style={{
-                            width: 5, height: 5, borderRadius: "50%",
-                            background: record.status === 'present' ? "#22c55e" : "#ef4444",
-                            display: "inline-block",
-                          }} />
+                      <td className="table-td-premium">
+                        <span className={`record-status-badge ${record.status}`}>
+                          <span className={`status-dot-pulse ${record.status}`} />
                           {record.status}
                         </span>
                       </td>
@@ -648,7 +927,7 @@ const StudentAttendanceView = ({ sid }) => {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan="4" style={{ textAlign: "center", padding: "24px" }}>
+                    <td colSpan="4" style={{ textAlign: "center", padding: "32px" }}>
                       <span style={{ fontSize: "13px", color: "var(--color-text-tertiary)" }}>No records found.</span>
                     </td>
                   </tr>
@@ -659,29 +938,21 @@ const StudentAttendanceView = ({ sid }) => {
 
           {/* Pagination Controls */}
           {totalPages > 1 && (
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 14 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 18 }}>
               <button
                 disabled={currentPage === 1}
                 onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                className="btn btn-outline"
-                style={{
-                  padding: "4px 10px", fontSize: "12px", display: "flex", alignItems: "center", gap: 4, background: "transparent",
-                  opacity: currentPage === 1 ? 0.5 : 1, cursor: currentPage === 1 ? 'not-allowed' : 'pointer'
-                }}
+                className="pagination-btn-premium"
               >
                 <ChevronLeft size={14} /> Previous
               </button>
-              <span style={{ fontSize: "12.5px", color: "var(--color-text-secondary)" }}>
+              <span style={{ fontSize: "12px", color: "var(--color-text-secondary)", fontWeight: 500 }}>
                 Page {currentPage} of {totalPages}
               </span>
               <button
                 disabled={currentPage === totalPages}
                 onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                className="btn btn-outline"
-                style={{
-                  padding: "4px 10px", fontSize: "12px", display: "flex", alignItems: "center", gap: 4, background: "transparent",
-                  opacity: currentPage === totalPages ? 0.5 : 1, cursor: currentPage === totalPages ? 'not-allowed' : 'pointer'
-                }}
+                className="pagination-btn-premium"
               >
                 Next <ChevronRight size={14} />
               </button>
