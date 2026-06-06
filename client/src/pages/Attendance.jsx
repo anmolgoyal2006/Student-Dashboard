@@ -396,8 +396,11 @@ function TeacherDashboard({ classSummary, isLoading, onUploadSuccess, apiUrl }) 
 
 export default function Attendance() {
   const { user } = useAuth();
+  const [authReady, setAuthReady] = useState(false);
   const isTeacher = user?.role === 'teacher';
   const isStudent = user?.role === 'student';
+
+  useEffect(() => { setAuthReady(Boolean(user)); }, [user]);
 
   const [classSummary, setClassSummary] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -407,6 +410,7 @@ export default function Attendance() {
   );
 
  const loadTeacherData = useCallback(async () => {
+    if (!authReady) return;
     if (!isTeacher) {
       setLoading(false);
       return;
@@ -417,6 +421,11 @@ export default function Attendance() {
       const response = await attendanceService.getClassSummary();
       setClassSummary(response.data.students || []);
     } catch (err) {
+      if (err.response?.status === 403) {
+        console.warn('[Attendance] Not authorized for class summary (expected if not teacher)');
+        setLoading(false);
+        return;
+      }
       console.error('Failed to load class summary:', err);
       const msg = err.message || 'Failed to load class summary.';
       setError(msg);
@@ -424,7 +433,7 @@ export default function Attendance() {
     } finally {
       setLoading(false);
     }
-  }, [isTeacher]);
+  }, [isTeacher, authReady]);
 
   useEffect(() => {
     loadTeacherData();
