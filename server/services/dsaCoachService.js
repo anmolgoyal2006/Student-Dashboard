@@ -198,12 +198,20 @@ function ruleBasedCoach(profile, lc) {
 }
 
 async function generateCoachPlan(career, options = {}) {
-  const profile = buildProfile(career);
-  const lc = await buildLeetcodeInsights(career, {
-    live: options.liveLeetcode !== false && !!career.leetcodeUsername,
-    topicTargets: TOPIC_TARGETS,
-  });
-  const base = ruleBasedCoach(profile, lc);
+  let profile, lc, base;
+  try {
+    profile = buildProfile(career);
+    lc = await buildLeetcodeInsights(career, {
+      live: options.liveLeetcode !== false && !!career.leetcodeUsername,
+      topicTargets: TOPIC_TARGETS,
+    });
+    base = ruleBasedCoach(profile, lc);
+  } catch (err) {
+    console.error('[DSA Coach] build failed', err);
+    profile = profile || buildProfile({ dsaTopics: [], targetCompany: 'Other', targetRole: 'Software Engineer', problemsSolved: 0, readiness: 'Beginner', skills: [] });
+    lc = null;
+    base = ruleBasedCoach(profile, lc);
+  }
 
   if (!lc) {
     const system = `You are an expert placement DSA coach for Indian college students targeting ${profile.targetCompany}.
@@ -222,8 +230,12 @@ For uncovered topics (0-2 problems), recommend starting with Easy LeetCode class
     try {
       const raw = await callGroq(system, user, 2000);
       const parsed = extractJSON(raw);
-      if (parsed?.dailyMission?.length) {
-        return { ...base, ...parsed, source: 'ai', leetcodeLinked: false };
+      if (Array.isArray(parsed?.dailyMission) && parsed.dailyMission.length) {
+        const merged = { ...base, ...parsed, source: 'ai', leetcodeLinked: false };
+        for (const key of ['dailyMission', 'weeklyFocus', 'recommendedProblems', 'topicRoadmap', 'weakTopics', 'strongTopics', 'uncoveredTopics']) {
+          if (!Array.isArray(merged[key])) merged[key] = base[key];
+        }
+        return merged;
       }
     } catch (err) {
       console.error('[DSA Coach]', err.message);
@@ -276,25 +288,17 @@ Return JSON:
   try {
     const raw = await callGroq(system, user, 2400);
     const parsed = extractJSON(raw);
-    if (parsed?.dailyMission?.length) {
-      const solvedSet = new Set(lc.solvedSlugs || []);
-      const aiRecs = filterUnsolvedRecommendations(
-        (parsed.recommendedProblems || []).map((p) => ({
-          ...p,
-          slug: p.slug || slugFromUrl(p.leetcodeUrl),
-          leetcodeUrl: p.leetcodeUrl || (p.slug ? `https://leetcode.com/problems/${p.slug}/` : undefined),
-        })),
-        solvedSet
-      );
+    if (Array.isArray(parsed?.dailyMission) && parsed.dailyMission.length) {
       const merged = {
         ...base,
         ...parsed,
         source: 'ai+leetcode',
         leetcodeLinked: true,
-        topicRoadmap: parsed.topicRoadmap?.length ? parsed.topicRoadmap : base.topicRoadmap,
-        recommendedProblems: base.recommendedProblems, // Always use our company-focused rule-based problems
-        uncoveredTopics: parsed.uncoveredTopics || base.uncoveredTopics,
+        recommendedProblems: base.recommendedProblems,
       };
+      for (const key of ['dailyMission', 'weeklyFocus', 'topicRoadmap', 'uncoveredTopics', 'weakTopics', 'strongTopics']) {
+        if (!Array.isArray(merged[key])) merged[key] = base[key];
+      }
       return merged;
     }
   } catch (err) {
