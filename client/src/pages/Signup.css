@@ -10,7 +10,7 @@
   padding: 24px;
   position: relative;
   overflow: hidden;
-  background: #06061a;
+  background: var(--color-surface-0);
   font-family: 'DM Sans', sans-serif;
 }
 
@@ -26,27 +26,27 @@
 }
 .orb-1 {
   width: 520px; height: 520px;
-  background: radial-gradient(circle, #6d28d9, #4f46e5);
+  background: radial-gradient(circle, var(--color-purple), var(--color-accent));
   top: -180px; left: -160px;
   animation-duration: 14s;
 }
 .orb-2 {
   width: 420px; height: 420px;
-  background: radial-gradient(circle, #0ea5e9, #06b6d4);
+  background: radial-gradient(circle, var(--color-sky), var(--color-cyan));
   bottom: -140px; right: -120px;
   animation-duration: 10s;
   animation-delay: -4s;
 }
 .orb-3 {
   width: 300px; height: 300px;
-  background: radial-gradient(circle, #8b5cf6, #a78bfa);
+  background: radial-gradient(circle, var(--color-violet), var(--color-accent));
   top: 50%; right: 22%;
   animation-duration: 16s;
   animation-delay: -7s;
 }
 .orb-4 {
   width: 200px; height: 200px;
-  background: radial-gradient(circle, #0d9488, #14b8a6);
+  background: radial-gradient(circle, var(--color-accent), var(--color-accent));
   bottom: 20%; left: 15%;
   animation-duration: 18s;
   animation-delay: -2s;
@@ -95,7 +95,7 @@
   width: 320px;
   flex-shrink: 0;
   padding: 48px 36px;
-  background: linear-gradient(160deg, #4f46e5 0%, #7c3aed 50%, #0e7490 100%);
+  background: linear-gradient(160deg, var(--color-accent) 0%, var(--color-accent) 50%, var(--color-dark-cyan) 100%);
   display: flex;
   flex-direction: column;
   gap: 0;
@@ -121,7 +121,7 @@
   font-family: 'Sora', sans-serif;
   font-size: 30px;
   font-weight: 700;
-  color: #fff;
+  color: var(--color-text-primary);
   margin: 0 0 12px;
   letter-spacing: -0.5px;
 }
@@ -170,7 +170,7 @@
   background: rgba(255,255,255,0.3);
 }
 .dot.active {
-  background: #fff;
+  background: var(--color-text-primary);
   width: 24px;
   border-radius: 4px;
 }
@@ -193,7 +193,7 @@
   font-family: 'Sora', sans-serif;
   font-size: 24px;
   font-weight: 700;
-  color: #f1f5f9;
+  color: var(--color-text-primary);
   margin: 0 0 6px;
   letter-spacing: -0.4px;
 }
@@ -248,7 +248,7 @@
   background: rgba(255,255,255,0.05);
   border: 1px solid rgba(255,255,255,0.1);
   border-radius: 10px;
-  color: #f1f5f9;
+  color: var(--color-text-primary);
   font-size: 14px;
   font-family: 'DM Sans', sans-serif;
   transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
@@ -260,14 +260,14 @@
   background: rgba(99,102,241,0.08);
   box-shadow: 0 0 0 3px rgba(99,102,241,0.15);
 }
-.field-focused .field-label { color: #a5b4fc; }
+.field-focused .field-label { color: var(--color-light-indigo); }
 
 .field-select {
   cursor: pointer;
   appearance: none;
   -webkit-appearance: none;
 }
-.field-select option { background: #1e1b4b; color: #f1f5f9; }
+.field-select option { background: var(--color-surface-3); color: var(--color-text-primary); }
 
 /* ─── Submit Button ───────────────────────────────────────── */
 .signup-btn {
@@ -283,10 +283,10 @@
   align-items: center;
   justify-content: center;
   gap: 10px;
-  background: linear-gradient(135deg, #6d28d9 0%, #4f46e5 50%, #0e7490 100%);
+  background: linear-gradient(135deg, var(--color-purple) 0%, var(--color-accent) 50%, var(--color-dark-cyan) 100%);
   background-size: 200% 200%;
   background-position: 0% 50%;
-  color: #fff;
+  color: var(--color-text-primary);
   letter-spacing: 0.02em;
   transition: background-position 0.4s ease, transform 0.2s, box-shadow 0.2s;
   box-shadow: 0 4px 20px rgba(79,70,229,0.4), 0 1px 4px rgba(0,0,0,0.3);
@@ -320,7 +320,7 @@
 .btn-spinner {
   width: 20px; height: 20px;
   border: 2.5px solid rgba(255,255,255,0.3);
-  border-top-color: #fff;
+  border-top-color: var(--color-text-primary);
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
   display: inline-block;
@@ -335,12 +335,12 @@
   color: rgba(148,163,184,0.7);
 }
 .signin-anchor {
-  color: #a5b4fc;
+  color: var(--color-light-indigo);
   font-weight: 600;
   text-decoration: none;
   transition: color 0.2s;
 }
-.signin-anchor:hover { color: #c4b5fd; text-decoration: underline; }
+.signin-anchor:hover { color: var(--color-accent); text-decoration: underline; }
 
 /* ─── Responsive ──────────────────────────────────────────── */
 @media (max-width: 768px) {

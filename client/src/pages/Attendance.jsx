@@ -100,7 +100,7 @@ export default function Attendance() {
               background: 'transparent',
               border: 'none',
               cursor: isTeacher ? 'not-allowed' : 'pointer',
-              color: activeTab === 'my-attendance' ? '#fff' : 'var(--color-text-secondary)',
+              color: activeTab === 'my-attendance' ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
               borderBottom: activeTab === 'my-attendance' ? '2px solid var(--color-accent)' : '2px solid transparent',
               fontSize: 13.5,
               fontWeight: activeTab === 'my-attendance' ? 500 : 400,
@@ -123,7 +123,7 @@ export default function Attendance() {
               background: 'transparent',
               border: 'none',
               cursor: isStudent ? 'not-allowed' : 'pointer',
-              color: activeTab === 'bulk-upload' ? '#fff' : 'var(--color-text-secondary)',
+              color: activeTab === 'bulk-upload' ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
               borderBottom: activeTab === 'bulk-upload' ? '2px solid var(--color-accent)' : '2px solid transparent',
               fontSize: 13.5,
               fontWeight: activeTab === 'bulk-upload' ? 500 : 400,
@@ -204,7 +204,7 @@ export default function Attendance() {
                         <td style={{ padding: '10px 12px' }}>
                           <span style={{
                             fontWeight: 600,
-                            color: s.overall >= 75 ? '#22c55e' : s.overall >= 60 ? '#f59e0b' : '#ef4444'
+                            color: s.overall >= 75 ? 'var(--color-success)' : s.overall >= 60 ? 'var(--color-warning)' : 'var(--color-danger)'
                           }}>
                             {s.overall}%
                           </span>
@@ -215,7 +215,7 @@ export default function Attendance() {
                               <span key={j} style={{
                                 padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 500,
                                 background: sub.percentage >= 75 ? 'rgba(34,197,94,0.1)' : sub.percentage >= 60 ? 'rgba(245,158,11,0.1)' : 'rgba(239,68,68,0.1)',
-                                color: sub.percentage >= 75 ? '#22c55e' : sub.percentage >= 60 ? '#f59e0b' : '#ef4444',
+                                color: sub.percentage >= 75 ? 'var(--color-success)' : sub.percentage >= 60 ? 'var(--color-warning)' : 'var(--color-danger)',
                                 border: `1px solid ${sub.percentage >= 75 ? 'rgba(34,197,94,0.2)' : sub.percentage >= 60 ? 'rgba(245,158,11,0.2)' : 'rgba(239,68,68,0.2)'}`,
                               }}>
                                 {sub.subject}: {sub.percentage}%

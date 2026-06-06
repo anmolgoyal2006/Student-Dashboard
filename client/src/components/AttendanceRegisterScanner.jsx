@@ -1,5 +1,6 @@
 // src/components/AttendanceRegisterScanner.jsx
 import { useState, useRef, useCallback } from "react";
+import { Camera } from 'lucide-react';
 import Tesseract from "tesseract.js";
 import * as XLSX from "xlsx";
 
@@ -100,7 +101,7 @@ function preprocessImage(file) {
       const ctx = canvas.getContext("2d");
 
       // White background
-      ctx.fillStyle = "#fff";
+      ctx.fillStyle = "var(--color-text-primary)";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
@@ -335,14 +336,14 @@ export default function AttendanceRegisterScanner({
       {/* Tips banner */}
       {stage === "idle" && (
         <div style={s.tipsBanner}>
-          <strong>📸 Tips for best results:</strong> Good lighting · Camera directly above · Register flat · Text horizontal · No shadows
+          <strong style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}><Camera size={14} /> Tips for best results:</strong> Good lighting · Camera directly above · Register flat · Text horizontal · No shadows
         </div>
       )}
 
       {/* Dropzone */}
       {stage === "idle" && (
         <div style={s.dropzone} onClick={() => fileInputRef.current?.click()}>
-          <span style={{ fontSize: 36 }}>📷</span>
+          <Camera size={36} style={{ color: 'var(--color-text-secondary)' }} />
           <span style={{ fontWeight: 500 }}>Click to upload register photo</span>
           <span style={{ fontSize: 12, opacity: 0.6 }}>JPEG / PNG — handwritten or printed</span>
           <input
@@ -379,7 +380,7 @@ export default function AttendanceRegisterScanner({
               <div style={{ fontWeight: 600, fontSize: 14 }}>
                 {rows.filter(r => r.status === "Present").length} Present &nbsp;·&nbsp;
                 {rows.filter(r => r.status === "Absent").length} Absent &nbsp;·&nbsp;
-                <span style={{ color: "var(--warning, #f59e0b)" }}>
+                <span style={{ color: "var(--warning, var(--color-warning))" }}>
                   {rows.filter(r => r.status === "UNKNOWN").length} needs review
                 </span>
               </div>
@@ -404,7 +405,7 @@ export default function AttendanceRegisterScanner({
                     key={idx}
                     style={!row.sid || row.status === "UNKNOWN" ? s.rowError : s.rowNormal}
                   >
-                    <td style={{ ...s.td, color: "var(--muted, #888)", fontSize: 11, width: 28 }}>
+                    <td style={{ ...s.td, color: "var(--muted, var(--color-text-secondary))", fontSize: 11, width: 28 }}>
                       {idx + 1}
                     </td>
                     <td style={s.td}>
@@ -428,10 +429,10 @@ export default function AttendanceRegisterScanner({
                         style={{
                           ...s.cellInput,
                           color: row.status === "Present"
-                            ? "var(--success, #4ade80)"
+                            ? "var(--success, var(--color-success))"
                             : row.status === "Absent"
-                            ? "var(--danger, #f87171)"
-                            : "var(--warning, #fbbf24)",
+                            ? "var(--danger, var(--color-danger))"
+                            : "var(--warning, var(--color-warning))",
                           fontWeight: 600,
                         }}
                         value={row.status}
@@ -496,12 +497,12 @@ export default function AttendanceRegisterScanner({
       {/* Done */}
       {stage === "done" && (
         <div style={s.successBox}>
-          <div style={{ fontSize: 36, color: "#16a34a" }}>✓</div>
-          <p style={{ fontSize: 16, color: "#166534", margin: "8px 0 4px" }}>
+          <div style={{ fontSize: 36, color: "var(--color-success)" }}>✓</div>
+          <p style={{ fontSize: 16, color: "var(--color-success)", margin: "8px 0 4px" }}>
             Attendance uploaded successfully!
           </p>
           {submitResult && (
-            <p style={{ fontSize: 13, color: "#166534", margin: "0 0 16px" }}>
+            <p style={{ fontSize: 13, color: "var(--color-success)", margin: "0 0 16px" }}>
               {submitResult.inserted} inserted · {submitResult.updated} updated · {submitResult.skipped} skipped
             </p>
           )}
@@ -551,8 +552,8 @@ const s = {
     padding: "6px 10px",
     border: "1px solid rgba(255,255,255,0.15)",
     borderRadius: 6, fontSize: 14,
-    background: "var(--card-bg, #1e1e2e)",
-    color: "var(--text, #fff)",
+    background: "var(--card-bg, var(--color-surface-1))",
+    color: "var(--text, var(--color-text-primary))",
     outline: "none", minWidth: 160,
   },
 
@@ -561,14 +562,14 @@ const s = {
     border: "1px solid rgba(99,102,241,0.25)",
     borderRadius: 8, padding: "10px 14px",
     fontSize: 13, marginBottom: 14,
-    color: "var(--text, #fff)",
+    color: "var(--text, var(--color-text-primary))",
   },
 
   dropzone: {
     border: "2px dashed rgba(255,255,255,0.2)",
     borderRadius: 10, padding: "36px 20px",
     textAlign: "center", cursor: "pointer",
-    color: "var(--text, #fff)",
+    color: "var(--text, var(--color-text-primary))",
     display: "flex", flexDirection: "column",
     alignItems: "center", gap: 8,
     transition: "border-color 0.2s",
@@ -579,7 +580,7 @@ const s = {
   thumbSmall: { maxHeight: 64, borderRadius: 6 },
   progressLabel: { fontSize: 13, opacity: 0.7, marginBottom: 8 },
   progressTrack: { height: 6, background: "rgba(255,255,255,0.1)", borderRadius: 3, overflow: "hidden" },
-  progressBar: { height: "100%", background: "#6366f1", borderRadius: 3, transition: "width 0.3s" },
+  progressBar: { height: "100%", background: "var(--color-accent)", borderRadius: 3, transition: "width 0.3s" },
 
   tableWrapper: { overflowX: "auto", marginBottom: 12 },
   table: { width: "100%", minWidth: "560px", borderCollapse: "collapse", fontSize: 13 },
@@ -597,29 +598,29 @@ const s = {
     width: "100%", padding: "5px 7px",
     border: "1px solid rgba(255,255,255,0.12)",
     borderRadius: 4, fontSize: 13,
-    background: "var(--card-bg, #1e1e2e)",
-    color: "var(--text, #fff)",
+    background: "var(--card-bg, var(--color-surface-1))",
+    color: "var(--text, var(--color-text-primary))",
     boxSizing: "border-box",
   },
 
   actionBar: { display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginBottom: 8 },
 
   btnPrimary: {
-    padding: "8px 18px", background: "#6366f1", color: "#fff",
+    padding: "8px 18px", background: "var(--color-accent)", color: "var(--color-text-primary)",
     border: "none", borderRadius: 6, cursor: "pointer", fontSize: 14, fontWeight: 500,
   },
   btnSecondary: {
     padding: "8px 14px", background: "rgba(255,255,255,0.08)",
-    color: "var(--text, #fff)", border: "1px solid rgba(255,255,255,0.15)",
+    color: "var(--text, var(--color-text-primary))", border: "1px solid rgba(255,255,255,0.15)",
     borderRadius: 6, cursor: "pointer", fontSize: 13,
   },
   btnGhost: {
     padding: "6px 10px", background: "transparent",
-    color: "var(--muted, #888)", border: "none", cursor: "pointer", fontSize: 12,
+    color: "var(--muted, var(--color-text-secondary))", border: "none", cursor: "pointer", fontSize: 12,
   },
   btnDanger: {
     padding: "2px 8px", background: "transparent",
-    color: "#ef4444", border: "none", cursor: "pointer", fontSize: 15,
+    color: "var(--color-danger)", border: "none", cursor: "pointer", fontSize: 15,
   },
 
   rawBox: {
@@ -627,28 +628,28 @@ const s = {
     background: "rgba(0,0,0,0.3)", borderRadius: 6,
     fontSize: 11, whiteSpace: "pre-wrap", wordBreak: "break-all",
     maxHeight: 200, overflowY: "auto",
-    color: "var(--muted, #aaa)",
+    color: "var(--muted, var(--color-text-secondary))",
   },
 
   errorBanner: {
     background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)",
-    color: "var(--danger, #f87171)", borderRadius: 6,
+    color: "var(--danger, var(--color-danger))", borderRadius: 6,
     padding: "10px 14px", fontSize: 13, marginTop: 8,
   },
   errorBox: {
     background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)",
-    borderRadius: 8, padding: 20, color: "var(--danger, #f87171)", fontSize: 14,
+    borderRadius: 8, padding: 20, color: "var(--danger, var(--color-danger))", fontSize: 14,
   },
   successBox: {
     textAlign: "center", padding: "28px 20px",
     background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.25)",
     borderRadius: 10,
   },
-  centred: { textAlign: "center", padding: "32px 0", color: "var(--text, #fff)" },
+  centred: { textAlign: "center", padding: "32px 0", color: "var(--text, var(--color-text-primary))" },
   spinner: {
     width: 34, height: 34,
     border: "3px solid rgba(255,255,255,0.1)",
-    borderTop: "3px solid #6366f1",
+    borderTop: "3px solid var(--color-accent)",
     borderRadius: "50%",
     animation: "spin 0.8s linear infinite",
     margin: "0 auto 12px",

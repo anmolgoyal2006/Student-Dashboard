@@ -1,33 +1,34 @@
 // components/StudentAttendanceView.jsx
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
+import { BarChart3, Clipboard, Loader2, X } from 'lucide-react';
 
 const styles = {
   container:  { maxWidth: 800, margin: '0 auto', padding: 24, fontFamily: 'sans-serif' },
-  card:       { background: '#1e1e2e', borderRadius: 12, padding: 24, color: '#fff', marginBottom: 16 },
+  card:       { background: 'var(--color-surface-1)', borderRadius: 12, padding: 24, color: 'var(--color-text-primary)', marginBottom: 16 },
   title:      { fontSize: 20, fontWeight: 700, marginBottom: 4 },
-  subtitle:   { fontSize: 13, color: '#aaa', marginBottom: 20 },
+  subtitle:   { fontSize: 13, color: 'var(--color-text-secondary)', marginBottom: 20 },
   grid:       { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12, marginBottom: 24 },
-  statCard:   { background: '#2a2a3e', borderRadius: 10, padding: 16, textAlign: 'center' },
+  statCard:   { background: 'var(--color-surface-3)', borderRadius: 10, padding: 16, textAlign: 'center' },
   statVal:    { fontSize: 28, fontWeight: 700, marginBottom: 4 },
-  statLabel:  { fontSize: 12, color: '#aaa' },
+  statLabel:  { fontSize: 12, color: 'var(--color-text-secondary)' },
   table:      { width: '100%', borderCollapse: 'collapse', fontSize: 14 },
-  th:         { background: '#2a2a3e', padding: '10px 14px', textAlign: 'left', color: '#aaa', fontWeight: 600 },
-  td:         { padding: '10px 14px', borderBottom: '1px solid #2a2a3e' },
+  th:         { background: 'var(--color-surface-3)', padding: '10px 14px', textAlign: 'left', color: 'var(--color-text-secondary)', fontWeight: 600 },
+  td:         { padding: '10px 14px', borderBottom: '1px solid var(--color-surface-3)' },
   badge:      { display: 'inline-block', padding: '3px 10px', borderRadius: 20, fontSize: 12, fontWeight: 600 },
-  present:    { background: '#1a3a2a', color: '#4caf7d' },
-  absent:     { background: '#3a1a1a', color: '#f44336' },
-  cancelled:  { background: '#2a2a1a', color: '#ff9800' },
-  bar:        { height: 8, borderRadius: 4, background: '#2a2a3e', overflow: 'hidden', marginTop: 6 },
+  present:    { background: 'var(--color-success-muted)', color: 'var(--color-success)' },
+  absent:     { background: 'var(--color-danger-muted)', color: 'var(--color-danger)' },
+  cancelled:  { background: 'var(--color-warning-muted)', color: 'var(--color-warning)' },
+  bar:        { height: 8, borderRadius: 4, background: 'var(--color-surface-3)', overflow: 'hidden', marginTop: 6 },
   barFill:    (pct) => ({
     height: '100%',
     width:  `${pct}%`,
     borderRadius: 4,
-    background: pct >= 75 ? '#4caf7d' : pct >= 50 ? '#ff9800' : '#f44336',
+    background: pct >= 75 ? 'var(--color-success)' : pct >= 50 ? 'var(--color-warning)' : 'var(--color-danger)',
     transition: 'width 0.4s ease',
   }),
-  loading:    { color: '#aaa', textAlign: 'center', padding: 40 },
-  error:      { color: '#f44336', textAlign: 'center', padding: 40 },
+  loading:    { color: 'var(--color-text-secondary)', textAlign: 'center', padding: 40 },
+  error:      { color: 'var(--color-danger)', textAlign: 'center', padding: 40 },
 };
 
 export default function StudentAttendanceView({ sid }) {
@@ -55,8 +56,8 @@ export default function StudentAttendanceView({ sid }) {
     fetch();
   }, [sid]);
 
-  if (loading) return <div style={styles.loading}>⏳ Loading attendance...</div>;
-  if (error)   return <div style={styles.error}>❌ {error}</div>;
+  if (loading) return <div style={{...styles.loading, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'}}><Loader2 size={16} className="spinner" /> Loading attendance...</div>;
+  if (error)   return <div style={{...styles.error, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'}}><X size={16} /> {error}</div>;
   if (!data)   return null;
 
   const filteredRecords = data.records.filter(r =>
@@ -71,25 +72,25 @@ export default function StudentAttendanceView({ sid }) {
 
       {/* ── Student Info ── */}
       <div style={styles.card}>
-        <div style={styles.title}>📊 Attendance — {data.student.name}</div>
+        <div style={{...styles.title, display: 'flex', alignItems: 'center', gap: '6px'}}><BarChart3 size={16} /> Attendance — {data.student.name}</div>
         <div style={styles.subtitle}>{data.student.email} · SID: {data.student.sid || sid}</div>
 
         {/* ── Overall Stats ── */}
         <div style={styles.grid}>
           <div style={styles.statCard}>
-            <div style={{ ...styles.statVal, color: '#6c63ff' }}>{data.total}</div>
+            <div style={{ ...styles.statVal, color: 'var(--color-accent)' }}>{data.total}</div>
             <div style={styles.statLabel}>Total Classes</div>
           </div>
           <div style={styles.statCard}>
-            <div style={{ ...styles.statVal, color: '#4caf7d' }}>{overallPresent}</div>
+            <div style={{ ...styles.statVal, color: 'var(--color-success)' }}>{overallPresent}</div>
             <div style={styles.statLabel}>Present</div>
           </div>
           <div style={styles.statCard}>
-            <div style={{ ...styles.statVal, color: '#f44336' }}>{data.total - overallPresent}</div>
+            <div style={{ ...styles.statVal, color: 'var(--color-danger)' }}>{data.total - overallPresent}</div>
             <div style={styles.statLabel}>Absent</div>
           </div>
           <div style={styles.statCard}>
-            <div style={{ ...styles.statVal, color: overallPct >= 75 ? '#4caf7d' : '#f44336' }}>
+            <div style={{ ...styles.statVal, color: overallPct >= 75 ? 'var(--color-success)' : 'var(--color-danger)' }}>
               {overallPct}%
             </div>
             <div style={styles.statLabel}>Overall</div>
@@ -98,12 +99,12 @@ export default function StudentAttendanceView({ sid }) {
 
         {/* ── Per Subject Summary ── */}
         <div style={{ marginTop: 8 }}>
-          <div style={{ fontSize: 13, color: '#aaa', marginBottom: 10 }}>Subject-wise Breakdown:</div>
+          <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginBottom: 10 }}>Subject-wise Breakdown:</div>
           {data.summary.map((s, i) => (
             <div key={i} style={{ marginBottom: 12 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
                 <span>{s.subject} {s.code ? `(${s.code})` : ''}</span>
-                <span style={{ color: s.percentage >= 75 ? '#4caf7d' : '#f44336', fontWeight: 600 }}>
+                <span style={{ color: s.percentage >= 75 ? 'var(--color-success)' : 'var(--color-danger)', fontWeight: 600 }}>
                   {s.present}/{s.total} — {s.percentage}%
                 </span>
               </div>
@@ -118,15 +119,15 @@ export default function StudentAttendanceView({ sid }) {
       {/* ── Records Table ── */}
       <div style={styles.card}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <div style={{ fontWeight: 600 }}>📋 Attendance Records</div>
+          <div style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}><Clipboard size={16} /> Attendance Records</div>
           <div style={{ display: 'flex', gap: 8 }}>
             {['all', 'present', 'absent'].map(f => (
               <button
                 key={f}
                 onClick={() => setFilter(f)}
                 style={{
-                  background: filter === f ? '#6c63ff' : '#2a2a3e',
-                  color: '#fff', border: 'none', borderRadius: 6,
+                  background: filter === f ? 'var(--color-accent)' : 'var(--color-surface-3)',
+                  color: 'var(--color-text-primary)', border: 'none', borderRadius: 6,
                   padding: '5px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 600,
                   textTransform: 'capitalize',
                 }}
@@ -149,7 +150,7 @@ export default function StudentAttendanceView({ sid }) {
             <tbody>
               {filteredRecords.length === 0 ? (
                 <tr>
-                  <td colSpan={3} style={{ ...styles.td, textAlign: 'center', color: '#aaa' }}>
+                  <td colSpan={3} style={{ ...styles.td, textAlign: 'center', color: 'var(--color-text-secondary)' }}>
                     No records found.
                   </td>
                 </tr>

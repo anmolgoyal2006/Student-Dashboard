@@ -1,3 +1,4 @@
+import { ClipboardList } from 'lucide-react';
 import React from 'react';
 
 export default function EmptyState({
@@ -53,7 +54,7 @@ export default function EmptyState({
             <line x1="22" y1="44" x2="30" y2="44" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
           </svg>
         ) : (
-          icon || <span>📋</span>
+          icon || <ClipboardList size={24} />
         )}
       </div>
       <h3 style={{

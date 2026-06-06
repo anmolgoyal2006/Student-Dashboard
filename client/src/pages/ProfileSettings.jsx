@@ -16,11 +16,11 @@ function getPasswordStrength(pw) {
 
   const meta = [
     null,
-    { label: 'Very weak',   color: '#ef4444', width: '20%'  },
-    { label: 'Weak',        color: '#f97316', width: '40%'  },
-    { label: 'Fair',        color: '#f59e0b', width: '60%'  },
-    { label: 'Strong',      color: '#22c55e', width: '80%'  },
-    { label: 'Very strong', color: '#10b981', width: '100%' },
+    { label: 'Very weak',   color: 'var(--color-danger)', width: '20%'  },
+    { label: 'Weak',        color: 'var(--color-warning)', width: '40%'  },
+    { label: 'Fair',        color: 'var(--color-warning)', width: '60%'  },
+    { label: 'Strong',      color: 'var(--color-success)', width: '80%'  },
+    { label: 'Very strong', color: 'var(--color-success)', width: '100%' },
   ];
   return { score, ...meta[Math.min(score, 5)] };
 }
@@ -265,7 +265,7 @@ export default function ProfileSettings() {
         {/* Card 2 — Change Password */}
         <div className="ps-card">
           <div className="ps-card-hdr">
-            <div className="ps-card-icon ps-card-icon--teal" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#14b8a6' }}>
+            <div className="ps-card-icon ps-card-icon--teal" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-accent)' }}>
               <Shield size={18} />
             </div>
             <div>
@@ -321,7 +321,7 @@ export default function ProfileSettings() {
 
             {passwords.confirmPassword && (
               <p className="ps-match" style={{
-                color: passwords.newPassword === passwords.confirmPassword ? '#4ade80' : '#f87171'
+                color: passwords.newPassword === passwords.confirmPassword ? 'var(--color-success)' : 'var(--color-danger)'
               }}>
                 {passwords.newPassword === passwords.confirmPassword
                   ? '✓ Passwords match' : '✕ Passwords do not match'}
@@ -344,7 +344,7 @@ export default function ProfileSettings() {
   {/* Card 3 — Update SID */}
         <div className="ps-card">
           <div className="ps-card-hdr">
-            <div className="ps-card-icon ps-card-icon--amber" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#f59e0b' }}>
+            <div className="ps-card-icon ps-card-icon--amber" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-warning)' }}>
               <GraduationCap size={18} />
             </div>
             <div>
@@ -369,7 +369,7 @@ export default function ProfileSettings() {
                 />
               </div>
               <p className="ps-hint" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <Info size={12} style={{ color: '#f59e0b' }} />
+                <Info size={12} style={{ color: 'var(--color-warning)' }} />
                 SID must be unique across all users.
               </p>
             </div>

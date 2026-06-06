@@ -16,9 +16,9 @@ import EmptyState from '../components/EmptyState';
 const COMPANIES = ['Amazon', 'Microsoft', 'Google', 'Meta', 'Apple', 'Netflix', 'Flipkart', 'Adobe', 'Uber', 'LinkedIn', 'Salesforce', 'Oracle', 'Infosys', 'TCS', 'Wipro', 'HCL Technologies', 'Other'];
 
 const READINESS_CONFIG = {
-  Beginner:     { color: '#f59e0b', bg: 'rgba(245,158,11,0.06)',  label: 'Beginner',     desc: 'Focus on DSA fundamentals and build projects.', icon: Sprout },
-  Intermediate: { color: '#6366f1', bg: 'rgba(99,102,241,0.06)',  label: 'Intermediate', desc: 'Start mock interviews and system design prep.', icon: Flame },
-  Ready:        { color: '#22c55e', bg: 'rgba(34,197,94,0.06)',   label: 'Ready',        desc: 'You are placement ready! Polish HR round prep.', icon: Award },
+  Beginner:     { color: 'var(--color-warning)', bg: 'rgba(245,158,11,0.06)',  label: 'Beginner',     desc: 'Focus on DSA fundamentals and build projects.', icon: Sprout },
+  Intermediate: { color: 'var(--color-accent)', bg: 'rgba(99,102,241,0.06)',  label: 'Intermediate', desc: 'Start mock interviews and system design prep.', icon: Flame },
+  Ready:        { color: 'var(--color-success)', bg: 'rgba(34,197,94,0.06)',   label: 'Ready',        desc: 'You are placement ready! Polish HR round prep.', icon: Award },
 };
 
 export default function Career() {
@@ -189,9 +189,13 @@ export default function Career() {
     };
 
     recognition.onerror = (e) => {
-      console.error('Speech recognition error:', e.error);
       setIsListening(false);
-      if (e.error !== 'aborted') {
+      if (e.error === 'aborted') return;
+
+      if (e.error === 'network') {
+        toast.error('Voice dictation needs an active browser speech connection. Try again in a moment.');
+      } else {
+        console.warn('Speech recognition error:', e.error);
         toast.error('Voice dictation error: ' + e.error);
       }
     };
@@ -396,15 +400,15 @@ export default function Career() {
               Total solved: <strong>{totalSolved}</strong>
             </span>
             <span style={{ fontSize: 12, padding: '4px 10px', background: 'rgba(255, 255, 255, 0.04)', border: '1px solid var(--border)', borderRadius: 'var(--radius-pill)', color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#22c55e' }} />
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--color-success)' }} />
               Easy: <strong>{easySolved}</strong>
             </span>
             <span style={{ fontSize: 12, padding: '4px 10px', background: 'rgba(255, 255, 255, 0.04)', border: '1px solid var(--border)', borderRadius: 'var(--radius-pill)', color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#f59e0b' }} />
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--color-warning)' }} />
               Medium: <strong>{medSolved}</strong>
             </span>
             <span style={{ fontSize: 12, padding: '4px 10px', background: 'rgba(255, 255, 255, 0.04)', border: '1px solid var(--border)', borderRadius: 'var(--radius-pill)', color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#ef4444' }} />
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--color-danger)' }} />
               Hard: <strong>{hardSolved}</strong>
             </span>
           </div>
@@ -420,12 +424,12 @@ export default function Career() {
           )}
           {saveStatus === 'saved' && (
             <span style={{ fontSize: 13, color: 'var(--color-text-tertiary)', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <CheckCircle size={14} color="#22c55e" />
+              <CheckCircle size={14} color="var(--color-success)" />
               Saved
             </span>
           )}
           {saveStatus === 'error' && (
-            <span style={{ fontSize: 13, color: '#ef4444', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontSize: 13, color: 'var(--color-danger)', display: 'flex', alignItems: 'center', gap: 6 }}>
               <ShieldAlert size={14} />
               Save error
             </span>
@@ -461,7 +465,7 @@ export default function Career() {
                 background: 'transparent',
                 border: 'none',
                 cursor: 'pointer',
-                color: activeTab === tab.id ? '#fff' : 'var(--color-text-secondary)',
+                color: activeTab === tab.id ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
                 borderBottom: activeTab === tab.id ? '2px solid var(--color-accent)' : '2px solid transparent',
                 fontSize: 13.5,
                 fontWeight: activeTab === tab.id ? 500 : 400,
@@ -550,18 +554,18 @@ export default function Career() {
                     display: 'flex', gap: 16,
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <CheckCircle size={16} color="#22c55e" />
+                      <CheckCircle size={16} color="var(--color-success)" />
                       <div>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: '#22c55e' }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-success)' }}>
                           {todayProgress.done}
                         </div>
                         <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>done today</div>
                       </div>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <Clock size={16} color="#f59e0b" />
+                      <Clock size={16} color="var(--color-warning)" />
                       <div>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: '#f59e0b' }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-warning)' }}>
                           {todayProgress.remaining}
                         </div>
                         <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>remaining</div>
@@ -653,7 +657,7 @@ export default function Career() {
                       ].map(m => (
                         <div key={m.label} className="flex items-center gap-2" style={{ marginBottom: 10 }}>
                           <span style={{ display: 'flex', alignItems: 'center' }}>
-                            {m.reached ? <CheckCircle size={15} color="#22c55e" /> : <div style={{ width: 14, height: 14, border: '1px solid var(--border)', borderRadius: '50%' }} />}
+                            {m.reached ? <CheckCircle size={15} color="var(--color-success)" /> : <div style={{ width: 14, height: 14, border: '1px solid var(--border)', borderRadius: '50%' }} />}
                           </span>
                           <div style={{ marginLeft: 6 }}>
                             <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)' }}>{m.label}</span>
@@ -789,16 +793,25 @@ export default function Career() {
           {/* Topic Targets */}
           {plan && (
             <div className="card mb-4">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
                 <div className="card-title" style={{ marginBottom: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
                   <Target size={18} color="var(--color-accent)" />
                   Topic targets
                 </div>
-                <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
-                  DSA: {plan.progressStats.problemsSolved} / {plan.progressStats.totalTarget} problems
+                <span style={{
+                  fontSize: 12,
+                  lineHeight: 1,
+                  color: 'var(--color-text-secondary)',
+                  background: 'rgba(255,255,255,0.03)',
+                  border: '1px solid rgba(255,255,255,0.06)',
+                  borderRadius: 'var(--radius-pill)',
+                  padding: '7px 10px',
+                  whiteSpace: 'nowrap',
+                }}>
+                  {plan.progressStats.problemsSolved} solved · {plan.progressStats.totalTarget} target
                 </span>
               </div>
-              <div className="grid-2" style={{ gap: '4px 16px' }}>
+              <div className="grid-2" style={{ gap: '12px 20px' }}>
                 {plan.topicProgress.map(t => (
                   <CareerProgressBar key={t.name} label={t.name} done={t.done} target={t.target} />
                 ))}
@@ -860,7 +873,7 @@ export default function Career() {
                         width:      `${pct}%`,
                         height:     '100%',
                         borderRadius: 99,
-                        background: pct >= 100 ? '#22c55e' : pct >= 50 ? '#f59e0b' : '#ef4444',
+                        background: pct >= 100 ? 'var(--color-success)' : pct >= 50 ? 'var(--color-warning)' : 'var(--color-danger)',
                         transition: 'width 0.4s ease',
                       }} />
                     </div>
@@ -1152,9 +1165,9 @@ export default function Career() {
                           minHeight: 'auto',
                           height: 26,
                           fontSize: 12,
-                          borderColor: isListening ? '#ef4444' : 'var(--border)',
+                          borderColor: isListening ? 'var(--color-danger)' : 'var(--border)',
                           background: isListening ? 'rgba(239,68,68,0.06)' : 'transparent',
-                          color: isListening ? '#ef4444' : 'var(--color-text-secondary)',
+                          color: isListening ? 'var(--color-danger)' : 'var(--color-text-secondary)',
                           display: 'flex',
                           alignItems: 'center',
                           gap: 4
@@ -1231,7 +1244,7 @@ export default function Career() {
                           padding: '2px 8px',
                           borderRadius: 'var(--radius-pill)',
                           background: evaluationResult.score >= 8 ? 'rgba(34,197,94,0.1)' : evaluationResult.score >= 5 ? 'rgba(245,158,11,0.1)' : 'rgba(239,68,68,0.1)',
-                          color: evaluationResult.score >= 8 ? '#22c55e' : evaluationResult.score >= 5 ? '#f59e0b' : '#ef4444',
+                          color: evaluationResult.score >= 8 ? 'var(--color-success)' : evaluationResult.score >= 5 ? 'var(--color-warning)' : 'var(--color-danger)',
                           border: `1px solid ${evaluationResult.score >= 8 ? 'rgba(34,197,94,0.15)' : evaluationResult.score >= 5 ? 'rgba(245,158,11,0.15)' : 'rgba(239,68,68,0.15)'}`
                         }}>
                           {evaluationResult.score}/10
@@ -1314,7 +1327,7 @@ export default function Career() {
                         <td style={{ padding: '12px 8px' }}>
                           <span className="badge" style={{
                             background: item.score >= 8 ? 'rgba(34,197,94,0.1)' : item.score >= 5 ? 'rgba(245,158,11,0.1)' : 'rgba(239,68,68,0.1)',
-                            color: item.score >= 8 ? '#22c55e' : item.score >= 5 ? '#f59e0b' : '#ef4444',
+                            color: item.score >= 8 ? 'var(--color-success)' : item.score >= 5 ? 'var(--color-warning)' : 'var(--color-danger)',
                             border: `1px solid ${item.score >= 8 ? 'rgba(34,197,94,0.15)' : item.score >= 5 ? 'rgba(245,158,11,0.15)' : 'rgba(239,68,68,0.15)'}`
                           }}>
                             {item.score}/10
@@ -1404,7 +1417,7 @@ export default function Career() {
                       fontSize: 13,
                       fontWeight: 700,
                       background: selectedHistoryItem.score >= 8 ? 'rgba(34,197,94,0.1)' : selectedHistoryItem.score >= 5 ? 'rgba(245,158,11,0.1)' : 'rgba(239,68,68,0.1)',
-                      color: selectedHistoryItem.score >= 8 ? '#22c55e' : selectedHistoryItem.score >= 5 ? '#f59e0b' : '#ef4444',
+                      color: selectedHistoryItem.score >= 8 ? 'var(--color-success)' : selectedHistoryItem.score >= 5 ? 'var(--color-warning)' : 'var(--color-danger)',
                       border: `1px solid ${selectedHistoryItem.score >= 8 ? 'rgba(34,197,94,0.15)' : selectedHistoryItem.score >= 5 ? 'rgba(245,158,11,0.15)' : 'rgba(239,68,68,0.15)'}`
                     }}>
                       {selectedHistoryItem.score}/10

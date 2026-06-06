@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, AlertTriangle } from 'lucide-react';
 
 const DAYS  = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const HOURS = ['08:00','09:00','10:00','11:00','12:00','13:00',
@@ -7,16 +7,16 @@ const HOURS = ['08:00','09:00','10:00','11:00','12:00','13:00',
 
 // 10 distinct colors for subjects
 const COLORS = [
-  { bg: 'rgba(99,102,241,0.18)',  border: '#6366f1', text: '#818cf8'  },
-  { bg: 'rgba(20,184,166,0.18)',  border: '#14b8a6', text: '#2dd4bf'  },
-  { bg: 'rgba(245,158,11,0.18)', border: '#f59e0b', text: '#fbbf24'  },
-  { bg: 'rgba(239,68,68,0.18)',  border: '#ef4444', text: '#f87171'  },
-  { bg: 'rgba(168,85,247,0.18)', border: '#a855f7', text: '#c084fc'  },
-  { bg: 'rgba(34,197,94,0.18)',  border: '#22c55e', text: '#4ade80'  },
-  { bg: 'rgba(236,72,153,0.18)', border: '#ec4899', text: '#f472b6'  },
-  { bg: 'rgba(59,130,246,0.18)', border: '#3b82f6', text: '#60a5fa'  },
-  { bg: 'rgba(249,115,22,0.18)', border: '#f97316', text: '#fb923c'  },
-  { bg: 'rgba(16,185,129,0.18)', border: '#10b981', text: '#34d399'  },
+  { bg: 'rgba(99,102,241,0.18)',  border: 'var(--color-accent)', text: 'var(--color-accent)'  },
+  { bg: 'rgba(20,184,166,0.18)',  border: 'var(--color-accent)', text: 'var(--color-accent-muted)'  },
+  { bg: 'rgba(245,158,11,0.18)', border: 'var(--color-warning)', text: 'var(--color-warning)'  },
+  { bg: 'rgba(239,68,68,0.18)',  border: 'var(--color-danger)', text: 'var(--color-danger)'  },
+  { bg: 'rgba(168,85,247,0.18)', border: 'var(--color-accent)', text: 'var(--color-accent)'  },
+  { bg: 'rgba(34,197,94,0.18)',  border: 'var(--color-success)', text: 'var(--color-success)'  },
+  { bg: 'rgba(236,72,153,0.18)', border: 'var(--color-danger)', text: 'var(--color-danger)'  },
+  { bg: 'rgba(59,130,246,0.18)', border: '#3b82f6', text: 'var(--color-accent)'  },
+  { bg: 'rgba(249,115,22,0.18)', border: 'var(--color-warning)', text: 'var(--color-warning)'  },
+  { bg: 'rgba(16,185,129,0.18)', border: 'var(--color-success)', text: 'var(--color-success)'  },
 ];
 
 const toMinutes = (t) => {
@@ -48,7 +48,7 @@ const getConflicts = (subjects) => {
       const aStart = toMinutes(a.startTime), aEnd = toMinutes(a.endTime);
       const bStart = toMinutes(b.startTime), bEnd = toMinutes(b.endTime);
       if (aStart < bEnd && bStart < aEnd) {
-        conflicts.push(`⚠️ Overlap: ${a.name} (${fmt12(a.startTime)}–${fmt12(a.endTime)}) & ${b.name} (${fmt12(b.startTime)}–${fmt12(b.endTime)}) overlap on ${a.day}`);
+        conflicts.push(`Overlap: ${a.name} (${fmt12(a.startTime)}–${fmt12(a.endTime)}) & ${b.name} (${fmt12(b.startTime)}–${fmt12(b.endTime)}) overlap on ${a.day}`);
       }
     }
   }
@@ -115,7 +115,7 @@ export default function WeeklyGrid({ subjects }) {
         <div key={i} style={{
           padding: '10px 14px', borderRadius: 10, marginBottom: 10,
           background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)',
-          color: '#f87171', fontSize: 13, fontWeight: 500,
+          color: 'var(--color-danger)', fontSize: 13, fontWeight: 500,
         }}>
           {c}
         </div>

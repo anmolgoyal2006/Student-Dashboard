@@ -3,23 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { aiChatService, aiCommandService } from '../services/apiServices';
 import { useGlobalData } from '../context/GlobalDataContext';
 import toast from '../context/ToastContext';
-import { 
-  Bot, 
-  BookOpen, 
-  Send, 
-  Upload, 
-  FileText, 
-  HelpCircle, 
-  Paperclip, 
-  Check, 
-  Calendar, 
-  BarChart2, 
-  CheckSquare, 
-  Layers,
-  ChevronRight,
-  Mic,
-  Trash2
-} from 'lucide-react';
+import { Bot, BookOpen, Send, Upload, FileText, HelpCircle, Paperclip, Check, Calendar, BarChart2, CheckSquare, Layers, ChevronRight, Mic, Trash2, Copy, Brain, Paperclip as Attachment } from 'lucide-react';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function cleanTextForSpeech(text) {
@@ -98,7 +82,7 @@ function CodeBlock({ code, language }) {
             transition: 'all 0.15s ease'
           }}
         >
-          {copied ? '✓ Copied' : '📋 Copy'}
+          {copied ? '✓ Copied' : <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><Copy size={13} /> Copy</span>}
         </button>
       </div>
       {/* Pre/Code content */}
@@ -146,7 +130,7 @@ function renderMessageText(text) {
                 padding: '2px 6px',
                 borderRadius: '4px',
                 fontSize: '0.85em',
-                color: '#fb7185',
+                color: 'var(--color-danger)',
                 wordBreak: 'break-all'
               }}
             >
@@ -198,7 +182,7 @@ function MessageBubble({ msg, mode }) {
         borderRadius: isUser ? '18px 18px 4px 18px' : '4px 18px 18px 18px',
         background: isUser ? 'var(--color-accent)' : 'var(--color-surface-2)',
         border: isUser ? 'none' : '1px solid var(--border)',
-        color: isUser ? '#fff' : 'var(--color-text-primary)', 
+        color: isUser ? 'var(--color-text-primary)' : 'var(--color-text-primary)', 
         fontSize: 14, lineHeight: 1.5,
         wordBreak: 'break-word',
       }}>
@@ -224,7 +208,7 @@ function MessageBubble({ msg, mode }) {
               borderRadius: '4px',
             }}
           >
-            {copied ? '✓' : '📋'}
+            {copied ? '✓' : <Copy size={13} />}
           </button>
         )}
 
@@ -237,7 +221,7 @@ function MessageBubble({ msg, mode }) {
                 fontSize: 11.5, color: 'var(--color-text-secondary)', marginTop: 4,
                 background: 'rgba(255,255,255,0.02)', borderRadius: 6, padding: '4px 8px',
               }}>
-                📄 <span style={{ color: 'var(--color-accent)' }}>{s.filename}</span> — {s.preview}
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><FileText size={14} /> <span style={{ color: 'var(--color-accent)' }}>{s.filename}</span></span> — {s.preview}
               </div>
             ))}
           </div>
@@ -257,7 +241,7 @@ function MessageBubble({ msg, mode }) {
             marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border)',
             fontSize: 11, color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: 4,
           }}>
-            🧠 Calculated from your data
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--color-text-secondary)' }}><Brain size={14} /> Calculated from your data</span>
           </div>
         )}
       </div>
@@ -460,7 +444,7 @@ export default function AIAssistant() {
       setInput(resultText);
     };
 
-    toast('🎤 Listening... Speak now.', { duration: 2000, icon: '🎙️' });
+    toast('Listening... Speak now.', { duration: 2000, icon: <Mic size={16} /> });
     recognition.start();
   };
 
@@ -488,7 +472,7 @@ export default function AIAssistant() {
       setUploadedFile(file);
       addMessage('notes', {
         role: 'ai',
-        text: `📎 **${data.filename}** uploaded! Created ${data.chunks} knowledge chunks. Ask me anything about it!`,
+        text: `**${data.filename}** uploaded! Created ${data.chunks} knowledge chunks. Ask me anything about it!`,
         id  : Date.now(),
       });
       toast.success(data.message);
@@ -614,7 +598,7 @@ export default function AIAssistant() {
                   gap: 8,
                   padding: '12px 4px',
                   background: 'transparent',
-                  color: active ? '#fff' : 'var(--color-text-secondary)',
+                  color: active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
                   border: 'none',
                   cursor: 'pointer',
                   fontSize: 13.5,
@@ -629,7 +613,7 @@ export default function AIAssistant() {
                   <span style={{
                     fontSize: '10px',
                     fontWeight: 500,
-                    color: '#fbbf24',
+                    color: 'var(--color-warning)',
                     background: 'rgba(251, 191, 36, 0.12)',
                     border: '1px solid rgba(251, 191, 36, 0.2)',
                     borderRadius: 'var(--radius-pill)',
@@ -654,7 +638,7 @@ export default function AIAssistant() {
               className="btn btn-sm btn-outline"
               onClick={() => fileInputRef.current?.click()}
               disabled={loading}
-              style={{ color: '#10b981', borderColor: 'rgba(16,185,129,0.35)', display: 'flex', alignItems: 'center', gap: 6 }}
+              style={{ color: 'var(--color-success)', borderColor: 'rgba(16,185,129,0.35)', display: 'flex', alignItems: 'center', gap: 6 }}
             >
               <Upload size={14} /> Upload Notes
             </button>
@@ -690,7 +674,7 @@ export default function AIAssistant() {
               <div style={{
                 display: 'flex', alignItems: 'center', gap: 6,
                 background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.25)',
-                borderRadius: 8, padding: '4px 10px', fontSize: 12, color: '#10b981',
+                borderRadius: 8, padding: '4px 10px', fontSize: 12, color: 'var(--color-success)',
               }}>
                 <Paperclip size={14} />
                 {uploadedFile.name.slice(0, 22)}{uploadedFile.name.length > 22 ? '…' : ''}
@@ -717,7 +701,7 @@ export default function AIAssistant() {
                     background: 'var(--color-surface-2)', border: '1px solid var(--border)',
                     borderRadius: 8, padding: '6px 12px', fontSize: 13, color: 'var(--color-text-secondary)',
                   }}>
-                    <span>📄 {n._id}</span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><FileText size={14} /> {n._id}</span>
                     <span style={{ color: 'var(--color-text-tertiary)', fontSize: 11 }}>({n.chunks} chunks)</span>
                     <button
                       onClick={() => handleDeleteNote(n._id)}
@@ -833,7 +817,7 @@ export default function AIAssistant() {
                   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
                 }}
                 placeholder={
-                  listening ? '🎤 Listening…'
+                  listening ? 'Listening…'
                   : mode === 'notes' ? 'Ask anything about your notes…'
                   : 'Say anything — add subject, mark attendance, ask about CGPA…'
                 }
@@ -868,7 +852,7 @@ export default function AIAssistant() {
                   alignItems: 'center',
                   justifyContent: 'center',
                   background: listening ? 'var(--color-danger)' : 'transparent',
-                  color: listening ? '#fff' : 'var(--color-text-secondary)',
+                  color: listening ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
                   transition: 'all 0.2s',
                 }}
               >
@@ -898,7 +882,7 @@ export default function AIAssistant() {
                 background: !input.trim() || loading
                   ? 'var(--color-surface-3)'
                   : 'var(--color-accent)',
-                color: !input.trim() || loading ? 'var(--color-text-tertiary)' : '#fff',
+                color: !input.trim() || loading ? 'var(--color-text-tertiary)' : 'var(--color-text-primary)',
                 transition: 'all 0.2s ease',
                 flexShrink: 0
               }}

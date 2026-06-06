@@ -5,9 +5,9 @@ import EmptyState from './EmptyState';
 import { Briefcase, Bookmark, Star, Target, ExternalLink } from 'lucide-react';
 
 const DIFF_COLOR = {
-  Easy: '#34d399',
-  Medium: '#fbbf24',
-  Hard: '#f87171',
+  Easy: 'var(--color-success)',
+  Medium: 'var(--color-warning)',
+  Hard: 'var(--color-danger)',
 };
 
 const FREQ_STYLE = {
@@ -108,7 +108,7 @@ export default function CompanyQuestionsPanel({ career }) {
                 <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 4 }}>
                   {selectedCompany} Questions
                 </div>
-                <div style={{ fontSize: 24, fontWeight: 700, color: '#818cf8' }}>
+                <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--color-accent)' }}>
                   {stats.total}
                 </div>
               </div>
@@ -261,12 +261,12 @@ export default function CompanyQuestionsPanel({ career }) {
                       {problem.difficulty}
                     </span>
                     <span style={{ color: 'var(--muted)' }}>•</span>
-                    <span style={{ color: '#818cf8' }}>{problem.topic}</span>
+                    <span style={{ color: 'var(--color-accent)' }}>{problem.topic}</span>
                   </div>
 
                   {problem.isCompanySpecific && (
                     <div style={{
-                      fontSize: 11, color: '#818cf8', marginBottom: 8,
+                      fontSize: 11, color: 'var(--color-accent)', marginBottom: 8,
                       padding: '4px 8px', borderRadius: 4,
                       background: 'rgba(99,102,241,0.1)',
                       display: 'flex', alignItems: 'center', gap: '4px'

@@ -75,7 +75,7 @@ export default function AICommandBar({ onRefresh }) {
       toast.success(data.message);
        if (data.explainTopic) {
   // Trigger your existing notes/explain panel
-  toast(`Opening explanation for ${data.explainTopic}…`, { icon: '📖' });
+  toast.info(`Opening explanation for ${data.explainTopic}…`);
   // Call your existing AI explain function here
 }
       setInput('');
@@ -144,7 +144,7 @@ export default function AICommandBar({ onRefresh }) {
             width:        42,
             height:       42,
             borderRadius: '50%',
-            border:       `2px solid ${listening ? '#f87171' : 'rgba(129,140,248,0.4)'}`,
+            border:       `2px solid ${listening ? 'var(--color-danger)' : 'rgba(129,140,248,0.4)'}`,
             background:   listening ? 'rgba(248,113,113,0.15)' : 'rgba(129,140,248,0.1)',
             cursor:       'pointer',
             display:      'flex',
@@ -157,11 +157,11 @@ export default function AICommandBar({ onRefresh }) {
           }}
         >
           {listening ? (
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="#f87171" style={{ display: 'block' }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="var(--color-danger)" style={{ display: 'block' }}>
               <rect x="4" y="4" width="16" height="16" />
             </svg>
           ) : (
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#818cf8" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'block' }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'block' }}>
               <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
               <path d="M19 10v1a7 7 0 0 1-14 0v-1" />
               <line x1="12" x2="12" y1="19" y2="22" />
@@ -185,14 +185,14 @@ export default function AICommandBar({ onRefresh }) {
         <div style={{
           marginTop:  10,
           fontSize:   13,
-          color:      '#f87171',
+          color:      'var(--color-danger)',
           display:    'flex',
           alignItems: 'center',
           gap:        8,
         }}>
           <span style={{
             width: 8, height: 8, borderRadius: '50%',
-            background: '#f87171',
+            background: 'var(--color-danger)',
             display: 'inline-block',
             animation: 'pulse 1s ease infinite',
           }} />
@@ -211,7 +211,7 @@ export default function AICommandBar({ onRefresh }) {
             ? 'rgba(52,211,153,0.1)' : 'rgba(248,113,113,0.1)',
           border:       `1px solid ${lastResult.success
             ? 'rgba(52,211,153,0.3)' : 'rgba(248,113,113,0.3)'}`,
-          color:        lastResult.success ? '#34d399' : '#f87171',
+          color:        lastResult.success ? 'var(--color-success)' : 'var(--color-danger)',
         }}>
           {lastResult.success ? '✅' : '❌'} {lastResult.message}
         </div>

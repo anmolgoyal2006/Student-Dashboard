@@ -253,7 +253,7 @@ export default function GradeEntryForm({ onLeaderboardGenerated }) {
               <button
                 className="btn btn-outline"
                 onClick={() => removeSubject(subj.id)}
-                style={{ fontSize: 12, padding: '4px 10px', color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)', display: 'flex', alignItems: 'center', gap: '4px' }}
+                style={{ fontSize: 12, padding: '4px 10px', color: 'var(--color-danger)', borderColor: 'rgba(239,68,68,0.3)', display: 'flex', alignItems: 'center', gap: '4px' }}
               >
                 <Trash2 size={12} />
                 Remove
@@ -283,7 +283,7 @@ export default function GradeEntryForm({ onLeaderboardGenerated }) {
                 Columns: <code>Name</code>, <code>Roll No</code>, <code>Grade</code>
               </p>
               {subj.students.length > 0 && (
-                <p style={{ fontSize: 12, color: '#10b981' }}>
+                <p style={{ fontSize: 12, color: 'var(--color-success)' }}>
                   ✓ {subj.students.length} students loaded
                 </p>
               )}
@@ -343,7 +343,7 @@ export default function GradeEntryForm({ onLeaderboardGenerated }) {
                               onClick={() => removeStudent(subj.id, stIdx)}
                               style={{
                                 background: 'none', border: 'none', cursor: 'pointer',
-                                color: '#ef4444', fontSize: 14, padding: '2px 4px',
+                                color: 'var(--color-danger)', fontSize: 14, padding: '2px 4px',
                               }}
                             >✕</button>
                           )}

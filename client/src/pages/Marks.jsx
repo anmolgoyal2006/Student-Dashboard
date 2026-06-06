@@ -301,7 +301,7 @@ export default function Marks() {
                 background: 'transparent',
                 border: 'none',
                 cursor: 'pointer',
-                color: active ? '#fff' : 'var(--color-text-secondary)',
+                color: active ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
                 borderBottom: active ? '2px solid var(--color-accent)' : '2px solid transparent',
                 transition: 'all 0.15s',
               }}

@@ -258,7 +258,7 @@ export default function BulkAttendanceUpload({ onUploadSuccess }) {
           </button>
         </div>
         {showUrlError && (
-          <div style={{ color: 'var(--color-danger, #ef4444)', fontSize: 12, marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+          <div style={{ color: 'var(--color-danger, var(--color-danger))', fontSize: 12, marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
             <AlertCircle size={12} /> Please paste a valid link
           </div>
         )}
@@ -288,8 +288,8 @@ export default function BulkAttendanceUpload({ onUploadSuccess }) {
                       const isAbsent = val === 'absent' || val === 'a';
                       return (
                         <td key={j} style={{ padding: '6px 10px', color: 'var(--color-text-primary)' }}>
-                          {isPresent && <span style={{ color: '#22c55e', fontWeight: 600 }}>Present</span>}
-                          {isAbsent && <span style={{ color: '#ef4444', fontWeight: 600 }}>Absent</span>}
+                          {isPresent && <span style={{ color: 'var(--color-success)', fontWeight: 600 }}>Present</span>}
+                          {isAbsent && <span style={{ color: 'var(--color-danger)', fontWeight: 600 }}>Absent</span>}
                           {!isPresent && !isAbsent && String(v)}
                         </td>
                       );
@@ -312,7 +312,7 @@ export default function BulkAttendanceUpload({ onUploadSuccess }) {
           marginTop: 10,
           color: 'var(--color-text-primary)'
         }}>
-          <div style={{ fontWeight: 600, color: '#22c55e', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ fontWeight: 600, color: 'var(--color-success)', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
             <CheckCircle size={16} /> Upload completed
           </div>
           <div style={{ fontSize: 13, display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -323,7 +323,7 @@ export default function BulkAttendanceUpload({ onUploadSuccess }) {
 
           {result.errors?.length > 0 && (
             <div style={{ marginTop: 10, borderTop: '1px solid rgba(34, 197, 94, 0.15)', paddingTop: 10 }}>
-              <div style={{ color: '#ef4444', fontWeight: 600, fontSize: 12.5, marginBottom: 4 }}>
+              <div style={{ color: 'var(--color-danger)', fontWeight: 600, fontSize: 12.5, marginBottom: 4 }}>
                 Skipped rows details:
               </div>
               <div style={{ maxHeight: 120, overflowY: 'auto' }}>
@@ -340,7 +340,7 @@ export default function BulkAttendanceUpload({ onUploadSuccess }) {
                       <tr key={idx} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.03)' }}>
                         <td style={{ padding: '2px 4px' }}>{e.row}</td>
                         <td style={{ padding: '2px 4px' }}>{e.sid || '—'}</td>
-                        <td style={{ padding: '2px 4px', color: '#ef4444' }}>{e.reason}</td>
+                        <td style={{ padding: '2px 4px', color: 'var(--color-danger)' }}>{e.reason}</td>
                       </tr>
                     ))}
                   </tbody>

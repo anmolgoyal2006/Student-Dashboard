@@ -44,7 +44,7 @@ export function onMessageListener() {
     onMessage(messaging, (payload) => {
       console.log("[FCM] Foreground message:", payload);
 
-      // 🔥 SHOW notification (THIS FIXES YOUR ISSUE)
+      // SHOW notification (THIS FIXES YOUR ISSUE)
       if (Notification.permission === "granted") {
         new Notification(payload.notification?.title || "Notification", {
           body: payload.notification?.body || "",

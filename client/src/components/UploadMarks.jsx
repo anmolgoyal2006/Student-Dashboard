@@ -7,7 +7,7 @@
  *   3. Generate leaderboard → POST /marks/generate-leaderboard
  */
 import { useState, useMemo } from 'react';
-import { Upload, Trophy, TrendingDown, TrendingUp, BarChart2, FolderOpen, Settings, FileText, GraduationCap, Target } from 'lucide-react';
+import { Upload, Trophy, TrendingDown, TrendingUp, BarChart2, FolderOpen, Settings, FileText, GraduationCap, Target, Save, Trash2, FileEdit, Search, Folder, FileText as FileIcon } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import toast from '../context/ToastContext';
 import Leaderboard from './Leaderboard';
@@ -532,7 +532,7 @@ export default function UploadMarks({ onResult }) {
       });
 
       bestOfGroupsMeta.forEach((bg, i) => {
-        const key = `🎯 ${bg.label}`;
+        const key = `${bg.label}`;
         const bd = s.breakdown?.[key];
         row[bestOfColLabels[i]] = bd?.score ?? 0;
         if (bd?.bestOf?.selected?.length) {
@@ -813,7 +813,7 @@ export default function UploadMarks({ onResult }) {
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 10 }}>
                     <div>
-                      <div style={{ fontWeight: 600, fontSize: 13 }}>📄 {src.fileName}</div>
+                      <div style={{ fontWeight: 600, fontSize: 13 }}><span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><FileText size={14} /> {src.fileName}</span></div>
                       <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
                         {src.studentCount} students · {src.columns?.length || 0} score column(s)
                       </div>
@@ -857,7 +857,7 @@ export default function UploadMarks({ onResult }) {
 
                   <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 10 }}>
                     File weight (auto):{' '}
-                    <strong style={{ color: '#818cf8' }}>{getSourceFileWeight(src)}</strong>
+                    <strong style={{ color: 'var(--color-accent)' }}>{getSourceFileWeight(src)}</strong>
                     {totalWeight > 0 && (
                       <span style={{ marginLeft: 8, color: '#a5b4fc' }}>
                         · {normalizedPreview[src.id] ?? 0}% of total
@@ -883,7 +883,7 @@ export default function UploadMarks({ onResult }) {
                           });
                         }}
                       />
-                      <span>💾 Save this PDF to my account</span>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Save size={14} /> Save this PDF to my account</span>
                     </label>
 
                     {src.saveToAccount && (
@@ -899,7 +899,7 @@ export default function UploadMarks({ onResult }) {
                         />
                         {src.isSaved ? (
                           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                            <span style={{ fontSize: 12, fontWeight: 600, color: '#10b981', display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-success)', display: 'flex', alignItems: 'center', gap: 4 }}>
                               <span>✓</span> Saved
                             </span>
                             <button
@@ -909,12 +909,12 @@ export default function UploadMarks({ onResult }) {
                                 fontSize: 11,
                                 padding: '5px 10px',
                                 borderColor: 'rgba(239,68,68,0.3)',
-                                color: '#ef4444',
+                                color: 'var(--color-danger)',
                               }}
                               onClick={() => handleDeleteSavedPdf(src.id, src.dbId)}
                               disabled={pdfSavingStates[src.id]}
                             >
-                              {pdfSavingStates[src.id] ? 'Deleting...' : '🗑 Delete from Account'}
+                              {pdfSavingStates[src.id] ? 'Deleting...' : <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Trash2 size={14} /> Delete from Account</span>}
                             </button>
                           </div>
                         ) : (
@@ -970,7 +970,7 @@ export default function UploadMarks({ onResult }) {
                 }}
               >
                 <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>
-                  🖊 Handwritten Grades Detected
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><FileEdit size={14} /> Handwritten Grades Detected</span>
                 </div>
                 <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 10 }}>
                   Some sources contain OCR-extracted handwritten grades. Review and correct them
@@ -981,10 +981,10 @@ export default function UploadMarks({ onResult }) {
                   onClick={() => setShowOcrReview(true)}
                   disabled={sgpaLoading}
                 >
-                  {ocrCorrectedGrades ? '📝 Re-review OCR Grades' : '🔍 Review OCR Grades'}
+                  {ocrCorrectedGrades ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><FileEdit size={14} /> Re-review OCR Grades</span> : <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Search size={14} /> Review OCR Grades</span>}
                 </button>
                 {ocrCorrectedGrades && (
-                  <span style={{ marginLeft: 10, fontSize: 11, color: '#10b981' }}>
+                  <span style={{ marginLeft: 10, fontSize: 11, color: 'var(--color-success)' }}>
                     ✓ {ocrCorrectedGrades.length} corrections saved
                   </span>
                 )}
@@ -1142,7 +1142,7 @@ export default function UploadMarks({ onResult }) {
                   style={{
                     background: 'rgba(16,185,129,0.15)',
                     border: '1px solid rgba(16,185,129,0.3)',
-                    color: '#10b981',
+                    color: 'var(--color-success)',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '6px'
@@ -1229,7 +1229,7 @@ export default function UploadMarks({ onResult }) {
                       borderRadius: 6,
                       background: isBestOf ? 'rgba(52,211,153,0.1)' : 'rgba(129,140,248,0.1)',
                       border: `1px solid ${isBestOf ? 'rgba(52,211,153,0.25)' : 'rgba(129,140,248,0.25)'}`,
-                      color: isBestOf ? '#34d399' : '#a5b4fc',
+                      color: isBestOf ? 'var(--color-success)' : '#a5b4fc',
                     }}
                   >
                     {s.label}{isBestOf
@@ -1283,10 +1283,10 @@ export default function UploadMarks({ onResult }) {
               padding: 12, borderRadius: 10,
               background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)',
             }}>
-              <div style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: '4px' }}><Trophy size={14} style={{ color: '#fbbf24' }} /> Highest: <strong>{sgpaLeaderboard.stats.highestSGPA}</strong></div>
-              <div style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: '4px' }}><TrendingDown size={14} style={{ color: '#ef4444' }} /> Lowest: <strong>{sgpaLeaderboard.stats.lowestSGPA}</strong></div>
+              <div style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: '4px' }}><Trophy size={14} style={{ color: 'var(--color-warning)' }} /> Highest: <strong>{sgpaLeaderboard.stats.highestSGPA}</strong></div>
+              <div style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: '4px' }}><TrendingDown size={14} style={{ color: 'var(--color-danger)' }} /> Lowest: <strong>{sgpaLeaderboard.stats.lowestSGPA}</strong></div>
               <div style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: '4px' }}><BarChart2 size={14} style={{ color: '#3b82f6' }} /> Average: <strong>{sgpaLeaderboard.stats.averageSGPA}</strong></div>
-              <div style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: '4px' }}><TrendingUp size={14} style={{ color: '#10b981' }} /> Median: <strong>{sgpaLeaderboard.stats.medianSGPA}</strong></div>
+              <div style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: '4px' }}><TrendingUp size={14} style={{ color: 'var(--color-success)' }} /> Median: <strong>{sgpaLeaderboard.stats.medianSGPA}</strong></div>
             </div>
           )}
 
@@ -1312,7 +1312,7 @@ export default function UploadMarks({ onResult }) {
               position: 'absolute', left: 12, top: '50%',
               transform: 'translateY(-50%)', fontSize: 15,
               color: 'var(--muted)', pointerEvents: 'none',
-            }}>🔍</span>
+            }}><Search size={14} /></span>
             <input
               className="form-input"
               placeholder="Search by name or roll number..."
@@ -1355,7 +1355,7 @@ export default function UploadMarks({ onResult }) {
                       String(s.sid || '').toLowerCase().includes(q)
                     );
                   }).map((s, i) => {
-                  const medal = s.rank === 1 ? '🥇' : s.rank === 2 ? '🥈' : s.rank === 3 ? '🥉' : `#${s.rank}`;
+                  const medal = s.rank === 1 ? <Trophy size={14} color="var(--color-warning)" /> : s.rank === 2 ? <Trophy size={14} color="var(--color-text-secondary)" /> : s.rank === 3 ? <Trophy size={14} color="#cd7c2f" /> : `#${s.rank}`;
                   return (
                     <tr key={s.sid || s.roll || i} style={{
                       background: s.rank <= 3 ? 'rgba(250,204,21,0.04)' : 'transparent',
@@ -1366,7 +1366,7 @@ export default function UploadMarks({ onResult }) {
                       <td>
                         <span style={{
                           fontWeight: 700,
-                          color: s.sgpa >= 9 ? '#10b981' : s.sgpa >= 7 ? '#3b82f6' : s.sgpa >= 5 ? '#f59e0b' : '#ef4444',
+                          color: s.sgpa >= 9 ? 'var(--color-success)' : s.sgpa >= 7 ? '#3b82f6' : s.sgpa >= 5 ? 'var(--color-warning)' : 'var(--color-danger)',
                         }}>
                           {s.sgpa.toFixed(2)}
                         </span>
@@ -1395,7 +1395,7 @@ export default function UploadMarks({ onResult }) {
           padding: 16
         }}>
           <div style={{
-            background: 'var(--card, #111b27)',
+            background: 'var(--card, var(--color-surface-2))',
             border: '1px solid var(--card-border, rgba(255,255,255,0.08))',
             borderRadius: '12px',
             padding: 24,
@@ -1409,7 +1409,7 @@ export default function UploadMarks({ onResult }) {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
               <div>
                 <h3 style={{ fontSize: 18, fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span>💾</span> Save PDFs to your account?
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Save size={14} /> Save PDFs to your account?</span>
                 </h3>
                 <p className="text-muted" style={{ fontSize: 13, margin: '6px 0 0' }}>
                   You can save these uploaded PDFs to access them at any time from the Saved PDFs Library.
@@ -1445,9 +1445,9 @@ export default function UploadMarks({ onResult }) {
                     />
                     <label
                       htmlFor={`modal-pdf-chk-${file.id}`}
-                      style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', cursor: 'pointer', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                      style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', cursor: 'pointer', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '6px' }}
                     >
-                      📄 {file.fileName}
+                      <FileIcon size={16} /> {file.fileName}
                     </label>
                   </div>
                   {file.checked && (
@@ -1485,7 +1485,7 @@ export default function UploadMarks({ onResult }) {
                   fontSize: 13,
                   padding: '8px 16px',
                   borderColor: 'rgba(239,68,68,0.3)',
-                  color: '#ef4444',
+                  color: 'var(--color-danger)',
                 }}
                 onClick={handleSkipSaving}
               >
@@ -1497,7 +1497,7 @@ export default function UploadMarks({ onResult }) {
                 style={{
                   fontSize: 13,
                   padding: '8px 18px',
-                  background: 'linear-gradient(135deg, var(--primary) 0%, #6366f1 100%)',
+                  background: 'linear-gradient(135deg, var(--primary) 0%, var(--color-accent) 100%)',
                 }}
                 onClick={handleSaveAllSelectedPdfs}
                 disabled={savePromptFiles.some(f => f.checked && !f.saveName.trim())}
@@ -1522,7 +1522,7 @@ export default function UploadMarks({ onResult }) {
           padding: 16
         }}>
           <div style={{
-            background: 'var(--card, #111b27)',
+            background: 'var(--card, var(--color-surface-2))',
             border: '1px solid var(--card-border, rgba(255,255,255,0.08))',
             borderRadius: '12px',
             padding: 24,
@@ -1561,7 +1561,7 @@ export default function UploadMarks({ onResult }) {
               </div>
             ) : availableSavedPdfs.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '30px 10px', color: 'var(--muted)' }}>
-                <span style={{ fontSize: 32 }}>📁</span>
+                <Folder size={32} style={{ color: 'var(--color-accent)' }} />
                 <p style={{ marginTop: 10, fontSize: 13, fontWeight: 500 }}>No saved PDFs found in your library.</p>
                 <p style={{ fontSize: 12, marginTop: 4 }}>Save PDFs from your account after uploading them.</p>
               </div>

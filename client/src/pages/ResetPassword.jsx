@@ -15,11 +15,11 @@ function getStrength(pw) {
   if (/[^A-Za-z0-9]/.test(pw))              score++;
   const levels = [
     null,
-    { label: 'Very weak',   color: '#ef4444', width: '20%'  },
-    { label: 'Weak',        color: '#f97316', width: '40%'  },
-    { label: 'Fair',        color: '#f59e0b', width: '60%'  },
-    { label: 'Strong',      color: '#22c55e', width: '80%'  },
-    { label: 'Very strong', color: '#10b981', width: '100%' },
+    { label: 'Very weak',   color: 'var(--color-danger)', width: '20%'  },
+    { label: 'Weak',        color: 'var(--color-warning)', width: '40%'  },
+    { label: 'Fair',        color: 'var(--color-warning)', width: '60%'  },
+    { label: 'Strong',      color: 'var(--color-success)', width: '80%'  },
+    { label: 'Very strong', color: 'var(--color-success)', width: '100%' },
   ];
   return { score, ...levels[Math.min(score, 5)] };
 }
@@ -94,7 +94,7 @@ export default function ResetPassword() {
 
         {done ? (
           <div className="auth-success-box">
-            <div className="auth-success-icon" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12, color: 'var(--color-success, #10b981)' }}>
+            <div className="auth-success-icon" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12, color: 'var(--color-success, var(--color-success))' }}>
               <CheckCircle size={40} />
             </div>
             <h3>Password reset!</h3>
@@ -137,7 +137,7 @@ export default function ResetPassword() {
             {confirmPassword && (
               <p style={{
                 fontSize: 12, fontWeight: 600, marginTop: -8, marginBottom: 14,
-                color: newPassword === confirmPassword ? '#4ade80' : '#f87171',
+                color: newPassword === confirmPassword ? 'var(--color-success)' : 'var(--color-danger)',
               }}>
                 {newPassword === confirmPassword ? '✓ Passwords match' : '✕ Passwords do not match'}
               </p>

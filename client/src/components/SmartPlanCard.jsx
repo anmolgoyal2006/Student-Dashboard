@@ -7,20 +7,20 @@ import { Brain, Target, Calendar, Sparkles } from 'lucide-react';
 
 /* ─── Risk config ──────────────────────────────────────────────────── */
 const RISK_CONFIG = {
-  High:   { color: '#ef4444', bg: 'rgba(239,68,68,0.12)',   border: 'rgba(239,68,68,0.28)',   dot: '#ef4444', label: 'High Risk'   },
-  Medium: { color: '#d97706', bg: 'rgba(217,119,6,0.12)',   border: 'rgba(217,119,6,0.28)',   dot: '#f59e0b', label: 'Medium Risk' },
-  Low:    { color: '#16a34a', bg: 'rgba(22,163,74,0.12)',   border: 'rgba(22,163,74,0.28)',   dot: '#22c55e', label: 'Low Risk'    },
+  High:   { color: 'var(--color-danger)', bg: 'rgba(239,68,68,0.12)',   border: 'rgba(239,68,68,0.28)',   dot: 'var(--color-danger)', label: 'High Risk'   },
+  Medium: { color: 'var(--color-warning)', bg: 'rgba(217,119,6,0.12)',   border: 'rgba(217,119,6,0.28)',   dot: 'var(--color-warning)', label: 'Medium Risk' },
+  Low:    { color: 'var(--color-success)', bg: 'rgba(22,163,74,0.12)',   border: 'rgba(22,163,74,0.28)',   dot: 'var(--color-success)', label: 'Low Risk'    },
 };
 
 /* ─── Priority → accent colour ─────────────────────────────────────── */
 const PRIORITY_COLOR = {
-  high:   '#ef4444',
-  medium: '#f59e0b',
-  low:    '#6366f1',
+  high:   'var(--color-danger)',
+  medium: 'var(--color-warning)',
+  low:    'var(--color-accent)',
 };
 
 const getPriorityColor = (priority) =>
-  PRIORITY_COLOR[priority?.toLowerCase()] ?? '#6366f1';
+  PRIORITY_COLOR[priority?.toLowerCase()] ?? 'var(--color-accent)';
 
 /* ─── Skeleton loader ───────────────────────────────────────────────── */
 function Skeleton({ width = '100%', height = 14, radius = 6, style = {} }) {
@@ -44,7 +44,7 @@ function CheckIcon() {
     <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
       <path
         d="M1 4L3.5 6.5L9 1"
-        stroke="#fff"
+        stroke="var(--color-text-primary)"
         strokeWidth="1.6"
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -69,7 +69,9 @@ function PlanItem({ item, index, checked, onToggle, scheduled, onSchedule }) {
         gap: 12,
         padding: '13px 16px',
         borderRadius: 12,
-        border: `1px solid ${hovered ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.06)'}`,
+        borderTop: `1px solid ${hovered ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.06)'}`,
+        borderRight: `1px solid ${hovered ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.06)'}`,
+        borderBottom: `1px solid ${hovered ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.06)'}`,
         borderLeft: `2.5px solid ${accentColor}`,
         background: hovered
           ? 'rgba(255,255,255,0.04)'
@@ -95,7 +97,7 @@ function PlanItem({ item, index, checked, onToggle, scheduled, onSchedule }) {
           justifyContent: 'center',
           fontSize: 11,
           fontWeight: 700,
-          color: '#fff',
+          color: 'var(--color-text-primary)',
           marginTop: 1,
         }}
       >
@@ -119,7 +121,7 @@ function PlanItem({ item, index, checked, onToggle, scheduled, onSchedule }) {
             style={{
               fontSize: 13,
               fontWeight: 600,
-              color: 'var(--text-primary, #f1f5f9)',
+              color: 'var(--text-primary, var(--color-text-primary))',
               flex: 1,
               minWidth: 0,
               textDecoration: checked ? 'line-through' : 'none',
@@ -138,7 +140,7 @@ function PlanItem({ item, index, checked, onToggle, scheduled, onSchedule }) {
                 borderRadius: 99,
                 background: 'rgba(255,255,255,0.07)',
                 border: '1px solid rgba(255,255,255,0.1)',
-                color: 'var(--text-secondary, #94a3b8)',
+                color: 'var(--text-secondary, var(--color-text-secondary))',
                 letterSpacing: '0.02em',
               }}
             >
@@ -152,7 +154,7 @@ function PlanItem({ item, index, checked, onToggle, scheduled, onSchedule }) {
             style={{
               margin: 0,
               fontSize: 12,
-              color: 'var(--text-secondary, #64748b)',
+              color: 'var(--text-secondary, var(--color-text-secondary))',
               lineHeight: 1.55,
             }}
           >
@@ -175,7 +177,7 @@ function PlanItem({ item, index, checked, onToggle, scheduled, onSchedule }) {
             padding: '4px 10px',
             fontSize: '11px',
             fontWeight: '600',
-            color: scheduled ? '#a7f3d0' : '#818cf8',
+            color: scheduled ? 'var(--color-success)' : 'var(--color-accent)',
             cursor: scheduled ? 'default' : 'pointer',
             transition: 'all 0.15s ease',
             display: 'inline-flex',
@@ -217,9 +219,9 @@ function PlanItem({ item, index, checked, onToggle, scheduled, onSchedule }) {
           borderRadius: '50%',
           flexShrink: 0,
           border: checked
-            ? '1.5px solid #22c55e'
+            ? '1.5px solid var(--color-success)'
             : '1.5px solid rgba(255,255,255,0.2)',
-          background: checked ? '#22c55e' : 'transparent',
+          background: checked ? 'var(--color-success)' : 'transparent',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -250,7 +252,7 @@ function ProgressBar({ total, done }) {
         style={{
           width: `${pct}%`,
           height: '100%',
-          background: 'linear-gradient(90deg, #7c3aed, #818cf8)',
+          background: 'linear-gradient(90deg, var(--color-accent), var(--color-accent))',
           borderRadius: 99,
           transition: 'width 0.4s cubic-bezier(0.4,0,0.2,1)',
         }}
@@ -396,7 +398,7 @@ export default function SmartPlanCard() {
     maxWidth: 800,
     borderRadius: 16,
     border: '1px solid rgba(255,255,255,0.08)',
-    background: 'var(--surface-1, #1e1e2e)',
+    background: 'var(--surface-1, var(--color-surface-1))',
     overflow: 'hidden',
   };
 
@@ -484,7 +486,7 @@ export default function SmartPlanCard() {
                 margin: 0,
                 fontSize: 15,
                 fontWeight: 700,
-                color: 'var(--text-primary, #f1f5f9)',
+                color: 'var(--text-primary, var(--color-text-primary))',
                 lineHeight: 1.3,
               }}
             >
@@ -494,7 +496,7 @@ export default function SmartPlanCard() {
               style={{
                 margin: '2px 0 0',
                 fontSize: 11,
-                color: 'var(--text-secondary, #64748b)',
+                color: 'var(--text-secondary, var(--color-text-secondary))',
               }}
             >
               Today's recommended actions
@@ -513,7 +515,7 @@ export default function SmartPlanCard() {
                 borderRadius: 99,
                 background: 'rgba(124,58,237,0.15)',
                 border: '1px solid rgba(124,58,237,0.3)',
-                color: '#a78bfa',
+                color: 'var(--color-accent)',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '4px'
@@ -588,10 +590,10 @@ export default function SmartPlanCard() {
           justifyContent: 'space-between',
         }}
       >
-        <span style={{ fontSize: 11, color: 'var(--text-secondary, #64748b)' }}>
+        <span style={{ fontSize: 11, color: 'var(--text-secondary, var(--color-text-secondary))' }}>
           Progress today
         </span>
-        <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-primary, #94a3b8)' }}>
+        <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-primary, var(--color-text-secondary))' }}>
           {doneCount} of {totalItems} completed
         </span>
       </div>

@@ -1,3 +1,4 @@
+import { Scale } from 'lucide-react';
 /**
  * WeightInput.jsx
  * ─────────────────────────────────────────────────────────────────────────────
@@ -50,11 +51,11 @@ export default function WeightInput({ columns = [], selectedColumns = [], weight
       }}>
         <div>
           <span style={{ fontWeight: 600, fontSize: 14, color: 'var(--text)' }}>
-            ⚖️ Custom Weights
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Scale size={15} /> Custom Weights</span>
           </span>
           <span style={{ marginLeft: 8, fontSize: 12, color: 'var(--muted)' }}>
             Total out-of:&nbsp;
-            <strong style={{ color: '#818cf8' }}>{Math.round(totalWeight * 100) / 100}</strong>
+            <strong style={{ color: 'var(--color-accent)' }}>{Math.round(totalWeight * 100) / 100}</strong>
           </span>
         </div>
         <button
@@ -95,7 +96,7 @@ export default function WeightInput({ columns = [], selectedColumns = [], weight
                     <span style={{
                       marginLeft   : 6,
                       fontSize     : 10,
-                      color        : '#818cf8',
+                      color        : 'var(--color-accent)',
                       background   : 'rgba(129,140,248,0.15)',
                       padding      : '1px 6px',
                       borderRadius : 99,
@@ -138,7 +139,7 @@ export default function WeightInput({ columns = [], selectedColumns = [], weight
                   fontSize    : 14,
                   padding     : '5px 8px',
                   borderColor : isModified ? 'rgba(129,140,248,0.4)' : undefined,
-                  color       : isModified ? '#818cf8' : 'var(--text)',
+                  color       : isModified ? 'var(--color-accent)' : 'var(--text)',
                 }}
               />
 

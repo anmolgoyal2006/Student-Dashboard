@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { predictionService } from '../services/apiServices';
 import { Line } from 'react-chartjs-2';
-import { Target } from 'lucide-react';
+import { Target, ClipboardList, Brain, TrendingUp, AlertTriangle, Lightbulb, CheckCircle } from 'lucide-react';
 import {
   Chart as ChartJS, CategoryScale, LinearScale,
   PointElement, LineElement, Tooltip, Legend, Filler,
@@ -128,10 +128,16 @@ export default function Prediction() {
 
   const chartLabels = data
     ? [
-        ...(data.sgpaList || []).map((_, i)  => `S${i + 1} (actual)`),
-        ...(data.futureSGPAs || []).map((_, i) => `S${data.completed + i + 1} (predicted)`),
+        ...(data.sgpaList || []).map((_, i)  => `S${i + 1}`),
+        ...(data.futureSGPAs || []).map((_, i) => `S${data.completed + i + 1}`),
       ]
     : [];
+
+  const strategyTitles = [
+    'Set your target CGPA',
+    'Prioritize high-credit subjects',
+    'Maintain 75% attendance',
+  ];
 
   const chartData = {
     labels: chartLabels,
@@ -139,10 +145,14 @@ export default function Prediction() {
       {
         label: 'Actual SGPA',
         data: data ? [...(data.sgpaList || []), ...Array((data.futureSGPAs || []).length).fill(null)] : [],
-        borderColor: '#6366f1',
-        backgroundColor: 'rgba(99,102,241,0.15)',
-        pointBackgroundColor: '#6366f1',
-        fill: true,
+        borderColor: '#818cf8',
+        backgroundColor: 'rgba(99,102,241,0.08)',
+        pointBackgroundColor: '#818cf8',
+        pointBorderColor: '#818cf8',
+        fill: {
+          target: 'origin',
+          above: 'rgba(99,102,241,0.08)',
+        },
         tension: 0.4,
       },
       {
@@ -152,11 +162,15 @@ export default function Prediction() {
              data.sgpaList?.[(data.sgpaList || []).length - 1],
              ...(data.futureSGPAs || [])]
           : [],
-        borderColor: '#10b981',
-        backgroundColor: 'rgba(16,185,129,0.08)',
-        pointBackgroundColor: '#10b981',
+        borderColor: '#34d399',
+        backgroundColor: 'rgba(52,211,153,0.05)',
+        pointBackgroundColor: '#34d399',
+        pointBorderColor: '#34d399',
         borderDash: [5, 5],
-        fill: true,
+        fill: {
+          target: 'origin',
+          above: 'rgba(52,211,153,0.05)',
+        },
         tension: 0.4,
       },
     ],
@@ -164,8 +178,9 @@ export default function Prediction() {
 
   const chartOptions = {
     responsive: true,
+    maintainAspectRatio: false,
     plugins: {
-      legend: { labels: { color: '#94a3b8', font: { size: 12 } } },
+      legend: { display: false },
       tooltip: {
         backgroundColor: 'rgba(19, 22, 31, 0.95)',
         borderColor: 'rgba(255,255,255,0.06)',
@@ -177,21 +192,23 @@ export default function Prediction() {
     scales: {
       y: {
         min: 0, max: 10,
-        grid:  { color: 'rgba(255,255,255,0.04)' },
-        ticks: { color: '#94a3b8' },
+        grid:  { color: 'rgba(255,255,255,0.04)', lineWidth: 1 },
+        border: { color: 'rgba(255,255,255,0.08)' },
+        ticks: { color: '#94a3b8', font: { size: 11 }, stepSize: 2 },
       },
       x: {
         grid:  { display: false },
-        ticks: { color: '#94a3b8', font: { size: 10 } },
+        border: { color: 'rgba(255,255,255,0.08)' },
+        ticks: { color: '#94a3b8', font: { size: 11 } },
       },
     },
   };
 
   const insightColor = (req) => {
-    if (req === null) return '#94a3b8';
-    if (req > 9.5)   return '#ef4444';
-    if (req > 8.0)   return '#f59e0b';
-    return '#10b981';
+    if (req === null) return 'var(--color-text-secondary)';
+    if (req > 9.5)   return 'var(--color-danger)';
+    if (req > 8.0)   return 'var(--color-warning)';
+    return 'var(--color-success)';
   };
 
   return (
@@ -202,7 +219,7 @@ export default function Prediction() {
           border: 1px solid var(--border);
           background: var(--color-surface-2);
           overflow: hidden;
-          margin-bottom: 28px;
+          margin-bottom: 16px;
         }
         
         .ai-trajectory-header {
@@ -265,6 +282,15 @@ export default function Prediction() {
           display: flex;
           align-items: center;
           gap: 8px;
+        }
+
+        .strategy-section-label {
+          font-size: 13px;
+          line-height: 1;
+          font-weight: 500;
+          color: var(--color-text-secondary);
+          text-transform: none;
+          letter-spacing: 0.05em;
         }
 
         .overview-text {
@@ -360,32 +386,128 @@ export default function Prediction() {
         }
 
         .strategy-item {
-          font-size: 13.5px;
+          position: relative;
+          font-size: 13px;
+          font-weight: 400;
           color: var(--color-text-secondary);
           line-height: 1.6;
           padding: 12px 16px;
           background: rgba(255, 255, 255, 0.01);
           border: 1px solid var(--border);
+          border-left: 2px solid rgba(99, 102, 241, 0.15);
           border-radius: 10px;
           display: flex;
           align-items: flex-start;
           gap: 12px;
+          cursor: default;
+          transition: background 0.15s ease;
+        }
+
+        .strategy-item:hover {
+          background: var(--color-surface-3);
+        }
+
+        .strategy-item::after {
+          content: '';
+          position: absolute;
+          left: 27px;
+          top: 38px;
+          bottom: -11px;
+          width: 2px;
+          background: rgba(99, 102, 241, 0.15);
+        }
+
+        .strategy-item:last-child::after {
+          display: none;
         }
 
         .strategy-bullet {
-          width: 20px;
-          height: 20px;
-          border-radius: 6px;
+          width: 24px;
+          height: 24px;
+          border-radius: 50%;
           background: var(--color-accent-muted);
-          border: 1px solid rgba(99, 102, 241, 0.25);
           display: flex;
           align-items: center;
           justify-content: center;
           color: var(--color-accent);
-          font-size: 11px;
-          font-weight: bold;
+          font-size: 12px;
+          line-height: 1;
+          font-weight: 500;
           flex-shrink: 0;
-          margin-top: 1px;
+          margin-top: 0;
+          position: relative;
+          z-index: 1;
+        }
+
+        .strategy-title {
+          display: block;
+          color: var(--color-text-primary);
+          font-size: 14px;
+          line-height: 1.35;
+          font-weight: 500;
+          margin-bottom: 2px;
+        }
+
+        .strategy-body {
+          font-size: 13px;
+          line-height: 1.55;
+          font-weight: 400;
+          color: var(--color-text-secondary);
+        }
+
+        .projection-chart-card {
+          min-height: 280px;
+          padding: 20px;
+          background: var(--color-surface-2);
+          border-radius: var(--radius-lg);
+          border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .projection-chart-title {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          margin-bottom: 16px;
+          color: var(--color-text-primary);
+          font-size: 16px;
+          line-height: 1.25;
+          font-weight: 500;
+          letter-spacing: 0;
+        }
+
+        .projection-chart-canvas {
+          min-height: 280px;
+          height: 280px;
+          position: relative;
+        }
+
+        .projection-chart-legend {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 18px;
+          margin-top: 12px;
+          color: var(--color-text-secondary);
+          font-size: 12px;
+          line-height: 1;
+          font-weight: 400;
+        }
+
+        .projection-legend-item {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .projection-legend-line {
+          width: 20px;
+          height: 0;
+          border-top: 2px solid #818cf8;
+        }
+
+        .projection-legend-line.predicted {
+          border-top-color: #34d399;
+          border-top-style: dashed;
         }
 
         .semester-credits-grid {
@@ -515,7 +637,7 @@ export default function Prediction() {
           onClick={() => setShowCredits(!showCredits)}
         >
           <span style={{ fontWeight: 500, fontSize: 13 }}>
-            📋 Per-Semester Credits — Total: <strong>{totalDegreeCredits}</strong>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><ClipboardList size={14} /> Per-Semester Credits</span> — Total: <strong>{totalDegreeCredits}</strong>
           </span>
           <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
             {showCredits ? '▲ Hide' : '▼ Edit (default: 22,21,22,24,20,12,19,21)'}
@@ -578,7 +700,7 @@ export default function Prediction() {
             </div>
 
             <div className="card stat-card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
-              <div className="stat-value" style={{ color: '#fbbf24', fontSize: '22px', fontWeight: 500 }}>
+              <div className="stat-value" style={{ color: 'var(--color-warning)', fontSize: '22px', fontWeight: 500 }}>
                 {data.completed}
               </div>
               <div className="stat-label" style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: '4px' }}>
@@ -587,7 +709,7 @@ export default function Prediction() {
             </div>
 
             <div className="card stat-card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
-              <div className="stat-value" style={{ color: '#f87171', fontSize: '22px', fontWeight: 500 }}>
+              <div className="stat-value" style={{ color: 'var(--color-danger)', fontSize: '22px', fontWeight: 500 }}>
                 {data.remaining}
               </div>
               <div className="stat-label" style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: '4px' }}>
@@ -604,7 +726,7 @@ export default function Prediction() {
               borderLeft: `4px solid ${insightColor(data.requiredSGPA)}`,
               flexWrap: 'wrap',
             }}>
-              <div style={{ fontSize: 32 }}>🎯</div>
+              <Target size={32} style={{ color: 'var(--color-accent)' }} />
               <div style={{ flex: 1 }}>
                 <p style={{ margin: 0, fontSize: 11, color: 'var(--color-text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   Required SGPA — Each Remaining Semester
@@ -634,9 +756,9 @@ export default function Prediction() {
                 }}>
                   <p style={{ margin: 0, fontSize: 11, color: 'var(--color-text-secondary)' }}>Difficulty</p>
                   <p style={{ margin: '4px 0 0', fontSize: 13, fontWeight: 500, color: insightColor(data.requiredSGPA) }}>
-                    {data.requiredSGPA > 9.5 ? '🔴 Very Hard'
-                     : data.requiredSGPA > 8.5 ? '🟡 Challenging'
-                     : data.requiredSGPA > 7.0 ? '🟢 Achievable'
+                    {data.requiredSGPA > 9.5 ? 'Very Hard'
+                     : data.requiredSGPA > 8.5 ? 'Challenging'
+                     : data.requiredSGPA > 7.0 ? 'Achievable'
                      : '✅ Easy'}
                   </p>
                 </div>
@@ -647,7 +769,7 @@ export default function Prediction() {
           {/* Trend message */}
           <div className="card mb-4">
             <span style={{ fontSize: 13, color: 'var(--color-success)', fontWeight: 500 }}>
-              📈 At your current trend, your CGPA will be approximately {data.predictedCGPA} by semester {totalSemesters}.
+              At your current trend, your CGPA will be approximately {data.predictedCGPA} by semester {totalSemesters}.
             </span>
           </div>
 
@@ -688,7 +810,7 @@ export default function Prediction() {
               color: 'var(--color-danger)',
               marginBottom: 24
             }}>
-              ⚠️ {aiError}
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><AlertTriangle size={14} /> {aiError}</span>
             </div>
           )}
 
@@ -749,7 +871,7 @@ export default function Prediction() {
                 <div style={{ padding: '20px 24px 24px' }}>
                   {aiData.feasibilityReason && (
                     <div className="insight-banner">
-                      <span style={{ fontSize: 18, marginTop: -2 }}>💡</span>
+                      <Lightbulb size={18} style={{ color: 'var(--color-warning)' }} />
                       <div>
                         <strong>Assessment:</strong> {aiData.feasibilityReason}
                       </div>
@@ -822,19 +944,17 @@ export default function Prediction() {
                   {/* Strategies */}
                   {aiData.strategies?.length > 0 && (
                     <div>
-                      <h4 className="section-label">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                          <polyline points="20 6 9 17 4 12"/>
-                        </svg>
-                        Actionable Improvement Plan
+                      <h4 className="section-label strategy-section-label">
+                        <CheckCircle size={14} color="#22c55e" strokeWidth={2.4} />
+                        Actionable improvement plan
                       </h4>
                       <ul className="strategy-list">
                         {aiData.strategies.map((s, i) => (
                           <li className="strategy-item" key={i}>
                             <div className="strategy-bullet">{i + 1}</div>
                             <div>
-                              <strong style={{ display: 'block', color: 'var(--color-text-primary)', marginBottom: 2 }}>{s.title || 'Study Strategy'}</strong>
-                              <span>{s.details || s}</span>
+                              <strong className="strategy-title">{strategyTitles[i] || s.title || 'Study strategy'}</strong>
+                              <span className="strategy-body">{s.details || s}</span>
                             </div>
                           </li>
                         ))}
@@ -847,10 +967,20 @@ export default function Prediction() {
           })()}
 
           {/* Line Chart */}
-          <div className="card">
-            <div className="card-title">📈 CGPA Projection Trajectory</div>
-            <div style={{ height: 280, position: 'relative' }}>
+          <div className="card projection-chart-card">
+            <div className="projection-chart-title"><TrendingUp size={16} color="var(--color-accent)" /> CGPA projection trajectory</div>
+            <div className="projection-chart-canvas">
               <Line data={chartData} options={chartOptions} />
+            </div>
+            <div className="projection-chart-legend" aria-label="CGPA projection legend">
+              <span className="projection-legend-item">
+                <span className="projection-legend-line" aria-hidden="true" />
+                Actual SGPA
+              </span>
+              <span className="projection-legend-item">
+                <span className="projection-legend-line predicted" aria-hidden="true" />
+                Predicted SGPA
+              </span>
             </div>
           </div>
         </>

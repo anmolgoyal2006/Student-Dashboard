@@ -299,7 +299,7 @@ export default function Timetable() {
                     <input className="form-input" type="text" value={slot.room} onChange={e => handleSlotChange(i, 'room', e.target.value)} placeholder="LH-101" />
                   </div>
                   <button type="button" onClick={() => removeSlot(i)} className="timetable-slot-delete-btn"
-                    style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#f87171', borderRadius: 8, padding: '9px 12px', cursor: 'pointer' }}>
+                    style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: 'var(--color-danger)', borderRadius: 8, padding: '9px 12px', cursor: 'pointer' }}>
                     ✕
                   </button>
                 </div>
@@ -338,7 +338,7 @@ export default function Timetable() {
                   background: 'transparent',
                   border: 'none',
                   borderBottom: active ? '2px solid var(--color-accent)' : '2px solid transparent',
-                  color: active ? '#fff' : 'var(--color-text-secondary)',
+                  color: active ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
                   cursor: 'pointer',
                   fontWeight: active ? 500 : 400,
                   fontSize: 13,

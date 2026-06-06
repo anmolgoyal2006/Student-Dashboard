@@ -11,6 +11,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 import { useState } from 'react';
+import { Target, AlertTriangle } from 'lucide-react';
 
 export default function MarksFilter({ columns = [], selected = [], onChange }) {
   if (!columns.length) return null;
@@ -43,7 +44,7 @@ export default function MarksFilter({ columns = [], selected = [], onChange }) {
       }}>
         <div>
           <span style={{ fontWeight: 600, fontSize: 14, color: 'var(--text)' }}>
-            🎯 Select Columns
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}><Target size={14} /> Select Columns</span>
           </span>
           <span style={{
             marginLeft   : 8,
@@ -97,7 +98,7 @@ export default function MarksFilter({ columns = [], selected = [], onChange }) {
                 cursor       : 'pointer',
                 border       : `1.5px solid ${isOn ? 'rgba(129,140,248,0.6)' : 'rgba(255,255,255,0.1)'}`,
                 background   : isOn ? 'rgba(129,140,248,0.15)' : 'transparent',
-                color        : isOn ? '#818cf8' : 'var(--muted)',
+                color        : isOn ? 'var(--color-accent)' : 'var(--muted)',
                 transition   : 'all 0.15s ease',
               }}
             >
@@ -117,8 +118,8 @@ export default function MarksFilter({ columns = [], selected = [], onChange }) {
       </div>
 
       {selected.length === 0 && (
-        <p style={{ margin: '10px 0 0', fontSize: 12, color: '#f87171' }}>
-          ⚠ No columns selected — please select at least one to rank students.
+        <p style={{ margin: '10px 0 0', fontSize: 12, color: 'var(--color-danger)' }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}><AlertTriangle size={14} /> No columns selected</span> — please select at least one to rank students.
         </p>
       )}
     </div>

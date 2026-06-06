@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { FolderOpen, Flag, Trophy, Search, BarChart3, AlertTriangle, RefreshCw } from 'lucide-react';
 
 /**
  * Leaderboard.jsx
@@ -56,14 +57,14 @@ const getProportionalCounts = (total) => {
 
 const getGradeBadgeStyle = (grade) => {
   const colors = {
-    'A+': { bg: 'rgba(16,185,129,0.12)', text: '#10b981', border: 'rgba(16,185,129,0.25)' },
-    'A' : { bg: 'rgba(34,197,94,0.12)', text: '#22c55e', border: 'rgba(34,197,94,0.25)' },
+    'A+': { bg: 'rgba(16,185,129,0.12)', text: 'var(--color-success)', border: 'rgba(16,185,129,0.25)' },
+    'A' : { bg: 'rgba(34,197,94,0.12)', text: 'var(--color-success)', border: 'rgba(34,197,94,0.25)' },
     'B+': { bg: 'rgba(59,130,246,0.12)', text: '#3b82f6', border: 'rgba(59,130,246,0.25)' },
-    'B' : { bg: 'rgba(99,102,241,0.12)', text: '#6366f1', border: 'rgba(99,102,241,0.25)' },
-    'C+': { bg: 'rgba(234,179,8,0.12)', text: '#eab308', border: 'rgba(234,179,8,0.25)' },
-    'C' : { bg: 'rgba(249,115,22,0.12)', text: '#f97316', border: 'rgba(249,115,22,0.25)' },
-    'D' : { bg: 'rgba(239,68,68,0.12)', text: '#ef4444', border: 'rgba(239,68,68,0.25)' },
-    'F' : { bg: 'rgba(148,163,184,0.12)', text: '#94a3b8', border: 'rgba(148,163,184,0.25)' }
+    'B' : { bg: 'rgba(99,102,241,0.12)', text: 'var(--color-accent)', border: 'rgba(99,102,241,0.25)' },
+    'C+': { bg: 'rgba(234,179,8,0.12)', text: 'var(--color-warning)', border: 'rgba(234,179,8,0.25)' },
+    'C' : { bg: 'rgba(249,115,22,0.12)', text: 'var(--color-warning)', border: 'rgba(249,115,22,0.25)' },
+    'D' : { bg: 'rgba(239,68,68,0.12)', text: 'var(--color-danger)', border: 'rgba(239,68,68,0.25)' },
+    'F' : { bg: 'rgba(148,163,184,0.12)', text: 'var(--color-text-secondary)', border: 'rgba(148,163,184,0.25)' }
   };
   const c = colors[grade] || colors['F'];
   return {
@@ -125,7 +126,7 @@ export default function Leaderboard({
   if (!data) {
     return (
       <div className="empty-state">
-        <div className="icon">📭</div>
+        <div className="icon"><FolderOpen size={40} style={{ opacity: 0.4 }} /></div>
         <p style={{ fontWeight: 600, color: 'var(--text-2)', marginBottom: 4 }}>No data uploaded yet</p>
         <p className="text-muted">Upload a PDF to generate the leaderboard.</p>
       </div>
@@ -135,7 +136,7 @@ export default function Leaderboard({
   if (!leaderboard?.length) {
     return (
       <div className="empty-state">
-        <div className="icon">🏁</div>
+        <div className="icon"><Flag size={40} style={{ opacity: 0.4 }} /></div>
         <p style={{ fontWeight: 600, color: 'var(--text-2)', marginBottom: 4 }}>No results found</p>
         <p className="text-muted">The uploaded file had no rankable student data.</p>
       </div>
@@ -143,7 +144,7 @@ export default function Leaderboard({
   }
 
   const medalFor = rank =>
-    rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `#${rank}`;
+    rank === 1 ? <Trophy size={14} color="var(--color-warning)" /> : rank === 2 ? <Trophy size={14} color="var(--color-text-secondary)" /> : rank === 3 ? <Trophy size={14} color="#cd7c2f" /> : `#${rank}`;
 
   const fmt = val => {
     const n = parseFloat(val);
@@ -183,7 +184,7 @@ export default function Leaderboard({
         alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 10,
       }}>
         <div>
-          <div className="card-title" style={{ margin: 0 }}>🏆 Leaderboard</div>
+          <div className="card-title" style={{ margin: 0, display: "inline-flex", alignItems: "center", gap: "6px" }}><Trophy size={16} color="var(--color-warning)" /> Leaderboard</div>
           <div className="text-muted" style={{ fontSize: 13 }}>
             {leaderboard.length} students ranked
           </div>
@@ -201,7 +202,7 @@ export default function Leaderboard({
           background: 'rgba(250,204,21,0.08)',
           border: '1px solid rgba(250,204,21,0.25)',
         }}>
-          <span style={{ fontSize: 28 }}>🏆</span>
+          <Trophy size={28} color="var(--color-warning)" />
           <div>
             <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--text)' }}>
               {topper.name}
@@ -226,7 +227,7 @@ export default function Leaderboard({
             fontSize: 16,
             color: 'var(--muted)',
             pointerEvents: 'none'
-          }}>🔍</span>
+          }}><Search size={16} /></span>
           <input
             type="text"
             className="form-input"
@@ -277,8 +278,8 @@ export default function Leaderboard({
           flexDirection: 'column',
           gap: 12,
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 700, color: '#818cf8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-            <span>🔍 Rank Finder Results ({filteredLeaderboard.length})</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 700, color: 'var(--color-accent)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}><Search size={14} /> Rank Finder Results ({filteredLeaderboard.length})</span>
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
             {filteredLeaderboard.slice(0, 3).map((st) => (
@@ -301,10 +302,10 @@ export default function Leaderboard({
                 <div style={{
                   fontSize: 18,
                   fontWeight: 900,
-                  color: st.rank === 1 ? '#facc15' : st.rank === 2 ? '#94a3b8' : st.rank === 3 ? '#cd7c2f' : '#818cf8',
+                  color: st.rank === 1 ? 'var(--color-warning)' : st.rank === 2 ? 'var(--color-text-secondary)' : st.rank === 3 ? 'var(--color-warning)' : 'var(--color-accent)',
                   paddingLeft: 8,
                 }}>
-                  {medalFor(st.rank)}
+                  {st.rank <= 3 ? <Trophy size={16} color={st.rank === 1 ? "#facc15" : st.rank === 2 ? "var(--color-text-secondary)" : "#cd7c2f"} /> : `#${st.rank}`}
                 </div>
               </div>
             ))}
@@ -335,11 +336,11 @@ export default function Leaderboard({
           cursor: 'pointer',
         }} onClick={() => setPanelExpanded(!panelExpanded)}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontWeight: 700, fontSize: 14 }}>
-            <span>📊 Relative Grading Options</span>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}><BarChart3 size={14} /> Relative Grading Options</span>
             {relativeGradingEnabled && (
               <span style={{
                 backgroundColor: 'rgba(16,185,129,0.15)',
-                color: '#10b981',
+                color: 'var(--color-success)',
                 padding: '2px 8px',
                 borderRadius: 20,
                 fontSize: 11,
@@ -366,7 +367,7 @@ export default function Leaderboard({
               <span style={{
                 position: 'absolute',
                 top: 0, left: 0, right: 0, bottom: 0,
-                backgroundColor: relativeGradingEnabled ? '#818cf8' : 'rgba(255,255,255,0.1)',
+                backgroundColor: relativeGradingEnabled ? 'var(--color-accent)' : 'rgba(255,255,255,0.1)',
                 transition: '.3s',
                 borderRadius: 34,
                 boxShadow: relativeGradingEnabled ? '0 0 10px rgba(129,140,248,0.5)' : 'none',
@@ -376,7 +377,7 @@ export default function Leaderboard({
                   height: 16, width: 16,
                   left: relativeGradingEnabled ? 25 : 3,
                   bottom: 3,
-                  backgroundColor: '#fff',
+                  backgroundColor: 'var(--color-text-primary)',
                   transition: '.3s',
                   borderRadius: '50%',
                 }} />
@@ -404,15 +405,15 @@ export default function Leaderboard({
             }}>
               <div>
                 {allocatedCount === totalStudents ? (
-                  <div style={{ color: '#10b981', fontWeight: 600, fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <div style={{ color: 'var(--color-success)', fontWeight: 600, fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}>
                     ✓ {allocatedCount}/{totalStudents} students allocated (Exact distribution)
                   </div>
                 ) : allocatedCount < totalStudents ? (
-                  <div style={{ color: '#f59e0b', fontWeight: 600, fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}>
-                    ⚠️ {allocatedCount}/{totalStudents} students allocated ({remainingCount} remaining will receive F)
+                  <div style={{ color: 'var(--color-warning)', fontWeight: 600, fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}><AlertTriangle size={14} /> {allocatedCount}/{totalStudents} students allocated</span> ({remainingCount} remaining will receive F)
                   </div>
                 ) : (
-                  <div style={{ color: '#ef4444', fontWeight: 600, fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <div style={{ color: 'var(--color-danger)', fontWeight: 600, fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}>
                     ❌ {allocatedCount}/{totalStudents} students allocated (Over-allocated by {overflowCount})
                   </div>
                 )}
@@ -423,7 +424,7 @@ export default function Leaderboard({
                 style={{ fontSize: 11, padding: '4px 10px' }}
                 onClick={() => setGradeCounts?.(getProportionalCounts(totalStudents))}
               >
-                🔄 Reset to Proportional Distribution
+                <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}><RefreshCw size={13} /> Reset to Proportional Distribution</span>
               </button>
             </div>
 
@@ -503,7 +504,7 @@ export default function Leaderboard({
                 style={{ background: s.rank <= 3 ? 'rgba(250,204,21,0.04)' : 'transparent' }}
               >
                 <td>
-                  <span style={{ fontWeight: 700, fontSize: 15 }}>{medalFor(s.rank)}</span>
+                  <span style={{ fontWeight: 700, fontSize: 15 }}>{s.rank <= 3 ? <Trophy size={16} color={s.rank === 1 ? "#facc15" : s.rank === 2 ? "var(--color-text-secondary)" : "#cd7c2f"} /> : `#${s.rank}`}</span>
                 </td>
                 <td style={{ fontWeight: s.rank <= 3 ? 600 : 400 }}>{s.name}</td>
                 <td style={{ color: 'var(--muted)', fontSize: 13 }}>{s.roll || '—'}</td>
@@ -523,9 +524,9 @@ export default function Leaderboard({
                 <td>
                   <span style={{
                     fontWeight: 700,
-                    color: s.rank === 1 ? '#facc15'
-                         : s.rank === 2 ? '#94a3b8'
-                         : s.rank === 3 ? '#cd7c2f'
+                    color: s.rank === 1 ? 'var(--color-warning)'
+                         : s.rank === 2 ? 'var(--color-text-secondary)'
+                         : s.rank === 3 ? 'var(--color-warning)'
                          : 'var(--text)',
                   }}>
                     {fmt(s.totalScore)}

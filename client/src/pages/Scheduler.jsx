@@ -2,12 +2,12 @@ import { useEffect, useState, useMemo } from 'react';
 import { taskService, subjectService } from '../services/apiServices';
 import toast from '../context/ToastContext';
 import EmptyState from '../components/EmptyState';
-import { Calendar, Clock, ListTodo, Play, AlertTriangle, Edit3, Plus, Trash2 } from 'lucide-react';
+import { Calendar, Clock, ListTodo, Play, AlertTriangle, Edit3, Plus, Trash2, ClipboardList, BookOpen, Rocket, RefreshCw, Pin } from 'lucide-react';
 
 const PRIORITY_COLOR = {
-  high:   { bg: 'rgba(248,113,113,0.12)', border: 'rgba(248,113,113,0.35)', text: '#f87171', badge: 'badge-danger'  },
-  medium: { bg: 'rgba(251,191,36,0.12)',  border: 'rgba(251,191,36,0.35)',  text: '#fbbf24', badge: 'badge-warning' },
-  low:    { bg: 'rgba(52,211,153,0.12)',  border: 'rgba(52,211,153,0.35)',  text: '#34d399', badge: 'badge-success' },
+  high:   { bg: 'rgba(248,113,113,0.12)', border: 'rgba(248,113,113,0.35)', text: 'var(--color-danger)', badge: 'badge-danger'  },
+  medium: { bg: 'rgba(251,191,36,0.12)',  border: 'rgba(251,191,36,0.35)',  text: 'var(--color-warning)', badge: 'badge-warning' },
+  low:    { bg: 'rgba(52,211,153,0.12)',  border: 'rgba(52,211,153,0.35)',  text: 'var(--color-success)', badge: 'badge-success' },
 };
 
 const STATUS_BADGE = {
@@ -17,11 +17,11 @@ const STATUS_BADGE = {
 };
 
 const TYPE_ICON = {
-  assignment: '📝',
-  exam:       '📚',
-  project:    '🚀',
-  revision:   '🔄',
-  other:      '📌',
+  assignment: 'assignment',
+  exam:       'exam',
+  project:    'project',
+  revision:   'revision',
+  other:      'other',
 };
 
 const DAYS  = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -50,6 +50,18 @@ function isSameDay(a, b) {
     a.getDate()     === b.getDate()
   );
 }
+
+
+// Dynamic type icon renderer to replace hardcoded emojis
+const renderTypeIcon = (type) => {
+  const style = { display: 'inline-flex', alignItems: 'center', verticalAlign: 'middle', marginRight: '6px' };
+  if (type === 'assignment') return <ClipboardList size={14} style={style} />;
+  if (type === 'exam') return <BookOpen size={14} style={style} />;
+  if (type === 'project') return <Rocket size={14} style={style} />;
+  if (type === 'revision') return <RefreshCw size={14} style={style} />;
+  return <Pin size={14} style={style} />;
+};
+
 
 export default function Scheduler() {
   const [tasks,    setTasks]    = useState([]);
@@ -181,9 +193,9 @@ export default function Scheduler() {
       <div className="grid-4 mb-4">
         {[
           { label: 'Total',       value: stats.total,      icon: <ListTodo size={16} />, color: 'var(--color-accent)' },
-          { label: 'Pending',     value: stats.pending,    icon: <Clock size={16} />, color: '#fbbf24'        },
-          { label: 'In Progress', value: stats.inProgress, icon: <Play size={16} />, color: '#60a5fa'        },
-          { label: 'Overdue',     value: stats.overdue,    icon: <AlertTriangle size={16} />, color: '#f87171'        },
+          { label: 'Pending',     value: stats.pending,    icon: <Clock size={16} />, color: 'var(--color-warning)'        },
+          { label: 'In Progress', value: stats.inProgress, icon: <Play size={16} />, color: 'var(--color-accent)'        },
+          { label: 'Overdue',     value: stats.overdue,    icon: <AlertTriangle size={16} />, color: 'var(--color-danger)'        },
         ].map(s => (
           <div className="card stat-card" key={s.label}>
             <span className="stat-icon" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: s.color }}>{s.icon}</span>
@@ -270,7 +282,7 @@ export default function Scheduler() {
                 <label className="form-label">Type</label>
                 <select className="form-select" name="type" value={form.type} onChange={handleChange}>
                   {['assignment','exam','project','revision','other'].map(t => (
-                    <option key={t} value={t}>{TYPE_ICON[t]} {t.charAt(0).toUpperCase() + t.slice(1)}</option>
+                    <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>
                   ))}
                 </select>
               </div>
@@ -481,13 +493,13 @@ export default function Scheduler() {
                           onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
                         >
                           <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text)', lineHeight: 1.3 }}>
-                            {TYPE_ICON[task.type]} {task.title.length > 14 ? task.title.slice(0, 14) + '…' : task.title}
+                            {renderTypeIcon(task.type)} {task.title.length > 14 ? task.title.slice(0, 14) + '…' : task.title}
                           </div>
                           <div style={{ fontSize: 10, color: pc.text, marginTop: 2 }}>
                             {task.dueTime} · {task.priority}
                           </div>
                           {task.status === 'completed' && (
-                            <div style={{ fontSize: 10, color: '#34d399', marginTop: 1 }}>✓ Done</div>
+                            <div style={{ fontSize: 10, color: 'var(--color-success)', marginTop: 1 }}>✓ Done</div>
                           )}
                         </div>
                       );
@@ -534,9 +546,9 @@ export default function Scheduler() {
                     return (
                       <tr key={task._id}>
                         <td>
-                          <div style={{ fontWeight: 600, color: isOverdue ? '#f87171' : 'var(--text)', fontSize: 13 }}>
+                          <div style={{ fontWeight: 600, color: isOverdue ? 'var(--color-danger)' : 'var(--text)', fontSize: 13 }}>
                             {task.title}
-                            {isOverdue && <span style={{ fontSize: 10, marginLeft: 6, color: '#f87171' }}>OVERDUE</span>}
+                            {isOverdue && <span style={{ fontSize: 10, marginLeft: 6, color: 'var(--color-danger)' }}>OVERDUE</span>}
                           </div>
                           {task.description && (
                             <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{task.description}</div>
@@ -547,7 +559,7 @@ export default function Scheduler() {
                           {new Date(task.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                           <div style={{ fontSize: 11, color: 'var(--muted)' }}>{task.dueTime}</div>
                         </td>
-                        <td style={{ fontSize: 13 }}>{TYPE_ICON[task.type]} {task.type}</td>
+                        <td style={{ fontSize: 13 }}>{renderTypeIcon(task.type)} {task.type}</td>
                         <td>
                           <span className={`badge ${PRIORITY_COLOR[task.priority].badge}`}>
                             {task.priority}

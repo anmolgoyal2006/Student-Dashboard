@@ -98,7 +98,7 @@ export default function App() {
 
       if (Notification.permission === 'granted' && data.subjectId) {
         navigator.serviceWorker.ready.then(reg => {
-          reg.showNotification(title || '🔔 Attendance', {
+          reg.showNotification(title || 'Attendance', {
             body: body || 'Mark your attendance',
             icon: '/logo192.png',
             badge: '/logo192.png',
@@ -115,7 +115,7 @@ export default function App() {
           });
         });
       } else if (title || body) {
-        toast.info(`🔔 ${title}: ${body}`);
+        toast.info(`${title}: ${body}`);
       }
     });
     return () => unsubscribe();

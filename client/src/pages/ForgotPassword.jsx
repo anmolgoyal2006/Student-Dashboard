@@ -44,7 +44,7 @@ export default function ForgotPassword() {
 
         {sent ? (
           <div className="auth-success-box">
-            <div className="auth-success-icon" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12, color: 'var(--color-success, #10b981)' }}>
+            <div className="auth-success-icon" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12, color: 'var(--color-success, var(--color-success))' }}>
               <Mail size={40} />
             </div>
             <h3>Check your inbox</h3>

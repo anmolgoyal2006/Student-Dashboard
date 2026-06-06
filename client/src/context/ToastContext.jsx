@@ -5,21 +5,23 @@ const ToastContext = createContext(null);
 
 let toastListener = null;
 
-export const toast = {
-  success: (message) => toastListener?.(message, 'success'),
-  error: (message) => toastListener?.(message, 'error'),
-  info: (message) => toastListener?.(message, 'info'),
-  warning: (message) => toastListener?.(message, 'warning'),
+export const toast = (message, options = {}) => {
+  toastListener?.(message, options.type || 'info', options);
 };
+
+toast.success = (message, options = {}) => toastListener?.(message, 'success', options);
+toast.error = (message, options = {}) => toastListener?.(message, 'error', options);
+toast.info = (message, options = {}) => toastListener?.(message, 'info', options);
+toast.warning = (message, options = {}) => toastListener?.(message, 'warning', options);
 
 export const ToastProvider = ({ children }) => {
   const [toasts, setToasts] = useState([]);
 
   useEffect(() => {
-    toastListener = (message, type) => {
+    toastListener = (message, type, options = {}) => {
       const id = Math.random().toString(36).substring(2, 9);
       setToasts((prev) => {
-        const next = [...prev, { id, message, type }];
+        const next = [...prev, { id, message, type, icon: options.icon }];
         if (next.length > 3) {
           return next.slice(next.length - 3);
         }
@@ -29,7 +31,7 @@ export const ToastProvider = ({ children }) => {
       // auto dismiss after 4s
       setTimeout(() => {
         setToasts((prev) => prev.filter((t) => t.id !== id));
-      }, 4000);
+      }, options.duration || 4000);
     };
 
     return () => {
@@ -83,18 +85,20 @@ const ToastItem = ({ toast, removeToast }) => {
   let borderColor = 'var(--border)';
   let accentColor = 'var(--color-accent)';
 
-  if (type === 'success') {
-    icon = <CheckCircle size={16} color="#22c55e" />;
+  if (toast.icon) {
+    icon = toast.icon;
+  } else if (type === 'success') {
+    icon = <CheckCircle size={16} color="var(--color-success)" />;
     borderColor = 'rgba(34, 197, 94, 0.2)';
-    accentColor = '#22c55e';
+    accentColor = 'var(--color-success)';
   } else if (type === 'error') {
-    icon = <AlertCircle size={16} color="#ef4444" />;
+    icon = <AlertCircle size={16} color="var(--color-danger)" />;
     borderColor = 'rgba(239, 68, 68, 0.2)';
-    accentColor = '#ef4444';
+    accentColor = 'var(--color-danger)';
   } else if (type === 'warning') {
-    icon = <AlertTriangle size={16} color="#f59e0b" />;
+    icon = <AlertTriangle size={16} color="var(--color-warning)" />;
     borderColor = 'rgba(245, 158, 11, 0.2)';
-    accentColor = '#f59e0b';
+    accentColor = 'var(--color-warning)';
   } else if (type === 'info') {
     icon = <Info size={16} color="#3b82f6" />;
     borderColor = 'rgba(59, 130, 246, 0.2)';

@@ -177,21 +177,21 @@ const StudentAttendanceView = ({ sid }) => {
   const pageRecords = filteredRecords.slice((currentPage - 1) * recordsPerPage, currentPage * recordsPerPage);
 
   const barColor = (pct) =>
-    pct >= 75 ? "#10b981" : pct >= 50 ? "#f59e0b" : "#ef4444";
+    pct >= 75 ? "var(--color-success)" : pct >= 50 ? "var(--color-warning)" : "var(--color-danger)";
 
   if (loading) return <div className="spinner" />;
 
   if (error) return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center",
       justifyContent: "center", height: "60vh", gap: "1rem" }}>
-      <ShieldAlert size={40} color="#ef4444" />
+      <ShieldAlert size={40} color="var(--color-danger)" />
       <p style={{ color: "var(--color-text-secondary)", fontSize: "0.95rem", textAlign: "center", maxWidth: "400px", lineHeight: "1.4" }}>{error}</p>
       {!sid && (
         <Link to="/profile" style={{
           marginTop: "0.5rem",
           padding: "0.6rem 1.2rem",
           background: "var(--color-accent)",
-          color: "#fff",
+          color: "var(--color-text-primary)",
           borderRadius: "var(--radius-md)",
           textDecoration: "none",
           fontWeight: 500,
@@ -218,15 +218,15 @@ const StudentAttendanceView = ({ sid }) => {
   const offset = circ - (stats.percentage / 100) * circ;
 
   const getAttendanceColor = (pct) => {
-    if (pct >= 75) return "#22c55e";
-    if (pct >= 50) return "#f59e0b";
-    return "#ef4444";
+    if (pct >= 75) return "var(--color-success)";
+    if (pct >= 50) return "var(--color-warning)";
+    return "var(--color-danger)";
   };
 
   const statCards = [
     { label: "Total classes", value: stats.total, color: "var(--color-accent)" },
-    { label: "Present", value: stats.present, color: "#22c55e" },
-    { label: "Absent", value: stats.absent, color: "#ef4444" },
+    { label: "Present", value: stats.present, color: "var(--color-success)" },
+    { label: "Absent", value: stats.absent, color: "var(--color-danger)" },
     { label: "Attendance %", value: `${stats.percentage}%`, color: getAttendanceColor(stats.percentage) },
   ];
 
@@ -317,7 +317,7 @@ const StudentAttendanceView = ({ sid }) => {
           gap: 6px;
           background: rgba(245, 158, 11, 0.08);
           border: 1px solid rgba(245, 158, 11, 0.25);
-          color: #fbbf24;
+          color: var(--color-warning);
           font-size: 12px;
           font-weight: 600;
           padding: 4px 10px;
@@ -337,9 +337,9 @@ const StudentAttendanceView = ({ sid }) => {
           background: rgba(255, 255, 255, 0.025);
           border-color: rgba(255, 255, 255, 0.06);
         }
-        .progress-bar-gradient-success { background: linear-gradient(90deg, #10b981, #34d399); }
-        .progress-bar-gradient-warning { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
-        .progress-bar-gradient-danger { background: linear-gradient(90deg, #ef4444, #f87171); }
+        .progress-bar-gradient-success { background: linear-gradient(90deg, var(--color-success), var(--color-success)); }
+        .progress-bar-gradient-warning { background: linear-gradient(90deg, var(--color-warning), var(--color-warning)); }
+        .progress-bar-gradient-danger { background: linear-gradient(90deg, var(--color-danger), var(--color-danger)); }
 
         .insight-banner-premium {
           display: flex;
@@ -391,12 +391,12 @@ const StudentAttendanceView = ({ sid }) => {
         }
         .record-status-badge.present {
           background: rgba(16, 185, 129, 0.08);
-          color: #10b981;
+          color: var(--color-success);
           border: 1px solid rgba(16, 185, 129, 0.15);
         }
         .record-status-badge.absent {
           background: rgba(239, 68, 68, 0.08);
-          color: #ef4444;
+          color: var(--color-danger);
           border: 1px solid rgba(239, 68, 68, 0.15);
         }
         .status-dot-pulse {
@@ -406,12 +406,12 @@ const StudentAttendanceView = ({ sid }) => {
           display: inline-block;
         }
         .status-dot-pulse.present {
-          background: #10b981;
-          box-shadow: 0 0 6px #10b981;
+          background: var(--color-success);
+          box-shadow: 0 0 6px var(--color-success);
         }
         .status-dot-pulse.absent {
-          background: #ef4444;
-          box-shadow: 0 0 6px #ef4444;
+          background: var(--color-danger);
+          box-shadow: 0 0 6px var(--color-danger);
         }
 
         /* PAGINATION BUTTONS */
@@ -569,8 +569,8 @@ const StudentAttendanceView = ({ sid }) => {
                             cursor: 'pointer',
                             fontSize: 13.5,
                             fontWeight: markForm.status === 'present' ? 500 : 400,
-                            background: markForm.status === 'present' ? '#22c55e' : 'var(--color-surface-3)',
-                            color: markForm.status === 'present' ? '#fff' : 'var(--color-text-secondary)',
+                            background: markForm.status === 'present' ? 'var(--color-success)' : 'var(--color-surface-3)',
+                            color: markForm.status === 'present' ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
                             transition: 'all 0.15s ease',
                             display: 'flex',
                             alignItems: 'center',
@@ -592,8 +592,8 @@ const StudentAttendanceView = ({ sid }) => {
                             cursor: 'pointer',
                             fontSize: 13.5,
                             fontWeight: markForm.status === 'absent' ? 500 : 400,
-                            background: markForm.status === 'absent' ? '#ef4444' : 'var(--color-surface-3)',
-                            color: markForm.status === 'absent' ? '#fff' : 'var(--color-text-secondary)',
+                            background: markForm.status === 'absent' ? 'var(--color-danger)' : 'var(--color-surface-3)',
+                            color: markForm.status === 'absent' ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
                             transition: 'all 0.15s ease',
                             display: 'flex',
                             alignItems: 'center',
@@ -616,7 +616,7 @@ const StudentAttendanceView = ({ sid }) => {
                       width: "100%",
                       marginTop: 8,
                       background: "var(--color-accent)",
-                      color: "#fff",
+                      color: "var(--color-text-primary)",
                       height: 48,
                       borderRadius: "var(--radius-md)",
                       fontSize: "15px",
@@ -628,7 +628,7 @@ const StudentAttendanceView = ({ sid }) => {
                   >
                     {marking ? (
                       <>
-                        <span className="spinner-small" style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.6s linear infinite', marginRight: 6 }} />
+                        <span className="spinner-small" style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: 'var(--color-text-primary)', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.6s linear infinite', marginRight: 6 }} />
                         Saving…
                       </>
                     ) : "Submit"}
@@ -650,7 +650,7 @@ const StudentAttendanceView = ({ sid }) => {
             </div>
             {overallStreak >= 2 && (
               <div className="pulsing-streak-badge">
-                <Flame size={13} fill="#fbbf24" style={{ filter: 'drop-shadow(0 0 2px rgba(251,191,36,0.5))' }} />
+                <Flame size={13} fill="var(--color-warning)" style={{ filter: 'drop-shadow(0 0 2px rgba(251,191,36,0.5))' }} />
                 <span>{overallStreak}-day streak</span>
               </div>
             )}
@@ -662,16 +662,16 @@ const StudentAttendanceView = ({ sid }) => {
                 <svg height={radius * 2} width={radius * 2} style={{ transform: 'rotate(-90deg)' }}>
                   <defs>
                     <linearGradient id="successGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stopColor="#10b981" />
-                      <stop offset="100%" stopColor="#34d399" />
+                      <stop offset="0%" stopColor="var(--color-success)" />
+                      <stop offset="100%" stopColor="var(--color-success)" />
                     </linearGradient>
                     <linearGradient id="warningGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stopColor="#f59e0b" />
-                      <stop offset="100%" stopColor="#fbbf24" />
+                      <stop offset="0%" stopColor="var(--color-warning)" />
+                      <stop offset="100%" stopColor="var(--color-warning)" />
                     </linearGradient>
                     <linearGradient id="dangerGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stopColor="#ef4444" />
-                      <stop offset="100%" stopColor="#f87171" />
+                      <stop offset="0%" stopColor="var(--color-danger)" />
+                      <stop offset="100%" stopColor="var(--color-danger)" />
                     </linearGradient>
                     <filter id="svgGlow" x="-20%" y="-20%" width="140%" height="140%">
                       <feGaussianBlur stdDeviation="3" result="blur" />
@@ -720,11 +720,11 @@ const StudentAttendanceView = ({ sid }) => {
               
               <div style={{ display: "flex", justifyContent: "center", gap: "20px", marginTop: "20px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                  <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#10b981", boxShadow: '0 0 8px rgba(16,185,129,0.5)' }} />
+                  <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--color-success)", boxShadow: '0 0 8px rgba(16,185,129,0.5)' }} />
                   <span style={{ fontSize: "12px", color: "var(--color-text-secondary)", fontWeight: 500 }}>Present: <strong style={{ color: 'var(--color-text-primary)' }}>{stats.present}</strong></span>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                  <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#ef4444", boxShadow: '0 0 8px rgba(239,68,68,0.5)' }} />
+                  <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--color-danger)", boxShadow: '0 0 8px rgba(239,68,68,0.5)' }} />
                   <span style={{ fontSize: "12px", color: "var(--color-text-secondary)", fontWeight: 500 }}>Absent: <strong style={{ color: 'var(--color-text-primary)' }}>{stats.absent}</strong></span>
                 </div>
               </div>
@@ -779,10 +779,10 @@ const StudentAttendanceView = ({ sid }) => {
                       : "progress-bar-gradient-danger";
                   
                   const insightVars = insight.status === 'safe'
-                    ? { '--insight-accent': '#10b981', '--insight-bg': 'rgba(16, 185, 129, 0.04)', '--insight-color': '#10b981', icon: Check }
+                    ? { '--insight-accent': 'var(--color-success)', '--insight-bg': 'rgba(16, 185, 129, 0.04)', '--insight-color': 'var(--color-success)', icon: Check }
                     : insight.status === 'warning'
-                      ? { '--insight-accent': '#f59e0b', '--insight-bg': 'rgba(245, 158, 11, 0.04)', '--insight-color': '#f59e0b', icon: Flame }
-                      : { '--insight-accent': '#ef4444', '--insight-bg': 'rgba(239, 68, 68, 0.04)', '--insight-color': '#ef4444', icon: ShieldAlert };
+                      ? { '--insight-accent': 'var(--color-warning)', '--insight-bg': 'rgba(245, 158, 11, 0.04)', '--insight-color': 'var(--color-warning)', icon: Flame }
+                      : { '--insight-accent': 'var(--color-danger)', '--insight-bg': 'rgba(239, 68, 68, 0.04)', '--insight-color': 'var(--color-danger)', icon: ShieldAlert };
                   const InsightIcon = insightVars.icon;
 
                   return (
@@ -804,7 +804,7 @@ const StudentAttendanceView = ({ sid }) => {
                             <span style={{
                               fontSize: "10px",
                               background: "rgba(245,158,11,0.08)",
-                              color: "#fbbf24",
+                              color: "var(--color-warning)",
                               padding: "2px 6px",
                               borderRadius: 4,
                               fontWeight: 600,
@@ -813,7 +813,7 @@ const StudentAttendanceView = ({ sid }) => {
                               gap: "2px",
                               border: "1px solid rgba(245,158,11,0.15)"
                             }}>
-                              <Flame size={10} fill="#fbbf24" /> {streak} Streak
+                              <Flame size={10} fill="var(--color-warning)" /> {streak} Streak
                             </span>
                           )}
                         </div>
@@ -876,7 +876,7 @@ const StudentAttendanceView = ({ sid }) => {
                   background: "transparent",
                   border: "none",
                   borderBottom: filter === f ? "2px solid var(--color-accent)" : "2px solid transparent",
-                  color: filter === f ? "#fff" : "var(--color-text-secondary)",
+                  color: filter === f ? "var(--color-text-primary)" : "var(--color-text-secondary)",
                   padding: "8px 4px",
                   fontSize: "13px",
                   fontWeight: filter === f ? 500 : 400,

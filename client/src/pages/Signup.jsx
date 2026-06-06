@@ -23,7 +23,7 @@ export default function Signup() {
     try {
       const { data } = await authService.signup(form);
       login(data.user, data.token);
-      toast.success('Account created! Welcome 🎉');
+      toast.success('Account created! Welcome');
       navigate('/');
     } catch (err) {
       toast.error(err.response?.data?.message || 'Signup failed');

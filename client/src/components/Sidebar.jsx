@@ -1,22 +1,7 @@
 import { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { 
-  LayoutDashboard, 
-  Calendar, 
-  CheckSquare, 
-  BarChart3, 
-  Rocket, 
-  Clock, 
-  User, 
-  Bot, 
-  LineChart, 
-  Users,
-  ChevronLeft,
-  ChevronRight,
-  LogOut,
-  GraduationCap
-} from 'lucide-react';
+import { LayoutDashboard, Calendar, CheckSquare, BarChart3, Rocket, Clock, User, Bot, LineChart, Users, ChevronLeft, ChevronRight, LogOut, GraduationCap, Menu, X } from 'lucide-react';
 
 const baseLinks = [
   { to: '/',             label: 'Dashboard',    icon: LayoutDashboard },
@@ -96,7 +81,7 @@ export default function Sidebar() {
               background: 'rgba(248, 113, 113, 0.1)',
               border: 'none',
               borderRadius: '8px',
-              color: 'var(--danger, #f87171)',
+              color: 'var(--danger, var(--color-danger))',
               padding: '6px 10px',
               fontSize: 13,
               fontWeight: 600,
@@ -116,7 +101,7 @@ export default function Sidebar() {
             aria-label="Toggle menu"
             style={{ margin: 0 }}
           >
-            {open ? '✕' : '☰'}
+            {open ? <X size={18} /> : <Menu size={18} />}
           </button>
         </div>
       </nav>
@@ -190,7 +175,7 @@ export default function Sidebar() {
                   background: 'rgba(248, 113, 113, 0.1)',
                   border: 'none',
                   borderRadius: '8px',
-                  color: 'var(--danger, #f87171)',
+                  color: 'var(--danger, var(--color-danger))',
                   width: 28,
                   height: 28,
                   display: 'flex',
@@ -213,7 +198,7 @@ export default function Sidebar() {
                 background: 'rgba(248, 113, 113, 0.1)',
                 border: 'none',
                 borderRadius: '8px',
-                color: 'var(--danger, #f87171)',
+                color: 'var(--danger, var(--color-danger))',
                 width: 32,
                 height: 32,
                 display: 'flex',

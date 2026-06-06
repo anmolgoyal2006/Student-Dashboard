@@ -5,7 +5,7 @@ import {
   Chart as ChartJS, CategoryScale, LinearScale,
   BarElement, ArcElement, Tooltip, Legend
 } from 'chart.js';
-import { Target, CheckCircle, BookOpen, AlertTriangle, Bot, Bell } from 'lucide-react';
+import { Target, CheckCircle, BookOpen, AlertTriangle, Bot, Bell, GraduationCap } from 'lucide-react';
 import { attendanceService, marksService, aiService, notificationService, subjectService } from '../services/apiServices';
 import { useAuth } from '../context/AuthContext';
 import SmartPlanCard from '../components/SmartPlanCard';
@@ -169,8 +169,8 @@ export default function Dashboard() {
         backgroundColor: 'rgba(19, 22, 31, 0.95)',
         borderColor: 'rgba(255,255,255,0.06)',
         borderWidth: 1,
-        titleColor: '#f1f5f9',
-        bodyColor: '#94a3b8',
+        titleColor: 'var(--color-text-primary)',
+        bodyColor: 'var(--color-text-secondary)',
         padding: 10,
       }
     },
@@ -178,11 +178,11 @@ export default function Dashboard() {
       y: {
         min: 0, max: 100,
         grid: { color: 'rgba(255,255,255,0.04)' },
-        ticks: { color: '#94a3b8', font: { size: 11 } },
+        ticks: { color: 'var(--color-text-secondary)', font: { size: 11 } },
       },
       x: {
         grid: { display: false },
-        ticks: { color: '#94a3b8', font: { size: 11 } },
+        ticks: { color: 'var(--color-text-secondary)', font: { size: 11 } },
       }
     }
   };
@@ -191,7 +191,7 @@ export default function Dashboard() {
     labels: ['CGPA', 'Remaining'],
     datasets: [{
       data: [cgpa || 0, 10 - (cgpa || 0)],
-      backgroundColor: ['#6366f1', 'rgba(255,255,255,0.05)'],
+      backgroundColor: ['var(--color-accent)', 'rgba(255,255,255,0.05)'],
       borderWidth: 0,
     }],
   };
@@ -234,7 +234,7 @@ export default function Dashboard() {
       <div className="page-header">
         <div>
           <h1 className="page-title" style={{ fontSize: '20px', fontWeight: 500 }}>
-            {getGreeting()}, {user?.name?.split(' ')[0]} 👋
+            {getGreeting()}, {user?.name?.split(' ')[0]}
           </h1>
           <p className="page-subtitle">{todayScheduleSummary}</p>
         </div>
@@ -280,7 +280,7 @@ export default function Dashboard() {
       <div className="grid-2 mb-4">
         <div className="card">
           <div className="card-title">
-            {isStudent ? '📊 Attendance per Subject' : '📊 Class Avg Attendance per Subject'}
+            {isStudent ? 'Attendance per Subject' : 'Class Avg Attendance per Subject'}
           </div>
           {isStudent ? (
             summary.length > 0
@@ -304,7 +304,7 @@ export default function Dashboard() {
         </div>
 
         <div className="card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <div className="card-title" style={{ alignSelf: 'flex-start' }}>🎓 CGPA Gauge</div>
+          <div className="card-title" style={{ alignSelf: 'flex-start', display: "inline-flex", alignItems: "center", gap: "6px" }}><GraduationCap size={16} color="var(--color-accent)" /> CGPA Gauge</div>
           {cgpa != null && cgpa > 0
             ? <>
                 <Doughnut
@@ -317,8 +317,8 @@ export default function Dashboard() {
                         backgroundColor: 'rgba(19, 22, 31, 0.95)',
                         borderColor: 'rgba(255,255,255,0.06)',
                         borderWidth: 1,
-                        titleColor: '#f1f5f9',
-                        bodyColor: '#94a3b8',
+                        titleColor: 'var(--color-text-primary)',
+                        bodyColor: 'var(--color-text-secondary)',
                       }
                     }
                   }}
@@ -379,7 +379,7 @@ export default function Dashboard() {
       <div className="grid-2">
         <div className="card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-            <div className="card-title" style={{ margin: 0 }}>🤖 AI Recommendations</div>
+            <div className="card-title" style={{ margin: 0, display: "inline-flex", alignItems: "center", gap: "6px" }}><Bot size={16} color="var(--color-accent)" /> AI Recommendations</div>
             <Link
               to="/ai-assistant?mode=assistant"
               style={{
@@ -418,7 +418,7 @@ export default function Dashboard() {
         </div>
 
         <div className="card">
-          <div className="card-title">🔔 Notifications</div>
+          <div className="card-title" style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}><Bell size={16} color="var(--color-accent)" /> Notifications</div>
           {notifs.length > 0
             ? notifs.map((n, i) => (
                 <div key={i} className="notification-item">

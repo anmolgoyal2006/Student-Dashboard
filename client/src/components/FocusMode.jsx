@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
+import { Zap, Target, Play, Square, RefreshCw, Sparkles, FileText } from 'lucide-react';
 
 const FOCUS_DURATION = 25 * 60;
 
 const DIFFICULTY_CONFIG = {
-  Easy:   { icon: '🟢', count: 2, desc: 'Revise concepts'         },
-  Medium: { icon: '🟡', count: 3, desc: 'Improve problem-solving' },
-  Hard:   { icon: '🔴', count: 5, desc: 'Improve speed'           },
+  Easy:   { color: 'var(--color-success)', count: 2, desc: 'Revise concepts'         },
+  Medium: { color: 'var(--color-warning)', count: 3, desc: 'Improve problem-solving' },
+  Hard:   { color: 'var(--color-danger)', count: 5, desc: 'Improve speed'           },
 };
 
 export default function FocusMode({ focusTopic }) {
@@ -56,7 +57,7 @@ export default function FocusMode({ focusTopic }) {
 
   return (
     <div className="card">
-      <div className="card-title">⚡ Focus Mode</div>
+      <div className="card-title" style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}><Zap size={16} color="var(--color-accent)" /> Focus Mode</div>
 
       {/* Topic pill */}
       <div style={{
@@ -64,7 +65,7 @@ export default function FocusMode({ focusTopic }) {
         borderRadius: 10, padding: '10px 14px', marginBottom: 14,
         fontSize: 13, color: 'var(--text)',
       }}>
-        🎯 <strong style={{ color: 'var(--primary)' }}>{focusTopic.name}</strong>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}><Target size={14} color="var(--color-accent)" /> <strong style={{ color: 'var(--primary)' }}>{focusTopic.name}</strong></span>
         <span style={{ color: 'var(--muted)', fontSize: 12, marginLeft: 8 }}>
           {focusTopic.done}/{focusTopic.target} done
         </span>
@@ -82,7 +83,7 @@ export default function FocusMode({ focusTopic }) {
                 className={`btn btn-sm ${difficulty === key ? 'btn-primary' : 'btn-outline'}`}
                 style={{ flex: 1, justifyContent: 'center' }}
               >
-                {val.icon} {key}
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: val.color, display: 'inline-block' }} /> {key}</span>
               </button>
             ))}
           </div>
@@ -95,7 +96,7 @@ export default function FocusMode({ focusTopic }) {
         borderRadius: 8, padding: '8px 12px', marginBottom: 16,
         fontSize: 12.5, color: 'var(--text-2)', lineHeight: 1.5,
       }}>
-        📝 {taskText}
+        <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}><FileText size={14} /> {taskText}</span>
       </div>
 
       {/* Timer ring */}
@@ -106,7 +107,7 @@ export default function FocusMode({ focusTopic }) {
               fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="7" />
             <circle cx="55" cy="55" r="48"
               fill="none"
-              stroke={completed ? '#34d399' : active ? '#818cf8' : 'rgba(129,140,248,0.3)'}
+              stroke={completed ? 'var(--color-success)' : active ? 'var(--color-accent)' : 'rgba(129,140,248,0.3)'}
               strokeWidth="7"
               strokeDasharray={`${2 * Math.PI * 48}`}
               strokeDashoffset={`${2 * Math.PI * 48 * (1 - pct / 100)}`}
@@ -122,7 +123,7 @@ export default function FocusMode({ focusTopic }) {
             <span style={{
               fontFamily: 'Space Grotesk, sans-serif',
               fontSize: 20, fontWeight: 700,
-              color: completed ? '#34d399' : 'var(--text)',
+              color: completed ? 'var(--color-success)' : 'var(--text)',
             }}>
               {completed ? '✓' : `${mins}:${secs}`}
             </span>
@@ -138,9 +139,9 @@ export default function FocusMode({ focusTopic }) {
         <div style={{
           background: 'rgba(52,211,153,0.1)', border: '1px solid rgba(52,211,153,0.3)',
           borderRadius: 8, padding: '8px 14px', marginBottom: 12,
-          fontSize: 13, color: '#34d399', textAlign: 'center',
+          fontSize: 13, color: 'var(--color-success)', textAlign: 'center',
         }}>
-          🎉 Session complete! Great work.
+          <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}><Sparkles size={14} /> Session complete! Great work.</span>
         </div>
       )}
 
@@ -148,11 +149,11 @@ export default function FocusMode({ focusTopic }) {
       <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
         {!active ? (
           <button className="btn btn-primary" onClick={start} style={{ minWidth: 150 }}>
-            {completed ? '🔄 New Session' : '▶ Start Focus Session'}
+            {completed ? <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><RefreshCw size={14} /> New Session</span> : <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><Play size={14} /> Start Focus Session</span>}
           </button>
         ) : (
           <button className="btn btn-outline" onClick={stop} style={{ minWidth: 150 }}>
-            ⏹ Stop
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><Square size={14} /> Stop</span>
           </button>
         )}
       </div>

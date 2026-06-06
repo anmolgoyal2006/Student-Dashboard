@@ -1,12 +1,13 @@
 import { useState, useMemo } from 'react';
+import { Search, Bot, EyeOff, Eye, FileText, Save } from 'lucide-react';
 import { marksService } from '../services/apiServices';
 
 const VALID_GRADES = ['A+', 'A', 'B+', 'B', 'C+', 'C', 'D', 'F'];
 
 function getConfidenceStyle(level) {
-  if (level === 'high') return { color: '#10b981', bg: 'rgba(16,185,129,0.1)', border: 'rgba(16,185,129,0.25)' };
-  if (level === 'medium') return { color: '#f59e0b', bg: 'rgba(245,158,11,0.1)', border: 'rgba(245,158,11,0.25)' };
-  return { color: '#ef4444', bg: 'rgba(239,68,68,0.1)', border: 'rgba(239,68,68,0.25)' };
+  if (level === 'high') return { color: 'var(--color-success)', bg: 'rgba(16,185,129,0.1)', border: 'rgba(16,185,129,0.25)' };
+  if (level === 'medium') return { color: 'var(--color-warning)', bg: 'rgba(245,158,11,0.1)', border: 'rgba(245,158,11,0.25)' };
+  return { color: 'var(--color-danger)', bg: 'rgba(239,68,68,0.1)', border: 'rgba(239,68,68,0.25)' };
 }
 
 export default function OcrReviewPanel({ sources, onProceed }) {
@@ -107,7 +108,7 @@ export default function OcrReviewPanel({ sources, onProceed }) {
 
   return (
     <div className="card" style={{ marginTop: 16 }}>
-      <div className="card-title">🔍 OCR Grade Review</div>
+      <div className="card-title" style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}><Search size={16} /> OCR Grade Review</div>
       <p className="text-muted" style={{ marginBottom: 12 }}>
         Review and correct OCR-extracted handwritten grades before generating the SGPA leaderboard.
       </p>
@@ -121,11 +122,11 @@ export default function OcrReviewPanel({ sources, onProceed }) {
         <div style={{ fontSize: 12 }}>
           <strong>{totalStudents}</strong> total students
         </div>
-        <div style={{ fontSize: 12, color: '#10b981' }}>
+        <div style={{ fontSize: 12, color: 'var(--color-success)' }}>
           <strong>{correctedCount}</strong> corrected
         </div>
         {lowConfCount > 0 && (
-          <div style={{ fontSize: 12, color: '#ef4444' }}>
+          <div style={{ fontSize: 12, color: 'var(--color-danger)' }}>
             <strong>{lowConfCount}</strong> low confidence
           </div>
         )}
@@ -138,13 +139,13 @@ export default function OcrReviewPanel({ sources, onProceed }) {
           onClick={handleAiCorrect}
           disabled={aiLoading}
         >
-          {aiLoading ? '🤖 AI Correcting...' : '🤖 AI Auto-Correct Low Confidence'}
+          {aiLoading ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Bot size={14} /> AI Correcting...</span> : <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Bot size={14} /> AI Auto-Correct Low Confidence</span>}
         </button>
         <button
           className={`btn ${reviewMode ? 'btn-primary' : 'btn-outline'}`}
           onClick={() => setReviewMode(!reviewMode)}
         >
-          {reviewMode ? '🕶 Hide Cell Images' : '👁 Show Cell Images'}
+          {reviewMode ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><EyeOff size={14} /> Hide Cell Images</span> : <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Eye size={14} /> Show Cell Images</span>}
         </button>
       </div>
 
@@ -154,7 +155,7 @@ export default function OcrReviewPanel({ sources, onProceed }) {
           <div style={{
             fontWeight: 600, fontSize: 13, marginBottom: 8, color: '#a5b4fc',
           }}>
-            📄 {src.label || src.fileName} ({src.students.length} students)
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><FileText size={14} /> {src.label || src.fileName}</span> ({src.students.length} students)
           </div>
 
           <div className="table-wrap">
@@ -199,7 +200,7 @@ export default function OcrReviewPanel({ sources, onProceed }) {
                                 height: 32,
                                 borderRadius: 4,
                                 border: '1px solid var(--border)',
-                                background: '#fff',
+                                background: 'var(--color-text-primary)',
                                 imageRendering: 'pixelated',
                               }}
                             />
@@ -215,7 +216,7 @@ export default function OcrReviewPanel({ sources, onProceed }) {
                         <span style={{
                           display: 'inline-block', padding: '2px 8px', borderRadius: 8,
                           fontWeight: 700, fontSize: 11,
-                          background: 'rgba(99,102,241,0.1)', color: '#818cf8',
+                          background: 'rgba(99,102,241,0.1)', color: 'var(--color-accent)',
                           border: '1px solid rgba(99,102,241,0.2)',
                         }}>
                           {st.grade || '?'}
@@ -261,7 +262,7 @@ export default function OcrReviewPanel({ sources, onProceed }) {
       {/* Save & close button */}
       <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
         <button className="btn btn-primary" onClick={handleProceed}>
-          💾 Save Corrections & Close ({correctedCount} corrected)
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Save size={14} /> Save Corrections & Close</span> ({correctedCount} corrected)
         </button>
       </div>
     </div>

@@ -130,7 +130,7 @@ export default function AdminPanel() {
                 fontWeight: 500,
                 fontSize: 13,
                 background: filter === f ? 'var(--primary)' : 'rgba(255,255,255,0.07)',
-                color: filter === f ? '#fff' : 'var(--text-2)',
+                color: filter === f ? 'var(--color-text-primary)' : 'var(--text-2)',
                 textTransform: 'capitalize',
                 display: 'flex',
                 alignItems: 'center',
@@ -204,7 +204,7 @@ export default function AdminPanel() {
                         fontWeight: 600,
                         background: u.role === 'teacher'
                           ? 'rgba(251,191,36,0.15)' : 'rgba(34,197,94,0.15)',
-                        color: u.role === 'teacher' ? '#fbbf24' : '#4ade80',
+                        color: u.role === 'teacher' ? 'var(--color-warning)' : 'var(--color-success)',
                         display: 'inline-flex',
                         alignItems: 'center',
                         gap: '4px'
@@ -241,7 +241,7 @@ export default function AdminPanel() {
                             opacity: updating === u._id ? 0.5 : 1,
                             background: u.role === 'teacher'
                               ? 'rgba(34,197,94,0.15)' : 'rgba(251,191,36,0.15)',
-                            color: u.role === 'teacher' ? '#4ade80' : '#fbbf24',
+                            color: u.role === 'teacher' ? 'var(--color-success)' : 'var(--color-warning)',
                           }}
                         >
                           {updating === u._id

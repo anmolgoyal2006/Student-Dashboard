@@ -1,19 +1,16 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { careerService } from '../services/apiServices';
 import toast from '../context/ToastContext';
-import { 
-  RefreshCw, CheckCircle, AlertCircle, ExternalLink, Target, Loader2, 
-  BookOpen, Star, HelpCircle, Award, Sparkles, TrendingUp, Calendar
-} from 'lucide-react';
+import { RefreshCw, CheckCircle, AlertCircle, ExternalLink, Target, Loader2, BookOpen, Star, HelpCircle, Award, Sparkles, TrendingUp, Calendar, Lightbulb } from 'lucide-react';
 
 const PRIORITY_STYLE = {
-  high:   { bg: 'rgba(239,68,68,0.08)', border: 'rgba(239,68,68,0.2)', label: 'High', color: '#ef4444' },
-  medium: { bg: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.2)', label: 'Medium', color: '#f59e0b' },
-  low:    { bg: 'rgba(34,197,94,0.08)', border: 'rgba(34,197,94,0.2)', label: 'Low', color: '#22c55e' },
+  high:   { bg: 'rgba(239,68,68,0.08)', border: 'rgba(239,68,68,0.2)', label: 'High', color: 'var(--color-danger)' },
+  medium: { bg: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.2)', label: 'Medium', color: 'var(--color-warning)' },
+  low:    { bg: 'rgba(34,197,94,0.08)', border: 'rgba(34,197,94,0.2)', label: 'Low', color: 'var(--color-success)' },
 };
 
 const DIFF_COLOR = {
-  Easy: '#22c55e', Medium: '#f59e0b', Hard: '#ef4444',
+  Easy: 'var(--color-success)', Medium: 'var(--color-warning)', Hard: 'var(--color-danger)',
 };
 
 export default function DsaCoachPanel({ career, onCareerUpdate, plan }) {
@@ -154,7 +151,7 @@ export default function DsaCoachPanel({ career, onCareerUpdate, plan }) {
   };
 
   const placementScore = coach?.placementScore ?? 0;
-  const scoreColor = placementScore >= 70 ? '#22c55e' : placementScore >= 40 ? '#f59e0b' : '#ef4444';
+  const scoreColor = placementScore >= 70 ? 'var(--color-success)' : placementScore >= 40 ? 'var(--color-warning)' : 'var(--color-danger)';
   const lcSync = career?.leetcodeSync;
   const lcLinked = Boolean(career?.leetcodeUsername);
   const lastSyncLabel = lcSync?.lastSyncAt
@@ -187,7 +184,7 @@ export default function DsaCoachPanel({ career, onCareerUpdate, plan }) {
                   display: 'inline-flex', alignItems: 'center', gap: 4,
                   padding: '2px 8px', borderRadius: 'var(--radius-pill)',
                   fontSize: 11, fontWeight: 500,
-                  background: 'rgba(34, 197, 94, 0.1)', color: '#22c55e',
+                  background: 'rgba(34, 197, 94, 0.1)', color: 'var(--color-success)',
                   border: '1px solid rgba(34, 197, 94, 0.15)'
                 }}>
                   <CheckCircle size={12} /> Connected
@@ -197,7 +194,7 @@ export default function DsaCoachPanel({ career, onCareerUpdate, plan }) {
                   display: 'inline-flex', alignItems: 'center', gap: 4,
                   padding: '2px 8px', borderRadius: 'var(--radius-pill)',
                   fontSize: 11, fontWeight: 500,
-                  background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b',
+                  background: 'rgba(245, 158, 11, 0.1)', color: 'var(--color-warning)',
                   border: '1px solid rgba(245, 158, 11, 0.15)'
                 }}>
                   <AlertCircle size={12} /> Not synced
@@ -276,7 +273,7 @@ export default function DsaCoachPanel({ career, onCareerUpdate, plan }) {
                 alignSelf: 'flex-start',
                 background: 'transparent',
                 border: 'none',
-                color: 'var(--color-danger, #ef4444)',
+                color: 'var(--color-danger, var(--color-danger))',
                 fontSize: '12.5px',
                 cursor: 'pointer',
                 padding: '4px 0',
@@ -298,15 +295,15 @@ export default function DsaCoachPanel({ career, onCareerUpdate, plan }) {
               </div>
               <div style={{ flex: 1, minWidth: 100, padding: '10px 14px', borderRadius: 'var(--radius-md)', background: 'var(--color-surface-2)', border: '1px solid rgba(34, 197, 94, 0.25)', display: 'flex', flexDirection: 'column', gap: 2 }}>
                 <span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>Easy solves</span>
-                <span style={{ fontSize: 18, fontWeight: 600, color: '#22c55e' }}>{easyCount}</span>
+                <span style={{ fontSize: 18, fontWeight: 600, color: 'var(--color-success)' }}>{easyCount}</span>
               </div>
               <div style={{ flex: 1, minWidth: 100, padding: '10px 14px', borderRadius: 'var(--radius-md)', background: 'var(--color-surface-2)', border: '1px solid rgba(245, 158, 11, 0.25)', display: 'flex', flexDirection: 'column', gap: 2 }}>
                 <span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>Medium solves</span>
-                <span style={{ fontSize: 18, fontWeight: 600, color: '#f59e0b' }}>{medCount}</span>
+                <span style={{ fontSize: 18, fontWeight: 600, color: 'var(--color-warning)' }}>{medCount}</span>
               </div>
               <div style={{ flex: 1, minWidth: 100, padding: '10px 14px', borderRadius: 'var(--radius-md)', background: 'var(--color-surface-2)', border: '1px solid rgba(239, 68, 68, 0.25)', display: 'flex', flexDirection: 'column', gap: 2 }}>
                 <span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>Hard solves</span>
-                <span style={{ fontSize: 18, fontWeight: 600, color: '#ef4444' }}>{hardCount}</span>
+                <span style={{ fontSize: 18, fontWeight: 600, color: 'var(--color-danger)' }}>{hardCount}</span>
               </div>
             </div>
 
@@ -314,9 +311,9 @@ export default function DsaCoachPanel({ career, onCareerUpdate, plan }) {
             {totalCount > 0 && (
               <div style={{ width: '100%' }}>
                 <div style={{ display: 'flex', height: 6, borderRadius: 3, overflow: 'hidden', background: 'var(--color-surface-3)', width: '100%' }}>
-                  <div style={{ width: `${(easyCount / totalCount) * 100}%`, background: '#22c55e' }} />
-                  <div style={{ width: `${(medCount / totalCount) * 100}%`, background: '#f59e0b' }} />
-                  <div style={{ width: `${(hardCount / totalCount) * 100}%`, background: '#ef4444' }} />
+                  <div style={{ width: `${(easyCount / totalCount) * 100}%`, background: 'var(--color-success)' }} />
+                  <div style={{ width: `${(medCount / totalCount) * 100}%`, background: 'var(--color-warning)' }} />
+                  <div style={{ width: `${(hardCount / totalCount) * 100}%`, background: 'var(--color-danger)' }} />
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 6 }}>
                   <span>Ratio composition</span>
@@ -387,9 +384,9 @@ export default function DsaCoachPanel({ career, onCareerUpdate, plan }) {
 
             {coach.uncoveredTopics?.length > 0 && (
               <div style={{ marginTop: 12, fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}>
-                <AlertCircle size={14} color="#ef4444" />
+                <AlertCircle size={14} color="var(--color-danger)" />
                 <span style={{ color: 'var(--color-text-secondary)' }}>
-                  <strong style={{ color: '#ef4444' }}>Gaps on LeetCode (&lt;5 solves): </strong>
+                  <strong style={{ color: 'var(--color-danger)' }}>Gaps on LeetCode (&lt;5 solves): </strong>
                   {coach.uncoveredTopics.join(', ')}
                 </span>
               </div>
@@ -439,7 +436,7 @@ export default function DsaCoachPanel({ career, onCareerUpdate, plan }) {
                               <span style={{
                                 fontSize: 10, fontWeight: 600, padding: '2px 6px', borderRadius: 4,
                                 background: r.startWith === 'Easy' ? 'rgba(34, 197, 94, 0.1)' : r.startWith === 'Hard' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(245, 158, 11, 0.1)',
-                                color: r.startWith === 'Easy' ? '#22c55e' : r.startWith === 'Hard' ? '#ef4444' : '#f59e0b',
+                                color: r.startWith === 'Easy' ? 'var(--color-success)' : r.startWith === 'Hard' ? 'var(--color-danger)' : 'var(--color-warning)',
                                 border: `1px solid ${r.startWith === 'Easy' ? 'rgba(34, 197, 94, 0.15)' : r.startWith === 'Hard' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(245, 158, 11, 0.15)'}`
                               }}>
                                 {r.startWith || 'Easy'}
@@ -522,7 +519,7 @@ export default function DsaCoachPanel({ career, onCareerUpdate, plan }) {
                   <span style={{ fontSize: 11, color: 'var(--color-accent)', fontWeight: 500 }}>Next milestone</span>
                   <div style={{ fontSize: 13, fontWeight: 600, marginTop: 2 }}>{coach.nextMilestone}</div>
                 </div>
-                <p style={{ fontSize: 12.5, color: '#818cf8', marginTop: 10, fontStyle: 'italic', display: 'flex', alignItems: 'center', gap: 4 }}>💡 {coach.studyTip}</p>
+                <p style={{ fontSize: 12.5, color: 'var(--color-accent)', marginTop: 10, fontStyle: 'italic', display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}><Lightbulb size={14} color="var(--color-warning)" /> {coach.studyTip}</span></p>
               </div>
             </div>
 
@@ -650,7 +647,7 @@ export default function DsaCoachPanel({ career, onCareerUpdate, plan }) {
             .slice(0, 5)
             .map((s, i) => (
               <div key={i} style={{ fontSize: 12.5, color: 'var(--color-text-secondary)', marginBottom: 6 }}>
-                <strong style={{ color: '#22c55e' }}>+{s.problemsAdded}</strong> — {s.note?.slice(0, 100)}
+                <strong style={{ color: 'var(--color-success)' }}>+{s.problemsAdded}</strong> — {s.note?.slice(0, 100)}
               </div>
             ))}
         </div>
