@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import * as XLSX from 'xlsx';
-import toast from 'react-hot-toast';
+import toast from '../context/ToastContext';
+import { GraduationCap, PenTool, FileSpreadsheet, Upload, Clipboard, Check, Trophy, Trash2 } from 'lucide-react';
 import { marksService } from '../services/apiServices';
 
 const VALID_GRADES = ['A+', 'A', 'B+', 'B', 'C+', 'C', 'D', 'F'];
@@ -184,7 +185,10 @@ export default function GradeEntryForm({ onLeaderboardGenerated }) {
 
   return (
     <div className="card" style={{ marginTop: 16 }}>
-      <div className="card-title" style={{ marginBottom: 4 }}>📝 Grade Entry</div>
+      <div className="card-title" style={{ marginBottom: 4, display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <GraduationCap size={18} style={{ color: 'var(--color-accent)' }} />
+        Grade Entry
+      </div>
       <p className="text-muted" style={{ marginBottom: 16, fontSize: 13 }}>
         Enter grades manually or upload an Excel/CSV file per subject.
       </p>
@@ -198,7 +202,17 @@ export default function GradeEntryForm({ onLeaderboardGenerated }) {
             onClick={() => setMode(m)}
             style={{ fontSize: 13 }}
           >
-            {m === 'manual' ? '✍️ Manual Entry' : '📊 Excel Upload'}
+            {m === 'manual' ? (
+              <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <PenTool size={14} />
+                Manual Entry
+              </span>
+            ) : (
+              <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <FileSpreadsheet size={14} />
+                Excel Upload
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -239,9 +253,10 @@ export default function GradeEntryForm({ onLeaderboardGenerated }) {
               <button
                 className="btn btn-outline"
                 onClick={() => removeSubject(subj.id)}
-                style={{ fontSize: 12, padding: '4px 10px', color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }}
+                style={{ fontSize: 12, padding: '4px 10px', color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)', display: 'flex', alignItems: 'center', gap: '4px' }}
               >
-                ✕ Remove
+                <Trash2 size={12} />
+                Remove
               </button>
             )}
           </div>
@@ -259,9 +274,10 @@ export default function GradeEntryForm({ onLeaderboardGenerated }) {
               <button
                 className="btn btn-outline"
                 onClick={() => fileRefs.current[subj.id]?.click()}
-                style={{ fontSize: 13, marginBottom: 10 }}
+                style={{ fontSize: 13, marginBottom: 10, display: 'flex', alignItems: 'center', gap: '6px' }}
               >
-                📂 Upload .xlsx / .csv
+                <Upload size={14} />
+                Upload .xlsx / .csv
               </button>
               <p style={{ fontSize: 11, color: 'var(--muted)', margin: '4px 0 8px' }}>
                 Columns: <code>Name</code>, <code>Roll No</code>, <code>Grade</code>
@@ -343,16 +359,18 @@ export default function GradeEntryForm({ onLeaderboardGenerated }) {
                 <button
                   className="btn btn-outline"
                   onClick={() => addStudent(subj.id)}
-                  style={{ fontSize: 12 }}
+                  style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: '4px' }}
                 >
-                  + Add Student
+                  <PenTool size={12} />
+                  Add Student
                 </button>
                 <button
                   className={`btn ${subj.showBulk ? 'btn-primary' : 'btn-outline'}`}
                   onClick={() => updateSubject(subj.id, 'showBulk', !subj.showBulk)}
-                  style={{ fontSize: 12 }}
+                  style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: '4px' }}
                 >
-                  📋 Bulk Paste
+                  <Clipboard size={12} />
+                  Bulk Paste
                 </button>
               </div>
 
@@ -373,9 +391,10 @@ export default function GradeEntryForm({ onLeaderboardGenerated }) {
                   <button
                     className="btn btn-primary"
                     onClick={() => applyBulkText(subj.id)}
-                    style={{ marginTop: 6, fontSize: 12 }}
+                    style={{ marginTop: 6, fontSize: 12, display: 'flex', alignItems: 'center', gap: '4px' }}
                   >
-                    ✓ Apply
+                    <Check size={12} />
+                    Apply
                   </button>
                 </div>
               )}
@@ -393,9 +412,16 @@ export default function GradeEntryForm({ onLeaderboardGenerated }) {
           className="btn btn-primary"
           onClick={handleSubmit}
           disabled={loading}
-          style={{ fontSize: 13 }}
+          style={{ fontSize: 13, display: 'flex', alignItems: 'center', gap: '6px' }}
         >
-          {loading ? '⏳ Generating...' : '🏆 Generate SGPA Leaderboard'}
+          {loading ? (
+            <>Generating...</>
+          ) : (
+            <>
+              <Trophy size={14} />
+              Generate SGPA Leaderboard
+            </>
+          )}
         </button>
       </div>
     </div>

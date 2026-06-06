@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { authService } from '../services/apiServices';
-import toast from 'react-hot-toast';
+import toast from '../context/ToastContext';
+import { GraduationCap, Mail, Lock, ArrowRight, Heart, Star } from 'lucide-react';
 import './Login.css';
 
 export default function Login() {
@@ -30,8 +31,8 @@ export default function Login() {
   };
 
   const fields = [
-    { label: 'Email',    name: 'email',    type: 'email',    placeholder: 'you@college.edu', icon: '✉️' },
-    { label: 'Password', name: 'password', type: 'password', placeholder: '••••••••',         icon: '🔒' },
+    { label: 'Email',    name: 'email',    type: 'email',    placeholder: 'you@college.edu' },
+    { label: 'Password', name: 'password', type: 'password', placeholder: '••••••••' },
   ];
 
   return (
@@ -45,7 +46,9 @@ export default function Login() {
       <div className="login-wrapper">
         {/* Left panel */}
         <div className="login-brand">
-          <div className="brand-logo">🎓</div>
+          <div className="brand-logo" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', color: 'var(--color-accent)' }}>
+            <GraduationCap size={44} />
+          </div>
           <h1 className="brand-title">StudentAI</h1>
           <p className="brand-tagline">Smart academics. Better career. All in one place.</p>
 
@@ -53,10 +56,13 @@ export default function Login() {
             {[
               { value: '10K+', label: 'Students'     },
               { value: '95%',  label: 'Satisfaction' },
-              { value: '4.9★', label: 'Rating'       },
+              { value: '4.9',  label: 'Rating', icon: <Star size={12} fill="currentColor" style={{ marginLeft: 2 }} /> },
             ].map(s => (
               <div className="stat-pill" key={s.label}>
-                <div className="stat-val">{s.value}</div>
+                <div className="stat-val" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {s.value}
+                  {s.icon}
+                </div>
                 <div className="stat-lbl">{s.label}</div>
               </div>
             ))}
@@ -77,11 +83,13 @@ export default function Login() {
 
           <form onSubmit={handleSubmit} className="login-form">
 
-            {fields.map(f => (
+             {fields.map(f => (
               <div className={`login-field ${focused === f.name ? 'field-focused' : ''}`} key={f.name}>
                 <label className="login-label">{f.label}</label>
                 <div className="login-input-wrap">
-                  <span className="login-icon">{f.icon}</span>
+                  <span className="login-icon" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {f.name === 'email' ? <Mail size={16} /> : <Lock size={16} />}
+                  </span>
                   <input
                     className="login-input"
                     type={f.type}
@@ -103,11 +111,15 @@ export default function Login() {
               </Link>
             </div>
 
-            <button className={`login-btn ${loading ? 'loading' : ''}`} type="submit" disabled={loading}>
-              {loading
-                ? <span className="btn-spinner" />
-                : <><span>Sign In</span><span className="btn-arrow">→</span></>
-              }
+            <button className={`login-btn ${loading ? 'loading' : ''}`} type="submit" disabled={loading} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+              {loading ? (
+                <span className="btn-spinner" />
+              ) : (
+                <>
+                  <span>Sign In</span>
+                  <ArrowRight size={14} />
+                </>
+              )}
             </button>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '16px 0' }}>
@@ -137,8 +149,8 @@ export default function Login() {
             <Link to="/signup" className="login-anchor">Create one free</Link>
           </p>
 
-          <p style={{ textAlign: 'center', marginTop: 24, fontSize: 12, color: 'var(--muted)', letterSpacing: '0.03em' }}>
-            Made with ❤️ by <span style={{ color: 'var(--primary)', fontWeight: 600 }}>Anmol Goyal</span>
+          <p style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', marginTop: 24, fontSize: 12, color: 'var(--muted)', letterSpacing: '0.03em' }}>
+            Made with <Heart size={12} fill="var(--primary)" color="var(--primary)" /> by <span style={{ color: 'var(--primary)', fontWeight: 600 }}>Anmol Goyal</span>
           </p>
         </div>
       </div>

@@ -5,6 +5,7 @@ import {
   Chart as ChartJS, CategoryScale, LinearScale,
   BarElement, ArcElement, Tooltip, Legend
 } from 'chart.js';
+import { Target, CheckCircle, BookOpen, AlertTriangle, Bot, Bell } from 'lucide-react';
 import { attendanceService, marksService, aiService, notificationService, subjectService } from '../services/apiServices';
 import { useAuth } from '../context/AuthContext';
 import SmartPlanCard from '../components/SmartPlanCard';
@@ -18,50 +19,145 @@ const getGreeting = () => {
   return 'Good evening';
 };
 
+function EmptyState({ title, description, buttonText, buttonLink }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px', textAlign: 'center', gap: '8px' }}>
+      <svg width="80" height="60" viewBox="0 0 120 90" fill="none" style={{ opacity: 0.4, marginBottom: '8px' }}>
+        <rect x="10" y="10" width="100" height="70" rx="8" fill="var(--color-surface-3)" stroke="var(--border)" strokeWidth="2" />
+        <circle cx="60" cy="40" r="16" fill="var(--color-accent-muted)" stroke="var(--color-accent)" strokeWidth="2" strokeDasharray="4 4" />
+        <path d="M40 70h40" stroke="var(--color-text-tertiary)" strokeWidth="2" strokeLinecap="round" />
+      </svg>
+      <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-primary)' }}>{title}</div>
+      <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)', maxWidth: '240px' }}>{description}</div>
+      {buttonText && (
+        <Link to={buttonLink} className="btn btn-primary btn-sm" style={{ marginTop: '12px', textDecoration: 'none' }}>
+          {buttonText}
+        </Link>
+      )}
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const { user }  = useAuth();
   const [summary, setSummary]         = useState([]);
   const [cgpa, setCgpa]               = useState(null);
   const [recs, setRecs]               = useState([]);
   const [notifs, setNotifs]           = useState([]);
-  const [subjectCount, setSubjectCount] = useState(0);   // ← NEW
+  const [subjects, setSubjects]       = useState([]);
+  const [subjectCount, setSubjectCount] = useState(0);
   const [loading, setLoading]         = useState(true);
+  const [classSummary, setClassSummary] = useState([]);
 
   useEffect(() => {
-    Promise.all([
+    const isTeacher = user?.role === 'teacher';
+    const promises = [
       attendanceService.getSummary(),
       marksService.getCGPAbySemester(),
       aiService.getRecommendations(),
       notificationService.getAll(),
-      subjectService.getAll(),               // ← NEW
-    ]).then(([a, m, r, n, s]) => {
+      subjectService.getAll(),
+    ];
+
+    if (isTeacher) {
+      promises.push(attendanceService.getClassSummary());
+    }
+
+    Promise.all(promises).then(([a, m, r, n, s, cs]) => {
       setSummary(a.data.summary || []);
       setCgpa(m.data.cgpa);
       setRecs(r.data.suggestions || []);
       setNotifs(n.data.notifications || []);
-      setSubjectCount((s.data.subjects || []).length);   // ← NEW
+      setSubjects(s.data.subjects || []);
+      setSubjectCount((s.data.subjects || []).length);
+      if (cs) {
+        setClassSummary(cs.data.students || []);
+      }
     }).catch(() => {
-      // 401 is handled globally (redirect to login); swallow to avoid error overlay
+      // 401 is handled globally; swallow
     }).finally(() => setLoading(false));
-  }, []);
+  }, [user]);
 
   const overallAttendance = summary.length
     ? (summary.reduce((s, i) => s + parseFloat(i.percentage), 0) / summary.length).toFixed(1)
     : 0;
 
-  const attendanceChartData = {
+  const classSummaryList = classSummary || [];
+  const classAvgAttendance = classSummaryList.length
+    ? (classSummaryList.reduce((acc, s) => acc + parseFloat(s.overall || 0), 0) / classSummaryList.length).toFixed(1)
+    : 0;
+
+  const subjectAverages = {};
+  classSummaryList.forEach(student => {
+    (student.subjects || []).forEach(sub => {
+      if (!subjectAverages[sub.subject]) {
+        subjectAverages[sub.subject] = { sum: 0, count: 0 };
+      }
+      subjectAverages[sub.subject].sum += parseFloat(sub.percentage || 0);
+      subjectAverages[sub.subject].count += 1;
+    });
+  });
+
+  const classSubjectLabels = Object.keys(subjectAverages);
+  const classSubjectData = classSubjectLabels.map(label => 
+    (subjectAverages[label].sum / subjectAverages[label].count).toFixed(1)
+  );
+
+  const getCgpaColor = (val) => {
+    if (val === '—' || val == null) return 'var(--color-text-primary)';
+    const num = parseFloat(val);
+    if (num > 8) return 'var(--color-success)';
+    if (num >= 6) return 'var(--color-warning)';
+    return 'var(--color-danger)';
+  };
+
+  const getAttendanceColor = (val) => {
+    if (val === '—' || val == null) return 'var(--color-text-primary)';
+    const num = parseFloat(val);
+    if (num > 75) return 'var(--color-success)';
+    if (num >= 50) return 'var(--color-warning)';
+    return 'var(--color-danger)';
+  };
+
+  const dayNames  = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const todayName = dayNames[new Date().getDay()];
+
+  const todayClasses = [];
+  subjects.forEach(sub => {
+    (sub.schedule || []).filter(sl => sl.day === todayName).forEach(sl => {
+      todayClasses.push({ ...sl, name: sub.name });
+    });
+  });
+
+  const todayScheduleSummary = todayClasses.length > 0
+    ? `Today: ${todayClasses.length} class${todayClasses.length > 1 ? 'es' : ''} scheduled (${todayClasses.map(c => c.name).join(', ')})`
+    : 'No classes scheduled for today';
+
+  const isStudent = user?.role === 'student';
+
+  const attendanceChartData = isStudent ? {
     labels: summary.map(s => s.subject),
     datasets: [{
       label: 'Attendance %',
       data: summary.map(s => s.percentage),
       backgroundColor: summary.map(s =>
-        s.isLow ? 'rgba(248,113,113,0.7)' : 'rgba(129,140,248,0.7)'
+        s.isLow ? 'rgba(239, 68, 68, 0.7)' : 'rgba(99, 102, 241, 0.7)'
       ),
       borderColor: summary.map(s =>
-        s.isLow ? 'rgba(248,113,113,1)' : 'rgba(129,140,248,1)'
+        s.isLow ? 'rgba(239, 68, 68, 1)' : 'rgba(99, 102, 241, 1)'
       ),
       borderWidth: 1,
-      borderRadius: 7,
+      borderRadius: 6,
+    }],
+  } : {
+    labels: classSubjectLabels,
+    datasets: [{
+      label: 'Class Avg Attendance %',
+      data: classSubjectData,
+      backgroundColor: 'rgba(99, 102, 241, 0.7)',
+      borderColor: 'rgba(99, 102, 241, 1)',
+      borderWidth: 1,
+      borderRadius: 6,
     }],
   };
 
@@ -70,23 +166,23 @@ export default function Dashboard() {
     plugins: {
       legend: { display: false },
       tooltip: {
-        backgroundColor: 'rgba(13,17,23,0.95)',
-        borderColor: 'rgba(255,255,255,0.1)',
+        backgroundColor: 'rgba(19, 22, 31, 0.95)',
+        borderColor: 'rgba(255,255,255,0.06)',
         borderWidth: 1,
-        titleColor: '#e6edf3',
-        bodyColor: '#6e7681',
+        titleColor: '#f1f5f9',
+        bodyColor: '#94a3b8',
         padding: 10,
       }
     },
     scales: {
       y: {
         min: 0, max: 100,
-        grid: { color: 'rgba(255,255,255,0.05)' },
-        ticks: { color: '#6e7681', font: { size: 11 } },
+        grid: { color: 'rgba(255,255,255,0.04)' },
+        ticks: { color: '#94a3b8', font: { size: 11 } },
       },
       x: {
         grid: { display: false },
-        ticks: { color: '#6e7681', font: { size: 11 } },
+        ticks: { color: '#94a3b8', font: { size: 11 } },
       }
     }
   };
@@ -95,36 +191,58 @@ export default function Dashboard() {
     labels: ['CGPA', 'Remaining'],
     datasets: [{
       data: [cgpa || 0, 10 - (cgpa || 0)],
-      backgroundColor: ['#818cf8', 'rgba(255,255,255,0.06)'],
+      backgroundColor: ['#6366f1', 'rgba(255,255,255,0.05)'],
       borderWidth: 0,
     }],
   };
 
   const stats = [
-    { label: 'CGPA',        value: cgpa ?? '—',                             icon: '🎯', color: '#818cf8' },
-    { label: 'Attendance',  value: `${overallAttendance}%`,                 icon: '✅', color: '#34d399' },
-    { label: 'Subjects',    value: subjectCount,                            icon: '📚', color: '#fbbf24' }, // ← FIXED
-    { label: 'Low Alerts',  value: summary.filter(s => s.isLow).length,    icon: '⚠️', color: '#f87171' },
+    { label: 'CGPA',        value: cgpa ?? '—',                  icon: Target,        color: getCgpaColor(cgpa), isPrimary: true },
+    { 
+      label: isStudent ? 'Attendance' : 'Class Attendance',  
+      value: isStudent ? `${overallAttendance}%` : `${classAvgAttendance}%`,      
+      icon: CheckCircle,   
+      color: getAttendanceColor(isStudent ? overallAttendance : classAvgAttendance) 
+    },
+    { label: 'Subjects',    value: subjectCount,                 icon: BookOpen,      color: 'var(--color-text-primary)' },
+    { 
+      label: isStudent ? 'Low Alerts' : 'Class Low Alerts',  
+      value: isStudent ? summary.filter(s => s.isLow).length : classSummaryList.filter(s => parseFloat(s.overall || 0) < 75).length, 
+      icon: AlertTriangle, 
+      color: (isStudent ? summary.filter(s => s.isLow).length : classSummaryList.filter(s => parseFloat(s.overall || 0) < 75).length) > 0 ? 'var(--color-danger)' : 'var(--color-text-secondary)' 
+    },
   ];
 
-  if (loading) return <div className="spinner" />;
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div className="shimmer" style={{ height: 60, width: '40%', borderRadius: 8 }} />
+        <div className="grid-4">
+          {[1,2,3,4].map(i => <div key={i} className="card shimmer" style={{ height: 100 }} />)}
+        </div>
+        <div className="grid-2">
+          <div className="card shimmer" style={{ height: 240 }} />
+          <div className="card shimmer" style={{ height: 240 }} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>
-
       {/* Header */}
       <div className="page-header">
         <div>
-          <h1 className="page-title">
+          <h1 className="page-title" style={{ fontSize: '20px', fontWeight: 500 }}>
             {getGreeting()}, {user?.name?.split(' ')[0]} 👋
           </h1>
-          <p className="page-subtitle">Here's your academic overview for today</p>
+          <p className="page-subtitle">{todayScheduleSummary}</p>
         </div>
         <div style={{
-          fontSize: 12, color: 'var(--muted)',
-          background: 'rgba(255,255,255,0.04)',
+          fontSize: 12, color: 'var(--color-text-secondary)',
+          background: 'var(--color-surface-2)',
           border: '1px solid var(--border)',
-          borderRadius: 8, padding: '6px 14px',
+          borderRadius: 'var(--radius-md)', padding: '6px 14px',
           fontWeight: 500,
         }}>
           {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
@@ -133,23 +251,56 @@ export default function Dashboard() {
 
       {/* Stat row */}
       <div className="grid-4 mb-4">
-        {stats.map(stat => (
-          <div className="card stat-card" key={stat.label}>
-            <span className="stat-icon">{stat.icon}</span>
-            <div className="stat-value" style={{ color: stat.color }}>{stat.value}</div>
-            <div className="stat-label">{stat.label}</div>
-          </div>
-        ))}
+        {stats.map(stat => {
+          const IconComponent = stat.icon;
+          return (
+            <div 
+              className="card stat-card" 
+              key={stat.label}
+              style={stat.isPrimary ? { borderLeft: '2px solid var(--color-accent)' } : undefined}
+            >
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
+                <div style={{
+                  width: 36, height: 36, borderRadius: '50%',
+                  background: 'var(--color-accent-muted)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: 'var(--color-accent)',
+                }}>
+                  <IconComponent size={18} />
+                </div>
+              </div>
+              <div className="stat-value" style={{ color: stat.color, fontSize: '28px' }}>{stat.value}</div>
+              <div className="stat-label">{stat.label}</div>
+            </div>
+          );
+        })}
       </div>
 
       {/* Charts row */}
       <div className="grid-2 mb-4">
         <div className="card">
-          <div className="card-title">📊 Attendance per Subject</div>
-          {summary.length > 0
-            ? <Bar data={attendanceChartData} options={chartOptions} />
-            : <p className="text-muted">No attendance data yet.</p>
-          }
+          <div className="card-title">
+            {isStudent ? '📊 Attendance per Subject' : '📊 Class Avg Attendance per Subject'}
+          </div>
+          {isStudent ? (
+            summary.length > 0
+              ? <Bar data={attendanceChartData} options={chartOptions} />
+              : <EmptyState 
+                  title="No Attendance Data" 
+                  description="Import your attendance report or mark attendance manually to unlock metrics." 
+                  buttonText="Add Attendance" 
+                  buttonLink="/attendance" 
+                />
+          ) : (
+            classSummaryList.length > 0
+              ? <Bar data={attendanceChartData} options={chartOptions} />
+              : <EmptyState 
+                  title="No Class Summary Data" 
+                  description="Upload attendance register sheets to view class metrics." 
+                  buttonText="Upload Attendance" 
+                  buttonLink="/attendance" 
+                />
+          )}
         </div>
 
         <div className="card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
@@ -163,22 +314,27 @@ export default function Dashboard() {
                     plugins: {
                       legend: { display: false },
                       tooltip: {
-                        backgroundColor: 'rgba(13,17,23,0.95)',
-                        borderColor: 'rgba(255,255,255,0.1)',
+                        backgroundColor: 'rgba(19, 22, 31, 0.95)',
+                        borderColor: 'rgba(255,255,255,0.06)',
                         borderWidth: 1,
-                        titleColor: '#e6edf3',
-                        bodyColor: '#6e7681',
+                        titleColor: '#f1f5f9',
+                        bodyColor: '#94a3b8',
                       }
                     }
                   }}
                   style={{ maxWidth: 180 }}
                 />
-                <p style={{ marginTop: 14, fontFamily: "'Space Grotesk', sans-serif", fontSize: 30, fontWeight: 700, color: 'var(--primary)' }}>
+                <p style={{ marginTop: 14, fontFamily: 'inherit', fontSize: 28, fontWeight: 500, color: 'var(--color-accent)' }}>
                   {cgpa}
                 </p>
                 <p className="text-muted">out of 10.0</p>
               </>
-            : <p className="text-muted" style={{ marginTop: 20 }}>Add final exam marks to see CGPA.</p>
+            : <EmptyState 
+                title="No CGPA Data" 
+                description="Add your semesters or exam marks to compute your gauge score." 
+                buttonText="Add Marks" 
+                buttonLink="/marks" 
+              />
           }
         </div>
       </div>
@@ -196,22 +352,20 @@ export default function Dashboard() {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           <div style={{
-            fontSize: 24,
-            background: 'linear-gradient(135deg, var(--primary-dark), var(--primary))',
-            borderRadius: 12,
+            background: 'var(--color-accent-muted)',
+            color: 'var(--color-accent)',
+            borderRadius: 'var(--radius-md)',
             width: 46,
             height: 46,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            color: '#fff',
-            boxShadow: '0 0 12px rgba(129,140,248,0.4)',
           }}>
-            🤖
+            <Bot size={24} />
           </div>
           <div>
-            <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>Talk to Dashboard AI</h3>
-            <p style={{ margin: '3px 0 0', fontSize: 12.5, color: 'var(--muted)', lineHeight: 1.4 }}>
+            <h3 style={{ margin: 0, fontSize: 15, fontWeight: 500, color: 'var(--color-text-primary)' }}>Talk to Dashboard AI</h3>
+            <p style={{ margin: '3px 0 0', fontSize: 12.5, color: 'var(--color-text-secondary)', lineHeight: 1.4 }}>
               Ask questions, predict CGPA, add subjects or marks with natural language commands.
             </p>
           </div>
@@ -230,9 +384,9 @@ export default function Dashboard() {
               to="/ai-assistant?mode=assistant"
               style={{
                 fontSize: 12,
-                color: 'var(--primary)',
+                color: 'var(--color-accent)',
                 textDecoration: 'none',
-                fontWeight: 600,
+                fontWeight: 500,
                 display: 'flex',
                 alignItems: 'center',
                 gap: 4,
@@ -254,7 +408,12 @@ export default function Dashboard() {
                   </div>
                 </div>
               ))
-            : <p className="text-muted">No recommendations yet. Add subjects, attendance and marks to get insights.</p>
+            : <EmptyState 
+                title="No Recommendations" 
+                description="Get personalized AI advice by chatting with the assistant." 
+                buttonText="Go to Assistant" 
+                buttonLink="/ai-assistant" 
+              />
           }
         </div>
 
@@ -265,12 +424,15 @@ export default function Dashboard() {
                 <div key={i} className="notification-item">
                   <div className={`notif-dot ${n.type}`} />
                   <div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{n.title}</div>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)' }}>{n.title}</div>
                     <div className="text-muted">{n.message}</div>
                   </div>
                 </div>
               ))
-            : <p className="text-muted">No notifications.</p>
+            : <EmptyState 
+                title="All Caught Up" 
+                description="No new notifications at this time. Check back later!" 
+              />
           }
         </div>
       </div>

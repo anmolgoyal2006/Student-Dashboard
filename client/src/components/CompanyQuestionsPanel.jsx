@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { careerService } from '../services/apiServices';
-import toast from 'react-hot-toast';
+import toast from '../context/ToastContext';
+import EmptyState from './EmptyState';
+import { Briefcase, Bookmark, Star, Target, ExternalLink } from 'lucide-react';
 
 const DIFF_COLOR = {
   Easy: '#34d399',
@@ -9,9 +11,9 @@ const DIFF_COLOR = {
 };
 
 const FREQ_STYLE = {
-  high: { bg: 'rgba(239,68,68,0.12)', border: 'rgba(239,68,68,0.35)', label: '🔥 High' },
-  medium: { bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.35)', label: '⚡ Medium' },
-  low: { bg: 'rgba(34,197,94,0.12)', border: 'rgba(34,197,94,0.35)', label: '💡 Low' },
+  high: { bg: 'rgba(239,68,68,0.12)', border: 'rgba(239,68,68,0.35)', label: 'High' },
+  medium: { bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.35)', label: 'Medium' },
+  low: { bg: 'rgba(34,197,94,0.12)', border: 'rgba(34,197,94,0.35)', label: 'Low' },
 };
 
 export default function CompanyQuestionsPanel({ career }) {
@@ -86,7 +88,10 @@ export default function CompanyQuestionsPanel({ career }) {
         background: 'linear-gradient(135deg, rgba(99,102,241,0.08) 0%, rgba(129,140,248,0.06) 100%)',
       }}>
         <div style={{ marginBottom: 16 }}>
-          <div className="card-title" style={{ marginBottom: 4 }}>🏢 Company-Focused Questions</div>
+          <div className="card-title" style={{ marginBottom: 4, display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Briefcase size={18} style={{ color: 'var(--color-accent)' }} />
+            Company-Focused Questions
+          </div>
           <p className="text-muted" style={{ fontSize: 13 }}>
             Real LeetCode problems frequently asked at your target company for interview preparation.
           </p>
@@ -166,9 +171,9 @@ export default function CompanyQuestionsPanel({ career }) {
               disabled={loading}
             >
               <option value="">All</option>
-              <option value="high">🔥 High</option>
-              <option value="medium">⚡ Medium</option>
-              <option value="low">💡 Low</option>
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
             </select>
           </div>
           <div style={{ flex: '1 1 100px' }}>
@@ -196,9 +201,10 @@ export default function CompanyQuestionsPanel({ career }) {
                 }
               }}
               disabled={bookmarkedQuestions.length === 0}
-              style={{ minWidth: '120px' }}
+              style={{ minWidth: '120px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
             >
-              ★ Bookmarks ({bookmarkedQuestions.length})
+              <Bookmark size={14} />
+              Bookmarks ({bookmarkedQuestions.length})
             </button>
           </div>
         </div>
@@ -210,11 +216,10 @@ export default function CompanyQuestionsPanel({ career }) {
             <p className="text-muted" style={{ marginTop: 12 }}>Loading company questions...</p>
           </div>
         ) : questions.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: 40, color: 'var(--muted)' }}>
-            <div style={{ fontSize: 48, marginBottom: 12 }}>🎉</div>
-            <p>No questions found with current filters.</p>
-            <p style={{ fontSize: 12 }}>Try adjusting filters or sync your LeetCode account.</p>
-          </div>
+          <EmptyState
+            title="No questions found"
+            subtitle="Try adjusting filters or sync your LeetCode account."
+          />
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
             {questions.map((problem, index) => {
@@ -264,8 +269,10 @@ export default function CompanyQuestionsPanel({ career }) {
                       fontSize: 11, color: '#818cf8', marginBottom: 8,
                       padding: '4px 8px', borderRadius: 4,
                       background: 'rgba(99,102,241,0.1)',
+                      display: 'flex', alignItems: 'center', gap: '4px'
                     }}>
-                      🎯 {problem.company} specific
+                      <Target size={12} />
+                      {problem.company} specific
                     </div>
                   )}
 
@@ -275,18 +282,22 @@ export default function CompanyQuestionsPanel({ career }) {
                       target="_blank"
                       rel="noreferrer"
                       className="btn btn-primary btn-sm"
-                      style={{ flex: 1, fontSize: 11, textDecoration: 'none', textAlign: 'center' }}
+                      style={{ flex: 1, fontSize: 11, textDecoration: 'none', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
                     >
-                      Solve on LeetCode ↗
+                      Solve on LeetCode <ExternalLink size={12} />
                     </a>
                     <button
                       type="button"
                       className={`btn btn-sm ${isBookmarked(problem.slug) ? 'btn-primary' : 'btn-outline'}`}
                       onClick={() => toggleBookmark(problem)}
-                      style={{ fontSize: 11, minWidth: '40px' }}
+                      style={{ fontSize: 11, minWidth: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                       title={isBookmarked(problem.slug) ? 'Remove bookmark' : 'Bookmark this problem'}
                     >
-                      {isBookmarked(problem.slug) ? '★' : '☆'}
+                      {isBookmarked(problem.slug) ? (
+                        <Star size={14} fill="currentColor" />
+                      ) : (
+                        <Star size={14} />
+                      )}
                     </button>
                   </div>
                 </div>

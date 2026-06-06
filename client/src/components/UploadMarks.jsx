@@ -7,8 +7,9 @@
  *   3. Generate leaderboard → POST /marks/generate-leaderboard
  */
 import { useState, useMemo } from 'react';
+import { Upload, Trophy, TrendingDown, TrendingUp, BarChart2, FolderOpen, Settings, FileText, GraduationCap, Target } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import toast from 'react-hot-toast';
+import toast from '../context/ToastContext';
 import Leaderboard from './Leaderboard';
 import MarksFilter from './MarksFilter';
 import WeightInput from './WeightInput';
@@ -679,7 +680,10 @@ export default function UploadMarks({ onResult }) {
   return (
     <>
       <div className="card">
-        <div className="card-title" style={{ marginBottom: 16 }}>📄 Upload PDFs & Rank Students</div>
+        <div className="card-title" style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <FileText size={18} style={{ color: 'var(--color-accent)' }} />
+          Upload PDFs & Rank Students
+        </div>
 
         {/* Visual Guide Banner */}
         <div style={{
@@ -690,7 +694,8 @@ export default function UploadMarks({ onResult }) {
           marginBottom: 20,
         }}>
           <h3 style={{ margin: '0 0 12px', fontSize: 16, fontWeight: 700, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span>📊</span> Multi-PDF Student Ranking System
+            <BarChart2 size={18} style={{ color: 'var(--color-accent)' }} />
+            Multi-PDF Student Ranking System
           </h3>
           <p style={{ margin: '0 0 18px', fontSize: 13, color: 'var(--muted)', lineHeight: 1.5 }}>
             Easily merge separate test or exam PDF files to generate a unified leaderboard, compute weighted grades, and track student performance.
@@ -698,7 +703,7 @@ export default function UploadMarks({ onResult }) {
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
             <div style={{ display: 'flex', gap: 10 }}>
-              <span style={{ fontSize: 20, marginTop: 2 }}>📂</span>
+              <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-accent)', marginTop: 2 }}><FolderOpen size={20} /></span>
               <div>
                 <h4 style={{ margin: '0 0 4px', fontSize: 13.5, fontWeight: 600, color: 'var(--text)' }}>1. Upload PDFs</h4>
                 <p style={{ margin: 0, fontSize: 12, color: 'var(--muted)', lineHeight: 1.4 }}>
@@ -708,7 +713,7 @@ export default function UploadMarks({ onResult }) {
             </div>
 
             <div style={{ display: 'flex', gap: 10 }}>
-              <span style={{ fontSize: 20, marginTop: 2 }}>⚙️</span>
+              <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-accent)', marginTop: 2 }}><Settings size={20} /></span>
               <div>
                 <h4 style={{ margin: '0 0 4px', fontSize: 13.5, fontWeight: 600, color: 'var(--text)' }}>2. Customize Weights</h4>
                 <p style={{ margin: 0, fontSize: 12, color: 'var(--muted)', lineHeight: 1.4 }}>
@@ -718,7 +723,7 @@ export default function UploadMarks({ onResult }) {
             </div>
 
             <div style={{ display: 'flex', gap: 10 }}>
-              <span style={{ fontSize: 20, marginTop: 2 }}>🏆</span>
+              <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-accent)', marginTop: 2 }}><Trophy size={20} /></span>
               <div>
                 <h4 style={{ margin: '0 0 4px', fontSize: 13.5, fontWeight: 600, color: 'var(--text)' }}>3. Rank & Export</h4>
                 <p style={{ margin: 0, fontSize: 12, color: 'var(--muted)', lineHeight: 1.4 }}>
@@ -731,12 +736,26 @@ export default function UploadMarks({ onResult }) {
 
         <div
           style={{
-            border: '2px dashed var(--card-border)',
-            borderRadius: 10,
-            padding: 24,
-            textAlign: 'center',
-            marginBottom: 16,
+            height: '120px',
+            border: '1px dashed rgba(99, 102, 241, 0.3)',
+            borderRadius: 'var(--radius-md)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            marginBottom: '16px',
             cursor: 'pointer',
+            background: 'var(--color-surface-1)',
+            transition: 'border-color 0.2s, background 0.2s',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.borderColor = 'var(--color-accent)';
+            e.currentTarget.style.background = 'var(--color-surface-3)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.borderColor = 'rgba(99, 102, 241, 0.3)';
+            e.currentTarget.style.background = 'var(--color-surface-1)';
           }}
           onClick={() => document.getElementById('pdf-multi-input').click()}
           onDragOver={(e) => e.preventDefault()}
@@ -745,7 +764,10 @@ export default function UploadMarks({ onResult }) {
             handleFilesSelected(e.dataTransfer.files);
           }}
         >
-          <span>🗂 Drag & drop PDFs here, or <u>click to browse</u></span>
+          <Upload size={24} color="var(--color-accent)" />
+          <span style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>
+            Drag & drop PDFs here, or <span style={{ color: 'var(--color-accent)', textDecoration: 'underline' }}>click to browse</span>
+          </span>
           <input
             id="pdf-multi-input"
             type="file"
@@ -764,8 +786,10 @@ export default function UploadMarks({ onResult }) {
             type="button"
             className="btn btn-outline btn-sm"
             onClick={handleOpenSavedPdfsSelector}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
           >
-            📂 Choose from Saved PDFs
+            <FolderOpen size={14} />
+            Choose from Saved PDFs
           </button>
         </div>
 
@@ -985,8 +1009,9 @@ export default function UploadMarks({ onResult }) {
                   background: 'rgba(52,211,153,0.04)',
                 }}
               >
-                <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 8 }}>
-                  🎯 Best-Of Groups
+                <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 8, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Target size={16} style={{ color: 'var(--color-accent)' }} />
+                  Best-Of Groups
                 </div>
                 <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 10 }}>
                   Group multiple PDFs so each student&apos;s <strong>top N</strong> scores are used
@@ -1100,8 +1125,14 @@ export default function UploadMarks({ onResult }) {
                 className="btn btn-primary"
                 onClick={handleGenerate}
                 disabled={loading || !sources.length}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
               >
-                {loading ? '⏳ Generating…' : '🏆 Generate Normal Leaderboard'}
+                {loading ? 'Generating…' : (
+                  <>
+                    <Trophy size={14} />
+                    Generate Normal Leaderboard
+                  </>
+                )}
               </button>
               {ocrCorrectedGrades && (
                 <button
@@ -1112,9 +1143,17 @@ export default function UploadMarks({ onResult }) {
                     background: 'rgba(16,185,129,0.15)',
                     border: '1px solid rgba(16,185,129,0.3)',
                     color: '#10b981',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
                   }}
                 >
-                  {sgpaLoading ? '⏳ Generating…' : '🎓 SGPA from OCR'}
+                  {sgpaLoading ? 'Generating…' : (
+                    <>
+                      <GraduationCap size={14} />
+                      SGPA from OCR
+                    </>
+                  )}
                 </button>
               )}
               <button
@@ -1125,9 +1164,17 @@ export default function UploadMarks({ onResult }) {
                   background: 'rgba(59,130,246,0.15)',
                   border: '1px solid rgba(59,130,246,0.3)',
                   color: '#3b82f6',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
                 }}
               >
-                {sgpaLoading ? '⏳ Generating…' : '🎓 Generate SGPA Leaderboard'}
+                {sgpaLoading ? 'Generating…' : (
+                  <>
+                    <GraduationCap size={14} />
+                    Generate SGPA Leaderboard
+                  </>
+                )}
               </button>
               <button
                 className="btn btn-outline"
@@ -1149,7 +1196,12 @@ export default function UploadMarks({ onResult }) {
             disabled={loading}
             onClick={() => document.getElementById('pdf-multi-input').click()}
           >
-            {loading ? '⏳ Parsing PDFs…' : '🚀 Select PDFs'}
+            {loading ? 'Parsing PDFs…' : (
+              <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Upload size={14} />
+                Select PDFs
+              </span>
+            )}
           </button>
         )}
       </div>
@@ -1211,7 +1263,10 @@ export default function UploadMarks({ onResult }) {
         <div className="card" style={{ marginTop: 16 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
             <div>
-              <div className="card-title" style={{ margin: 0 }}>🎓 SGPA Leaderboard</div>
+              <div className="card-title" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <GraduationCap size={18} style={{ color: 'var(--color-accent)' }} />
+                SGPA Leaderboard
+              </div>
               <div className="text-muted" style={{ fontSize: 13 }}>
                 {sgpaLeaderboard.totalStudents} students ranked by SGPA
               </div>
@@ -1228,10 +1283,10 @@ export default function UploadMarks({ onResult }) {
               padding: 12, borderRadius: 10,
               background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)',
             }}>
-              <div style={{ fontSize: 12 }}>🏆 Highest: <strong>{sgpaLeaderboard.stats.highestSGPA}</strong></div>
-              <div style={{ fontSize: 12 }}>📉 Lowest: <strong>{sgpaLeaderboard.stats.lowestSGPA}</strong></div>
-              <div style={{ fontSize: 12 }}>📊 Average: <strong>{sgpaLeaderboard.stats.averageSGPA}</strong></div>
-              <div style={{ fontSize: 12 }}>📈 Median: <strong>{sgpaLeaderboard.stats.medianSGPA}</strong></div>
+              <div style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: '4px' }}><Trophy size={14} style={{ color: '#fbbf24' }} /> Highest: <strong>{sgpaLeaderboard.stats.highestSGPA}</strong></div>
+              <div style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: '4px' }}><TrendingDown size={14} style={{ color: '#ef4444' }} /> Lowest: <strong>{sgpaLeaderboard.stats.lowestSGPA}</strong></div>
+              <div style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: '4px' }}><BarChart2 size={14} style={{ color: '#3b82f6' }} /> Average: <strong>{sgpaLeaderboard.stats.averageSGPA}</strong></div>
+              <div style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: '4px' }}><TrendingUp size={14} style={{ color: '#10b981' }} /> Median: <strong>{sgpaLeaderboard.stats.medianSGPA}</strong></div>
             </div>
           )}
 
@@ -1481,7 +1536,10 @@ export default function UploadMarks({ onResult }) {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
               <div>
                 <h3 style={{ fontSize: 18, fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span>📂</span> Choose from Saved PDFs
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <FolderOpen size={18} style={{ color: 'var(--color-accent)' }} />
+                    Choose from Saved PDFs
+                  </span>
                 </h3>
                 <p className="text-muted" style={{ fontSize: 13, margin: '6px 0 0' }}>
                   Select a marksheet or grade list PDF saved in your library to load it into the workspace.

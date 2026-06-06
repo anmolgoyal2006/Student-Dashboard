@@ -1,7 +1,8 @@
 import { useState, useRef } from 'react';
 import { subjectService } from '../services/apiServices';
 import { apiRequest }     from '../api/axios';
-import toast from 'react-hot-toast';
+import toast from '../context/ToastContext';
+import { Brain } from 'lucide-react';
 
 // ── Voice support detection ───────────────────────────────────────────────
 const SpeechRecognition =
@@ -108,8 +109,9 @@ export default function AICommandBar({ onRefresh }) {
     <div className="card mb-4">
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-        <div className="card-title" style={{ marginBottom: 0 }}>
-          🧠 AI Command
+        <div className="card-title" style={{ marginBottom: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <Brain size={18} style={{ color: 'var(--color-accent)' }} />
+          AI Command
         </div>
         <span style={{
           fontSize: 11, color: 'var(--muted)',

@@ -1,6 +1,8 @@
 import { useEffect, useState, useMemo } from 'react';
 import { taskService, subjectService } from '../services/apiServices';
-import toast from 'react-hot-toast';
+import toast from '../context/ToastContext';
+import EmptyState from '../components/EmptyState';
+import { Calendar, Clock, ListTodo, Play, AlertTriangle, Edit3, Plus, Trash2 } from 'lucide-react';
 
 const PRIORITY_COLOR = {
   high:   { bg: 'rgba(248,113,113,0.12)', border: 'rgba(248,113,113,0.35)', text: '#f87171', badge: 'badge-danger'  },
@@ -166,7 +168,10 @@ export default function Scheduler() {
       {/* ── Header ── */}
       <div className="page-header">
         <div>
-          <h1 className="page-title">🗓️ Smart Scheduler</h1>
+          <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Calendar size={20} style={{ color: 'var(--color-accent)' }} />
+            Smart scheduler
+          </h1>
           <p className="page-subtitle">Manage tasks, deadlines and your weekly plan</p>
         </div>
         <button className="btn btn-primary" onClick={openAdd}>+ Add Task</button>
@@ -175,13 +180,13 @@ export default function Scheduler() {
       {/* ── Stat row ── */}
       <div className="grid-4 mb-4">
         {[
-          { label: 'Total',       value: stats.total,      icon: '📋', color: 'var(--primary)' },
-          { label: 'Pending',     value: stats.pending,    icon: '⏳', color: '#fbbf24'        },
-          { label: 'In Progress', value: stats.inProgress, icon: '⚡', color: '#60a5fa'        },
-          { label: 'Overdue',     value: stats.overdue,    icon: '🔥', color: '#f87171'        },
+          { label: 'Total',       value: stats.total,      icon: <ListTodo size={16} />, color: 'var(--color-accent)' },
+          { label: 'Pending',     value: stats.pending,    icon: <Clock size={16} />, color: '#fbbf24'        },
+          { label: 'In Progress', value: stats.inProgress, icon: <Play size={16} />, color: '#60a5fa'        },
+          { label: 'Overdue',     value: stats.overdue,    icon: <AlertTriangle size={16} />, color: '#f87171'        },
         ].map(s => (
           <div className="card stat-card" key={s.label}>
-            <span className="stat-icon">{s.icon}</span>
+            <span className="stat-icon" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: s.color }}>{s.icon}</span>
             <div className="stat-value" style={{ color: s.color }}>{s.value}</div>
             <div className="stat-label">{s.label}</div>
           </div>
@@ -191,7 +196,19 @@ export default function Scheduler() {
       {/* ── Add/Edit Form ── */}
       {showForm && (
         <div className="card mb-4">
-          <div className="card-title">{editing ? '✏️ Edit Task' : '➕ Add New Task'}</div>
+          <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            {editing ? (
+              <>
+                <Edit3 size={16} style={{ color: 'var(--color-accent)' }} />
+                Edit Task
+              </>
+            ) : (
+              <>
+                <Plus size={16} style={{ color: 'var(--color-accent)' }} />
+                Add New Task
+              </>
+            )}
+          </div>
           <form onSubmit={handleSubmit}>
             <div className="grid-2">
               {/* Title */}
@@ -262,9 +279,9 @@ export default function Scheduler() {
               <div className="form-group">
                 <label className="form-label">Priority</label>
                 <select className="form-select" name="priority" value={form.priority} onChange={handleChange}>
-                  <option value="low">🟢 Low</option>
-                  <option value="medium">🟡 Medium</option>
-                  <option value="high">🔴 High</option>
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
                 </select>
               </div>
 
@@ -272,9 +289,9 @@ export default function Scheduler() {
               <div className="form-group">
                 <label className="form-label">Status</label>
                 <select className="form-select" name="status" value={form.status} onChange={handleChange}>
-                  <option value="pending">⏳ Pending</option>
-                  <option value="in-progress">⚡ In Progress</option>
-                  <option value="completed">✅ Completed</option>
+                  <option value="pending">Pending</option>
+                  <option value="in-progress">In Progress</option>
+                  <option value="completed">Completed</option>
                 </select>
               </div>
 
@@ -318,8 +335,19 @@ export default function Scheduler() {
                 key={v}
                 className={`btn btn-sm ${view === v ? 'btn-primary' : 'btn-outline'}`}
                 onClick={() => setView(v)}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
               >
-                {v === 'week' ? '📅 Week' : '📋 List'}
+                {v === 'week' ? (
+                  <>
+                    <Calendar size={14} />
+                    Week
+                  </>
+                ) : (
+                  <>
+                    <ListTodo size={14} />
+                    List
+                  </>
+                )}
               </button>
             ))}
           </div>
@@ -475,12 +503,17 @@ export default function Scheduler() {
       {/* ── List View ── */}
       {view === 'list' && (
         <div className="card">
-          <div className="card-title">📋 All Tasks ({filteredTasks.length})</div>
+          <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <ListTodo size={16} style={{ color: 'var(--color-accent)' }} />
+            All Tasks ({filteredTasks.length})
+          </div>
           {filteredTasks.length === 0 ? (
-            <div className="empty-state">
-              <div className="icon">📭</div>
-              <p>No tasks found. Click "+ Add Task" to get started.</p>
-            </div>
+            <EmptyState
+              title="No tasks found"
+              subtitle="Get started by adding your first task or checking other categories."
+              actionLabel="+ Add Task"
+              onAction={openAdd}
+            />
           ) : (
             <div className="table-wrap">
               <table>

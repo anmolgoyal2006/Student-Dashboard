@@ -1,13 +1,14 @@
 import { useEffect, useState, useMemo } from 'react';
 import { subjectService } from '../services/apiServices';
-import toast from 'react-hot-toast';
+import toast from '../context/ToastContext';
 import WeeklyGrid from '../components/WeeklyGrid';
+import EmptyState from '../components/EmptyState';
+import { LayoutGrid, List, Plus, Edit, Trash2, Calendar, Clock } from 'lucide-react';
 
 const DAYS  = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 const EMPTY = { name: '', code: '', instructor: '', credits: 4, schedule: [] };
 
 const EMPTY_SLOT = { day: 'Mon', startTime: '09:00', endTime: '10:00', room: '' };
-
 
 const fmt12 = (t) => {
   if (!t) return '';
@@ -96,20 +97,20 @@ export default function Timetable() {
   };
 
   const handleEdit = s => {
-  setForm({
-    name      : s.name,
-    code      : s.code,
-    instructor: s.instructor || '',
-    credits   : String(s.credits || 4),
-    schedule  : (s.schedule || []).map(sl => ({
-      ...sl,
-      startTime: sl.startTime || '09:00',
-      endTime  : sl.endTime   || '10:00',
-    })),
-  });
-  setEditing(s._id);
-  setShowForm(true);
-};
+    setForm({
+      name      : s.name,
+      code      : s.code,
+      instructor: s.instructor || '',
+      credits   : String(s.credits || 4),
+      schedule  : (s.schedule || []).map(sl => ({
+        ...sl,
+        startTime: sl.startTime || '09:00',
+        endTime  : sl.endTime   || '10:00',
+      })),
+    });
+    setEditing(s._id);
+    setShowForm(true);
+  };
 
   const handleDelete = async id => {
     if (!window.confirm('Delete this subject?')) return;
@@ -157,13 +158,30 @@ export default function Timetable() {
           }
         }
       `}</style>
+      
       {/* ── Page header ──────────────────────────────────── */}
       <div className="page-header">
         <div>
-          <h1 className="page-title">📅 Timetable</h1>
+          <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Calendar size={20} style={{ color: 'var(--color-accent)' }} />
+            Timetable
+          </h1>
           <p className="page-subtitle">Weekly schedule and subject management</p>
         </div>
-        <button className="btn btn-primary" onClick={() => { setShowForm(true); setEditing(null); setForm(EMPTY); }}>
+        <button 
+          className="btn" 
+          style={{
+            border: '1px solid var(--color-accent)',
+            background: 'transparent',
+            color: 'var(--color-accent)',
+            transition: 'background 0.2s',
+            fontWeight: 500,
+            borderRadius: 'var(--radius-md)'
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.background = 'var(--color-accent-muted)'}
+          onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+          onClick={() => { setShowForm(true); setEditing(null); setForm(EMPTY); }}
+        >
           + Add Subject
         </button>
       </div>
@@ -173,14 +191,16 @@ export default function Timetable() {
         <div style={{
           padding: '14px 20px', borderRadius: 12, marginBottom: 16,
           background: currentClass
-            ? 'linear-gradient(135deg, rgba(34,197,94,0.15), rgba(20,184,166,0.1))'
-            : 'linear-gradient(135deg, rgba(99,102,241,0.15), rgba(20,184,166,0.1))',
-          border: `1px solid ${currentClass ? 'rgba(34,197,94,0.3)' : 'rgba(99,102,241,0.3)'}`,
+            ? 'linear-gradient(135deg, rgba(16,185,129,0.12), rgba(20,184,166,0.08))'
+            : 'linear-gradient(135deg, rgba(99,102,241,0.12), rgba(20,184,166,0.08))',
+          border: `1px solid ${currentClass ? 'rgba(16,185,129,0.2)' : 'rgba(99,102,241,0.2)'}`,
           display: 'flex', alignItems: 'center', gap: 12,
         }}>
-          <span style={{ fontSize: 22 }}>{currentClass ? '🟢' : '⏰'}</span>
+          <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: currentClass ? 'var(--color-success)' : 'var(--color-accent)' }}>
+            {currentClass ? <Clock size={20} /> : <Calendar size={20} />}
+          </span>
           <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>
+            <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>
               {currentClass
                 ? `Now: ${currentClass.name} (${fmt12(currentClass.startTime)} – ${fmt12(currentClass.endTime)})`
                 : `Next: ${nextClass.name} at ${fmt12(nextClass.startTime)}`
@@ -199,7 +219,10 @@ export default function Timetable() {
       {/* ── Today's schedule strip ───────────────────────── */}
       {todayClasses.length > 0 && (
         <div className="card" style={{ marginBottom: 16 }}>
-          <div className="card-title">📆 Today's Schedule — {todayName}</div>
+          <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Clock size={16} style={{ color: 'var(--color-accent)' }} />
+            Today's Schedule — {todayName}
+          </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {todayClasses.map((c, i) => {
               const isPast    = toMinutes(c.endTime) < nowMin;
@@ -208,19 +231,19 @@ export default function Timetable() {
                 <div key={i} style={{
                   padding: '8px 14px', borderRadius: 10,
                   background: isCurrent
-                    ? 'rgba(34,197,94,0.15)'
+                    ? 'rgba(16,185,129,0.15)'
                     : isPast
-                    ? 'rgba(255,255,255,0.03)'
-                    : 'rgba(99,102,241,0.12)',
-                  border: `1px solid ${isCurrent ? 'rgba(34,197,94,0.3)' : isPast ? 'rgba(255,255,255,0.06)' : 'rgba(99,102,241,0.25)'}`,
+                    ? 'rgba(255,255,255,0.02)'
+                    : 'var(--color-accent-muted)',
+                  border: `1px solid ${isCurrent ? 'rgba(16,185,129,0.3)' : isPast ? 'rgba(255,255,255,0.04)' : 'rgba(99,102,241,0.2)'}`,
                   opacity: isPast ? 0.5 : 1,
                 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{c.name}</div>
+                  <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>{c.name}</div>
                   <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2 }}>
                     {fmt12(c.startTime)} – {fmt12(c.endTime)}
                     {c.room ? ` · ${c.room}` : ''}
                   </div>
-                  {isCurrent && <div style={{ fontSize: 10, color: '#4ade80', marginTop: 3, fontWeight: 600 }}>● In progress</div>}
+                  {isCurrent && <div style={{ fontSize: 10, color: 'var(--color-success)', marginTop: 3, fontWeight: 500 }}>● In progress</div>}
                 </div>
               );
             })}
@@ -254,7 +277,7 @@ export default function Timetable() {
 
             {/* Schedule slots */}
             <div style={{ marginBottom: 16 }}>
-             <label className="form-label" style={{ marginBottom: 10, display: 'block' }}>Schedule Slots</label>
+              <label className="form-label" style={{ marginBottom: 10, display: 'block' }}>Schedule Slots</label>
               {(form.schedule || []).map((slot, i) => (
                 <div key={i} className={`timetable-slot-row${i > 0 ? ' timetable-slot-row-subsequent' : ''}`}>
                   <div className="form-group" style={{ margin: 0 }}>
@@ -276,18 +299,18 @@ export default function Timetable() {
                     <input className="form-input" type="text" value={slot.room} onChange={e => handleSlotChange(i, 'room', e.target.value)} placeholder="LH-101" />
                   </div>
                   <button type="button" onClick={() => removeSlot(i)} className="timetable-slot-delete-btn"
-                    style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.25)', color: '#f87171', borderRadius: 8, padding: '9px 12px', cursor: 'pointer' }}>
+                    style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#f87171', borderRadius: 8, padding: '9px 12px', cursor: 'pointer' }}>
                     ✕
                   </button>
                 </div>
               ))}
               {(form.schedule || []).length === 0 && (
-                <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>No slots added. Click "+ Add Slot" to schedule this subject.</p>
+                <p style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>No slots added. Click "+ Add Slot" to schedule this subject.</p>
               )}
             </div>
-<div className="flex gap-2">
+            <div className="flex gap-2">
               <button className="btn btn-primary" type="submit">{editing ? 'Update Subject' : 'Add Subject'}</button>
-              <button type="button" className="btn btn-primary" onClick={addSlot} style={{ background: 'rgba(99,102,241,0.25)', border: '1px solid rgba(99,102,241,0.5)' }}>+ Add Slot</button>
+              <button type="button" className="btn" onClick={addSlot} style={{ background: 'var(--color-accent-muted)', border: '1px solid rgba(99,102,241,0.3)', color: 'var(--color-accent)' }}>+ Add Slot</button>
               <button className="btn btn-outline" type="button" onClick={() => { setShowForm(false); setForm(EMPTY); setEditing(null); }}>Cancel</button>
             </div>
           </form>
@@ -296,20 +319,37 @@ export default function Timetable() {
 
       {/* ── Tab switcher ─────────────────────────────────── */}
       {subjects.length > 0 && (
-        <div style={{ display: 'flex', gap: 4, marginBottom: 14 }}>
-          {[['grid','📊 Weekly Grid'],['list','📋 Subject List']].map(([key, label]) => (
-            <button key={key} onClick={() => setTab(key)}
-              style={{
-                padding: '7px 16px', borderRadius: 8, border: 'none', cursor: 'pointer',
-                fontSize: 13, fontWeight: 600,
-                background: tab === key ? 'rgba(99,102,241,0.2)' : 'rgba(255,255,255,0.04)',
-                color: tab === key ? '#818cf8' : 'var(--text-secondary)',
-                border: tab === key ? '1px solid rgba(99,102,241,0.3)' : '1px solid transparent',
-                transition: 'all 0.15s',
-              }}>
-              {label}
-            </button>
-          ))}
+        <div style={{ display: 'flex', gap: 16, borderBottom: '1px solid var(--border)', marginBottom: 16 }}>
+          {[
+            { key: 'grid', label: 'Weekly Grid', icon: LayoutGrid },
+            { key: 'list', label: 'Subject List', icon: List }
+          ].map(t => {
+            const active = tab === t.key;
+            const IconComponent = t.icon;
+            return (
+              <button 
+                key={t.key} 
+                onClick={() => setTab(t.key)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  padding: '10px 4px',
+                  background: 'transparent',
+                  border: 'none',
+                  borderBottom: active ? '2px solid var(--color-accent)' : '2px solid transparent',
+                  color: active ? '#fff' : 'var(--color-text-secondary)',
+                  cursor: 'pointer',
+                  fontWeight: active ? 500 : 400,
+                  fontSize: 13,
+                  transition: 'all 0.2s',
+                }}
+              >
+                <IconComponent size={16} />
+                {t.label}
+              </button>
+            );
+          })}
         </div>
       )}
 
@@ -338,17 +378,17 @@ export default function Timetable() {
                     <td>
                       {(s.schedule || []).length > 0
                         ? s.schedule.map((sl, i) => (
-                            <span key={i} style={{ display: 'inline-block', marginRight: 6, marginBottom: 3, padding: '2px 8px', borderRadius: 6, background: 'rgba(99,102,241,0.12)', color: '#818cf8', fontSize: 11, fontWeight: 600 }}>
+                            <span key={i} style={{ display: 'inline-block', marginRight: 6, marginBottom: 3, padding: '2px 8px', borderRadius: 6, background: 'var(--color-accent-muted)', color: 'var(--color-accent)', fontSize: 11, fontWeight: 500 }}>
                               {sl.day} {fmt12(sl.startTime)}
                             </span>
                           ))
-                        : <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>No schedule</span>
+                        : <span style={{ color: 'var(--color-text-secondary)', fontSize: 12 }}>No schedule</span>
                       }
                     </td>
                     <td>
                       <div className="flex gap-2">
-                        <button className="btn btn-outline btn-sm" onClick={() => handleEdit(s)}>Edit</button>
-                        <button className="btn btn-danger btn-sm"  onClick={() => handleDelete(s._id)}>Delete</button>
+                        <button className="btn btn-outline btn-sm" onClick={() => handleEdit(s)}><Edit size={14} /></button>
+                        <button className="btn btn-danger btn-sm"  onClick={() => handleDelete(s._id)}><Trash2 size={14} /></button>
                       </div>
                     </td>
                   </tr>
@@ -360,10 +400,12 @@ export default function Timetable() {
       )}
 
       {subjects.length === 0 && !showForm && (
-        <div className="card empty-state">
-          <div className="icon">📚</div>
-          <p>No subjects added yet. Click "Add Subject" to start building your timetable.</p>
-        </div>
+        <EmptyState
+          title="No subjects added"
+          subtitle="Create your academic subjects to populate the weekly schedule and manage classes."
+          actionLabel="+ Add Subject"
+          onAction={() => { setShowForm(true); setEditing(null); setForm(EMPTY); }}
+        />
       )}
     </div>
   );

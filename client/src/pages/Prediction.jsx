@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { predictionService, marksService } from '../services/apiServices';
+import { predictionService } from '../services/apiServices';
 import { Line } from 'react-chartjs-2';
+import { Target } from 'lucide-react';
 import {
   Chart as ChartJS, CategoryScale, LinearScale,
   PointElement, LineElement, Tooltip, Legend, Filler,
@@ -97,7 +98,18 @@ export default function Prediction() {
     }
   };
 
-  // Inject styles for skeleton animations
+  // ⌘ Enter keyboard shortcut listener
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+        e.preventDefault();
+        fetchPredict();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [targetCGPA, totalSemesters, manualCGPA, completedManual, semCredits]);
+
   useEffect(() => {
     const id = 'ai-pred-styles';
     if (document.getElementById(id)) return;
@@ -127,9 +139,9 @@ export default function Prediction() {
       {
         label: 'Actual SGPA',
         data: data ? [...(data.sgpaList || []), ...Array((data.futureSGPAs || []).length).fill(null)] : [],
-        borderColor: '#818cf8',
-        backgroundColor: 'rgba(129,140,248,0.15)',
-        pointBackgroundColor: '#818cf8',
+        borderColor: '#6366f1',
+        backgroundColor: 'rgba(99,102,241,0.15)',
+        pointBackgroundColor: '#6366f1',
         fill: true,
         tension: 0.4,
       },
@@ -140,9 +152,9 @@ export default function Prediction() {
              data.sgpaList?.[(data.sgpaList || []).length - 1],
              ...(data.futureSGPAs || [])]
           : [],
-        borderColor: '#34d399',
-        backgroundColor: 'rgba(52,211,153,0.08)',
-        pointBackgroundColor: '#34d399',
+        borderColor: '#10b981',
+        backgroundColor: 'rgba(16,185,129,0.08)',
+        pointBackgroundColor: '#10b981',
         borderDash: [5, 5],
         fill: true,
         tension: 0.4,
@@ -155,51 +167,47 @@ export default function Prediction() {
     plugins: {
       legend: { labels: { color: '#94a3b8', font: { size: 12 } } },
       tooltip: {
-        backgroundColor: 'rgba(13,17,23,0.95)',
-        borderColor: 'rgba(255,255,255,0.1)',
+        backgroundColor: 'rgba(19, 22, 31, 0.95)',
+        borderColor: 'rgba(255,255,255,0.06)',
         borderWidth: 1,
-        titleColor: '#e6edf3',
-        bodyColor: '#6e7681',
+        titleColor: '#f1f5f9',
+        bodyColor: '#94a3b8',
       },
     },
     scales: {
       y: {
         min: 0, max: 10,
-        grid:  { color: 'rgba(255,255,255,0.05)' },
-        ticks: { color: '#6e7681' },
+        grid:  { color: 'rgba(255,255,255,0.04)' },
+        ticks: { color: '#94a3b8' },
       },
       x: {
         grid:  { display: false },
-        ticks: { color: '#6e7681', font: { size: 10 } },
+        ticks: { color: '#94a3b8', font: { size: 10 } },
       },
     },
   };
 
   const insightColor = (req) => {
     if (req === null) return '#94a3b8';
-    if (req > 9.5)   return '#f87171';
-    if (req > 8.0)   return '#fbbf24';
-    return '#34d399';
+    if (req > 9.5)   return '#ef4444';
+    if (req > 8.0)   return '#f59e0b';
+    return '#10b981';
   };
 
   return (
     <div>
       <style>{`
         .ai-trajectory-card {
-          border-radius: 20px;
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          background: linear-gradient(135deg, rgba(30, 30, 46, 0.7) 0%, rgba(15, 23, 42, 0.8) 100%);
-          backdrop-filter: blur(16px);
-          -webkit-backdrop-filter: blur(16px);
+          border-radius: 12px;
+          border: 1px solid var(--border);
+          background: var(--color-surface-2);
           overflow: hidden;
-          box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.05);
           margin-bottom: 28px;
-          animation: aiFadeIn 0.4s ease-out both;
         }
         
         .ai-trajectory-header {
           padding: 20px 24px;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+          border-bottom: 1px solid var(--border);
           display: flex;
           align-items: center;
           justify-content: space-between;
@@ -210,30 +218,15 @@ export default function Prediction() {
         .ai-brain-container {
           width: 40px;
           height: 40px;
-          border-radius: 12px;
-          background: linear-gradient(135deg, rgba(129, 140, 248, 0.2) 0%, rgba(99, 102, 241, 0.2) 100%);
-          border: 1px solid rgba(129, 140, 248, 0.4);
+          border-radius: 8px;
+          background: var(--color-accent-muted);
+          border: 1px solid rgba(99, 102, 241, 0.2);
           display: flex;
           align-items: center;
           justify-content: center;
           position: relative;
           overflow: hidden;
-        }
-
-        .ai-brain-pulse {
-          position: absolute;
-          width: 100%;
-          height: 100%;
-          background: rgba(129, 140, 248, 0.15);
-          border-radius: 50%;
-          animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;
-        }
-
-        @keyframes ping {
-          75%, 100% {
-            transform: scale(2);
-            opacity: 0;
-          }
+          color: var(--color-accent);
         }
 
         .feasibility-pill {
@@ -243,25 +236,19 @@ export default function Prediction() {
           padding: 6px 16px;
           border-radius: 99px;
           font-size: 12px;
-          font-weight: 700;
+          font-weight: 500;
           text-transform: uppercase;
           letter-spacing: 0.05em;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-          transition: all 0.3s ease;
-        }
-
-        .feasibility-pill:hover {
-          transform: scale(1.05);
         }
 
         .insight-banner {
           padding: 16px 20px;
-          border-radius: 14px;
-          background: linear-gradient(90deg, rgba(99, 102, 241, 0.08) 0%, rgba(139, 92, 246, 0.04) 100%);
+          border-radius: 12px;
+          background: var(--color-accent-muted);
           border: 1px solid rgba(99, 102, 241, 0.15);
           font-size: 13.5px;
           line-height: 1.6;
-          color: #e2e8f0;
+          color: var(--color-text-primary);
           margin-bottom: 24px;
           display: flex;
           align-items: flex-start;
@@ -271,8 +258,8 @@ export default function Prediction() {
         .section-label {
           margin: 0 0 12px;
           font-size: 12px;
-          font-weight: 700;
-          color: #a5b4fc;
+          font-weight: 500;
+          color: var(--color-accent);
           text-transform: uppercase;
           letter-spacing: 0.08em;
           display: flex;
@@ -283,12 +270,12 @@ export default function Prediction() {
         .overview-text {
           margin: 0;
           font-size: 14px;
-          color: #cbd5e1;
-          line-height: 1.7;
+          color: var(--color-text-secondary);
+          line-height: 1.6;
           background: rgba(255, 255, 255, 0.01);
           padding: 16px;
           border-radius: 12px;
-          border: 1px solid rgba(255, 255, 255, 0.03);
+          border: 1px solid var(--border);
         }
 
         .bottleneck-grid {
@@ -299,48 +286,33 @@ export default function Prediction() {
 
         .bottleneck-card {
           padding: 16px;
-          border-radius: 14px;
-          background: rgba(244, 63, 94, 0.01);
-          border: 1px solid rgba(244, 63, 94, 0.15);
-          border-left: 4px solid #f43f5e;
-          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        .bottleneck-card:hover {
-          transform: translateY(-2px);
-          background: rgba(244, 63, 94, 0.03);
-          border-color: rgba(244, 63, 94, 0.3);
-          box-shadow: 0 6px 20px rgba(244, 63, 94, 0.1);
+          border-radius: 12px;
+          background: rgba(239, 68, 68, 0.02);
+          border: 1px solid rgba(239, 68, 68, 0.15);
+          border-left: 4px solid var(--color-danger);
         }
 
         .success-card {
           padding: 20px;
-          border-radius: 14px;
-          background: linear-gradient(135deg, rgba(16, 185, 129, 0.02) 0%, rgba(52, 211, 153, 0.05) 100%);
+          border-radius: 12px;
+          background: rgba(16, 185, 129, 0.02);
           border: 1px solid rgba(16, 185, 129, 0.15);
-          border-left: 4px solid #10b981;
+          border-left: 4px solid var(--color-success);
           display: flex;
           align-items: center;
           gap: 16px;
-          transition: all 0.3s ease;
-        }
-
-        .success-card:hover {
-          transform: translateY(-2px);
-          border-color: rgba(16, 185, 129, 0.3);
-          box-shadow: 0 6px 20px rgba(16, 185, 129, 0.1);
         }
 
         .success-check-circle {
           width: 38px;
           height: 38px;
           border-radius: 50%;
-          background: rgba(16, 185, 129, 0.15);
+          background: var(--color-success-muted);
           border: 1.5px solid rgba(16, 185, 129, 0.3);
           display: flex;
           align-items: center;
           justify-content: center;
-          color: #34d399;
+          color: var(--color-success);
           flex-shrink: 0;
         }
 
@@ -352,45 +324,29 @@ export default function Prediction() {
 
         .roadmap-card {
           padding: 16px 12px;
-          border-radius: 14px;
-          background: rgba(255, 255, 255, 0.02);
-          border: 1px solid rgba(255, 255, 255, 0.05);
+          border-radius: 12px;
+          background: rgba(255, 255, 255, 0.01);
+          border: 1px solid var(--border);
           text-align: center;
           display: flex;
           flex-direction: column;
           gap: 6px;
           position: relative;
           overflow: hidden;
-          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         .roadmap-card::before {
           content: '';
           position: absolute;
           top: 0; left: 0; width: 100%; height: 3px;
-          background: linear-gradient(90deg, #6366f1, #8b92f6);
+          background: var(--color-accent);
           opacity: 0.7;
-        }
-
-        .roadmap-card:hover {
-          transform: translateY(-5px);
-          background: rgba(255, 255, 255, 0.04);
-          border-color: rgba(99, 102, 241, 0.3);
-          box-shadow: 0 8px 25px rgba(99, 102, 241, 0.15);
-        }
-
-        .roadmap-card:hover::before {
-          opacity: 1;
-          height: 4px;
         }
 
         .roadmap-value {
           font-size: 24px;
-          font-weight: 800;
-          background: linear-gradient(135deg, #a5b4fc 0%, #818cf8 100%);
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-          font-family: 'Space Grotesk', sans-serif;
+          font-weight: 500;
+          color: var(--color-text-primary);
           margin: 4px 0;
         }
 
@@ -405,50 +361,31 @@ export default function Prediction() {
 
         .strategy-item {
           font-size: 13.5px;
-          color: #cbd5e1;
+          color: var(--color-text-secondary);
           line-height: 1.6;
           padding: 12px 16px;
           background: rgba(255, 255, 255, 0.01);
-          border: 1px solid rgba(255, 255, 255, 0.04);
+          border: 1px solid var(--border);
           border-radius: 10px;
           display: flex;
           align-items: flex-start;
           gap: 12px;
-          transition: all 0.2s ease;
-        }
-
-        .strategy-item:hover {
-          background: rgba(255, 255, 255, 0.03);
-          border-color: rgba(129, 140, 248, 0.2);
-          transform: translateX(4px);
         }
 
         .strategy-bullet {
           width: 20px;
           height: 20px;
           border-radius: 6px;
-          background: rgba(129, 140, 248, 0.12);
-          border: 1px solid rgba(129, 140, 248, 0.25);
+          background: var(--color-accent-muted);
+          border: 1px solid rgba(99, 102, 241, 0.25);
           display: flex;
           align-items: center;
           justify-content: center;
-          color: #818cf8;
+          color: var(--color-accent);
           font-size: 11px;
           font-weight: bold;
           flex-shrink: 0;
           margin-top: 1px;
-        }
-
-        .prediction-controls {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-          gap: 16px;
-          align-items: flex-end;
-        }
-
-        .prediction-controls-btn {
-          height: 42px;
-          width: 100%;
         }
 
         .semester-credits-grid {
@@ -459,12 +396,6 @@ export default function Prediction() {
         }
 
         @media (max-width: 768px) {
-          .prediction-controls {
-            grid-template-columns: repeat(2, 1fr);
-          }
-          .prediction-controls-btn {
-            grid-column: span 2;
-          }
           .semester-credits-grid {
             grid-template-columns: repeat(4, 1fr);
           }
@@ -477,12 +408,6 @@ export default function Prediction() {
         }
 
         @media (max-width: 480px) {
-          .prediction-controls {
-            grid-template-columns: 1fr;
-          }
-          .prediction-controls-btn {
-            grid-column: span 1;
-          }
           .semester-credits-grid {
             grid-template-columns: repeat(3, 1fr);
           }
@@ -493,63 +418,93 @@ export default function Prediction() {
             grid-template-columns: repeat(2, 1fr);
           }
         }
-        
-        @media (max-width: 360px) {
-          .roadmap-grid {
-            grid-template-columns: 1fr;
-          }
-        }
       `}</style>
+
       <div className="page-header">
         <div>
-          <h1 className="page-title">🎯 CGPA Predictor</h1>
+          <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Target size={22} color="var(--color-accent)" />
+            CGPA Predictor
+          </h1>
           <p className="page-subtitle">Set a target and see what SGPA you need each semester</p>
         </div>
       </div>
 
-      {/* Controls */}
-      <div className="card mb-4 prediction-controls">
-        <div className="form-group" style={{ margin: 0 }}>
-          <label className="form-label">Current CGPA (optional)</label>
-          <input
-            className="form-input"
-            type="number" min="0" max="10" step="0.01"
-            placeholder="e.g. 8.71"
-            value={manualCGPA}
-            onChange={e => setManualCGPA(e.target.value)}
-          />
+      {/* Controls Card with 2-Column Grid */}
+      <div className="card mb-4" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
+          
+          <div className="form-group" style={{ margin: 0 }}>
+            <label className="form-label" style={{ marginBottom: 4 }}>Current CGPA</label>
+            <input
+              className="form-input"
+              type="number" min="0" max="10" step="0.01"
+              style={{ height: 44 }}
+              placeholder="e.g. 8.71"
+              value={manualCGPA}
+              onChange={e => setManualCGPA(e.target.value)}
+            />
+            <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 4 }}>
+              Your current cumulative GPA score
+            </span>
+          </div>
+
+          <div className="form-group" style={{ margin: 0 }}>
+            <label className="form-label" style={{ marginBottom: 4 }}>Completed Semesters</label>
+            <input
+              className="form-input"
+              type="number" min="1" max="16"
+              style={{ height: 44 }}
+              placeholder="e.g. 3"
+              value={completedManual}
+              onChange={e => setCompletedManual(e.target.value)}
+            />
+            <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 4 }}>
+              Number of semesters finished so far
+            </span>
+          </div>
+
+          <div className="form-group" style={{ margin: 0 }}>
+            <label className="form-label" style={{ marginBottom: 4 }}>Target CGPA</label>
+            <input
+              className="form-input"
+              type="number" min="0" max="10" step="0.1"
+              style={{ height: 44 }}
+              placeholder="e.g. 9.0"
+              value={targetCGPA}
+              onChange={e => setTargetCGPA(e.target.value)}
+            />
+            <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 4 }}>
+              The grade point average you wish to reach
+            </span>
+          </div>
+
+          <div className="form-group" style={{ margin: 0 }}>
+            <label className="form-label" style={{ marginBottom: 4 }}>Total Semesters</label>
+            <input
+              className="form-input"
+              type="number" min="1" max="16"
+              style={{ height: 44 }}
+              value={totalSemesters}
+              onChange={e => handleTotalSemestersChange(e.target.value)}
+            />
+            <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 4 }}>
+              Total semesters in your academic program
+            </span>
+          </div>
         </div>
-        <div className="form-group" style={{ margin: 0 }}>
-          <label className="form-label">Completed Sems</label>
-          <input
-            className="form-input"
-            type="number" min="1" max="16"
-            placeholder="e.g. 3"
-            value={completedManual}
-            onChange={e => setCompletedManual(e.target.value)}
-          />
-        </div>
-        <div className="form-group" style={{ margin: 0 }}>
-          <label className="form-label">Target CGPA</label>
-          <input
-            className="form-input"
-            type="number" min="0" max="10" step="0.1"
-            placeholder="e.g. 9.0"
-            value={targetCGPA}
-            onChange={e => setTargetCGPA(e.target.value)}
-          />
-        </div>
-        <div className="form-group" style={{ margin: 0 }}>
-          <label className="form-label">Total Semesters</label>
-          <input
-            className="form-input"
-            type="number" min="1" max="16"
-            value={totalSemesters}
-            onChange={e => handleTotalSemestersChange(e.target.value)}
-          />
-        </div>
-        <button className="btn btn-primary prediction-controls-btn" onClick={fetchPredict} disabled={loading}>
-          {loading ? 'Calculating…' : 'Calculate'}
+
+        {/* Full-width Calculate button with shortcut label */}
+        <button 
+          className="btn btn-primary" 
+          onClick={fetchPredict} 
+          disabled={loading} 
+          style={{ width: '100%', height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+        >
+          <span>{loading ? 'Calculating…' : 'Calculate'}</span>
+          <span style={{ fontSize: 10, opacity: 0.6, background: 'rgba(255,255,255,0.15)', padding: '2px 6px', borderRadius: '4px' }}>
+            ⌘ Enter
+          </span>
         </button>
       </div>
 
@@ -559,10 +514,10 @@ export default function Prediction() {
           style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
           onClick={() => setShowCredits(!showCredits)}
         >
-          <span style={{ fontWeight: 600, fontSize: 13 }}>
+          <span style={{ fontWeight: 500, fontSize: 13 }}>
             📋 Per-Semester Credits — Total: <strong>{totalDegreeCredits}</strong>
           </span>
-          <span style={{ fontSize: 12, color: 'var(--muted)' }}>
+          <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
             {showCredits ? '▲ Hide' : '▼ Edit (default: 22,21,22,24,20,12,19,21)'}
           </span>
         </div>
@@ -584,7 +539,7 @@ export default function Prediction() {
         )}
       </div>
 
-      {error && <p style={{ color: '#f87171', marginBottom: 16 }}>{error}</p>}
+      {error && <p style={{ color: 'var(--color-danger)', marginBottom: 16 }}>{error}</p>}
 
       {data && data.sgpaList && data.sgpaList.length === 0 && !manualCGPA && (
         <div className="card">
@@ -594,27 +549,50 @@ export default function Prediction() {
 
       {data && data.currentCGPA != null && (
         <>
-          {/* Stat cards */}
-          <div className="grid-4 mb-4">
-            <div className="card stat-card">
-              <div className="stat-icon">📊</div>
-              <div className="stat-value" style={{ color: '#818cf8' }}>{data.currentCGPA}</div>
-              <div className="stat-label">Current CGPA (credit-weighted)</div>
+          {/* Result metric cards: 2x2 grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+            
+            <div className="card stat-card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
+              <div className="stat-value" style={{ color: 'var(--color-accent)', fontSize: '28px', fontWeight: 500 }}>
+                {data.currentCGPA}
+              </div>
+              <div className="stat-label" style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: '4px' }}>
+                Current CGPA
+              </div>
             </div>
-            <div className="card stat-card">
-              <div className="stat-icon">🔮</div>
-              <div className="stat-value" style={{ color: '#34d399' }}>{data.predictedCGPA}</div>
-              <div className="stat-label">Predicted CGPA</div>
+
+            <div className="card stat-card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                <span className="stat-value" style={{ color: 'var(--color-success)', fontSize: '28px', fontWeight: 500 }}>
+                  {data.predictedCGPA}
+                </span>
+                {data.predictedCGPA > data.currentCGPA && (
+                  <span style={{ color: 'var(--color-success)', fontSize: '13px', fontWeight: 500 }}>
+                    ↑ +{(data.predictedCGPA - data.currentCGPA).toFixed(2)}
+                  </span>
+                )}
+              </div>
+              <div className="stat-label" style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: '4px' }}>
+                Predicted CGPA
+              </div>
             </div>
-            <div className="card stat-card">
-              <div className="stat-icon">✅</div>
-              <div className="stat-value" style={{ color: '#fbbf24' }}>{data.completed}</div>
-              <div className="stat-label">Completed</div>
+
+            <div className="card stat-card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
+              <div className="stat-value" style={{ color: '#fbbf24', fontSize: '22px', fontWeight: 500 }}>
+                {data.completed}
+              </div>
+              <div className="stat-label" style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: '4px' }}>
+                Completed Semesters
+              </div>
             </div>
-            <div className="card stat-card">
-              <div className="stat-icon">⏳</div>
-              <div className="stat-value" style={{ color: '#f87171' }}>{data.remaining}</div>
-              <div className="stat-label">Remaining</div>
+
+            <div className="card stat-card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
+              <div className="stat-value" style={{ color: '#f87171', fontSize: '22px', fontWeight: 500 }}>
+                {data.remaining}
+              </div>
+              <div className="stat-label" style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: '4px' }}>
+                Remaining Semesters
+              </div>
             </div>
           </div>
 
@@ -628,17 +606,17 @@ export default function Prediction() {
             }}>
               <div style={{ fontSize: 32 }}>🎯</div>
               <div style={{ flex: 1 }}>
-                <p style={{ margin: 0, fontSize: 12, color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                <p style={{ margin: 0, fontSize: 11, color: 'var(--color-text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   Required SGPA — Each Remaining Semester
                 </p>
-                <p style={{ margin: '4px 0 0', fontSize: 28, fontWeight: 800, color: insightColor(data.requiredSGPA) }}>
+                <p style={{ margin: '4px 0 0', fontSize: 28, fontWeight: 500, color: insightColor(data.requiredSGPA) }}>
                   {data.requiredSGPA > 10
                     ? 'Not achievable'
                     : data.requiredSGPA < 0
                     ? 'Already achieved!'
                     : data.requiredSGPA}
                 </p>
-                <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--muted)' }}>
+                <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--color-text-secondary)' }}>
                   {data.requiredSGPA > 10
                     ? `Target CGPA ${targetCGPA} cannot be reached in ${data.remaining} remaining semester(s).`
                     : data.requiredSGPA < 0
@@ -654,8 +632,8 @@ export default function Prediction() {
                   border: `1px solid ${insightColor(data.requiredSGPA)}40`,
                   textAlign: 'center', flexShrink: 0,
                 }}>
-                  <p style={{ margin: 0, fontSize: 11, color: 'var(--muted)' }}>Difficulty</p>
-                  <p style={{ margin: '4px 0 0', fontSize: 13, fontWeight: 700, color: insightColor(data.requiredSGPA) }}>
+                  <p style={{ margin: 0, fontSize: 11, color: 'var(--color-text-secondary)' }}>Difficulty</p>
+                  <p style={{ margin: '4px 0 0', fontSize: 13, fontWeight: 500, color: insightColor(data.requiredSGPA) }}>
                     {data.requiredSGPA > 9.5 ? '🔴 Very Hard'
                      : data.requiredSGPA > 8.5 ? '🟡 Challenging'
                      : data.requiredSGPA > 7.0 ? '🟢 Achievable'
@@ -668,7 +646,7 @@ export default function Prediction() {
 
           {/* Trend message */}
           <div className="card mb-4">
-            <span style={{ fontSize: 13, color: '#34d399', fontWeight: 600 }}>
+            <span style={{ fontSize: 13, color: 'var(--color-success)', fontWeight: 500 }}>
               📈 At your current trend, your CGPA will be approximately {data.predictedCGPA} by semester {totalSemesters}.
             </span>
           </div>
@@ -676,9 +654,9 @@ export default function Prediction() {
           {/* AI-Powered Strategic Analysis section */}
           {aiLoading && (
             <div style={{
-              borderRadius: 16,
-              border: '1px solid rgba(255,255,255,0.08)',
-              background: 'var(--surface-1, #1e1e2e)',
+              borderRadius: 12,
+              border: '1px solid var(--border)',
+              background: 'var(--color-surface-1)',
               padding: '24px 20px',
               display: 'flex',
               flexDirection: 'column',
@@ -702,12 +680,12 @@ export default function Prediction() {
 
           {aiError && (
             <div style={{
-              borderRadius: 16,
-              border: '1px solid rgba(244,63,94,0.2)',
-              background: 'rgba(244,63,94,0.05)',
+              borderRadius: 12,
+              border: '1px solid rgba(239, 68, 68, 0.2)',
+              background: 'rgba(239, 68, 68, 0.05)',
               padding: '16px 20px',
               fontSize: 13,
-              color: '#f43f5e',
+              color: 'var(--color-danger)',
               marginBottom: 24
             }}>
               ⚠️ {aiError}
@@ -716,11 +694,11 @@ export default function Prediction() {
 
           {aiData && (() => {
             const feasibilityColors = {
-              High: { bg: 'rgba(16, 185, 129, 0.1)', text: '#34d399', border: 'rgba(16, 185, 129, 0.25)', dot: '#10b981' },
-              Medium: { bg: 'rgba(99, 102, 241, 0.1)', text: '#818cf8', border: 'rgba(99, 102, 241, 0.25)', dot: '#6366f1' },
-              Challenging: { bg: 'rgba(245, 158, 11, 0.1)', text: '#fbbf24', border: 'rgba(245, 158, 11, 0.25)', dot: '#f59e0b' },
-              Low: { bg: 'rgba(244, 63, 94, 0.1)', text: '#f43f5e', border: 'rgba(244, 63, 94, 0.25)', dot: '#f43f5e' },
-              Impossible: { bg: 'rgba(239, 68, 68, 0.12)', text: '#ef4444', border: 'rgba(239, 68, 68, 0.3)', dot: '#ef4444' }
+              High: { bg: 'var(--color-success-muted)', text: 'var(--color-success)', border: 'rgba(16, 185, 129, 0.25)', dot: 'var(--color-success)' },
+              Medium: { bg: 'var(--color-accent-muted)', text: 'var(--color-accent)', border: 'rgba(99, 102, 241, 0.25)', dot: 'var(--color-accent)' },
+              Challenging: { bg: 'var(--color-warning-muted)', text: 'var(--color-warning)', border: 'rgba(245, 158, 11, 0.25)', dot: 'var(--color-warning)' },
+              Low: { bg: 'var(--color-danger-muted)', text: 'var(--color-danger)', border: 'rgba(239, 68, 68, 0.25)', dot: 'var(--color-danger)' },
+              Impossible: { bg: 'var(--color-danger-muted)', text: 'var(--color-danger)', border: 'rgba(239, 68, 68, 0.3)', dot: 'var(--color-danger)' }
             };
             const fColor = feasibilityColors[aiData.feasibility] || feasibilityColors.Medium;
             const hasNoBottlenecks = !aiData.bottlenecks || aiData.bottlenecks.length === 0 || 
@@ -732,18 +710,17 @@ export default function Prediction() {
                 <div className="ai-trajectory-header">
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                     <div className="ai-brain-container">
-                      <div className="ai-brain-pulse" />
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#818cf8" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ position: 'relative', zIndex: 1 }}>
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ position: 'relative', zIndex: 1 }}>
                         <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
                         <path d="M19 10v1a7 7 0 0 1-14 0v-1" />
                         <line x1="12" x2="12" y1="19" y2="22" />
                       </svg>
                     </div>
                     <div>
-                      <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#f1f5f9', letterSpacing: '-0.01em' }}>
+                      <h3 style={{ margin: 0, fontSize: 15, fontWeight: 500, color: 'var(--color-text-primary)' }}>
                         StudentAI Trajectory Analysis
                       </h3>
-                      <p style={{ margin: '2px 0 0', fontSize: 11, color: '#94a3b8' }}>
+                      <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--color-text-secondary)' }}>
                         Real-time academic projection & study roadmap
                       </p>
                     </div>
@@ -770,7 +747,6 @@ export default function Prediction() {
 
                 {/* Body */}
                 <div style={{ padding: '20px 24px 24px' }}>
-                  {/* Feasibility Reason banner */}
                   {aiData.feasibilityReason && (
                     <div className="insight-banner">
                       <span style={{ fontSize: 18, marginTop: -2 }}>💡</span>
@@ -780,7 +756,6 @@ export default function Prediction() {
                     </div>
                   )}
 
-                  {/* AI analysis narrative */}
                   {aiData.analysis && (
                     <div style={{ marginBottom: 24 }}>
                       <h4 className="section-label">
@@ -795,108 +770,71 @@ export default function Prediction() {
                     </div>
                   )}
 
-                  {/* Bottlenecks (Warning list) */}
+                  {/* Bottlenecks */}
                   <div style={{ marginBottom: 24 }}>
                     <h4 className="section-label">
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12" y1="17" y2="17.01"/>
+                        <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
                       </svg>
-                      Key Trajectory Bottlenecks
+                      Risk Areas & Bottlenecks
                     </h4>
-                    
                     {hasNoBottlenecks ? (
                       <div className="success-card">
-                        <div className="success-check-circle">
-                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                            <polyline points="20 6 9 17 4 12" />
-                          </svg>
-                        </div>
+                        <div className="success-check-circle">✓</div>
                         <div>
-                          <h5 style={{ margin: 0, fontSize: '13.5px', fontWeight: 700, color: '#34d399' }}>
-                            Academic Path Clear
-                          </h5>
-                          <p style={{ margin: '3px 0 0', fontSize: '12px', color: '#94a3b8', lineHeight: 1.4 }}>
-                            No active bottlenecks detected. Attendance is above 75%, and grades are on track! Keep maintaining this momentum.
-                          </p>
+                          <strong style={{ display: 'block', color: 'var(--color-success)', fontSize: 14 }}>No High Risk Subjects</strong>
+                          <span style={{ fontSize: 12.5, color: 'var(--color-text-secondary)' }}>You don't have any subjects in critical danger of pulling down your GPA trend. Keep up the consistent work!</span>
                         </div>
                       </div>
                     ) : (
                       <div className="bottleneck-grid">
-                        {aiData.bottlenecks.map((btn, idx) => (
-                          <div key={idx} className="bottleneck-card">
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                              <span style={{ fontSize: 13, fontWeight: 700, color: '#f43f5e' }}>
-                                {btn.subject}
-                              </span>
-                              <span style={{
-                                fontSize: 10,
-                                background: 'rgba(244,63,94,0.1)',
-                                padding: '2px 8px',
-                                borderRadius: 99,
-                                color: '#f43f5e',
-                                fontWeight: 600,
-                                border: '1px solid rgba(244,63,94,0.15)'
-                              }}>
-                                Risk Factor
-                              </span>
-                            </div>
-                            <div style={{ fontSize: 12.5, color: '#e2e8f0', marginBottom: 4 }}>
-                              <strong>Issue:</strong> {btn.issue}
-                            </div>
-                            <div style={{ fontSize: 11.5, color: '#94a3b8', lineHeight: 1.4 }}>
-                              <strong>Impact:</strong> {btn.impact}
-                            </div>
+                        {aiData.bottlenecks.map((b, i) => (
+                          <div className="bottleneck-card" key={i}>
+                            <strong style={{ display: 'block', fontSize: 14, color: 'var(--color-text-primary)' }}>{b.subject}</strong>
+                            <p style={{ margin: '4px 0 0', fontSize: 12.5, color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>{b.reason}</p>
                           </div>
                         ))}
                       </div>
                     )}
                   </div>
 
-                  {/* Roadmap Suggested SGPAs */}
-                  {aiData.roadmap && aiData.roadmap.length > 0 && (
+                  {/* Future Milestones */}
+                  {aiData.milestones?.length > 0 && (
                     <div style={{ marginBottom: 24 }}>
                       <h4 className="section-label">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                          <polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21 3 6"/><line x1="9" x2="9" y1="3" y2="18"/><line x1="15" x2="15" y1="6" y2="21"/>
+                          <circle cx="12" cy="12" r="10"/><polygon points="12 6 12 12 16 14"/>
                         </svg>
-                        Suggested SGPA Targets By Semester
+                        SGPA Targets Roadmap
                       </h4>
                       <div className="roadmap-grid">
-                        {aiData.roadmap.map((sem, idx) => (
-                          <div key={idx} className="roadmap-card">
-                            <div style={{ fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                              Semester {sem.semester}
-                            </div>
-                            <div className="roadmap-value">
-                              {sem.suggestedSGPA}
-                            </div>
-                            <div style={{ fontSize: '11px', color: '#cbd5e1', lineHeight: 1.3, marginTop: '2px', minHeight: '2.6em', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                              {sem.focus}
-                            </div>
+                        {aiData.milestones.map((m, i) => (
+                          <div className="roadmap-card" key={i}>
+                            <span style={{ fontSize: 11, color: 'var(--color-text-secondary)', fontWeight: 500 }}>{m.semester}</span>
+                            <span className="roadmap-value">{m.targetSGPA}</span>
+                            <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>Target SGPA</span>
                           </div>
                         ))}
                       </div>
                     </div>
                   )}
 
-                  {/* Actionable Strategies */}
-                  {aiData.strategies && aiData.strategies.length > 0 && (
+                  {/* Strategies */}
+                  {aiData.strategies?.length > 0 && (
                     <div>
                       <h4 className="section-label">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                          <polyline points="20 6 9 17 4 12"/>
                         </svg>
-                        AI-Powered Action Strategy
+                        Actionable Improvement Plan
                       </h4>
-                      <ul className="roadmap-grid" style={{ display: 'none' /* hidden standard layout */ }} />
                       <ul className="strategy-list">
-                        {aiData.strategies.map((strat, idx) => (
-                          <li key={idx} className="strategy-item">
-                            <div className="strategy-bullet">
-                              {idx + 1}
-                            </div>
-                            <div style={{ flex: 1 }}>
-                              {strat}
+                        {aiData.strategies.map((s, i) => (
+                          <li className="strategy-item" key={i}>
+                            <div className="strategy-bullet">{i + 1}</div>
+                            <div>
+                              <strong style={{ display: 'block', color: 'var(--color-text-primary)', marginBottom: 2 }}>{s.title || 'Study Strategy'}</strong>
+                              <span>{s.details || s}</span>
                             </div>
                           </li>
                         ))}
@@ -908,32 +846,13 @@ export default function Prediction() {
             );
           })()}
 
-          {/* Credit Breakdown */}
-          {data.creditBreakdown && (
-            <div className="card mb-4">
-              <div className="card-title">📋 Credit Distribution</div>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                {data.creditBreakdown.map((c, i) => (
-                  <span key={i} style={{
-                    fontSize: 11, padding: '4px 10px', borderRadius: 99,
-                    background: i < data.completed ? 'rgba(129,140,248,0.12)' : 'rgba(52,211,153,0.12)',
-                    border: `1px solid ${i < data.completed ? 'rgba(129,140,248,0.25)' : 'rgba(52,211,153,0.25)'}`,
-                    color: i < data.completed ? '#a5b4fc' : '#34d399',
-                  }}>
-                    S{i + 1}: {c}cr {i < data.completed ? '(done)' : '(ahead)'}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Chart */}
-          {data.sgpaList && data.sgpaList.length > 0 && (
-            <div className="card">
-              <div className="card-title">📉 SGPA Trend + Prediction</div>
+          {/* Line Chart */}
+          <div className="card">
+            <div className="card-title">📈 CGPA Projection Trajectory</div>
+            <div style={{ height: 280, position: 'relative' }}>
               <Line data={chartData} options={chartOptions} />
             </div>
-          )}
+          </div>
         </>
       )}
     </div>

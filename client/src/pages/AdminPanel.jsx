@@ -1,7 +1,9 @@
 // src/pages/AdminPanel.jsx
 import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import toast from 'react-hot-toast';
+import toast from '../context/ToastContext';
+import EmptyState from '../components/EmptyState';
+import { Lock, Users, GraduationCap, UserCheck, ListTodo } from 'lucide-react';
 
 const API = process.env.REACT_APP_API_URL.replace(/\/api$/, '');
 
@@ -16,8 +18,8 @@ export default function AdminPanel() {
   // ── Guard ────────────────────────────────────────────────────────────────
   if (user?.role !== 'teacher') {
     return (
-      <div className="card" style={{ textAlign: 'center', padding: 40 }}>
-        <p style={{ fontSize: 32 }}>🔒</p>
+      <div className="card" style={{ textAlign: 'center', padding: 40, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+        <Lock size={32} style={{ color: 'var(--color-accent)' }} />
         <p style={{ fontWeight: 600 }}>Access denied — teachers only.</p>
       </div>
     );
@@ -80,9 +82,9 @@ export default function AdminPanel() {
   const teacherCount = users.filter(u => u.role === 'teacher').length;
   const studentCount = users.filter(u => u.role === 'student').length;
 
- if (user?.role !== 'teacher') return (
-    <div className="card" style={{ textAlign: 'center', padding: 40 }}>
-      <p style={{ fontSize: 32 }}>🔒</p>
+  if (user?.role !== 'teacher') return (
+    <div className="card" style={{ textAlign: 'center', padding: 40, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+      <Lock size={32} style={{ color: 'var(--color-accent)' }} />
       <p style={{ fontWeight: 600 }}>Access denied — teachers only.</p>
     </div>
   );
@@ -100,10 +102,10 @@ export default function AdminPanel() {
 
       {/* Stats */}
       <div className="grid-4 mb-4">
-        <StatCard emoji="👥" value={users.length}   label="Total Users"  color="var(--primary)" />
-        <StatCard emoji="🎓" value={studentCount}   label="Students"     color="var(--success)" />
-        <StatCard emoji="👨‍🏫" value={teacherCount} label="Teachers"     color="var(--warning)" />
-        <StatCard emoji="📋" value={visible.length} label="Showing"      color="var(--primary)" />
+        <StatCard icon={<Users size={16} />} value={users.length}   label="Total Users"  color="var(--primary)" />
+        <StatCard icon={<GraduationCap size={16} />} value={studentCount}   label="Students"     color="var(--success)" />
+        <StatCard icon={<UserCheck size={16} />} value={teacherCount} label="Teachers"     color="var(--warning)" />
+        <StatCard icon={<ListTodo size={16} />} value={visible.length} label="Showing"      color="var(--primary)" />
       </div>
 
       {/* Search + filter */}
@@ -130,9 +132,22 @@ export default function AdminPanel() {
                 background: filter === f ? 'var(--primary)' : 'rgba(255,255,255,0.07)',
                 color: filter === f ? '#fff' : 'var(--text-2)',
                 textTransform: 'capitalize',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
               }}
             >
-              {f === 'all' ? 'All' : f === 'student' ? '🎓 Students' : '👨‍🏫 Teachers'}
+              {f === 'all' ? 'All' : f === 'student' ? (
+                <>
+                  <GraduationCap size={14} />
+                  Students
+                </>
+              ) : (
+                <>
+                  <UserCheck size={14} />
+                  Teachers
+                </>
+              )}
             </button>
           ))}
         </div>
@@ -141,11 +156,10 @@ export default function AdminPanel() {
       {/* Users table */}
       <div className="card">
         {visible.length === 0 ? (
-          <div className="empty-state">
-            <div className="icon">🔍</div>
-            <p style={{ fontWeight: 600, color: 'var(--text-2)' }}>No users found</p>
-            <p className="text-muted">Try a different search or filter.</p>
-          </div>
+          <EmptyState
+            title="No users found"
+            subtitle="Try a different search query or filter to locate users."
+          />
         ) : (
           <div className="table-wrap">
             <table style={{ width: '100%', minWidth: '560px', borderCollapse: 'collapse', fontSize: 13 }}>
@@ -191,8 +205,21 @@ export default function AdminPanel() {
                         background: u.role === 'teacher'
                           ? 'rgba(251,191,36,0.15)' : 'rgba(34,197,94,0.15)',
                         color: u.role === 'teacher' ? '#fbbf24' : '#4ade80',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px'
                       }}>
-                        {u.role === 'teacher' ? '👨‍🏫 Teacher' : '🎓 Student'}
+                        {u.role === 'teacher' ? (
+                          <>
+                            <UserCheck size={12} />
+                            Teacher
+                          </>
+                        ) : (
+                          <>
+                            <GraduationCap size={12} />
+                            Student
+                          </>
+                        )}
                       </span>
                     </td>
 
@@ -237,10 +264,10 @@ export default function AdminPanel() {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-function StatCard({ emoji, value, label, color }) {
+function StatCard({ icon, value, label, color }) {
   return (
     <div className="card stat-card">
-      <span className="stat-icon">{emoji}</span>
+      <span className="stat-icon" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color }}>{icon}</span>
       <div className="stat-value" style={{ color }}>{value}</div>
       <div className="stat-label">{label}</div>
     </div>

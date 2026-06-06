@@ -2,67 +2,42 @@
 import React, { useState, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import axios from 'axios';
+import { FileSpreadsheet, Download, Upload, Link2, AlertCircle } from 'lucide-react';
+import toast from '../context/ToastContext';
 
-// ─── Styles (inline for portability) ─────────────────────────────────────────
-const styles = {
-  container:   { maxWidth: 700, margin: '0 auto', padding: '24px 14px', fontFamily: 'sans-serif' },
-  card:        { background: '#1e1e2e', borderRadius: 12, padding: 24, color: '#fff' },
-  title:       { fontSize: 22, fontWeight: 700, marginBottom: 4 },
-  subtitle:    { fontSize: 14, color: '#aaa', marginBottom: 24 },
-  dropzone:    { border: '2px dashed #555', borderRadius: 10, padding: 32, textAlign: 'center', cursor: 'pointer', marginBottom: 16, transition: 'border-color 0.2s' },
-  dropzoneActive: { borderColor: '#6c63ff' },
-  btn:         { background: '#6c63ff', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 22px', cursor: 'pointer', fontWeight: 600, fontSize: 14 },
-  btnSecondary:{ background: '#2e2e3e', color: '#ccc', border: 'none', borderRadius: 8, padding: '10px 22px', cursor: 'pointer', fontWeight: 600, fontSize: 14, marginRight: 8 },
-  btnDisabled: { opacity: 0.5, cursor: 'not-allowed' },
-  success:     { background: '#1a3a2a', border: '1px solid #2e7d52', borderRadius: 8, padding: 16, marginTop: 16, color: '#4caf7d' },
-  error:       { background: '#3a1a1a', border: '1px solid #7d2e2e', borderRadius: 8, padding: 16, marginTop: 16, color: '#f44336' },
-  table:       { width: '100%', minWidth: '500px', borderCollapse: 'collapse', marginTop: 12, fontSize: 13 },
-  th:          { background: '#2a2a3e', padding: '8px 12px', textAlign: 'left', color: '#aaa' },
-  td:          { padding: '8px 12px', borderBottom: '1px solid #333' },
-  tag:         { display: 'inline-block', padding: '2px 8px', borderRadius: 4, fontSize: 12, fontWeight: 600 },
-  tagPresent:  { background: '#1a3a2a', color: '#4caf7d' },
-  tagAbsent:   { background: '#3a1a1a', color: '#f44336' },
-  dividerContainer: { display: 'flex', alignItems: 'center', margin: '24px 0', gap: 12 },
-  dividerLine: { flex: 1, height: 1, background: '#333' },
-  dividerText: { fontSize: 13, color: '#666', fontWeight: 600 },
-  inputGroup: { display: 'flex', gap: 8, marginBottom: 16 },
-  urlInput: {
-    flex: 1,
-    padding: '12px 16px',
-    background: '#141421',
-    border: '1px solid #333',
-    borderRadius: 8,
-    color: '#fff',
-    fontSize: 14,
-    outline: 'none',
-    transition: 'border-color 0.2s',
-  },
-};
-
-export default function BulkAttendanceUpload() {
-  const [file,      setFile]      = useState(null);
-  const [preview,   setPreview]   = useState([]);
-  const [result,    setResult]    = useState(null);
-  const [loading,   setLoading]   = useState(false);
-  const [dragging,  setDragging]  = useState(false);
-  const [error,     setError]     = useState('');
-  const [url,       setUrl]       = useState('');
+export default function BulkAttendanceUpload({ onUploadSuccess }) {
+  const [file, setFile] = useState(null);
+  const [preview, setPreview] = useState([]);
+  const [result, setResult] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [dragging, setDragging] = useState(false);
+  const [error, setError] = useState('');
+  const [url, setUrl] = useState('');
   const [urlLoading, setUrlLoading] = useState(false);
   const inputRef = useRef();
 
-  // ── Parse Excel for preview ──────────────────────────────────────────────
+  // Parse Excel for preview
   const handleFile = (f) => {
     if (!f) return;
+    if (f.size > 10 * 1024 * 1024) {
+      toast.error('File size exceeds 10MB limit.');
+      return;
+    }
     setFile(f);
     setResult(null);
     setError('');
 
     const reader = new FileReader();
     reader.onload = (e) => {
-      const wb   = XLSX.read(e.target.result, { type: 'binary' });
-      const ws   = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
-      setPreview(rows.slice(0, 10)); // show first 10 rows
+      try {
+        const wb = XLSX.read(e.target.result, { type: 'binary' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+        setPreview(rows.slice(0, 5)); // show first 5 rows for preview
+      } catch (err) {
+        console.error(err);
+        toast.error('Failed to parse Excel file preview.');
+      }
     };
     reader.readAsBinaryString(f);
   };
@@ -74,7 +49,7 @@ export default function BulkAttendanceUpload() {
     if (f) handleFile(f);
   };
 
-  // ── Upload ───────────────────────────────────────────────────────────────
+  // Upload
   const handleUpload = async () => {
     if (!file) return;
     setLoading(true);
@@ -86,23 +61,28 @@ export default function BulkAttendanceUpload() {
       formData.append('file', file);
 
       const token = localStorage.getItem('token');
-      const res   = await axios.post(`${process.env.REACT_APP_API_URL}/attendance/upload`, formData, {
+      const res = await axios.post(`${process.env.REACT_APP_API_URL}/attendance/upload`, formData, {
         headers: {
-          'Content-Type':  'multipart/form-data',
+          'Content-Type': 'multipart/form-data',
           'Authorization': `Bearer ${token}`,
         },
       });
 
       setResult(res.data);
+      toast.success(`Attendance marked for ${res.data.inserted} students`);
+      if (onUploadSuccess) onUploadSuccess();
     } catch (err) {
-      setError(err.response?.data?.message || 'Upload failed. Please try again.');
+      const errMsg = err.response?.data?.message || 'Upload failed. Please try again.';
+      setError(errMsg);
+      toast.error(errMsg);
     } finally {
       setLoading(false);
     }
   };
 
+  // URL Link Upload
   const handleUrlUpload = async () => {
-    if (!url.trim()) return;
+    if (!url.trim() || !url.trim().startsWith('http')) return;
     setUrlLoading(true);
     setError('');
     setResult(null);
@@ -118,181 +98,258 @@ export default function BulkAttendanceUpload() {
         }
       });
       setResult(res.data);
+      toast.success(`Attendance marked for ${res.data.inserted} students`);
       setUrl('');
+      if (onUploadSuccess) onUploadSuccess();
     } catch (err) {
-      setError(err.response?.data?.message || err.response?.data?.error || 'Failed to process Excel sheet from the provided link. Ensure it is publicly accessible.');
+      const errMsg = err.response?.data?.message || err.response?.data?.error || 'Failed to process Excel sheet from the link.';
+      setError(errMsg);
+      toast.error(errMsg);
     } finally {
       setUrlLoading(false);
     }
   };
 
-  // ── Download template ────────────────────────────────────────────────────
-const downloadTemplate = async () => {
+  // Download template
+  const downloadTemplate = async () => {
     try {
       const token = localStorage.getItem('token');
       const res = await fetch(`${process.env.REACT_APP_API_URL}/attendance/template`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const blob = await res.blob();
-      const url  = URL.createObjectURL(blob);
-      const a    = document.createElement('a');
-      a.href     = url;
+      const templateUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = templateUrl;
       a.download = 'attendance_template.xlsx';
       a.click();
-      URL.revokeObjectURL(url);
+      URL.revokeObjectURL(templateUrl);
+      toast.success('Template downloaded successfully.');
     } catch (err) {
       console.error('Template download failed:', err);
+      toast.error('Failed to download template.');
     }
   };
 
+  const showUrlError = url.trim() !== '' && !url.trim().startsWith('http');
+
   return (
-    <div style={styles.container}>
-      <div style={styles.card}>
-        <div style={styles.title}>📤 Bulk Attendance Upload</div>
-        <div style={styles.subtitle}>Upload an Excel file to mark attendance for multiple students at once.</div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      
+      {/* Drag & Drop Zone */}
+      <div
+        onClick={() => inputRef.current.click()}
+        onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={onDrop}
+        style={{
+          height: 140,
+          border: dragging ? '1.5px solid var(--color-accent)' : '1.5px dashed rgba(99, 102, 241, 0.35)',
+          background: dragging ? 'rgba(99, 102, 241, 0.06)' : 'rgba(255, 255, 255, 0.01)',
+          borderRadius: 'var(--radius-lg)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          transition: 'all 0.2s ease',
+          gap: 6,
+          padding: '0 16px',
+        }}
+      >
+        <FileSpreadsheet size={32} color="var(--color-accent)" style={{ opacity: 0.9 }} />
+        <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--color-text-primary)' }}>
+          {file ? file.name : 'Drop your Excel file here'}
+        </span>
+        <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>
+          {file ? `${(file.size / 1024).toFixed(1)} KB` : 'XLS, XLSX up to 10MB'}
+        </span>
+        <input
+          ref={inputRef}
+          type="file"
+          accept=".xlsx,.xls"
+          style={{ display: 'none' }}
+          onChange={(e) => handleFile(e.target.files[0])}
+        />
+      </div>
 
-        {/* ── Dropzone ── */}
-        <div
-          style={{ ...styles.dropzone, ...(dragging ? styles.dropzoneActive : {}) }}
-          onClick={() => inputRef.current.click()}
-          onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
-          onDragLeave={() => setDragging(false)}
-          onDrop={onDrop}
+      {/* Buttons */}
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        <button
+          type="button"
+          onClick={downloadTemplate}
+          className="btn btn-outline"
+          style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, background: 'transparent' }}
         >
-          {file
-            ? <span>📄 <strong>{file.name}</strong> — {(file.size / 1024).toFixed(1)} KB</span>
-            : <span>🗂 Drag & drop an Excel file here, or <u>click to browse</u></span>
-          }
-          <input
-            ref={inputRef}
-            type="file"
-            accept=".xlsx,.xls"
-            style={{ display: 'none' }}
-            onChange={(e) => handleFile(e.target.files[0])}
-          />
-        </div>
+          <Download size={15} /> Download template
+        </button>
+        
+        <button
+          type="button"
+          onClick={handleUpload}
+          disabled={!file || loading}
+          className="btn btn-primary"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            fontSize: 13,
+            opacity: (!file || loading) ? 0.5 : 1,
+            cursor: (!file || loading) ? 'not-allowed' : 'pointer'
+          }}
+        >
+          <Upload size={15} />
+          {loading ? 'Uploading...' : 'Upload'}
+        </button>
 
-        {/* ── Buttons ── */}
-        <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
-          <button style={styles.btnSecondary} onClick={downloadTemplate}>
-            ⬇ Download Template
-          </button>
+        {file && (
           <button
-            style={{ ...styles.btn, ...((!file || loading) ? styles.btnDisabled : {}) }}
-            onClick={handleUpload}
-            disabled={!file || loading}
+            type="button"
+            className="btn btn-outline"
+            style={{ fontSize: 13, color: 'var(--color-text-secondary)', background: 'transparent', borderColor: 'var(--border)' }}
+            onClick={() => { setFile(null); setPreview([]); setResult(null); setError(''); }}
           >
-            {loading ? '⏳ Uploading...' : '🚀 Upload'}
+            Clear
           </button>
-          {file && (
-            <button style={styles.btnSecondary} onClick={() => { setFile(null); setPreview([]); setResult(null); }}>
-              ✕ Clear
-            </button>
-          )}
-        </div>
+        )}
+      </div>
 
-        {/* ── URL Link Section ── */}
-        <div style={styles.dividerContainer}>
-          <div style={styles.dividerLine} />
-          <div style={styles.dividerText}>OR PASTE EXCEL LINK</div>
-          <div style={styles.dividerLine} />
-        </div>
+      {/* Divider */}
+      <div style={{ display: 'flex', alignItems: 'center', margin: '8px 0', gap: 12 }}>
+        <div style={{ flex: 1, height: 1, background: 'rgba(255, 255, 255, 0.06)' }} />
+        <span style={{ fontSize: 13, color: 'var(--color-text-tertiary)', fontWeight: 500, textTransform: 'none' }}>
+          Or paste a OneDrive / Excel link
+        </span>
+        <div style={{ flex: 1, height: 1, background: 'rgba(255, 255, 255, 0.06)' }} />
+      </div>
 
-        <div style={styles.inputGroup}>
+      {/* OneDrive URL flex input */}
+      <div>
+        <div style={{ display: 'flex', gap: 8 }}>
           <input
-            style={styles.urlInput}
             type="text"
-            placeholder="Paste OneDrive or direct Excel link (e.g. https://1drv.ms/...)"
+            className="form-input"
+            style={{ flex: 1, height: 38 }}
+            placeholder="Paste OneDrive or direct Excel link (https://...)"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             disabled={loading || urlLoading}
           />
           <button
-            style={{ ...styles.btn, ...((!url.trim() || loading || urlLoading) ? styles.btnDisabled : {}) }}
+            type="button"
             onClick={handleUrlUpload}
-            disabled={!url.trim() || loading || urlLoading}
+            disabled={!url.trim() || showUrlError || loading || urlLoading}
+            className="btn btn-primary"
+            style={{
+              width: 140,
+              height: 38,
+              fontSize: 13,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 6,
+              opacity: (!url.trim() || showUrlError || loading || urlLoading) ? 0.5 : 1,
+              cursor: (!url.trim() || showUrlError || loading || urlLoading) ? 'not-allowed' : 'pointer',
+              flexShrink: 0
+            }}
           >
-            {urlLoading ? '⏳ Fetching...' : '🔗 Fetch & Upload'}
+            <Link2 size={15} />
+            {urlLoading ? 'Fetching...' : 'Fetch & upload'}
           </button>
         </div>
-
-        {/* ── Preview ── */}
-        {preview.length > 0 && (
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 13, color: '#aaa', marginBottom: 8 }}>
-              📋 Preview (first {preview.length} rows):
-            </div>
-            <div style={{ overflowX: 'auto' }}>
-              <table style={styles.table}>
-                <thead>
-                  <tr>
-                    {Object.keys(preview[0]).map(k => (
-                      <th key={k} style={styles.th}>{k}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {preview.map((row, i) => (
-                    <tr key={i}>
-                      {Object.values(row).map((v, j) => {
-                        const val = String(v).trim().toLowerCase();
-                        const isPresent = val === 'present' || val === 'p';
-                        const isAbsent = val === 'absent' || val === 'a';
-                        return (
-                          <td key={j} style={styles.td}>
-                            {isPresent && <span style={{ ...styles.tag, ...styles.tagPresent }}>Present</span>}
-                            {isAbsent  && <span style={{ ...styles.tag, ...styles.tagAbsent  }}>Absent</span>}
-                            {!isPresent && !isAbsent && String(v)}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+        {showUrlError && (
+          <div style={{ color: 'var(--color-danger, #ef4444)', fontSize: 12, marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+            <AlertCircle size={12} /> Please paste a valid link
           </div>
         )}
+      </div>
 
-        {/* ── Error ── */}
-        {error && <div style={styles.error}>❌ {error}</div>}
+      {/* Preview table */}
+      {preview.length > 0 && (
+        <div style={{ marginTop: 10 }}>
+          <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', marginBottom: 6, fontWeight: 500 }}>
+            Previewing first {preview.length} rows:
+          </div>
+          <div style={{ overflowX: 'auto', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+              <thead>
+                <tr style={{ background: 'var(--color-surface-3)' }}>
+                  {Object.keys(preview[0]).map(k => (
+                    <th key={k} style={{ padding: '6px 10px', textAlign: 'left', color: 'var(--color-text-secondary)', fontWeight: 500, borderBottom: '1px solid var(--border)' }}>{k}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {preview.map((row, i) => (
+                  <tr key={i} style={{ borderBottom: i < preview.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                    {Object.values(row).map((v, j) => {
+                      const val = String(v).trim().toLowerCase();
+                      const isPresent = val === 'present' || val === 'p';
+                      const isAbsent = val === 'absent' || val === 'a';
+                      return (
+                        <td key={j} style={{ padding: '6px 10px', color: 'var(--color-text-primary)' }}>
+                          {isPresent && <span style={{ color: '#22c55e', fontWeight: 600 }}>Present</span>}
+                          {isAbsent && <span style={{ color: '#ef4444', fontWeight: 600 }}>Absent</span>}
+                          {!isPresent && !isAbsent && String(v)}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
-        {/* ── Result ── */}
-        {result && (
-          <div style={styles.success}>
-            <div style={{ fontWeight: 700, marginBottom: 8 }}>✅ Upload Complete</div>
-            <div>✔ Inserted: <strong>{result.inserted}</strong></div>
-            <div>🔄 Updated:  <strong>{result.updated}</strong></div>
-            <div>⚠ Skipped:  <strong>{result.skipped}</strong></div>
+      {/* Result report logs */}
+      {result && (
+        <div style={{
+          background: 'rgba(34, 197, 94, 0.08)',
+          border: '1.5px solid rgba(34, 197, 94, 0.2)',
+          borderRadius: 'var(--radius-md)',
+          padding: 14,
+          marginTop: 10,
+          color: 'var(--color-text-primary)'
+        }}>
+          <div style={{ fontWeight: 600, color: '#22c55e', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <CheckCircle size={16} /> Upload completed
+          </div>
+          <div style={{ fontSize: 13, display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <div>Successfully imported: <strong>{result.inserted}</strong></div>
+            <div>Updated records: <strong>{result.updated}</strong></div>
+            <div>Skipped records: <strong>{result.skipped}</strong></div>
+          </div>
 
-            {result.errors?.length > 0 && (
-              <div style={{ marginTop: 12 }}>
-                <div style={{ color: '#f44336', fontWeight: 600, marginBottom: 6 }}>
-                  ⚠ Invalid Rows:
-                </div>
-                <table style={{ ...styles.table, fontSize: 12 }}>
+          {result.errors?.length > 0 && (
+            <div style={{ marginTop: 10, borderTop: '1px solid rgba(34, 197, 94, 0.15)', paddingTop: 10 }}>
+              <div style={{ color: '#ef4444', fontWeight: 600, fontSize: 12.5, marginBottom: 4 }}>
+                Skipped rows details:
+              </div>
+              <div style={{ maxHeight: 120, overflowY: 'auto' }}>
+                <table style={{ width: '100%', fontSize: 12 }}>
                   <thead>
-                    <tr>
-                      <th style={styles.th}>Row</th>
-                      <th style={styles.th}>SID</th>
-                      <th style={styles.th}>Reason</th>
+                    <tr style={{ color: 'var(--color-text-secondary)' }}>
+                      <th style={{ textAlign: 'left', padding: '2px 4px' }}>Row</th>
+                      <th style={{ textAlign: 'left', padding: '2px 4px' }}>SID</th>
+                      <th style={{ textAlign: 'left', padding: '2px 4px' }}>Reason</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {result.errors.map((e, i) => (
-                      <tr key={i}>
-                        <td style={styles.td}>{e.row}</td>
-                        <td style={styles.td}>{e.sid || '—'}</td>
-                        <td style={{ ...styles.td, color: '#f44336' }}>{e.reason}</td>
+                    {result.errors.map((e, idx) => (
+                      <tr key={idx} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.03)' }}>
+                        <td style={{ padding: '2px 4px' }}>{e.row}</td>
+                        <td style={{ padding: '2px 4px' }}>{e.sid || '—'}</td>
+                        <td style={{ padding: '2px 4px', color: '#ef4444' }}>{e.reason}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-            )}
-          </div>
-        )}
-      </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

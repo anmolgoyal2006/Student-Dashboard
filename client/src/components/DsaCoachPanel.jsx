@@ -1,32 +1,36 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { careerService } from '../services/apiServices';
-import toast from 'react-hot-toast';
+import toast from '../context/ToastContext';
+import { 
+  RefreshCw, CheckCircle, AlertCircle, ExternalLink, Target, Loader2, 
+  BookOpen, Star, HelpCircle, Award, Sparkles, TrendingUp, Calendar
+} from 'lucide-react';
 
 const PRIORITY_STYLE = {
-  high:   { bg: 'rgba(239,68,68,0.12)', border: 'rgba(239,68,68,0.35)', label: '🔥 High' },
-  medium: { bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.35)', label: '⚡ Medium' },
-  low:    { bg: 'rgba(34,197,94,0.12)', border: 'rgba(34,197,94,0.35)', label: '✅ Low' },
+  high:   { bg: 'rgba(239,68,68,0.08)', border: 'rgba(239,68,68,0.2)', label: 'High', color: '#ef4444' },
+  medium: { bg: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.2)', label: 'Medium', color: '#f59e0b' },
+  low:    { bg: 'rgba(34,197,94,0.08)', border: 'rgba(34,197,94,0.2)', label: 'Low', color: '#22c55e' },
 };
 
 const DIFF_COLOR = {
-  Easy: '#34d399', Medium: '#fbbf24', Hard: '#f87171',
+  Easy: '#22c55e', Medium: '#f59e0b', Hard: '#ef4444',
 };
 
 export default function DsaCoachPanel({ career, onCareerUpdate, plan }) {
-  const [coach, setCoach]           = useState(career?.dsaCoach || null);
-  const [loading, setLoading]       = useState(false);
+  const [coach, setCoach] = useState(career?.dsaCoach || null);
+  const [loading, setLoading] = useState(false);
   const [selectedTopic, setSelectedTopic] = useState('');
-  const [guide, setGuide]           = useState(null);
-  const [guideLoad, setGuideLoad]   = useState(false);
-  const [hintTopic, setHintTopic]   = useState('');
-  const [hintTitle, setHintTitle]   = useState('');
+  const [guide, setGuide] = useState(null);
+  const [guideLoad, setGuideLoad] = useState(false);
+  const [hintTopic, setHintTopic] = useState('');
+  const [hintTitle, setHintTitle] = useState('');
   const [hintAttempt, setHintAttempt] = useState('');
-  const [hint, setHint]             = useState(null);
-  const [hintLoad, setHintLoad]     = useState(false);
+  const [hint, setHint] = useState(null);
+  const [hintLoad, setHintLoad] = useState(false);
   const [lcUsername, setLcUsername] = useState(career?.leetcodeUsername || '');
-  const [lcSyncing, setLcSyncing]   = useState(false);
-  const [lcLinking, setLcLinking]   = useState(false);
-  const lcAutoSynced                = useRef(false);
+  const [lcSyncing, setLcSyncing] = useState(false);
+  const [lcLinking, setLcLinking] = useState(false);
+  const lcAutoSynced = useRef(false);
 
   useEffect(() => {
     setLcUsername(career?.leetcodeUsername || '');
@@ -150,24 +154,57 @@ export default function DsaCoachPanel({ career, onCareerUpdate, plan }) {
   };
 
   const placementScore = coach?.placementScore ?? 0;
-  const scoreColor = placementScore >= 70 ? '#34d399' : placementScore >= 40 ? '#fbbf24' : '#f87171';
+  const scoreColor = placementScore >= 70 ? '#22c55e' : placementScore >= 40 ? '#f59e0b' : '#ef4444';
   const lcSync = career?.leetcodeSync;
   const lcLinked = Boolean(career?.leetcodeUsername);
   const lastSyncLabel = lcSync?.lastSyncAt
     ? new Date(lcSync.lastSyncAt).toLocaleString()
     : 'Never';
 
+  // Metrics details
+  const easyCount = lcSync?.easy ?? 0;
+  const medCount = lcSync?.medium ?? 0;
+  const hardCount = lcSync?.hard ?? 0;
+  const totalCount = lcSync?.totalOnLeetcode ?? 0;
+
   return (
     <div style={{ marginBottom: 20 }}>
-      {/* ── LeetCode sync ── */}
+      {/* LeetCode Sync Section */}
       <div className="card mb-4" style={{
-        border: '1px solid rgba(255, 161, 22, 0.35)',
-        background: 'linear-gradient(135deg, rgba(255,161,22,0.08) 0%, rgba(255,255,255,0.02) 100%)',
+        position: 'relative',
+        border: '1.5px solid rgba(99, 102, 241, 0.2)',
+        background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.04) 0%, rgba(255, 255, 255, 0.01) 100%)',
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
           <div>
-            <div className="card-title" style={{ marginBottom: 4 }}>🟠 LeetCode sync</div>
-            <p className="text-muted" style={{ fontSize: 13, maxWidth: 520 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 16, fontWeight: 500, color: 'var(--color-text-primary)' }}>
+                <RefreshCw size={16} color="var(--color-accent)" />
+                LeetCode sync
+              </span>
+              {lcLinked ? (
+                <span style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 4,
+                  padding: '2px 8px', borderRadius: 'var(--radius-pill)',
+                  fontSize: 11, fontWeight: 500,
+                  background: 'rgba(34, 197, 94, 0.1)', color: '#22c55e',
+                  border: '1px solid rgba(34, 197, 94, 0.15)'
+                }}>
+                  <CheckCircle size={12} /> Connected
+                </span>
+              ) : (
+                <span style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 4,
+                  padding: '2px 8px', borderRadius: 'var(--radius-pill)',
+                  fontSize: 11, fontWeight: 500,
+                  background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b',
+                  border: '1px solid rgba(245, 158, 11, 0.15)'
+                }}>
+                  <AlertCircle size={12} /> Not synced
+                </span>
+              )}
+            </div>
+            <p className="text-muted" style={{ fontSize: 13, maxWidth: 520, margin: 0 }}>
               Auto-sync from LeetCode — progress, AI plan, and problem picks (unsolved only). No manual logging.
             </p>
           </div>
@@ -176,66 +213,148 @@ export default function DsaCoachPanel({ career, onCareerUpdate, plan }) {
               href={`https://leetcode.com/u/${career.leetcodeUsername}/`}
               target="_blank"
               rel="noreferrer"
-              className="btn btn-outline btn-sm"
-              style={{ textDecoration: 'none' }}
+              className="btn btn-outline"
+              style={{
+                padding: '6px 12px',
+                fontSize: 12,
+                height: 28,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                background: 'transparent',
+                borderColor: 'var(--border)',
+                color: 'var(--color-text-secondary)',
+                textDecoration: 'none'
+              }}
             >
-              Open profile ↗
+              <ExternalLink size={14} />
+              Open profile
             </a>
           )}
         </div>
 
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 12, alignItems: 'center' }}>
-          <input
-            className="form-input"
-            style={{ maxWidth: 220, flex: '1 1 160px' }}
-            placeholder="LeetCode username"
-            value={lcUsername}
-            onChange={(e) => setLcUsername(e.target.value.replace(/\s/g, ''))}
-            disabled={lcSyncing || lcLinking}
-          />
-          {!lcLinked ? (
-            <button type="button" className="btn btn-primary btn-sm" onClick={handleLinkLeetcode} disabled={lcLinking || lcSyncing}>
-              {lcLinking ? '⏳…' : 'Link account'}
+        {/* Input layout */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 16 }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', width: '100%', flexWrap: 'wrap' }}>
+            <input
+              className="form-input"
+              style={{ flex: 1, minWidth: 200 }}
+              placeholder="LeetCode username"
+              value={lcUsername}
+              onChange={(e) => setLcUsername(e.target.value.replace(/\s/g, ''))}
+              disabled={lcSyncing || lcLinking}
+            />
+            {!lcLinked ? (
+              <button
+                type="button"
+                className="btn btn-primary"
+                style={{ height: 38, padding: '0 18px', fontSize: 13, flexShrink: 0 }}
+                onClick={handleLinkLeetcode}
+                disabled={lcLinking || lcSyncing || !lcUsername.trim()}
+              >
+                {lcLinking ? 'Linking...' : 'Link account'}
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="btn btn-primary"
+                style={{ height: 38, padding: '0 18px', fontSize: 13, flexShrink: 0 }}
+                onClick={() => handleSyncLeetcode(false)}
+                disabled={lcSyncing}
+              >
+                {lcSyncing ? 'Syncing...' : 'Sync now'}
+              </button>
+            )}
+          </div>
+          
+          {lcLinked && (
+            <button
+              type="button"
+              onClick={handleUnlinkLeetcode}
+              disabled={lcSyncing}
+              style={{
+                alignSelf: 'flex-start',
+                background: 'transparent',
+                border: 'none',
+                color: 'var(--color-danger, #ef4444)',
+                fontSize: '12.5px',
+                cursor: 'pointer',
+                padding: '4px 0',
+                textDecoration: 'underline',
+              }}
+            >
+              Disconnect
             </button>
-          ) : (
-            <>
-              <button type="button" className="btn btn-primary btn-sm" onClick={() => handleSyncLeetcode(false)} disabled={lcSyncing}>
-                {lcSyncing ? '⏳ Syncing…' : '🔄 Sync now'}
-              </button>
-              <button type="button" className="btn btn-outline btn-sm" onClick={handleUnlinkLeetcode} disabled={lcSyncing}>
-                Disconnect
-              </button>
-            </>
           )}
         </div>
 
+        {/* Stats Metric Chips */}
         {lcLinked && lcSync?.totalOnLeetcode != null && (
-          <div style={{ marginTop: 14, display: 'flex', flexWrap: 'wrap', gap: 16, fontSize: 13 }}>
-            <span><strong>{lcSync.totalOnLeetcode}</strong> total solved</span>
-            <span style={{ color: '#34d399' }}>Easy {lcSync.easy ?? 0}</span>
-            <span style={{ color: '#fbbf24' }}>Med {lcSync.medium ?? 0}</span>
-            <span style={{ color: '#f87171' }}>Hard {lcSync.hard ?? 0}</span>
-            <span className="text-muted">Last sync: {lastSyncLabel}</span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 16 }}>
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+              <div style={{ flex: 1, minWidth: 100, padding: '10px 14px', borderRadius: 'var(--radius-md)', background: 'var(--color-surface-2)', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>Total solved</span>
+                <span style={{ fontSize: 18, fontWeight: 600, color: 'var(--color-text-primary)' }}>{totalCount}</span>
+              </div>
+              <div style={{ flex: 1, minWidth: 100, padding: '10px 14px', borderRadius: 'var(--radius-md)', background: 'var(--color-surface-2)', border: '1px solid rgba(34, 197, 94, 0.25)', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>Easy solves</span>
+                <span style={{ fontSize: 18, fontWeight: 600, color: '#22c55e' }}>{easyCount}</span>
+              </div>
+              <div style={{ flex: 1, minWidth: 100, padding: '10px 14px', borderRadius: 'var(--radius-md)', background: 'var(--color-surface-2)', border: '1px solid rgba(245, 158, 11, 0.25)', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>Medium solves</span>
+                <span style={{ fontSize: 18, fontWeight: 600, color: '#f59e0b' }}>{medCount}</span>
+              </div>
+              <div style={{ flex: 1, minWidth: 100, padding: '10px 14px', borderRadius: 'var(--radius-md)', background: 'var(--color-surface-2)', border: '1px solid rgba(239, 68, 68, 0.25)', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>Hard solves</span>
+                <span style={{ fontSize: 18, fontWeight: 600, color: '#ef4444' }}>{hardCount}</span>
+              </div>
+            </div>
+
+            {/* Mini ratio bar */}
+            {totalCount > 0 && (
+              <div style={{ width: '100%' }}>
+                <div style={{ display: 'flex', height: 6, borderRadius: 3, overflow: 'hidden', background: 'var(--color-surface-3)', width: '100%' }}>
+                  <div style={{ width: `${(easyCount / totalCount) * 100}%`, background: '#22c55e' }} />
+                  <div style={{ width: `${(medCount / totalCount) * 100}%`, background: '#f59e0b' }} />
+                  <div style={{ width: `${(hardCount / totalCount) * 100}%`, background: '#ef4444' }} />
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 6 }}>
+                  <span>Ratio composition</span>
+                  <span>Last sync: {lastSyncLabel}</span>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
 
-      {/* ── AI Coach header ── */}
+      {/* AI Coach Card */}
       <div className="card mb-4" style={{
         background: 'linear-gradient(135deg, rgba(99,102,241,0.12) 0%, rgba(129,140,248,0.06) 100%)',
         border: '1px solid rgba(129,140,248,0.35)',
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
           <div>
-            <div className="card-title" style={{ marginBottom: 4 }}>🤖 AI DSA Coach</div>
-            <p className="text-muted" style={{ fontSize: 13, maxWidth: 520 }}>
+            <div className="card-title" style={{ marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Sparkles size={18} color="var(--color-accent)" />
+              AI DSA Coach
+            </div>
+            <p className="text-muted" style={{ fontSize: 13, maxWidth: 520, margin: 0 }}>
               {coach?.leetcodeLinked
                 ? `Plan based on your LeetCode (@${career?.leetcodeUsername}) — gaps, Easy-first topics, and problem counts.`
                 : `Personalized for ${career?.targetCompany || 'your target'}. Link LeetCode above for topic-aware picks.`}
             </p>
           </div>
-          <button className="btn btn-primary btn-sm" onClick={() => loadCoach(true)} disabled={loading}>
-            {loading ? '⏳ Thinking…' : '🔄 Refresh plan'}
+          
+          <button 
+            type="button"
+            className="btn btn-outline" 
+            onClick={() => loadCoach(true)} 
+            disabled={loading}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'transparent', height: 32, padding: '0 12px', fontSize: 12 }}
+          >
+            {loading ? <Loader2 size={14} className="animate-spin" style={{ animation: 'spin 1s linear infinite' }} /> : <RefreshCw size={14} />}
+            Refresh plan
           </button>
         </div>
 
@@ -246,92 +365,173 @@ export default function DsaCoachPanel({ career, onCareerUpdate, plan }) {
           </div>
         ) : coach ? (
           <>
+            {/* Plan Card */}
             {coach.leetcodeInsight && (
               <div style={{
-                marginTop: 14, padding: 12, borderRadius: 10,
-                background: 'rgba(255,161,22,0.1)', border: '1px solid rgba(255,161,22,0.3)',
-                fontSize: 13, lineHeight: 1.5,
+                marginTop: 14, padding: 14, borderRadius: 'var(--radius-md)',
+                background: 'var(--color-surface-2)', border: '1px solid var(--border)',
+                display: 'flex', flexDirection: 'column', gap: 8
               }}>
-                <strong>🟠 LeetCode plan:</strong> {coach.leetcodeInsight}
+                <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-accent)' }}>Your AI plan</span>
+                <span style={{ fontSize: '14px', fontWeight: 400, color: 'var(--color-text-primary)', lineHeight: 1.5 }}>
+                  {coach.leetcodeInsight}
+                </span>
                 {coach.dailyProblemTarget > 0 && (
-                  <span className="text-muted" style={{ display: 'block', marginTop: 6, fontSize: 12 }}>
-                    Target: <strong>{coach.dailyProblemTarget}</strong> problems/day on LeetCode
-                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '13px', color: 'var(--color-text-secondary)', marginTop: 4 }}>
+                    <Target size={14} color="var(--color-accent)" />
+                    <span>Daily goal: solve <strong>{coach.dailyProblemTarget}</strong> problems/day on LeetCode</span>
+                  </div>
                 )}
               </div>
             )}
 
-            {(coach.uncoveredTopics?.length > 0) && (
-              <div style={{ marginTop: 12, fontSize: 13 }}>
-                <span style={{ fontWeight: 600, color: '#f87171' }}>Gaps on LeetCode (&lt;5 per tag): </span>
-                {coach.uncoveredTopics.join(', ')}
+            {coach.uncoveredTopics?.length > 0 && (
+              <div style={{ marginTop: 12, fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <AlertCircle size={14} color="#ef4444" />
+                <span style={{ color: 'var(--color-text-secondary)' }}>
+                  <strong style={{ color: '#ef4444' }}>Gaps on LeetCode (&lt;5 solves): </strong>
+                  {coach.uncoveredTopics.join(', ')}
+                </span>
               </div>
             )}
 
-            {(coach.topicRoadmap?.length > 0) && (
-              <div style={{ marginTop: 16 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>📊 Topic roadmap (from LeetCode)</div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 8 }}>
+            {/* Horizontal Scroll Topic Roadmap */}
+            {coach.topicRoadmap?.length > 0 && (
+              <div style={{ marginTop: 20 }}>
+                <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 10, color: 'var(--color-text-secondary)' }}>Topic roadmap</div>
+                <div style={{ 
+                  display: 'flex', 
+                  gap: 12, 
+                  overflowX: 'auto', 
+                  paddingBottom: 8, 
+                  scrollbarWidth: 'thin',
+                  alignItems: 'stretch'
+                }}>
                   {coach.topicRoadmap
                     .filter((r) => r.status === 'weak' || r.status === 'not_covered')
                     .sort((a, b) => (b.lcCount ?? 0) - (a.lcCount ?? 0))
                     .slice(0, 6)
-                    .map((r) => (
-                      <div key={r.topic} style={{
-                        padding: 10, borderRadius: 8, fontSize: 12,
-                        border: `1px solid ${r.status === 'not_covered' ? 'rgba(248,113,113,0.4)' : 'rgba(251,191,36,0.35)'}`,
-                        background: r.status === 'not_covered' ? 'rgba(248,113,113,0.08)' : 'rgba(251,191,36,0.06)',
-                      }}>
-                        <div style={{ fontWeight: 600 }}>{r.topic}</div>
-                        <div style={{ color: 'var(--muted)', marginTop: 4 }}>
-                          {r.lcCount != null ? (
-                            <><strong>{r.lcCount}</strong> on LeetCode · </>
-                          ) : null}
-                          {r.solved}/{r.target} · <strong>{r.toSolveThisWeek}</strong>/week
+                    .map((r) => {
+                      const percentage = r.target > 0 ? Math.round((r.solved / r.target) * 100) : 0;
+                      return (
+                        <div key={r.topic} style={{
+                          minWidth: 180,
+                          flexShrink: 0,
+                          padding: 12,
+                          borderRadius: 'var(--radius-md)',
+                          background: 'var(--color-surface-2)',
+                          border: '1px solid var(--border)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          justifyContent: 'space-between',
+                          gap: 10
+                        }}>
+                          <div>
+                            <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--color-text-primary)', marginBottom: 4 }}>{r.topic}</div>
+                            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+                              <span style={{
+                                fontSize: 10, fontWeight: 600, padding: '2px 6px', borderRadius: 4,
+                                background: 'rgba(99, 102, 241, 0.1)', color: 'var(--color-accent)',
+                                border: '1px solid rgba(99, 102, 241, 0.15)'
+                              }}>
+                                {r.toSolveThisWeek}/wk
+                              </span>
+                              <span style={{
+                                fontSize: 10, fontWeight: 600, padding: '2px 6px', borderRadius: 4,
+                                background: r.startWith === 'Easy' ? 'rgba(34, 197, 94, 0.1)' : r.startWith === 'Hard' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(245, 158, 11, 0.1)',
+                                color: r.startWith === 'Easy' ? '#22c55e' : r.startWith === 'Hard' ? '#ef4444' : '#f59e0b',
+                                border: `1px solid ${r.startWith === 'Easy' ? 'rgba(34, 197, 94, 0.15)' : r.startWith === 'Hard' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(245, 158, 11, 0.15)'}`
+                              }}>
+                                {r.startWith || 'Easy'}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--color-text-secondary)', marginBottom: 4 }}>
+                              <span>Progress</span>
+                              <span>{r.solved}/{r.target}</span>
+                            </div>
+                            <div style={{ width: '100%', height: 4, borderRadius: 2, background: 'var(--color-surface-3)', overflow: 'hidden' }}>
+                              <div style={{ width: `${Math.min(100, percentage)}%`, height: '100%', background: 'var(--color-accent)' }} />
+                            </div>
+                          </div>
                         </div>
-                        <div style={{ marginTop: 4, color: '#818cf8' }}>
-                          Start: {r.startWith || 'Easy'}
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
+                  
+                  <div style={{
+                    minWidth: 120,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                  }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const manualTrackerBtn = document.querySelector('[data-manual-tracker-btn]');
+                        if (manualTrackerBtn) {
+                          manualTrackerBtn.click();
+                          manualTrackerBtn.scrollIntoView({ behavior: 'smooth' });
+                        }
+                      }}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: 'var(--color-accent)',
+                        fontSize: 13.5,
+                        fontWeight: 500,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 4
+                      }}
+                    >
+                      View all topics →
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
 
-            <div className="grid-2" style={{ marginTop: 16, gap: 12 }}>
+            <div className="grid-2" style={{ marginTop: 20, gap: 12 }}>
               <div style={{
                 padding: 14, borderRadius: 10,
-                background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)',
+                background: 'var(--color-surface-2)', border: '1px solid var(--border)',
               }}>
-                <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 6 }}>Placement readiness</div>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-                  <span style={{ fontSize: 36, fontWeight: 700, color: scoreColor }}>{placementScore}</span>
-                  <span style={{ color: 'var(--muted)' }}>/ 100</span>
+                <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginBottom: 6, fontWeight: 500 }}>Placement readiness</div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
+                  <span style={{ fontSize: 32, fontWeight: 600, color: scoreColor }}>{placementScore}</span>
+                  <span style={{ color: 'var(--color-text-tertiary)', fontSize: 14 }}>/ 100</span>
                 </div>
-                <div className="progress" style={{ marginTop: 10 }}>
+                <div className="progress" style={{ marginTop: 10, height: 6 }}>
                   <div className="progress-bar" style={{ width: `${placementScore}%`, background: scoreColor }} />
                 </div>
-                <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 10 }}>{coach.readinessInsight}</p>
+                <p style={{ fontSize: 12.5, color: 'var(--color-text-secondary)', marginTop: 10, lineHeight: 1.45 }}>{coach.readinessInsight}</p>
               </div>
               <div style={{
                 padding: 14, borderRadius: 10,
-                background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)',
+                background: 'var(--color-surface-2)', border: '1px solid var(--border)',
               }}>
-                <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 6 }}>
+                <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginBottom: 6, fontWeight: 500 }}>
                   {career?.targetCompany} focus
                 </div>
-                <p style={{ fontSize: 13, lineHeight: 1.5 }}>{coach.companyFocus}</p>
-                <div style={{ marginTop: 12, padding: '8px 10px', borderRadius: 8, background: 'rgba(129,140,248,0.1)' }}>
-                  <span style={{ fontSize: 11, color: '#a5b4fc' }}>Next milestone</span>
+                <p style={{ fontSize: 13, lineHeight: 1.45, color: 'var(--color-text-primary)' }}>{coach.companyFocus}</p>
+                <div style={{ marginTop: 12, padding: '10px 12px', borderRadius: 8, background: 'var(--color-accent-muted)', border: '1px solid rgba(99, 102, 241, 0.15)' }}>
+                  <span style={{ fontSize: 11, color: 'var(--color-accent)', fontWeight: 500 }}>Next milestone</span>
                   <div style={{ fontSize: 13, fontWeight: 600, marginTop: 2 }}>{coach.nextMilestone}</div>
                 </div>
-                <p style={{ fontSize: 12, color: '#818cf8', marginTop: 10, fontStyle: 'italic' }}>💡 {coach.studyTip}</p>
+                <p style={{ fontSize: 12.5, color: '#818cf8', marginTop: 10, fontStyle: 'italic', display: 'flex', alignItems: 'center', gap: 4 }}>💡 {coach.studyTip}</p>
               </div>
             </div>
 
             {/* Daily mission */}
-            <div style={{ marginTop: 16 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>🎯 Today&apos;s mission</div>
+            <div style={{ marginTop: 20 }}>
+              <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 10, color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Target size={15} color="var(--color-accent)" />
+                Today's mission
+              </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {(coach.dailyMission || []).map((m, i) => {
                   const ps = PRIORITY_STYLE[m.priority] || PRIORITY_STYLE.medium;
@@ -343,17 +543,18 @@ export default function DsaCoachPanel({ career, onCareerUpdate, plan }) {
                     }}>
                       <span style={{
                         width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
-                        background: 'rgba(255,255,255,0.08)', display: 'flex',
-                        alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 12,
+                        background: 'rgba(255,255,255,0.04)', display: 'flex',
+                        alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: 12,
+                        color: 'var(--color-text-primary)'
                       }}>{i + 1}</span>
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 600, fontSize: 13 }}>{m.task}</div>
-                        <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
+                        <div style={{ fontWeight: 600, fontSize: 13.5, color: 'var(--color-text-primary)' }}>{m.task}</div>
+                        <div style={{ fontSize: 11.5, color: 'var(--color-text-secondary)', marginTop: 2 }}>
                           {m.topic} · ~{m.minutes || 45} min
                           {m.problemsCount ? ` · ${m.problemsCount} problem(s)` : ''}
                         </div>
                       </div>
-                      <span style={{ fontSize: 10, fontWeight: 600 }}>{ps.label}</span>
+                      <span style={{ fontSize: 11, fontWeight: 600, color: ps.color }}>{ps.label}</span>
                     </div>
                   );
                 })}
@@ -361,60 +562,70 @@ export default function DsaCoachPanel({ career, onCareerUpdate, plan }) {
             </div>
 
             {/* Recommended problems */}
-            {(coach.recommendedProblems?.length > 0) && (
-              <div style={{ marginTop: 16 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>
-                  📌 Next problems (not solved on LeetCode yet)
+            {coach.recommendedProblems?.length > 0 && (
+              <div style={{ marginTop: 20 }}>
+                <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 10, color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Award size={15} color="var(--color-accent)" />
+                  Next problems (unsolved on LeetCode)
                   {career?.leetcodeSync?.solvedCount > 0 && (
                     <span className="text-muted" style={{ fontWeight: 400, marginLeft: 8, fontSize: 11 }}>
                       filtered from {career.leetcodeSync.solvedCount} AC
                     </span>
                   )}
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 10 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 12 }}>
                   {coach.recommendedProblems.map((p, i) => (
                     <div key={i} style={{
-                      padding: 12, borderRadius: 10,
+                      padding: 14, borderRadius: 10,
                       border: '1px solid var(--border)',
-                      background: 'rgba(255,255,255,0.02)',
+                      background: 'var(--color-surface-2)',
                       cursor: 'pointer',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between',
+                      gap: 10
                     }}
                       onClick={() => {
                         setHintTopic(p.topic);
                         setHintTitle(p.title);
                       }}
                     >
-                      <div style={{ fontWeight: 600, fontSize: 13 }}>{p.title}</div>
-                      <div style={{ fontSize: 11, color: DIFF_COLOR[p.difficulty] || 'var(--muted)', marginTop: 4 }}>
-                        {p.difficulty} · {p.pattern}
-                      </div>
-                      <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6 }}>{p.why}</div>
-                      {p.problemsToSolve > 0 && (
-                        <div style={{ fontSize: 11, color: '#a5b4fc', marginTop: 6 }}>
-                          Solve <strong>{p.problemsToSolve}</strong> this week
+                      <div>
+                        <div style={{ fontWeight: 600, fontSize: 13.5, color: 'var(--color-text-primary)' }}>{p.title}</div>
+                        <div style={{ fontSize: 11.5, color: DIFF_COLOR[p.difficulty] || 'var(--color-text-secondary)', marginTop: 4, fontWeight: 500 }}>
+                          {p.difficulty} · {p.pattern}
                         </div>
-                      )}
-                      <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
-                        {p.leetcodeUrl && (
-                          <a
-                            href={p.leetcodeUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="btn btn-primary btn-sm"
-                            style={{ fontSize: 10, textDecoration: 'none' }}
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            Open on LeetCode ↗
-                          </a>
+                        <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 6, lineHeight: 1.4 }}>{p.why}</div>
+                      </div>
+
+                      <div>
+                        {p.problemsToSolve > 0 && (
+                          <div style={{ fontSize: 11.5, color: 'var(--color-accent)', marginTop: 6, fontWeight: 500 }}>
+                            Solve <strong>{p.problemsToSolve}</strong> this week
+                          </div>
                         )}
-                        <button
-                          type="button"
-                          className="btn btn-outline btn-sm"
-                          style={{ fontSize: 10 }}
-                          onClick={(e) => { e.stopPropagation(); loadTopicGuide(p.topic); }}
-                        >
-                          Study {p.topic}
-                        </button>
+                        <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
+                          {p.leetcodeUrl && (
+                            <a
+                              href={p.leetcodeUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="btn btn-primary"
+                              style={{ fontSize: 11.5, padding: '4px 8px', height: 26, minHeight: 'auto', textDecoration: 'none', display: 'flex', alignItems: 'center' }}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              Solve
+                            </a>
+                          )}
+                          <button
+                            type="button"
+                            className="btn btn-outline"
+                            style={{ fontSize: 11.5, padding: '4px 8px', height: 26, minHeight: 'auto', background: 'transparent' }}
+                            onClick={(e) => { e.stopPropagation(); loadTopicGuide(p.topic); }}
+                          >
+                            Study guide
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -425,33 +636,40 @@ export default function DsaCoachPanel({ career, onCareerUpdate, plan }) {
         ) : null}
       </div>
 
-      {lcLinked && (career?.dsaSessions?.length > 0) && (
+      {lcLinked && career?.dsaSessions?.length > 0 && (
         <div className="card mb-4">
-          <div className="card-title">🔄 Auto-synced from LeetCode</div>
-          <p className="text-muted" style={{ fontSize: 12, marginBottom: 10 }}>
+          <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+            <TrendingUp size={18} color="var(--color-accent)" />
+            Auto-synced from LeetCode
+          </div>
+          <p className="text-muted" style={{ fontSize: 12.5, marginBottom: 12 }}>
             New solves update your tracker automatically when you sync.
           </p>
           {career.dsaSessions
             .filter((s) => s.aiFeedback === 'Synced from LeetCode' || s.note?.includes('LeetCode'))
             .slice(0, 5)
             .map((s, i) => (
-              <div key={i} style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 6 }}>
-                <strong style={{ color: '#34d399' }}>+{s.problemsAdded}</strong> — {s.note?.slice(0, 100)}
+              <div key={i} style={{ fontSize: 12.5, color: 'var(--color-text-secondary)', marginBottom: 6 }}>
+                <strong style={{ color: '#22c55e' }}>+{s.problemsAdded}</strong> — {s.note?.slice(0, 100)}
               </div>
             ))}
         </div>
       )}
 
-      {/* ── Topic guide + hint ── */}
+      {/* Topic guide + hint */}
       <div className="grid-2 mb-4">
         <div className="card">
-          <div className="card-title">📚 AI topic guide</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
+          <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <BookOpen size={18} color="var(--color-accent)" />
+            AI topic guide
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12, marginTop: 12 }}>
             {(career?.dsaTopics || []).map((t) => (
               <button
                 key={t.name}
                 type="button"
                 className={`btn btn-sm ${selectedTopic === t.name ? 'btn-primary' : 'btn-outline'}`}
+                style={{ padding: '4px 10px', fontSize: 12, background: selectedTopic === t.name ? 'var(--color-accent)' : 'transparent' }}
                 onClick={() => loadTopicGuide(t.name)}
               >
                 {t.name}
@@ -460,93 +678,106 @@ export default function DsaCoachPanel({ career, onCareerUpdate, plan }) {
           </div>
           {guideLoad && <div className="spinner" style={{ margin: '12px auto' }} />}
           {guide && !guideLoad && (
-            <div style={{ fontSize: 13 }}>
-              <p style={{ marginBottom: 10 }}>{guide.summary}</p>
-              <div style={{ marginBottom: 10 }}>
-                <strong>Patterns:</strong>{' '}
+            <div style={{ fontSize: 13, marginTop: 12 }}>
+              <p style={{ marginBottom: 10, lineHeight: 1.45, color: 'var(--color-text-primary)' }}>{guide.summary}</p>
+              <div style={{ marginBottom: 10, color: 'var(--color-text-secondary)' }}>
+                <strong>Key patterns:</strong>{' '}
                 {(guide.keyPatterns || []).join(' · ')}
               </div>
-              <div style={{ marginBottom: 12 }}>
+              <div style={{ marginBottom: 12, color: 'var(--color-text-secondary)' }}>
                 <strong>Study order:</strong>
-                <ol style={{ margin: '6px 0 0 18px', padding: 0 }}>
+                <ol style={{ margin: '6px 0 0 18px', padding: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
                   {(guide.studyOrder || []).map((s, i) => <li key={i}>{s}</li>)}
                 </ol>
               </div>
               {(guide.problems || []).map((p, i) => (
                 <div key={i} style={{
-                  padding: 10, marginBottom: 8, borderRadius: 8,
-                  background: 'rgba(129,140,248,0.06)', border: '1px solid rgba(129,140,248,0.15)',
+                  padding: 12, marginBottom: 10, borderRadius: 8,
+                  background: 'var(--color-surface-2)', border: '1px solid var(--border)',
                 }}>
-                  <div style={{ fontWeight: 600 }}>{p.title}</div>
-                  <div style={{ fontSize: 11, color: DIFF_COLOR[p.difficulty] }}>{p.difficulty} · {p.pattern}</div>
-                  <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>{p.approach}</div>
+                  <div style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>{p.title}</div>
+                  <div style={{ fontSize: 11, color: DIFF_COLOR[p.difficulty], fontWeight: 500, marginTop: 2 }}>{p.difficulty} · {p.pattern}</div>
+                  <div style={{ fontSize: 11.5, color: 'var(--color-text-secondary)', marginTop: 6, lineHeight: 1.4 }}>{p.approach}</div>
                   {p.leetcodeUrl && (
-                    <a href={p.leetcodeUrl} target="_blank" rel="noreferrer" className="btn btn-outline btn-sm"
-                      style={{ marginTop: 8, fontSize: 10, textDecoration: 'none' }}>
-                      Open on LeetCode ↗
+                    <a href={p.leetcodeUrl} target="_blank" rel="noreferrer" className="btn btn-outline"
+                      style={{ marginTop: 8, fontSize: 11, padding: '4px 10px', height: 26, minHeight: 'auto', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', background: 'transparent' }}>
+                      Open LeetCode
                     </a>
                   )}
                 </div>
               ))}
-              <p className="text-muted" style={{ fontSize: 11 }}>{guide.weekPlan}</p>
+              <p className="text-muted" style={{ fontSize: 11.5 }}>{guide.weekPlan}</p>
             </div>
           )}
         </div>
 
         <div className="card">
-          <div className="card-title">💡 AI hint (no spoilers)</div>
-          <div className="form-group">
-            <label className="form-label">Topic</label>
-            <select className="form-select" value={hintTopic} onChange={(e) => setHintTopic(e.target.value)}>
-              <option value="">Select topic</option>
-              {(career?.dsaTopics || []).map((t) => (
-                <option key={t.name} value={t.name}>{t.name}</option>
-              ))}
-            </select>
+          <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <HelpCircle size={18} color="var(--color-accent)" />
+            AI hint (no spoilers)
           </div>
-          <div className="form-group">
-            <label className="form-label">Problem</label>
-            <input className="form-input" value={hintTitle} onChange={(e) => setHintTitle(e.target.value)}
-              placeholder="e.g. Two Sum, LRU Cache" />
-          </div>
-          <div className="form-group">
-            <label className="form-label">Your attempt (optional)</label>
-            <textarea className="form-input" rows={2} value={hintAttempt}
-              onChange={(e) => setHintAttempt(e.target.value)} placeholder="What you tried so far…" />
-          </div>
-          <button className="btn btn-primary btn-sm" onClick={fetchHint} disabled={hintLoad}>
-            {hintLoad ? '⏳…' : 'Get hint'}
-          </button>
-          {hint && (
-            <div style={{
-              marginTop: 12, padding: 12, borderRadius: 8,
-              background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.25)',
-            }}>
-              <div style={{ fontSize: 13 }}>{hint.hint}</div>
-              {hint.nextStep && (
-                <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 8 }}>
-                  Next: {hint.nextStep}
-                </div>
-              )}
+          
+          <div style={{ marginTop: 12 }}>
+            <div className="form-group">
+              <label className="form-label">Topic</label>
+              <select className="form-select" value={hintTopic} onChange={(e) => setHintTopic(e.target.value)}>
+                <option value="">Select topic</option>
+                {(career?.dsaTopics || []).map((t) => (
+                  <option key={t.name} value={t.name}>{t.name}</option>
+                ))}
+              </select>
             </div>
-          )}
+            <div className="form-group">
+              <label className="form-label">Problem</label>
+              <input className="form-input" value={hintTitle} onChange={(e) => setHintTitle(e.target.value)}
+                placeholder="e.g. Two Sum, LRU Cache" />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Your attempt (optional)</label>
+              <textarea className="form-input" rows={3} value={hintAttempt}
+                onChange={(e) => setHintAttempt(e.target.value)} placeholder="What you tried so far…" />
+            </div>
+            <button className="btn btn-primary" onClick={fetchHint} disabled={hintLoad} style={{ height: 38, fontSize: 13 }}>
+              {hintLoad ? 'Thinking...' : 'Get hint'}
+            </button>
+            {hint && (
+              <div style={{
+                marginTop: 14, padding: 12, borderRadius: 8,
+                background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.2)',
+                color: 'var(--color-text-primary)', fontSize: 13, lineHeight: 1.45
+              }}>
+                <div>{hint.hint}</div>
+                {hint.nextStep && (
+                  <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 8, fontWeight: 500 }}>
+                    Recommended next step: {hint.nextStep}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* AI weekly overlay if coach has weeklyFocus */}
+      {/* AI weekly schedule */}
       {coach?.weeklyFocus?.length > 0 && (
         <div className="card mb-4">
-          <div className="card-title">📅 AI weekly schedule</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8 }}>
+          <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
+            <Calendar size={18} color="var(--color-accent)" />
+            AI weekly schedule
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 10 }}>
             {coach.weeklyFocus.map((d, i) => (
               <div key={i} style={{
-                padding: 10, borderRadius: 8, textAlign: 'center',
-                background: plan?.weeklyPlan?.[i]?.day === d.day ? 'rgba(129,140,248,0.15)' : 'rgba(255,255,255,0.03)',
-                border: '1px solid var(--border)',
+                padding: 12, borderRadius: 'var(--radius-md)', textAlign: 'center',
+                background: plan?.weeklyPlan?.[i]?.day === d.day ? 'var(--color-accent-muted)' : 'var(--color-surface-2)',
+                border: plan?.weeklyPlan?.[i]?.day === d.day ? '1.5px solid var(--color-accent)' : '1.5px solid var(--border)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 4
               }}>
-                <div style={{ fontWeight: 700, fontSize: 12, color: '#818cf8' }}>{d.day}</div>
-                <div style={{ fontSize: 12, fontWeight: 600, marginTop: 4 }}>{d.topic}</div>
-                <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 4 }}>{d.goal}</div>
+                <div style={{ fontWeight: 600, fontSize: 12, color: 'var(--color-accent)' }}>{d.day}</div>
+                <div style={{ fontSize: 12.5, fontWeight: 600, marginTop: 2, color: 'var(--color-text-primary)' }}>{d.topic}</div>
+                <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 2 }}>{d.goal}</div>
               </div>
             ))}
           </div>

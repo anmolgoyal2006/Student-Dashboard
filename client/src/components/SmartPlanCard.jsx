@@ -1,7 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
 import API from '../api/axios';
-import toast from 'react-hot-toast';
+import toast from '../context/ToastContext';
 import { taskService } from '../services/apiServices';
+import { Brain, Target, Calendar, Sparkles } from 'lucide-react';
 
 
 /* ─── Risk config ──────────────────────────────────────────────────── */
@@ -194,7 +195,16 @@ function PlanItem({ item, index, checked, onToggle, scheduled, onSchedule }) {
             }
           }}
         >
-          {scheduled ? '✓ Scheduled' : '📅 Schedule'}
+          {scheduled ? (
+            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              ✓ Scheduled
+            </span>
+          ) : (
+            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <Calendar size={12} />
+              Schedule
+            </span>
+          )}
         </button>
       </div>
 
@@ -462,11 +472,11 @@ export default function SmartPlanCard() {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: 16,
+              color: 'var(--color-accent)',
               flexShrink: 0,
             }}
           >
-            🧠
+            <Brain size={18} />
           </div>
           <div>
             <p
@@ -504,9 +514,13 @@ export default function SmartPlanCard() {
                 background: 'rgba(124,58,237,0.15)',
                 border: '1px solid rgba(124,58,237,0.3)',
                 color: '#a78bfa',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
               }}
             >
-              🎯 {plan.focusArea}
+              <Target size={12} />
+              {plan.focusArea}
             </span>
           )}
           <span
@@ -579,7 +593,6 @@ export default function SmartPlanCard() {
         </span>
         <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-primary, #94a3b8)' }}>
           {doneCount} of {totalItems} completed
-          {doneCount === totalItems && totalItems > 0 && ' 🎉'}
         </span>
       </div>
 

@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { Plus } from 'lucide-react';
 
 const DAYS  = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const HOURS = ['08:00','09:00','10:00','11:00','12:00','13:00',
@@ -32,7 +33,6 @@ const fmt12 = (t) => {
   return `${h12}:${String(m).padStart(2,'0')} ${ampm}`;
 };
 
-/* Detect conflicts */
 const getConflicts = (subjects) => {
   const conflicts = [];
   const slots = [];
@@ -48,7 +48,7 @@ const getConflicts = (subjects) => {
       const aStart = toMinutes(a.startTime), aEnd = toMinutes(a.endTime);
       const bStart = toMinutes(b.startTime), bEnd = toMinutes(b.endTime);
       if (aStart < bEnd && bStart < aEnd) {
-        conflicts.push(`⚠️ Conflict: ${a.name} (${fmt12(a.startTime)}–${fmt12(a.endTime)}) & ${b.name} (${fmt12(b.startTime)}–${fmt12(b.endTime)}) overlap on ${a.day}`);
+        conflicts.push(`⚠️ Overlap: ${a.name} (${fmt12(a.startTime)}–${fmt12(a.endTime)}) & ${b.name} (${fmt12(b.startTime)}–${fmt12(b.endTime)}) overlap on ${a.day}`);
       }
     }
   }
@@ -64,13 +64,11 @@ export default function WeeklyGrid({ subjects }) {
 
   const conflicts = useMemo(() => getConflicts(subjects), [subjects]);
 
-  // Get current day + time for highlighting
   const now        = new Date();
   const dayNames   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   const todayName  = dayNames[now.getDay()];
   const nowMinutes = now.getHours() * 60 + now.getMinutes();
 
-  // Build grid: grid[day][hourSlot] = subject entry
   const grid = useMemo(() => {
     const g = {};
     DAYS.forEach(d => { g[d] = {}; });
@@ -78,7 +76,6 @@ export default function WeeklyGrid({ subjects }) {
       const color = colorMap[s._id];
       (s.schedule || []).forEach(slot => {
         if (!slot.day || !slot.startTime) return;
-        // Find which hour slot this falls in (normalize non-exact hour to nearest exact hour slot)
         const hourPrefix = slot.startTime.split(':')[0];
         const startHour = `${hourPrefix.padStart(2, '0')}:00`;
         if (!g[slot.day]) return;
@@ -103,6 +100,16 @@ export default function WeeklyGrid({ subjects }) {
 
   return (
     <div>
+      <style>{`
+        .empty-cell-plus-hover {
+          opacity: 0;
+          transition: opacity 0.2s ease;
+        }
+        .grid-cell-container:hover .empty-cell-plus-hover {
+          opacity: 0.3;
+        }
+      `}</style>
+
       {/* Conflict warnings */}
       {conflicts.map((c, i) => (
         <div key={i} style={{
@@ -128,18 +135,18 @@ export default function WeeklyGrid({ subjects }) {
             <div key={d} style={{
               height: 40,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontFamily: 'Sora, sans-serif',
-              fontSize: 13, fontWeight: 700,
-              color: d === todayName ? '#818cf8' : 'var(--text-secondary)',
-              background: d === todayName ? 'rgba(99,102,241,0.12)' : 'transparent',
+              fontFamily: 'inherit',
+              fontSize: 13, fontWeight: 500,
+              color: d === todayName ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+              background: d === todayName ? 'var(--color-accent-muted)' : 'transparent',
               borderRadius: 8,
-              border: d === todayName ? '1px solid rgba(99,102,241,0.25)' : '1px solid transparent',
+              border: d === todayName ? '1px solid rgba(99,102,241,0.2)' : '1px solid transparent',
             }}>
               {d}
               {d === todayName && (
                 <span style={{
-                  width: 6, height: 6, borderRadius: '50%',
-                  background: '#6366f1', marginLeft: 5,
+                  width: 5, height: 5, borderRadius: '50%',
+                  background: 'var(--color-accent)', marginLeft: 5,
                   display: 'inline-block',
                 }} />
               )}
@@ -147,17 +154,24 @@ export default function WeeklyGrid({ subjects }) {
           ))}
 
           {/* Hour rows */}
-          {HOURS.map(hour => {
+          {HOURS.map((hour, hourIdx) => {
             const hMin = toMinutes(hour);
             const isCurrentHour = nowMinutes >= hMin && nowMinutes < hMin + 60 && todayName !== 'Sun';
+            const isOddRow = hourIdx % 2 === 1;
+            const rowBackground = isOddRow ? 'rgba(31, 35, 48, 0.4)' : 'rgba(255,255,255,0.01)';
+
             return [
               /* Time label */
               <div key={`label-${hour}`} style={{
                 height: 64,
                 display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
                 paddingRight: 10,
-                fontSize: 11, color: isCurrentHour ? '#818cf8' : 'var(--text-muted)',
-                fontWeight: isCurrentHour ? 700 : 400,
+                fontSize: '12px',
+                fontVariantNumeric: 'tabular-nums',
+                color: isCurrentHour ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
+                fontWeight: isCurrentHour ? 500 : 400,
+                background: isCurrentHour ? 'rgba(99,102,241,0.05)' : rowBackground,
+                borderLeft: isCurrentHour ? '3px solid var(--color-accent)' : 'none',
               }}>
                 {fmt12(hour)}
               </div>,
@@ -166,21 +180,23 @@ export default function WeeklyGrid({ subjects }) {
               ...displayDays.map(day => {
                 const cell   = grid[day]?.[hour];
                 const isCurrent = isCurrentHour && day === todayName;
+                const cellBg = isCurrent && !cell
+                  ? 'rgba(99,102,241,0.05)'
+                  : (cell ? 'transparent' : rowBackground);
+
                 return (
-                  <div key={`${day}-${hour}`} style={{
+                  <div key={`${day}-${hour}`} className="grid-cell-container" style={{
                     height: 64,
                     borderRadius: 8,
                     padding: 4,
-                    background: isCurrent && !cell
-                      ? 'rgba(99,102,241,0.05)'
-                      : 'rgba(255,255,255,0.02)',
+                    background: cellBg,
                     border: isCurrent && !cell
                       ? '1px solid rgba(99,102,241,0.15)'
-                      : '1px solid rgba(255,255,255,0.04)',
+                      : '1px solid rgba(255,255,255,0.03)',
                     position: 'relative',
                     transition: 'background 0.15s',
                   }}>
-                    {cell && (
+                    {cell ? (
                       <div style={{
                         height: '100%',
                         borderRadius: 6,
@@ -193,17 +209,28 @@ export default function WeeklyGrid({ subjects }) {
                         overflow: 'hidden',
                       }}>
                         <div style={{
-                          fontSize: 12, fontWeight: 700,
+                          fontSize: 12, fontWeight: 500,
                           color: cell.color.text,
                           whiteSpace: 'nowrap', overflow: 'hidden',
                           textOverflow: 'ellipsis',
                         }}>
                           {cell.name}
                         </div>
-                        <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 1 }}>
+                        <div style={{ fontSize: 10, color: 'var(--color-text-secondary)', marginTop: 1 }}>
                           {fmt12(cell.startTime)}–{fmt12(cell.endTime)}
                           {cell.room ? ` · ${cell.room}` : ''}
                         </div>
+                      </div>
+                    ) : (
+                      <div className="empty-cell-plus-hover" style={{
+                        position: 'absolute',
+                        inset: 0,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: 'var(--color-accent)',
+                      }}>
+                        <Plus size={16} />
                       </div>
                     )}
                   </div>

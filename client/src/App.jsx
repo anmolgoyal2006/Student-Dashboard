@@ -1,8 +1,9 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { Toaster } from 'react-hot-toast';
+import { ToastProvider, toast } from './context/ToastContext';
 import { useEffect } from 'react';
 import { useAuth } from './context/AuthContext';
 import Sidebar    from './components/Sidebar';
+import { motion } from 'framer-motion';
 import Login      from './pages/Login';
 import Signup     from './pages/Signup';
 import Dashboard  from './pages/Dashboard';
@@ -21,7 +22,6 @@ import AdminPanel from './pages/AdminPanel';
 import LoginSuccess from './pages/LoginSuccess';
 import { getFCMToken, getMessagingInstance } from './firebase';
 import { onMessage } from 'firebase/messaging';
-import toast from 'react-hot-toast';
 import axios from 'axios';
 
 const ProtectedRoute = ({ children }) => {
@@ -29,130 +29,143 @@ const ProtectedRoute = ({ children }) => {
   return isLoggedIn ? children : <Navigate to="/login" replace />;
 };
 
-const AppLayout = ({ children }) => (
-  <div className="layout">
-    <Sidebar />
-    <main className="main-content">{children}</main>
-    <AttendancePrompt />
-  </div>
-);
+const AppLayout = ({ children }) => {
+  const isProduction = process.env.REACT_APP_ENV === 'production' || process.env.VITE_APP_ENV === 'production';
+  return (
+    <div className="layout">
+      <Sidebar />
+      <main className="main-content">
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.2, ease: 'easeOut' }}
+        >
+          {children}
+        </motion.div>
+      </main>
+      {/* Hide debug overlays in production */}
+      {!isProduction && (
+        <div id="debug-overlay-root" style={{ display: 'none' }} />
+      )}
+      <AttendancePrompt />
+    </div>
+  );
+};
+
 export default function App() {
   const { isLoggedIn } = useAuth();
 
-  // AFTER
-useEffect(() => {
-  if (!isLoggedIn) return;
+  useEffect(() => {
+    if (!isLoggedIn) return;
 
-  const saveJwtToCache = async () => {
-    try {
-      const jwt = localStorage.getItem('token');
-      if (jwt) {
-        const cache = await caches.open('auth-cache');
-        await cache.put('auth-token', new Response(JSON.stringify({ token: jwt })));
-        console.log('[Cache] JWT saved for SW');
-      }
-    } catch (err) {
-      console.error('[Cache] Failed:', err);
-    }
-  };
-
-  const initFCM = async () => {
-    try {
-      const fcmToken = await getFCMToken();
-      if (fcmToken) {
+    const saveJwtToCache = async () => {
+      try {
         const jwt = localStorage.getItem('token');
-        await axios.post(
-          `${process.env.REACT_APP_API_URL}/user/save-token`,
-          { token: fcmToken },
-          { headers: { Authorization: `Bearer ${jwt}` } }
-        );
-        console.log('[FCM] Token saved');
+        if (jwt) {
+          const cache = await caches.open('auth-cache');
+          await cache.put('auth-token', new Response(JSON.stringify({ token: jwt })));
+          console.log('[Cache] JWT saved for SW');
+        }
+      } catch (err) {
+        console.error('[Cache] Failed:', err);
       }
-    } catch (err) {
-      console.error('[FCM Init]', err.message);
-    }
-  };
+    };
 
+    const initFCM = async () => {
+      try {
+        const fcmToken = await getFCMToken();
+        if (fcmToken) {
+          const jwt = localStorage.getItem('token');
+          await axios.post(
+            `${process.env.REACT_APP_API_URL}/user/save-token`,
+            { token: fcmToken },
+            { headers: { Authorization: `Bearer ${jwt}` } }
+          );
+          console.log('[FCM] Token saved');
+        }
+      } catch (err) {
+        console.error('[FCM Init]', err.message);
+      }
+    };
 
- saveJwtToCache();
-  initFCM();
+    saveJwtToCache();
+    initFCM();
 
-  const messaging = getMessagingInstance();
-  const unsubscribe = onMessage(messaging, (payload) => {
-    const { title, body } = payload?.notification || {};
-    const data = payload?.data || {};
+    const messaging = getMessagingInstance();
+    const unsubscribe = onMessage(messaging, (payload) => {
+      const { title, body } = payload?.notification || {};
+      const data = payload?.data || {};
 
-    // Show system notification with action buttons (works in foreground too)
-    if (Notification.permission === 'granted' && data.subjectId) {
-      navigator.serviceWorker.ready.then(reg => {
-        reg.showNotification(title || '🔔 Attendance', {
-          body: body || 'Mark your attendance',
-          icon: '/logo192.png',
-          badge: '/logo192.png',
-          data: {
-            subjectId: data.subjectId,
-            date: data.date,
-            url: `/?markAttendance=1&subjectId=${data.subjectId}&date=${data.date}`,
-          },
-          actions: [
-            { action: 'attended',     title: '✅ Attended'    },
-            { action: 'not_attended', title: '❌ Not Attended' },
-            { action: 'not_held',     title: '⏸ Not Held'     },
-          ],
+      if (Notification.permission === 'granted' && data.subjectId) {
+        navigator.serviceWorker.ready.then(reg => {
+          reg.showNotification(title || '🔔 Attendance', {
+            body: body || 'Mark your attendance',
+            icon: '/logo192.png',
+            badge: '/logo192.png',
+            data: {
+              subjectId: data.subjectId,
+              date: data.date,
+              url: `/?markAttendance=1&subjectId=${data.subjectId}&date=${data.date}`,
+            },
+            actions: [
+              { action: 'attended',     title: '✅ Attended'    },
+              { action: 'not_attended', title: '❌ Not Attended' },
+              { action: 'not_held',     title: '⏸ Not Held'     },
+            ],
+          });
         });
-      });
-    } else if (title || body) {
-      // Fallback toast for browsers that don't support SW notifications
-      toast(`🔔 ${title}: ${body}`, { duration: 5000 });
-    }
-  });
-  return () => unsubscribe();
-}, [isLoggedIn]);                                 // ← re-runs on login
-  return (
-    <BrowserRouter>
-      <Toaster position="top-right" />
-      <Routes>
-        <Route path="/login"  element={<Login />} />
-        <Route path="/signup" element={<Signup />} />
-        <Route path="/forgot-password" element={<ForgotPassword />} />
-        <Route path="/reset-password/:token" element={<ResetPassword />} />
-        <Route path="/" element={
-          <ProtectedRoute><AppLayout><Dashboard /></AppLayout></ProtectedRoute>
-        } />
-        <Route path="/login-success" element={<LoginSuccess />} />
-        <Route path="/prediction" element={
-          <ProtectedRoute><AppLayout><Prediction /></AppLayout></ProtectedRoute>
-        } />
-        <Route path="/timetable" element={
-          <ProtectedRoute><AppLayout><Timetable /></AppLayout></ProtectedRoute>
-        } />
-        <Route path="/attendance" element={
-  <ProtectedRoute><AppLayout><Attendance /></AppLayout></ProtectedRoute>
-} />
+      } else if (title || body) {
+        toast.info(`🔔 ${title}: ${body}`);
+      }
+    });
+    return () => unsubscribe();
+  }, [isLoggedIn]);
 
-<Route path="/attendance/upload" element={
-  <ProtectedRoute><AppLayout><Attendance /></AppLayout></ProtectedRoute>
-} />
-        <Route path="/marks" element={
-          <ProtectedRoute><AppLayout><Marks /></AppLayout></ProtectedRoute>
-        } />
-        <Route path="/career" element={
-          <ProtectedRoute><AppLayout><Career /></AppLayout></ProtectedRoute>
-        } />
-        <Route path="/scheduler" element={
-          <ProtectedRoute><AppLayout><Scheduler /></AppLayout></ProtectedRoute>
-        } />
-        <Route path="/ai-assistant" element={
-          <ProtectedRoute><AppLayout><AIAssistant /></AppLayout></ProtectedRoute>
-        } />
-        <Route path="/profile" element={
-          <ProtectedRoute><AppLayout><ProfileSettings /></AppLayout></ProtectedRoute>
-        } />
-       <Route path="/admin" element={
-          <ProtectedRoute><AppLayout><AdminPanel /></AppLayout></ProtectedRoute>
-        } />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </BrowserRouter>
+  return (
+    <ToastProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/login"  element={<Login />} />
+          <Route path="/signup" element={<Signup />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password/:token" element={<ResetPassword />} />
+          <Route path="/" element={
+            <ProtectedRoute><AppLayout><Dashboard /></AppLayout></ProtectedRoute>
+          } />
+          <Route path="/login-success" element={<LoginSuccess />} />
+          <Route path="/prediction" element={
+            <ProtectedRoute><AppLayout><Prediction /></AppLayout></ProtectedRoute>
+          } />
+          <Route path="/timetable" element={
+            <ProtectedRoute><AppLayout><Timetable /></AppLayout></ProtectedRoute>
+          } />
+          <Route path="/attendance" element={
+            <ProtectedRoute><AppLayout><Attendance /></AppLayout></ProtectedRoute>
+          } />
+          <Route path="/attendance/upload" element={
+            <ProtectedRoute><AppLayout><Attendance /></AppLayout></ProtectedRoute>
+          } />
+          <Route path="/marks" element={
+            <ProtectedRoute><AppLayout><Marks /></AppLayout></ProtectedRoute>
+          } />
+          <Route path="/career" element={
+            <ProtectedRoute><AppLayout><Career /></AppLayout></ProtectedRoute>
+          } />
+          <Route path="/scheduler" element={
+            <ProtectedRoute><AppLayout><Scheduler /></AppLayout></ProtectedRoute>
+          } />
+          <Route path="/ai-assistant" element={
+            <ProtectedRoute><AppLayout><AIAssistant /></AppLayout></ProtectedRoute>
+          } />
+          <Route path="/profile" element={
+            <ProtectedRoute><AppLayout><ProfileSettings /></AppLayout></ProtectedRoute>
+          } />
+          <Route path="/admin" element={
+            <ProtectedRoute><AppLayout><AdminPanel /></AppLayout></ProtectedRoute>
+          } />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </BrowserRouter>
+    </ToastProvider>
   );
 }

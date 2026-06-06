@@ -1,52 +1,44 @@
 import { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { 
+  LayoutDashboard, 
+  Calendar, 
+  CheckSquare, 
+  BarChart3, 
+  Rocket, 
+  Clock, 
+  User, 
+  Bot, 
+  LineChart, 
+  Users,
+  ChevronLeft,
+  ChevronRight,
+  LogOut,
+  GraduationCap
+} from 'lucide-react';
 
-
-// ── Define SettingsIcon before using it ──────────────────
-function SettingsIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-      stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="3"/>
-      <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83
-               2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33
-               1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09
-               A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06
-               a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15
-               a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09
-               A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06
-               a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68
-               a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09
-               a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06
-               a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9
-               a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09
-               a1.65 1.65 0 00-1.51 1z"/>
-    </svg>
-  );
-}
-
-// ── All icons now use the same format (strings or JSX) ───
-// consistent with the rest of the links array format.
-// This avoids JSX-in-object-literal issues.
 const baseLinks = [
-  { to: '/',             label: 'Dashboard',    icon: '🏠' },
-  { to: '/timetable',    label: 'Timetable',    icon: '📅' },
-  { to: '/attendance',   label: 'Attendance',   icon: '✅' },
-  { to: '/marks',        label: 'Marks & Ranking', icon: '📊' },
-  { to: '/career',       label: 'Career',       icon: '🚀' },
-  { to: '/scheduler',    label: 'Scheduler',    icon: '🗓️' },
-  { to: '/profile',      label: 'Profile',      icon: '⚙️' },
-  { to: '/ai-assistant', label: 'AI Assistant', icon: '🤖' },
-  { to: '/prediction',   label: 'Predictor',    icon: '🎯' },
+  { to: '/',             label: 'Dashboard',    icon: LayoutDashboard },
+  { to: '/timetable',    label: 'Timetable',    icon: Calendar },
+  { to: '/attendance',   label: 'Attendance',   icon: CheckSquare },
+  { to: '/marks',        label: 'Marks & Ranking', icon: BarChart3 },
+  { to: '/career',       label: 'Career',       icon: Rocket },
+  { to: '/scheduler',    label: 'Scheduler',    icon: Clock },
+  { to: '/profile',      label: 'Profile',      icon: User },
+  { to: '/ai-assistant', label: 'AI Assistant', icon: Bot },
+  { to: '/prediction',   label: 'Predictor',    icon: LineChart },
 ];
 
 export default function Sidebar() {
   const { user, logout } = useAuth();
-  const [open, setOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(() => {
+    return localStorage.getItem('sidebar-collapsed') === 'true';
+  });
+  const [open, setOpen] = useState(false); // Mobile sidebar drawer open state
 
   const links = user?.role === 'teacher'
-    ? [...baseLinks, { to: '/admin', label: 'User Management', icon: '👥' }]
+    ? [...baseLinks, { to: '/admin', label: 'User Management', icon: Users }]
     : baseLinks;
 
   const initials = user?.name
@@ -57,8 +49,18 @@ export default function Sidebar() {
     if (window.innerWidth <= 768) setOpen(false);
   };
 
+  const toggleCollapse = () => {
+    setCollapsed(prev => {
+      const next = !prev;
+      localStorage.setItem('sidebar-collapsed', String(next));
+      return next;
+    });
+  };
+
   useEffect(() => {
-    const onResize = () => { if (window.innerWidth > 768) setOpen(false); };
+    const onResize = () => { 
+      if (window.innerWidth > 768) setOpen(false); 
+    };
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
@@ -68,11 +70,25 @@ export default function Sidebar() {
     return () => { document.body.style.overflow = ''; };
   }, [open]);
 
+  // Synchronize layout class with collapsible state
+  useEffect(() => {
+    const layout = document.querySelector('.layout');
+    if (layout) {
+      if (collapsed) {
+        layout.classList.add('sidebar-collapsed');
+      } else {
+        layout.classList.remove('sidebar-collapsed');
+      }
+    }
+  }, [collapsed]);
+
   return (
     <>
-      {/* Mobile top navbar */}
       <nav className="mobile-navbar">
-        <span className="mobile-nav-logo">🎓 StudentAI</span>
+        <span className="mobile-nav-logo" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <GraduationCap size={18} color="var(--color-accent)" />
+          StudentAI
+        </span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <button
             onClick={logout}
@@ -91,7 +107,7 @@ export default function Sidebar() {
             }}
             title="Logout"
           >
-            <span>🚪</span>
+            <LogOut size={14} />
             <span style={{ fontSize: 11 }}>Logout</span>
           </button>
           <button
@@ -114,25 +130,83 @@ export default function Sidebar() {
       )}
 
       {/* Sidebar */}
-     <aside className={`sidebar${open ? ' open' : ''}`} style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflowY: 'auto' }}>
-        <div className="sidebar-logo">StudentAI</div>
+      <aside className={`sidebar${open ? ' open' : ''}`}>
+        {/* Logo Monogram & Text */}
+        <div className="sidebar-logo" style={{ justifyContent: collapsed ? 'center' : 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div className="sidebar-logo-mark">S</div>
+            {!collapsed && <span className="sidebar-logo-text">StudentAI</span>}
+          </div>
+          {!collapsed && (
+            <button className="sidebar-toggle-btn" onClick={toggleCollapse}>
+              <ChevronLeft size={16} />
+            </button>
+          )}
+        </div>
 
+        {collapsed && (
+          <button className="sidebar-toggle-btn" onClick={toggleCollapse} style={{ margin: '0 auto 16px' }}>
+            <ChevronRight size={16} />
+          </button>
+        )}
+
+        {!collapsed && <div className="sidebar-section-label">Navigation</div>}
+
+        {links.map(l => {
+          const IconComponent = l.icon;
+          return (
+            <NavLink
+              key={l.to}
+              to={l.to}
+              end={l.to === '/'}
+              className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}
+              onClick={handleLinkClick}
+              title={collapsed ? l.label : undefined}
+            >
+              <span className="sidebar-link-icon">
+                <IconComponent size={18} />
+              </span>
+              {!collapsed && <span>{l.label}</span>}
+            </NavLink>
+          );
+        })}
+
+        {/* User profile block at bottom */}
         <div className="sidebar-user">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{
-              width: 34, height: 34, borderRadius: '50%',
-              background: 'linear-gradient(135deg, #6366f1, #818cf8)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 13, fontWeight: 700, color: '#fff',
-              flexShrink: 0, boxShadow: '0 0 12px rgba(129,140,248,0.3)',
-            }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'flex-start', gap: 12 }}>
+            <div className="sidebar-user-avatar">
               {initials}
             </div>
-            <div style={{ minWidth: 0, flex: 1 }}>
-              <div className="sidebar-user-name">{user?.name}</div>
-              <div className="sidebar-user-email">{user?.email}</div>
-            </div>
-            {/* Quick Logout button in User Card */}
+            {!collapsed && (
+              <div className="sidebar-user-info">
+                <div className="sidebar-user-name">{user?.name}</div>
+                <div className="sidebar-user-email">{user?.email}</div>
+              </div>
+            )}
+            {!collapsed && (
+              <button
+                onClick={logout}
+                style={{
+                  background: 'rgba(248, 113, 113, 0.1)',
+                  border: 'none',
+                  borderRadius: '8px',
+                  color: 'var(--danger, #f87171)',
+                  width: 28,
+                  height: 28,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  flexShrink: 0,
+                  transition: 'background 0.2s',
+                }}
+                title="Logout"
+              >
+                <LogOut size={14} />
+              </button>
+            )}
+          </div>
+          {collapsed && (
             <button
               onClick={logout}
               style={{
@@ -140,38 +214,21 @@ export default function Sidebar() {
                 border: 'none',
                 borderRadius: '8px',
                 color: 'var(--danger, #f87171)',
-                width: 28,
-                height: 28,
+                width: 32,
+                height: 32,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 cursor: 'pointer',
-                flexShrink: 0,
-                transition: 'background 0.2s',
+                marginTop: 8,
+                width: '100%',
               }}
               title="Logout"
-              onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(248, 113, 113, 0.2)'}
-              onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(248, 113, 113, 0.1)'}
             >
-              🚪
+              <LogOut size={16} />
             </button>
-          </div>
+          )}
         </div>
-
-        <div className="sidebar-section-label">Navigation</div>
-
-        {links.map(l => (
-          <NavLink
-            key={l.to}
-            to={l.to}
-            end={l.to === '/'}
-            className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}
-            onClick={handleLinkClick}
-          >
-            <span className="sidebar-link-icon">{l.icon}</span>
-            {l.label}
-          </NavLink>
-        ))}
       </aside>
     </>
   );

@@ -1,7 +1,8 @@
 // src/components/AttendancePrompt.jsx
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import toast from 'react-hot-toast';
+import toast from '../context/ToastContext';
+import { Bell, CheckCircle, XCircle, PauseCircle } from 'lucide-react';
 
 const API = process.env.REACT_APP_API_URL;
 
@@ -76,7 +77,9 @@ export default function AttendancePrompt() {
   return (
     <div style={s.overlay}>
       <div style={s.card}>
-        <div style={s.icon}>🔔</div>
+        <div style={{ ...s.icon, display: 'flex', justifyContent: 'center', color: 'var(--color-accent)' }}>
+          <Bell size={40} />
+        </div>
         <h3 style={s.title}>Mark Your Attendance</h3>
         <p style={s.sub}>Did you attend this class?</p>
 
@@ -86,21 +89,21 @@ export default function AttendancePrompt() {
             disabled={!!marking}
             onClick={() => mark('attended')}
           >
-            {marking === 'attended' ? '…' : '✅ Attended'}
+            {marking === 'attended' ? '…' : <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}><CheckCircle size={16} /> Attended</span>}
           </button>
           <button
             style={{ ...s.btn, ...s.btnAbsent }}
             disabled={!!marking}
             onClick={() => mark('not_attended')}
           >
-            {marking === 'not_attended' ? '…' : '❌ Not Attended'}
+            {marking === 'not_attended' ? '…' : <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}><XCircle size={16} /> Not Attended</span>}
           </button>
           <button
             style={{ ...s.btn, ...s.btnNeutral }}
             disabled={!!marking}
             onClick={() => mark('not_held')}
           >
-            {marking === 'not_held' ? '…' : '⏸ Not Held'}
+            {marking === 'not_held' ? '…' : <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}><PauseCircle size={16} /> Not Held</span>}
           </button>
         </div>
 

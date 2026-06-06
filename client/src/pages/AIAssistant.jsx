@@ -2,69 +2,24 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useSearchParams } from 'react-router-dom';
 import { aiChatService, aiCommandService } from '../services/apiServices';
 import { useGlobalData } from '../context/GlobalDataContext';
-import toast from 'react-hot-toast';
-
-// ─── Icons ────────────────────────────────────────────────────────────────────
-const BookIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
-  </svg>
-);
-const BotIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/>
-  </svg>
-);
-const SendIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-    <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
-  </svg>
-);
-const UploadIcon = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
-  </svg>
-);
-const SummarizeIcon = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <line x1="21" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="17" y1="18" x2="3" y2="18"/>
-  </svg>
-);
-const QuizIcon = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-  </svg>
-);
-const ClipIcon = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
-  </svg>
-);
-const CheckIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="20 6 9 17 4 12"/>
-  </svg>
-);
-const CalendarIcon = () => (
-  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
-  </svg>
-);
-const BarChartIcon = () => (
-  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
-  </svg>
-);
-const TaskIcon = () => (
-  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
-  </svg>
-);
-const SubjectIcon = () => (
-  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
-  </svg>
-);
+import toast from '../context/ToastContext';
+import { 
+  Bot, 
+  BookOpen, 
+  Send, 
+  Upload, 
+  FileText, 
+  HelpCircle, 
+  Paperclip, 
+  Check, 
+  Calendar, 
+  BarChart2, 
+  CheckSquare, 
+  Layers,
+  ChevronRight,
+  Mic,
+  Trash2
+} from 'lucide-react';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function cleanTextForSpeech(text) {
@@ -106,23 +61,23 @@ function CodeBlock({ code, language }) {
 
   return (
     <div style={{
-      background: '#0d1117',
-      border: '1px solid rgba(255,255,255,0.08)',
-      borderRadius: '8px',
+      background: 'var(--color-surface-0)',
+      border: '1px solid var(--border)',
+      borderRadius: 'var(--radius-md)',
       margin: '12px 0',
       overflow: 'hidden',
-      fontFamily: 'SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace',
+      fontFamily: 'SFMono-Regular, Consolas, monospace',
     }}>
       {/* Header bar */}
       <div style={{
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        background: 'rgba(255,255,255,0.03)',
+        background: 'rgba(255,255,255,0.02)',
         padding: '6px 12px',
-        borderBottom: '1px solid rgba(255,255,255,0.08)',
+        borderBottom: '1px solid var(--border)',
         fontSize: '11px',
-        color: '#8b949e',
+        color: 'var(--color-text-secondary)',
         textTransform: 'uppercase',
         userSelect: 'none'
       }}>
@@ -132,18 +87,16 @@ function CodeBlock({ code, language }) {
           style={{
             background: 'transparent',
             border: 'none',
-            color: copied ? '#34d399' : '#8b949e',
+            color: copied ? 'var(--color-success)' : 'var(--color-text-secondary)',
             cursor: 'pointer',
             fontSize: '11px',
             display: 'flex',
             alignItems: 'center',
             gap: '4px',
             padding: '2px 6px',
-            borderRadius: '4px',
+            borderRadius: 'var(--radius-sm)',
             transition: 'all 0.15s ease'
           }}
-          onMouseEnter={(e) => { e.currentTarget.style.color = '#c9d1d9'; e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.color = copied ? '#34d399' : '#8b949e'; e.currentTarget.style.background = 'transparent'; }}
         >
           {copied ? '✓ Copied' : '📋 Copy'}
         </button>
@@ -155,7 +108,7 @@ function CodeBlock({ code, language }) {
         overflowX: 'auto',
         fontSize: '13px',
         lineHeight: '1.5',
-        color: '#c9d1d9',
+        color: 'var(--color-text-primary)',
         textAlign: 'left'
       }}>
         <code>{code}</code>
@@ -167,11 +120,9 @@ function CodeBlock({ code, language }) {
 function renderMessageText(text) {
   if (!text) return null;
 
-  // Split by fenced code blocks
   const parts = text.split(/(```[\s\S]*?```)/g);
   
   return parts.map((part, index) => {
-    // If it's an odd index, it's a code block
     if (index % 2 === 1) {
       const match = part.match(/^```(\w*)\r?\n?([\s\S]*?)```$/);
       if (match) {
@@ -181,7 +132,6 @@ function renderMessageText(text) {
       }
       return <pre key={index} style={{ whiteSpace: 'pre-wrap', margin: '4px 0' }}>{part}</pre>;
     } else {
-      // It's normal text, split by inline code blocks
       const inlineParts = part.split(/(`[^`\n]+`)/g);
       return inlineParts.map((subPart, subIndex) => {
         if (subIndex % 2 === 1) {
@@ -190,13 +140,13 @@ function renderMessageText(text) {
             <code
               key={subIndex}
               style={{
-                background: 'rgba(255,255,255,0.08)',
-                border: '1px solid rgba(255,255,255,0.12)',
-                fontFamily: 'SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace',
+                background: 'rgba(255,255,255,0.06)',
+                border: '1px solid var(--border)',
+                fontFamily: 'SFMono-Regular, Consolas, monospace',
                 padding: '2px 6px',
                 borderRadius: '4px',
                 fontSize: '0.85em',
-                color: '#fb7185', // nice rose color for contrast in dark mode
+                color: '#fb7185',
                 wordBreak: 'break-all'
               }}
             >
@@ -213,7 +163,7 @@ function renderMessageText(text) {
 // ─── Message bubble ───────────────────────────────────────────────────────────
 function MessageBubble({ msg, mode }) {
   const isUser = msg.role === 'user';
-  const accent = mode === 'notes' ? '#10b981' : 'var(--primary)';
+  const accent = 'var(--color-accent)';
   const [copied, setCopied] = useState(false);
 
   const handleBubbleCopy = () => {
@@ -231,13 +181,14 @@ function MessageBubble({ msg, mode }) {
     }}>
       {!isUser && (
         <div style={{
-          width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
-          background: mode === 'notes'
-            ? 'linear-gradient(135deg,#064e3b,#10b981)'
-            : 'linear-gradient(135deg,var(--primary-dark),var(--primary))',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff',
+          width: 28, height: 28, 
+          borderRadius: 'var(--radius-sm)',
+          flexShrink: 0,
+          background: 'var(--color-accent-muted)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', 
+          color: 'var(--color-accent)',
         }}>
-          {mode === 'notes' ? <BookIcon /> : <BotIcon />}
+          <Bot size={16} />
         </div>
       )}
       <div style={{
@@ -245,19 +196,16 @@ function MessageBubble({ msg, mode }) {
         maxWidth: '75%', padding: '11px 15px',
         paddingRight: isUser ? '15px' : '40px',
         borderRadius: isUser ? '18px 18px 4px 18px' : '4px 18px 18px 18px',
-        background: isUser
-          ? (mode === 'notes'
-              ? 'linear-gradient(135deg,#064e3b,#10b981)'
-              : 'linear-gradient(135deg,var(--primary-dark),var(--primary))')
-          : 'var(--bg-3)',
-        border: isUser ? 'none' : '1px solid var(--card-border)',
-        color: 'var(--text)', fontSize: 14, lineHeight: 1.6,
+        background: isUser ? 'var(--color-accent)' : 'var(--color-surface-2)',
+        border: isUser ? 'none' : '1px solid var(--border)',
+        color: isUser ? '#fff' : 'var(--color-text-primary)', 
+        fontSize: 14, lineHeight: 1.5,
         wordBreak: 'break-word',
       }}>
         {!isUser && (
           <button
             onClick={handleBubbleCopy}
-            title="Copy message to clipboard"
+            title="Copy message"
             style={{
               position: 'absolute',
               top: '8px',
@@ -266,7 +214,7 @@ function MessageBubble({ msg, mode }) {
               border: 'none',
               cursor: 'pointer',
               fontSize: '13px',
-              color: copied ? '#34d399' : 'var(--muted)',
+              color: copied ? 'var(--color-success)' : 'var(--color-text-secondary)',
               opacity: 0.6,
               transition: 'opacity 0.2s, color 0.2s',
               padding: '4px',
@@ -275,8 +223,6 @@ function MessageBubble({ msg, mode }) {
               justifyContent: 'center',
               borderRadius: '4px',
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.6'; e.currentTarget.style.background = 'transparent'; }}
           >
             {copied ? '✓' : '📋'}
           </button>
@@ -288,61 +234,34 @@ function MessageBubble({ msg, mode }) {
           <div style={{ marginTop: 8, borderTop: '1px solid var(--border)', paddingTop: 8 }}>
             {msg.sources.map((s, i) => (
               <div key={i} style={{
-                fontSize: 11.5, color: 'var(--muted)', marginTop: 4,
-                background: 'rgba(255,255,255,0.03)', borderRadius: 6, padding: '4px 8px',
+                fontSize: 11.5, color: 'var(--color-text-secondary)', marginTop: 4,
+                background: 'rgba(255,255,255,0.02)', borderRadius: 6, padding: '4px 8px',
               }}>
-                📄 <span style={{ color: 'var(--primary)' }}>{s.filename}</span> — {s.preview}
+                📄 <span style={{ color: 'var(--color-accent)' }}>{s.filename}</span> — {s.preview}
               </div>
             ))}
           </div>
         )}
 
-        {/* Show "dashboard updated" only for real data mutations */}
-       {msg.entity && msg.entity !== 'none' && ['add', 'update', 'delete'].includes(msg.action) && (
+        {msg.entity && msg.entity !== 'none' && ['add', 'update', 'delete'].includes(msg.action) && (
           <div style={{
             marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border)',
             fontSize: 11, color: accent, display: 'flex', alignItems: 'center', gap: 4,
           }}>
-            <CheckIcon /> Dashboard updated · {msg.entity}
+            <Check size={12} /> Dashboard updated · {msg.entity}
           </div>
         )}
 
-        {/* For analytical answers, show a subtle info tag */}
         {msg.action === 'answer' && (
           <div style={{
             marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border)',
-            fontSize: 11, color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: 4,
+            fontSize: 11, color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: 4,
           }}>
             🧠 Calculated from your data
           </div>
         )}
       </div>
     </div>
-  );
-}
-
-// ─── Command chip ─────────────────────────────────────────────────────────────
-function CommandChip({ icon, label, example, onClick }) {
-  const [hovered, setHovered] = useState(false);
-  return (
-    <button
-      onClick={() => onClick(example)}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        background: hovered ? 'rgba(129,140,248,0.1)' : 'var(--bg-3)',
-        border: '1px solid var(--card-border)', borderRadius: 10,
-        padding: '10px 13px', cursor: 'pointer', textAlign: 'left',
-        transition: 'all 0.18s ease', color: 'var(--text)',
-        transform: hovered ? 'translateY(-2px)' : 'none',
-      }}
-    >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-        <span style={{ color: 'var(--primary)' }}>{icon}</span>
-        <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</span>
-      </div>
-      <div style={{ fontSize: 12.5, color: 'var(--muted)', fontStyle: 'italic' }}>"{example}"</div>
-    </button>
   );
 }
 
@@ -384,6 +303,7 @@ export default function AIAssistant() {
       setMode(qMode);
     }
   }, [searchParams]);
+
   useEffect(() => {
     try {
       localStorage.setItem("ai_assistant_chat_history_notes", JSON.stringify(messages.notes));
@@ -434,7 +354,6 @@ export default function AIAssistant() {
     setMessages(prev => ({ ...prev, [modeKey]: [...prev[modeKey], msg] }));
   };
 
-  // ─── Speech ───────────────────────────────────────────────────────────────
   const speak = (text) => {
     if (!voiceEnabled || !window.speechSynthesis) return;
     window.speechSynthesis.cancel();
@@ -444,9 +363,6 @@ export default function AIAssistant() {
     window.speechSynthesis.speak(utter);
   };
 
-  const stopSpeaking = () => window.speechSynthesis?.cancel();
-
-  // ─── Send ─────────────────────────────────────────────────────────────────
   const handleSend = async (overrideText) => {
     const text = (overrideText ?? input).trim();
     if (!text || loading) return;
@@ -457,17 +373,13 @@ export default function AIAssistant() {
 
     try {
       if (mode === 'notes') {
-        // Notes mode — always goes to RAG/chat AI
         const res = await callNotesAI('chat', { 
           message: text,
           history: messages.notes.map(m => ({ role: m.role, text: m.text }))
         });
         addMessage('notes', { role: 'ai', text: res.text, sources: res.sources, id: Date.now() + 1 });
         speak(res.text);
-
       } else {
-        // Assistant mode — Groq decides if it's a command, query, or analytical answer
-        // No frontend pattern matching — let the backend handle routing entirely
         let res = await callSmartAssistant({ 
           message: text,
           history: messages.assistant.map(m => ({ role: m.role, text: m.text }))
@@ -501,12 +413,10 @@ export default function AIAssistant() {
         });
         speak(res.message);
 
-        // Refresh dashboard data only for real mutations (not answers or gets)
         if (res.success && res.entity && res.entity !== 'none' && ['add', 'update', 'delete'].includes(res.action)) {
           refreshByEntity(res.entity);
         }
       }
-
     } catch (err) {
       const errText = err.response?.data?.message || 'Something went wrong. Please try again.';
       addMessage(mode, { role: 'ai', text: `❌ ${errText}`, id: Date.now() + 1 });
@@ -515,7 +425,6 @@ export default function AIAssistant() {
     }
   };
 
-  // ─── Voice ───────────────────────────────────────────────────────────────
   const handleVoice = () => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) { toast.error('Voice not supported. Use Chrome.'); return; }
@@ -597,7 +506,6 @@ export default function AIAssistant() {
     inputRef.current?.focus();
   };
 
-  // ─── Intro messages ───────────────────────────────────────────────────────
   const notesIntro = [{
     role: 'ai',
     text: "Hi! I'm your Notes AI. Upload your study material and I'll help you:\n\n- Summarize key concepts\n- Quiz you on the content\n- Answer questions about your notes\n\nStart by uploading a file or just ask me anything!",
@@ -614,17 +522,15 @@ export default function AIAssistant() {
     ? (mode === 'notes' ? notesIntro : assistantIntro)
     : currentMessages;
 
-  // Example commands — these are illustrative, not hardcoded routing
   const ASSISTANT_COMMANDS = [
-    { icon: <CalendarIcon />, label: 'Attendance', example: 'I attended Data Structures today'              },
-    { icon: <BarChartIcon />, label: 'Marks',      example: 'I scored 42 out of 50 in Physics midterm'     },
-    { icon: <TaskIcon />,     label: 'Task',       example: 'Add high priority task to submit project by Friday' },
-    { icon: <SubjectIcon />,  label: 'Subject',    example: 'Add Maths and Physics on Monday and Tuesday'  },
+    { icon: Calendar, label: 'Attendance', example: 'I attended Data Structures today' },
+    { icon: BarChart2, label: 'Marks',      example: 'I scored 42 out of 50 in Physics midterm' },
+    { icon: CheckSquare, label: 'Task',       example: 'Add high priority task to submit project by Friday' },
+    { icon: Layers,  label: 'Subject',    example: 'Add Maths and Physics on Monday and Tuesday' },
   ];
 
   return (
     <div className="page-container-fixed">
-
       <style>{`
         @keyframes aiBubbleIn {
           from { opacity: 0; transform: translateY(10px) scale(0.96); }
@@ -645,7 +551,7 @@ export default function AIAssistant() {
         }
         .ai-dot-loader span {
           display: inline-block; width: 6px; height: 6px; border-radius: 50%;
-          background: var(--muted); margin: 0 2px;
+          background: var(--color-text-tertiary); margin: 0 2px;
           animation: aiDotBounce 1.2s ease-in-out infinite;
         }
         .ai-dot-loader span:nth-child(2) { animation-delay: 0.2s; }
@@ -657,7 +563,10 @@ export default function AIAssistant() {
       {/* ── Page header ── */}
       <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          <h1 className="page-title">🤖 AI Study Assistant</h1>
+          <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Bot size={20} color="var(--color-accent)" />
+            AI Study Assistant
+          </h1>
           <p className="page-subtitle">
             {mode === 'notes'
               ? 'Ask questions, summarize notes, generate quizzes'
@@ -672,67 +581,62 @@ export default function AIAssistant() {
               toast.success('Chat history cleared');
             }
           }}
-          style={{ padding: '6px 12px', fontSize: 13, borderColor: 'var(--border)', color: 'var(--muted)', background: 'transparent' }}
+          style={{ padding: '6px 12px', fontSize: 13, borderColor: 'var(--border)', color: 'var(--color-text-tertiary)', background: 'transparent' }}
         >
-          🗑️ Clear Chat
+          Clear Chat
         </button>
       </div>
 
       {/* ── Main card ── */}
       <div className="card" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: 0 }}>
-
+        
         {/* ── Tabs ── */}
         <div style={{
-          display: 'flex', background: 'var(--bg-2)',
-          borderBottom: '1px solid var(--border)', padding: '6px 6px 0', gap: 4,
+          display: 'flex',
+          borderBottom: '1px solid var(--border)',
+          padding: '0 16px',
+          gap: 24,
+          background: 'var(--color-surface-1)'
         }}>
           {[
-            { key: 'assistant', label: 'Dashboard AI', icon: <BotIcon />,  color: 'var(--primary)' },
-            { key: 'notes',     label: 'Notes AI',     icon: <BookIcon />, color: '#10b981'        },
+            { key: 'assistant', label: 'Dashboard AI', icon: Bot },
+            { key: 'notes',     label: 'Notes AI',     icon: BookOpen, isBeta: true },
           ].map(tab => {
             const active = mode === tab.key;
+            const IconComponent = tab.icon;
             return (
               <button
                 key={tab.key}
                 onClick={() => switchMode(tab.key)}
                 style={{
-                  flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  gap: 8, padding: '10px 16px',
-                  background: active 
-                    ? 'var(--bg-3)' 
-                    : (tab.key === 'assistant' ? 'rgba(129, 140, 248, 0.04)' : 'rgba(16, 185, 129, 0.04)'),
-                  color: active 
-                    ? tab.color 
-                    : (tab.key === 'assistant' ? 'rgba(129, 140, 248, 0.8)' : 'rgba(16, 185, 129, 0.8)'),
-                  borderRadius: '8px 8px 0 0', border: 'none', cursor: 'pointer',
-                  fontFamily: 'inherit', fontSize: 13.5, fontWeight: active ? 600 : 500,
-                  transition: 'all 0.2s ease',
-                  borderBottom: active 
-                    ? `2.5px solid ${tab.color}` 
-                    : (tab.key === 'assistant' ? '1px solid rgba(129, 140, 248, 0.2)' : '1px solid rgba(16, 185, 129, 0.2)'),
-                  position: 'relative',
-                  boxShadow: !active ? `inset 0 0 6px ${tab.key === 'assistant' ? 'rgba(129,140,248,0.03)' : 'rgba(16,185,129,0.03)'}` : 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  padding: '12px 4px',
+                  background: 'transparent',
+                  color: active ? '#fff' : 'var(--color-text-secondary)',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: 13.5,
+                  fontWeight: active ? 500 : 400,
+                  borderBottom: active ? '2px solid var(--color-accent)' : '2px solid transparent',
+                  transition: 'all 0.15s ease',
                 }}
               >
-                {tab.icon}
-                {tab.label}
-                {tab.key === 'assistant' && (
-                  <span className="ai-pulse" style={{
-                    fontSize: 9.5,
-                    background: active ? 'rgba(129,140,248,0.22)' : 'rgba(129,140,248,0.12)',
-                    color: '#c7d2fe',
-                    padding: '2px 6px',
-                    borderRadius: 4,
-                    marginLeft: 6,
-                    fontWeight: 700,
-                    letterSpacing: '0.05em',
-                    border: '1px solid rgba(129,140,248,0.3)',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 3,
+                <IconComponent size={16} />
+                <span>{tab.label}</span>
+                {tab.isBeta && (
+                  <span style={{
+                    fontSize: '10px',
+                    fontWeight: 500,
+                    color: '#fbbf24',
+                    background: 'rgba(251, 191, 36, 0.12)',
+                    border: '1px solid rgba(251, 191, 36, 0.2)',
+                    borderRadius: 'var(--radius-pill)',
+                    padding: '1px 6px',
+                    marginLeft: '4px'
                   }}>
-                    <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#34d399', display: 'inline-block', boxShadow: '0 0 6px #34d399' }} />
-                    GROQ
+                    Beta
                   </span>
                 )}
               </button>
@@ -752,7 +656,7 @@ export default function AIAssistant() {
               disabled={loading}
               style={{ color: '#10b981', borderColor: 'rgba(16,185,129,0.35)', display: 'flex', alignItems: 'center', gap: 6 }}
             >
-              <UploadIcon /> Upload Notes
+              <Upload size={14} /> Upload Notes
             </button>
             <input
               ref={fileInputRef} type="file"
@@ -764,7 +668,7 @@ export default function AIAssistant() {
               onClick={() => { setShowNotes(n => !n); loadNotes(); }}
               style={{ display: 'flex', alignItems: 'center', gap: 6 }}
             >
-              📚 Notes ({notes.length})
+              <BookOpen size={14} /> Notes ({notes.length})
             </button>
             <button
               className="btn btn-sm btn-outline"
@@ -772,7 +676,7 @@ export default function AIAssistant() {
               disabled={loading}
               style={{ display: 'flex', alignItems: 'center', gap: 6 }}
             >
-              <SummarizeIcon /> Summarize
+              <FileText size={14} /> Summarize
             </button>
             <button
               className="btn btn-sm btn-outline"
@@ -780,7 +684,7 @@ export default function AIAssistant() {
               disabled={loading}
               style={{ display: 'flex', alignItems: 'center', gap: 6 }}
             >
-              <QuizIcon /> Quiz Me
+              <HelpCircle size={14} /> Quiz Me
             </button>
             {uploadedFile && (
               <div style={{
@@ -788,7 +692,7 @@ export default function AIAssistant() {
                 background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.25)',
                 borderRadius: 8, padding: '4px 10px', fontSize: 12, color: '#10b981',
               }}>
-                <ClipIcon />
+                <Paperclip size={14} />
                 {uploadedFile.name.slice(0, 22)}{uploadedFile.name.length > 22 ? '…' : ''}
               </div>
             )}
@@ -798,26 +702,26 @@ export default function AIAssistant() {
         {/* ── Notes panel ── */}
         {mode === 'notes' && showNotes && (
           <div className="ai-fade-in" style={{
-            padding: '12px 16px', borderBottom: '1px solid var(--border)', background: 'var(--bg-2)',
+            padding: '12px 16px', borderBottom: '1px solid var(--border)', background: 'var(--color-surface-1)',
           }}>
-            <p style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600 }}>
+            <p style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 500 }}>
               Uploaded Notes ({notes.length})
             </p>
             {notes.length === 0 ? (
-              <p style={{ fontSize: 13, color: 'var(--muted)' }}>No notes uploaded yet.</p>
+              <p style={{ fontSize: 13, color: 'var(--color-text-tertiary)' }}>No notes uploaded yet.</p>
             ) : (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                 {notes.map(n => (
                   <div key={n._id} style={{
                     display: 'flex', alignItems: 'center', gap: 8,
-                    background: 'var(--bg-3)', border: '1px solid var(--card-border)',
-                    borderRadius: 8, padding: '6px 12px', fontSize: 13, color: 'var(--text-2)',
+                    background: 'var(--color-surface-2)', border: '1px solid var(--border)',
+                    borderRadius: 8, padding: '6px 12px', fontSize: 13, color: 'var(--color-text-secondary)',
                   }}>
                     <span>📄 {n._id}</span>
-                    <span style={{ color: 'var(--muted)', fontSize: 11 }}>({n.chunks} chunks)</span>
+                    <span style={{ color: 'var(--color-text-tertiary)', fontSize: 11 }}>({n.chunks} chunks)</span>
                     <button
                       onClick={() => handleDeleteNote(n._id)}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', fontSize: 14, padding: '0 2px' }}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-danger)', fontSize: 14, padding: '0 2px' }}
                     >✕</button>
                   </div>
                 ))}
@@ -826,18 +730,49 @@ export default function AIAssistant() {
           </div>
         )}
 
-        {/* ── Assistant example chips — illustrative only, not routing logic ── */}
+        {/* ── Horizontal Suggestions pills/chips ── */}
         {mode === 'assistant' && currentMessages.length === 0 && (
           <div className="ai-fade-in" style={{
-            padding: '14px 16px', borderBottom: '1px solid var(--border)', background: 'var(--bg-2)',
+            padding: '14px 16px', borderBottom: '1px solid var(--border)', background: 'var(--color-surface-1)',
           }}>
-            <p style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600 }}>
-              Example Commands — or type anything naturally
+            <p style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 500 }}>
+              Quick Suggestions
             </p>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: 8 }}>
-              {ASSISTANT_COMMANDS.map(cmd => (
-                <CommandChip key={cmd.label} {...cmd} onClick={handleChipClick} />
-              ))}
+            <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, scrollbarWidth: 'none' }}>
+              {ASSISTANT_COMMANDS.map(cmd => {
+                const IconComponent = cmd.icon;
+                return (
+                  <button
+                    key={cmd.label}
+                    onClick={() => handleChipClick(cmd.example)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      padding: '6px 12px',
+                      background: 'var(--color-surface-3)',
+                      border: '1px solid var(--border)',
+                      borderRadius: 'var(--radius-pill)',
+                      color: 'var(--color-text-primary)',
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap',
+                      fontSize: 13,
+                      transition: 'all 0.15s',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = 'var(--color-accent)';
+                      e.currentTarget.style.background = 'var(--color-accent-muted)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = 'var(--border)';
+                      e.currentTarget.style.background = 'var(--color-surface-3)';
+                    }}
+                  >
+                    <IconComponent size={14} color="var(--color-accent)" />
+                    <span>{cmd.example}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}
@@ -849,7 +784,6 @@ export default function AIAssistant() {
           opacity: switchAnim ? 0 : 1,
           transform: switchAnim ? 'translateY(8px)' : 'none',
           transition: 'opacity 0.18s ease, transform 0.18s ease',
-          scrollbarWidth: 'thin',
         }}>
           {displayMessages.map(msg => (
             <MessageBubble key={msg.id} msg={msg} mode={mode} />
@@ -858,17 +792,15 @@ export default function AIAssistant() {
           {loading && (
             <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, marginBottom: 16 }}>
               <div style={{
-                width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
-                background: mode === 'notes'
-                  ? 'linear-gradient(135deg,#064e3b,#10b981)'
-                  : 'linear-gradient(135deg,var(--primary-dark),var(--primary))',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff',
+                width: 28, height: 28, borderRadius: 'var(--radius-sm)', flexShrink: 0,
+                background: 'var(--color-accent-muted)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-accent)',
               }}>
-                {mode === 'notes' ? <BookIcon /> : <BotIcon />}
+                <Bot size={16} />
               </div>
               <div style={{
-                padding: '12px 16px', background: 'var(--bg-3)',
-                border: '1px solid var(--card-border)', borderRadius: '4px 18px 18px 18px',
+                padding: '12px 16px', background: 'var(--color-surface-2)',
+                border: '1px solid var(--border)', borderRadius: '4px 18px 18px 18px',
               }}>
                 <div className="ai-dot-loader"><span /><span /><span /></div>
               </div>
@@ -879,111 +811,103 @@ export default function AIAssistant() {
 
         {/* ── Input ── */}
         <div style={{ padding: '12px 16px 16px', borderTop: '1px solid var(--border)' }}>
-          <div style={{
-            display: 'flex', alignItems: 'flex-end', gap: 8,
-            background: 'var(--bg-2)',
-            border: `1.5px solid ${input
-              ? (mode === 'notes' ? 'rgba(16,185,129,0.4)' : 'rgba(129,140,248,0.4)')
-              : 'var(--border)'}`,
-            borderRadius: 12, padding: '8px 10px 8px 14px',
-            transition: 'border-color 0.2s ease',
-          }}>
-            <textarea
-              ref={inputRef}
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
-              }}
-              placeholder={
-                listening ? '🎤 Listening…'
-                : mode === 'notes' ? 'Ask anything about your notes…'
-                : 'Say anything — add subject, mark attendance, ask about CGPA…'
-              }
-              rows={1}
-              style={{
-                flex: 1, background: 'transparent', color: 'var(--text)',
-                fontSize: 14, fontFamily: 'inherit', lineHeight: 1.6,
-                border: 'none', outline: 'none', resize: 'none', maxHeight: 120,
-              }}
-              onInput={e => {
-                e.target.style.height = 'auto';
-                e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
-              }}
-            />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            
+            {/* Input Wrapper */}
+            <div style={{
+              position: 'relative',
+              flex: 1,
+              display: 'flex',
+              alignItems: 'center',
+              background: 'var(--color-surface-1)',
+              border: `1.5px solid ${input ? 'rgba(99, 102, 241, 0.4)' : 'var(--border)'}`,
+              borderRadius: 'var(--radius-md)',
+              padding: '4px 44px 4px 12px',
+              transition: 'border-color 0.2s ease',
+            }}>
+              <textarea
+                ref={inputRef}
+                value={input}
+                onChange={e => setInput(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
+                }}
+                placeholder={
+                  listening ? '🎤 Listening…'
+                  : mode === 'notes' ? 'Ask anything about your notes…'
+                  : 'Say anything — add subject, mark attendance, ask about CGPA…'
+                }
+                rows={1}
+                style={{
+                  flex: 1, background: 'transparent', color: 'var(--color-text-primary)',
+                  fontSize: 14, fontFamily: 'inherit', lineHeight: 1.5,
+                  border: 'none', outline: 'none', resize: 'none', maxHeight: 80,
+                  height: '24px',
+                  padding: '4px 0',
+                }}
+                onInput={e => {
+                  e.target.style.height = 'auto';
+                  e.target.style.height = Math.min(e.target.scrollHeight, 80) + 'px';
+                }}
+              />
 
-            {/* Voice output toggle */}
-            <button
-              onClick={() => setVoiceEnabled(v => !v)}
-              title={voiceEnabled ? 'Voice output on' : 'Voice output off'}
-              style={{
-                minWidth: 36, height: 36, borderRadius: 8, border: 'none', cursor: 'pointer',
-                background: voiceEnabled ? '#22c55e' : 'var(--bg-3)',
-                color: voiceEnabled ? '#fff' : 'var(--text)',
-              }}
-            >
-              {voiceEnabled ? '🔊' : '🔇'}
-            </button>
-
-            {/* Stop speaking */}
-            <button
-              onClick={stopSpeaking}
-              title="Stop speaking"
-              style={{
-                minWidth: 36, height: 36, borderRadius: 8, border: 'none',
-                cursor: 'pointer', background: 'var(--bg-3)', color: 'var(--text)',
-              }}
-            >
-              ⛔
-            </button>
-
-            {/* Mic — 300ms warmup prevents word cutoff */}
-            <button
-              onClick={handleVoice}
-              disabled={loading}
-              style={{
-                minWidth: 36, height: 36, borderRadius: 8, border: 'none', cursor: 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: listening
-                  ? '#ef4444'
-                  : mode === 'notes' ? 'rgba(16,185,129,0.2)' : 'rgba(129,140,248,0.2)',
-                color: listening ? '#fff' : 'var(--text)',
-              }}
-            >
-              {listening ? (
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-                  <rect x="4" y="4" width="16" height="16" />
-                </svg>
-              ) : (
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
-                  <path d="M19 10v1a7 7 0 0 1-14 0v-1" />
-                  <line x1="12" x2="12" y1="19" y2="22" />
-                </svg>
-              )}
-            </button>
+              {/* Mic Icon / Stop Recording inside the input area */}
+              <button
+                onClick={handleVoice}
+                disabled={loading}
+                title={listening ? 'Stop listening' : 'Start voice input'}
+                style={{
+                  position: 'absolute',
+                  right: '8px',
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: 'var(--radius-sm)',
+                  border: 'none',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: listening ? 'var(--color-danger)' : 'transparent',
+                  color: listening ? '#fff' : 'var(--color-text-secondary)',
+                  transition: 'all 0.2s',
+                }}
+              >
+                {listening ? (
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
+                    <rect x="4" y="4" width="16" height="16" />
+                  </svg>
+                ) : (
+                  <Mic size={16} />
+                )}
+              </button>
+            </div>
 
             {/* Send */}
             <button
               onClick={() => handleSend()}
               disabled={!input.trim() || loading}
               style={{
-                minWidth: 36, height: 36, borderRadius: 8, border: 'none', cursor: 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: '40px',
+                height: '40px',
+                borderRadius: 'var(--radius-md)',
+                border: 'none',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
                 background: !input.trim() || loading
-                  ? 'var(--bg-3)'
-                  : mode === 'notes'
-                    ? 'linear-gradient(135deg,#064e3b,#10b981)'
-                    : 'linear-gradient(135deg,var(--primary-dark),var(--primary))',
-                color: !input.trim() || loading ? 'var(--muted)' : '#fff',
+                  ? 'var(--color-surface-3)'
+                  : 'var(--color-accent)',
+                color: !input.trim() || loading ? 'var(--color-text-tertiary)' : '#fff',
                 transition: 'all 0.2s ease',
+                flexShrink: 0
               }}
             >
-              <SendIcon />
+              <Send size={16} />
             </button>
           </div>
 
-          <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6, textAlign: 'center' }}>
+          <p style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 8, textAlign: 'center' }}>
             {mode === 'notes'
               ? 'Notes AI · Shift+Enter for new line'
               : 'Groq AI · Understands natural language · Updates dashboard in real-time'}

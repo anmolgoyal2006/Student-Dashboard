@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { userService } from '../services/apiServices';
-import toast from 'react-hot-toast';
+import toast from '../context/ToastContext';
+import { GraduationCap, Mail, MailWarning, ArrowRight } from 'lucide-react';
 import './AuthShared.css';
 
 export default function ForgotPassword() {
@@ -35,13 +36,17 @@ export default function ForgotPassword() {
       <div className="auth-grid-overlay" />
 
       <div className="auth-card">
-        <div className="auth-card-logo">🎓</div>
+        <div className="auth-card-logo" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', color: 'var(--color-accent)' }}>
+          <GraduationCap size={40} />
+        </div>
         <h1 className="auth-card-title">Forgot Password</h1>
         <p className="auth-card-sub">Enter your registered email and we'll send you a reset link.</p>
 
         {sent ? (
           <div className="auth-success-box">
-            <div className="auth-success-icon">📬</div>
+            <div className="auth-success-icon" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12, color: 'var(--color-success, #10b981)' }}>
+              <Mail size={40} />
+            </div>
             <h3>Check your inbox</h3>
             <p>We sent a reset link to <strong>{email}</strong>. It expires in <strong>15 minutes</strong>.</p>
             <p className="auth-success-hint">
@@ -54,7 +59,7 @@ export default function ForgotPassword() {
             <div className="auth-field">
               <label className="auth-label">Email Address</label>
               <div className="auth-input-wrap">
-                <span className="auth-icon">✉️</span>
+                <span className="auth-icon" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Mail size={16} /></span>
                 <input
                   className="auth-input"
                   type="email"
@@ -67,11 +72,15 @@ export default function ForgotPassword() {
               </div>
             </div>
 
-            <button type="submit" className="auth-btn auth-btn--primary" disabled={loading}>
-              {loading
-                ? <><span className="auth-spinner" />Sending…</>
-                : <><span>Send Reset Link</span><span className="auth-arrow">→</span></>
-              }
+            <button type="submit" className="auth-btn auth-btn--primary" disabled={loading} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+              {loading ? (
+                <>Sending…</>
+              ) : (
+                <>
+                  <span>Send Reset Link</span>
+                  <ArrowRight size={14} />
+                </>
+              )}
             </button>
           </form>
         )}

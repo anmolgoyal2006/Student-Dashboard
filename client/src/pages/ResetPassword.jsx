@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { userService } from '../services/apiServices';
-import toast from 'react-hot-toast';
+import toast from '../context/ToastContext';
+import { Lock, Eye, EyeOff, GraduationCap, CheckCircle, ArrowRight, ArrowLeft } from 'lucide-react';
 import './AuthShared.css';
 
 function getStrength(pw) {
@@ -29,7 +30,7 @@ function PasswordInput({ label, value, onChange, placeholder }) {
     <div className="auth-field">
       <label className="auth-label">{label}</label>
       <div className="auth-input-wrap">
-        <span className="auth-icon">🔒</span>
+        <span className="auth-icon" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Lock size={16} /></span>
         <input
           className="auth-input"
           type={show ? 'text' : 'password'}
@@ -38,8 +39,8 @@ function PasswordInput({ label, value, onChange, placeholder }) {
           placeholder={placeholder}
           autoComplete="new-password"
         />
-        <button type="button" className="auth-eye-btn" onClick={() => setShow(s => !s)}>
-          {show ? '🙈' : '👁'}
+        <button type="button" className="auth-eye-btn" onClick={() => setShow(s => !s)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {show ? <EyeOff size={16} /> : <Eye size={16} />}
         </button>
       </div>
     </div>
@@ -85,13 +86,17 @@ export default function ResetPassword() {
       <div className="auth-grid-overlay" />
 
       <div className="auth-card">
-        <div className="auth-card-logo">🎓</div>
+        <div className="auth-card-logo" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', color: 'var(--color-accent)' }}>
+          <GraduationCap size={40} />
+        </div>
         <h1 className="auth-card-title">Reset Password</h1>
         <p className="auth-card-sub">Enter your new password below.</p>
 
         {done ? (
           <div className="auth-success-box">
-            <div className="auth-success-icon">✅</div>
+            <div className="auth-success-icon" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12, color: 'var(--color-success, #10b981)' }}>
+              <CheckCircle size={40} />
+            </div>
             <h3>Password reset!</h3>
             <p>Your password has been updated successfully.</p>
             <p className="auth-success-hint">Redirecting you to login…</p>
@@ -138,17 +143,24 @@ export default function ResetPassword() {
               </p>
             )}
 
-            <button type="submit" className="auth-btn auth-btn--primary" disabled={loading}>
-              {loading
-                ? <><span className="auth-spinner" />Resetting…</>
-                : <><span>Reset Password</span><span className="auth-arrow">→</span></>
-              }
+            <button type="submit" className="auth-btn auth-btn--primary" disabled={loading} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+              {loading ? (
+                <>Resetting…</>
+              ) : (
+                <>
+                  <span>Reset Password</span>
+                  <ArrowRight size={14} />
+                </>
+              )}
             </button>
           </form>
         )}
 
         <p className="auth-footer-link">
-          <Link to="/login" className="auth-anchor">← Back to Login</Link>
+          <Link to="/login" className="auth-anchor" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+            <ArrowLeft size={14} />
+            Back to Login
+          </Link>
         </p>
       </div>
     </div>

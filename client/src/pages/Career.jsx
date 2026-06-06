@@ -4,25 +4,33 @@ import FocusMode           from '../components/FocusMode';
 import CareerProgressBar   from '../components/CareerProgressBar';
 import DsaCoachPanel       from '../components/DsaCoachPanel';
 import CompanyQuestionsPanel from '../components/CompanyQuestionsPanel';
-import toast from 'react-hot-toast';
+import toast from '../context/ToastContext';
+import { 
+  Briefcase, CheckCircle, Brain, BarChart2, Sprout, Flame, Award, 
+  Target, Settings, Calendar, FileText, ClipboardList, RefreshCw, 
+  ChevronDown, ChevronRight, Activity, Lightbulb, Bot, Mic, Loader2,
+  Gamepad, ExternalLink, Trash2, ShieldAlert, Clock, Upload
+} from 'lucide-react';
+import EmptyState from '../components/EmptyState';
 
 const COMPANIES = ['Amazon', 'Microsoft', 'Google', 'Meta', 'Apple', 'Netflix', 'Flipkart', 'Adobe', 'Uber', 'LinkedIn', 'Salesforce', 'Oracle', 'Infosys', 'TCS', 'Wipro', 'HCL Technologies', 'Other'];
 
 const READINESS_CONFIG = {
-  Beginner:     { color: '#f59e0b', bg: 'rgba(245,158,11,0.1)',  label: '🌱 Beginner',     desc: 'Focus on DSA fundamentals and build projects.' },
-  Intermediate: { color: '#6366f1', bg: 'rgba(99,102,241,0.1)',  label: '🔥 Intermediate', desc: 'Start mock interviews and system design prep.'  },
-  Ready:        { color: '#22c55e', bg: 'rgba(34,197,94,0.1)',   label: '🏆 Ready',        desc: 'You are placement ready! Polish HR round prep.' },
+  Beginner:     { color: '#f59e0b', bg: 'rgba(245,158,11,0.06)',  label: 'Beginner',     desc: 'Focus on DSA fundamentals and build projects.', icon: Sprout },
+  Intermediate: { color: '#6366f1', bg: 'rgba(99,102,241,0.06)',  label: 'Intermediate', desc: 'Start mock interviews and system design prep.', icon: Flame },
+  Ready:        { color: '#22c55e', bg: 'rgba(34,197,94,0.06)',   label: 'Ready',        desc: 'You are placement ready! Polish HR round prep.', icon: Award },
 };
 
 export default function Career() {
   const [career,    setCareer]    = useState(null);
   const [loading,   setLoading]   = useState(true);
-  const [saving,    setSaving]    = useState(false);
   const [plan,      setPlan]      = useState(null);
   const [planLoad,  setPlanLoad]  = useState(true);
   const [activeDay, setActiveDay] = useState(0);
   const [todayProgress, setTodayProgress] = useState({ done: 0, remaining: 0 });
   const [manualDsaOpen, setManualDsaOpen] = useState(false);
+  const [saveStatus, setSaveStatus] = useState('idle'); // 'idle' | 'saving' | 'saved' | 'error'
+  const isFirstRender = useRef(true);
 
   // Tab switching
   const [activeTab, setActiveTab] = useState('dsa');
@@ -55,7 +63,7 @@ export default function Career() {
       const { data } = await careerService.analyzeResume(resumeText);
       setResumeAnalysis(data);
       toast.success('Resume analyzed successfully!');
-      setCareer(prev => ({ ...prev, resumeScore: data.score }));
+      setCareer(prev => ({ ...prev, resumeScore: data.score, resumeFeedback: data.feedback, resumeKeywords: data.missingKeywords }));
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to analyze resume');
     } finally {
@@ -73,7 +81,7 @@ export default function Career() {
       const { data } = await careerService.uploadResume(formData);
       setResumeAnalysis(data);
       toast.success('Resume file scanned and analyzed successfully!');
-      setCareer(prev => ({ ...prev, resumeScore: data.score }));
+      setCareer(prev => ({ ...prev, resumeScore: data.score, resumeFeedback: data.feedback, resumeKeywords: data.missingKeywords }));
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to analyze resume file');
     } finally {
@@ -165,7 +173,7 @@ export default function Career() {
     const recognition = new SpeechRecognition();
     voiceRecogRef.current = recognition;
     recognition.lang = 'en-US';
-    recognition.continuous = false; // Single-shot like AI Assistant
+    recognition.continuous = false;
     recognition.interimResults = true;
 
     const baseText = userAnswer ? userAnswer.trim() + ' ' : '';
@@ -173,7 +181,7 @@ export default function Career() {
 
     recognition.onstart = () => {
       setIsListening(true);
-      toast('🎙️ Listening... Speak your answer.', { icon: '🎤', duration: 2000 });
+      toast.info('Listening... Speak your answer.');
     };
 
     recognition.onend = () => {
@@ -240,7 +248,6 @@ export default function Career() {
       const { data } = await careerService.get();
       setCareer(data.career);
 
-      // Restore Resume Analysis from DB if present
       if (data.career.resumeScore > 0) {
         setResumeAnalysis({
           score: data.career.resumeScore,
@@ -249,7 +256,6 @@ export default function Career() {
         });
       }
 
-      // Restore active interview from DB if present
       const activeInt = data.career.activeInterview;
       if (activeInt && activeInt.questions && activeInt.questions.length > 0) {
         setInterviewTopic(activeInt.topic || 'Arrays');
@@ -298,23 +304,41 @@ export default function Career() {
     setTodayProgress({ done, remaining });
   }, [plan]);
 
-  const handleSave = async () => {
-    setSaving(true);
-    try {
-      await careerService.update({
-        targetCompany:  career.targetCompany,
-        targetRole:     career.targetRole,
-        problemsSolved: career.problemsSolved,
-        skills:         career.skills,
-        dsaTopics:      career.dsaTopics,
-      });
-      toast.success('Career progress saved!');
-      load();
-      loadPlan(); // refresh plan after save
-    } catch {
-      toast.error('Failed to save');
-    } finally { setSaving(false); }
-  };
+  // Debounced auto-save effect
+  useEffect(() => {
+    if (loading || !career) return;
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+
+    setSaveStatus('saving');
+    const timer = setTimeout(async () => {
+      try {
+        await careerService.update({
+          targetCompany:  career.targetCompany,
+          targetRole:     career.targetRole,
+          problemsSolved: career.problemsSolved,
+          skills:         career.skills,
+          dsaTopics:      career.dsaTopics,
+        });
+        setSaveStatus('saved');
+        const { data } = await careerService.getPlan();
+        setPlan(data);
+      } catch (err) {
+        setSaveStatus('error');
+        toast.error('Auto-save failed');
+      }
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [
+    career?.targetCompany,
+    career?.targetRole,
+    career?.problemsSolved,
+    JSON.stringify(career?.skills),
+    JSON.stringify(career?.dsaTopics)
+  ]);
 
   const toggleTopic = (topicName, completed) => {
     setCareer(p => ({
@@ -336,60 +360,119 @@ export default function Career() {
   const completedTopics = career.dsaTopics.filter(t => t.completed).length;
   const totalTopics     = career.dsaTopics.length;
   const progressPct     = totalTopics ? Math.round((completedTopics / totalTopics) * 100) : 0;
+  
   const rc              = READINESS_CONFIG[career.readiness] || READINESS_CONFIG.Beginner;
+  const ReadinessIcon   = rc.icon;
+
   const hasAiCoach      = Boolean(
     career.dsaCoach?.dailyMission?.length || career.dsaCoach?.weeklyFocus?.length
   );
+  
   const TABS = [
-    { id: 'dsa',    label: '📊 DSA Tracker' },
-    { id: 'prep',   label: '🤖 AI Career Prep' },
+    { id: 'dsa',    label: 'DSA tracker', icon: BarChart2 },
+    { id: 'prep',   label: 'AI career prep', icon: Brain },
   ];
+
+  const totalSolved = career.leetcodeUsername ? (career.leetcodeSync?.totalOnLeetcode ?? 0) : (career.problemsSolved ?? 0);
+  const easySolved = career.leetcodeSync?.easy ?? 0;
+  const medSolved = career.leetcodeSync?.medium ?? 0;
+  const hardSolved = career.leetcodeSync?.hard ?? 0;
 
   return (
     <div>
-      {/* ── Header ── */}
-      <div className="page-header">
+      {/* Page Header */}
+      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <h1 className="page-title">🚀 Career Preparation</h1>
+          <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '22px', fontWeight: 500 }}>
+            <Briefcase size={20} color="var(--color-accent)" />
+            Career preparation
+          </h1>
           <p className="page-subtitle">Track your DSA progress and placement readiness</p>
+          
+          {/* Summary Stat pills */}
+          <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 12, padding: '4px 10px', background: 'rgba(255, 255, 255, 0.04)', border: '1px solid var(--border)', borderRadius: 'var(--radius-pill)', color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--color-accent)' }} />
+              Total solved: <strong>{totalSolved}</strong>
+            </span>
+            <span style={{ fontSize: 12, padding: '4px 10px', background: 'rgba(255, 255, 255, 0.04)', border: '1px solid var(--border)', borderRadius: 'var(--radius-pill)', color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#22c55e' }} />
+              Easy: <strong>{easySolved}</strong>
+            </span>
+            <span style={{ fontSize: 12, padding: '4px 10px', background: 'rgba(255, 255, 255, 0.04)', border: '1px solid var(--border)', borderRadius: 'var(--radius-pill)', color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#f59e0b' }} />
+              Medium: <strong>{medSolved}</strong>
+            </span>
+            <span style={{ fontSize: 12, padding: '4px 10px', background: 'rgba(255, 255, 255, 0.04)', border: '1px solid var(--border)', borderRadius: 'var(--radius-pill)', color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#ef4444' }} />
+              Hard: <strong>{hardSolved}</strong>
+            </span>
+          </div>
         </div>
-        <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
-          {saving ? 'Saving…' : '💾 Save Progress'}
-        </button>
+
+        {/* Auto-save Status Indicator */}
+        <div style={{ display: 'flex', alignItems: 'center', height: 38 }}>
+          {saveStatus === 'saving' && (
+            <span style={{ fontSize: 13, color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Loader2 size={14} className="animate-spin" style={{ animation: 'spin 1s linear infinite' }} />
+              Saving...
+            </span>
+          )}
+          {saveStatus === 'saved' && (
+            <span style={{ fontSize: 13, color: 'var(--color-text-tertiary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <CheckCircle size={14} color="#22c55e" />
+              Saved
+            </span>
+          )}
+          {saveStatus === 'error' && (
+            <span style={{ fontSize: 13, color: '#ef4444', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <ShieldAlert size={14} />
+              Save error
+            </span>
+          )}
+          <style>{`
+            @keyframes spin {
+              0% { transform: rotate(0deg); }
+              100% { transform: rotate(360deg); }
+            }
+          `}</style>
+        </div>
       </div>
 
-      {/* ── Tab Bar ── */}
+      {/* Tabs */}
       <div style={{
-        display: 'flex', gap: 4,
-        borderBottom: '1px solid rgba(255,255,255,0.08)',
-        marginBottom: 24, marginTop: 20,
+        display: 'flex',
+        borderBottom: '1px solid var(--border)',
+        marginBottom: 24,
+        gap: 24,
+        marginTop: 12
       }}>
-        {TABS.map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            style={{
-              padding: '8px 18px',
-              fontSize: 13,
-              fontWeight: 600,
-              borderRadius: '8px 8px 0 0',
-              border: 'none',
-              cursor: 'pointer',
-              transition: 'all 0.15s',
-              background: activeTab === tab.id
-                ? 'rgba(165,180,252,0.15)'
-                : 'transparent',
-              color: activeTab === tab.id
-                ? 'var(--primary, #a5b4fc)'
-                : 'var(--muted)',
-              borderBottom: activeTab === tab.id
-                ? '2px solid var(--primary, #a5b4fc)'
-                : '2px solid transparent',
-            }}
-          >
-            {tab.label}
-          </button>
-        ))}
+        {TABS.map(tab => {
+          const TabIcon = tab.icon;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '12px 4px',
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                color: activeTab === tab.id ? '#fff' : 'var(--color-text-secondary)',
+                borderBottom: activeTab === tab.id ? '2px solid var(--color-accent)' : '2px solid transparent',
+                fontSize: 13.5,
+                fontWeight: activeTab === tab.id ? 500 : 400,
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <TabIcon size={15} />
+              <span>{tab.label}</span>
+            </button>
+          );
+        })}
       </div>
 
       {activeTab === 'dsa' ? (
@@ -405,21 +488,29 @@ export default function Career() {
 
           <CompanyQuestionsPanel career={career} />
 
-          {/* ── Readiness banner ── */}
-          {/* ── Readiness + Overall Goal ── */}
+          {/* Readiness + Overall Goal */}
           <div className="grid-2 mb-4">
+            
+            {/* Readiness Card */}
             <div className="card" style={{
-              background:   rc.bg,
-              borderColor:  rc.color,
+              background: rc.bg,
+              borderColor: rc.color,
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              padding: 20
             }}>
-              <div className="flex justify-between items-center">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
                 <div>
-                  <div style={{ fontSize: 20, fontWeight: 700, color: rc.color }}>{rc.label}</div>
-                  <div className="text-muted" style={{ marginTop: 4 }}>{rc.desc}</div>
+                  <div style={{ fontSize: 18, fontWeight: 600, color: rc.color, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <ReadinessIcon size={18} color={rc.color} />
+                    {rc.label}
+                  </div>
+                  <div className="text-muted" style={{ marginTop: 4, fontSize: 13 }}>{rc.desc}</div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: 28, fontWeight: 700, color: rc.color }}>{career.problemsSolved}</div>
-                  <div className="text-muted" style={{ fontSize: 13 }}>problems solved</div>
+                  <div style={{ fontSize: 26, fontWeight: 600, color: rc.color }}>{career.problemsSolved}</div>
+                  <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>problems solved</div>
                 </div>
               </div>
             </div>
@@ -427,10 +518,13 @@ export default function Career() {
             {/* Overall Goal Tracker */}
             {plan && (
               <div className="card">
-                <div className="card-title">🏁 Overall Goal</div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                  <span style={{ fontSize: 13, color: 'var(--muted)' }}>Goal: {plan.progressStats.totalTarget} problems</span>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--primary)' }}>
+                <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <CheckCircle size={18} color="var(--color-accent)" />
+                  Overall goal
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, marginTop: 12 }}>
+                  <span style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>Goal: {plan.progressStats.totalTarget} problems</span>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-accent)' }}>
                     {plan.progressStats.problemsSolved}/{plan.progressStats.totalTarget}
                   </span>
                 </div>
@@ -441,10 +535,10 @@ export default function Career() {
                   showCount={false}
                 />
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 10 }}>
-                  <span style={{ fontSize: 12, color: 'var(--muted)' }}>
+                  <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
                     {plan.progressStats.pct}% complete
                   </span>
-                  <span style={{ fontSize: 12, color: 'var(--muted)' }}>
+                  <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
                     {plan.progressStats.totalTarget - plan.progressStats.problemsSolved} remaining
                   </span>
                 </div>
@@ -456,21 +550,21 @@ export default function Career() {
                     display: 'flex', gap: 16,
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span style={{ fontSize: 16 }}>✅</span>
+                      <CheckCircle size={16} color="#22c55e" />
                       <div>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: '#34d399' }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: '#22c55e' }}>
                           {todayProgress.done}
                         </div>
-                        <div style={{ fontSize: 11, color: 'var(--muted)' }}>done today</div>
+                        <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>done today</div>
                       </div>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span style={{ fontSize: 16 }}>⏳</span>
+                      <Clock size={16} color="#f59e0b" />
                       <div>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: '#fbbf24' }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: '#f59e0b' }}>
                           {todayProgress.remaining}
                         </div>
-                        <div style={{ fontSize: 11, color: 'var(--muted)' }}>remaining</div>
+                        <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>remaining</div>
                       </div>
                     </div>
                   </div>
@@ -479,147 +573,165 @@ export default function Career() {
             )}
           </div>
 
-          {/* ── Manual tracker (hidden when LeetCode linked — auto-sync only) ── */}
+          {/* Manual tracker trigger */}
           {!career.leetcodeUsername && (
-          <div className="card mb-4" style={{ padding: 0, overflow: 'hidden' }}>
-            <button
-              type="button"
-              onClick={() => setManualDsaOpen(o => !o)}
-              style={{
-                width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                padding: '14px 16px', border: 'none', background: 'transparent', cursor: 'pointer',
-                color: 'var(--text)', textAlign: 'left',
-              }}
-            >
-              <div>
-                <div style={{ fontSize: 15, fontWeight: 600 }}>⚙️ Manual tracker &amp; settings</div>
-                <div className="text-muted" style={{ fontSize: 12, marginTop: 4 }}>
-                  {hasAiCoach
-                    ? 'AI coach handles daily & weekly plans — expand to edit targets or topics'
-                    : 'Target company, problem counts, and topic checklist'}
-                </div>
-              </div>
-              <span style={{ fontSize: 18, color: 'var(--muted)', flexShrink: 0 }}>
-                {manualDsaOpen ? '▾' : '▸'}
-              </span>
-            </button>
-            {manualDsaOpen && (
-              <div style={{ padding: '0 16px 16px', borderTop: '1px solid var(--border)' }}>
-                <div className="grid-2 mb-4" style={{ marginTop: 16 }}>
-                  <div className="card" style={{ marginBottom: 0 }}>
-                    <div className="card-title">🎯 Target Settings</div>
-                    <div className="form-group">
-                      <label className="form-label">Target Company</label>
-                      <select className="form-select" value={career.targetCompany} onChange={e => setCareer(p => ({ ...p, targetCompany: e.target.value }))}>
-                        {COMPANIES.map(c => <option key={c} value={c}>{c}</option>)}
-                      </select>
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">Target Role</label>
-                      <input className="form-input" value={career.targetRole} onChange={e => setCareer(p => ({ ...p, targetRole: e.target.value }))} placeholder="Software Engineer" />
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">Total Problems Solved</label>
-                      <input className="form-input" type="number" min="0" value={career.problemsSolved} onChange={e => setCareer(p => ({ ...p, problemsSolved: parseInt(e.target.value) || 0 }))} />
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">Skills (comma-separated)</label>
-                      <input className="form-input" value={(career.skills || []).join(', ')} onChange={e => setCareer(p => ({ ...p, skills: e.target.value.split(',').map(s => s.trim()).filter(Boolean) }))} placeholder="React, Node.js, MongoDB" />
-                    </div>
-                    <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                      {(career.skills || []).map(s => <span key={s} className="badge badge-primary">{s}</span>)}
-                    </div>
+            <div className="card mb-4" style={{ padding: 0, overflow: 'hidden' }}>
+              <button
+                type="button"
+                data-manual-tracker-btn
+                onClick={() => setManualDsaOpen(o => !o)}
+                style={{
+                  width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '14px 16px', border: 'none', background: 'transparent', cursor: 'pointer',
+                  color: 'var(--color-text-primary)', textAlign: 'left',
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: 15, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <Settings size={16} color="var(--color-accent)" />
+                    Manual tracker & settings
                   </div>
-
-                  <div className="card" style={{ marginBottom: 0 }}>
-                    <div className="card-title">📊 DSA Progress Overview</div>
-                    <div style={{ marginBottom: 16 }}>
-                      <div className="flex justify-between" style={{ marginBottom: 6 }}>
-                        <span style={{ fontSize: 14 }}>{completedTopics} / {totalTopics} topics completed</span>
-                        <strong>{progressPct}%</strong>
+                  <div className="text-muted" style={{ fontSize: 12, marginTop: 4 }}>
+                    {hasAiCoach
+                      ? 'AI coach handles plans — expand to edit targets or topics'
+                      : 'Target company, problem counts, and topic checklist'}
+                  </div>
+                </div>
+                <span style={{ color: 'var(--color-text-secondary)', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+                  {manualDsaOpen ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+                </span>
+              </button>
+              {manualDsaOpen && (
+                <div style={{ padding: '0 16px 16px', borderTop: '1px solid var(--border)' }}>
+                  <div className="grid-2 mb-4" style={{ marginTop: 16 }}>
+                    <div className="card" style={{ marginBottom: 0 }}>
+                      <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14 }}>
+                        <Target size={15} color="var(--color-accent)" />
+                        Target settings
                       </div>
-                      <div className="progress">
-                        <div className={`progress-bar ${progressPct >= 75 ? 'success' : progressPct >= 40 ? 'warning' : 'danger'}`} style={{ width: `${progressPct}%` }} />
+                      <div className="form-group" style={{ marginTop: 12 }}>
+                        <label className="form-label">Target Company</label>
+                        <select className="form-select" value={career.targetCompany} onChange={e => setCareer(p => ({ ...p, targetCompany: e.target.value }))}>
+                          {COMPANIES.map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Target Role</label>
+                        <input className="form-input" value={career.targetRole} onChange={e => setCareer(p => ({ ...p, targetRole: e.target.value }))} placeholder="Software Engineer" />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Total Problems Solved</label>
+                        <input className="form-input" type="number" min="0" value={career.problemsSolved} onChange={e => setCareer(p => ({ ...p, problemsSolved: parseInt(e.target.value) || 0 }))} />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Skills (comma-separated)</label>
+                        <input className="form-input" value={(career.skills || []).join(', ')} onChange={e => setCareer(p => ({ ...p, skills: e.target.value.split(',').map(s => s.trim()).filter(Boolean) }))} placeholder="React, Node.js, MongoDB" />
+                      </div>
+                      <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                        {(career.skills || []).map(s => <span key={s} className="badge badge-primary">{s}</span>)}
                       </div>
                     </div>
-                    {[
-                      { label: 'Beginner',        threshold: 50,  reached: career.problemsSolved >= 50  },
-                      { label: 'Intermediate',    threshold: 100, reached: career.problemsSolved >= 100 },
-                      { label: 'Placement Ready', threshold: 200, reached: career.problemsSolved >= 200 },
-                    ].map(m => (
-                      <div key={m.label} className="flex items-center gap-2" style={{ marginBottom: 10 }}>
-                        <span style={{ fontSize: 18 }}>{m.reached ? '✅' : '⬜'}</span>
-                        <div>
-                          <span style={{ fontSize: 14, fontWeight: 500 }}>{m.label}</span>
-                          <span className="text-muted" style={{ marginLeft: 8 }}>{m.threshold}+ problems</span>
+
+                    <div className="card" style={{ marginBottom: 0 }}>
+                      <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14 }}>
+                        <BarChart2 size={15} color="var(--color-accent)" />
+                        DSA progress overview
+                      </div>
+                      <div style={{ marginBottom: 16, marginTop: 12 }}>
+                        <div className="flex justify-between" style={{ marginBottom: 6 }}>
+                          <span style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>{completedTopics} / {totalTopics} topics completed</span>
+                          <strong style={{ fontSize: 13, color: 'var(--color-text-primary)' }}>{progressPct}%</strong>
+                        </div>
+                        <div className="progress" style={{ height: 6 }}>
+                          <div className={`progress-bar ${progressPct >= 75 ? 'success' : progressPct >= 40 ? 'warning' : 'danger'}`} style={{ width: `${progressPct}%` }} />
                         </div>
                       </div>
-                    ))}
+                      {[
+                        { label: 'Beginner',        threshold: 50,  reached: career.problemsSolved >= 50  },
+                        { label: 'Intermediate',    threshold: 100, reached: career.problemsSolved >= 100 },
+                        { label: 'Placement Ready', threshold: 200, reached: career.problemsSolved >= 200 },
+                      ].map(m => (
+                        <div key={m.label} className="flex items-center gap-2" style={{ marginBottom: 10 }}>
+                          <span style={{ display: 'flex', alignItems: 'center' }}>
+                            {m.reached ? <CheckCircle size={15} color="#22c55e" /> : <div style={{ width: 14, height: 14, border: '1px solid var(--border)', borderRadius: '50%' }} />}
+                          </span>
+                          <div style={{ marginLeft: 6 }}>
+                            <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)' }}>{m.label}</span>
+                            <span style={{ marginLeft: 8, fontSize: 11, color: 'var(--color-text-secondary)' }}>{m.threshold}+ problems</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
 
-                <div className="card" style={{ marginBottom: 0 }}>
-                  <div className="card-title">📋 DSA Topic Tracker</div>
-                  <div className="grid-2">
-                    {career.dsaTopics.map(topic => (
-                      <div key={topic.name} style={{
-                        display: 'flex', alignItems: 'center', gap: 12,
-                        padding: '10px 12px', borderRadius: 8, marginBottom: 8,
-                        background: topic.completed ? 'rgba(34,197,94,0.08)' : 'rgba(255,255,255,0.02)',
-                        border: `1px solid ${topic.completed ? 'rgba(34,197,94,0.3)' : 'var(--border)'}`,
-                      }}>
-                        <input type="checkbox" checked={topic.completed} onChange={e => toggleTopic(topic.name, e.target.checked)}
-                          style={{ width: 16, height: 16, cursor: 'pointer', accentColor: 'var(--primary)' }} />
-                        <div style={{ flex: 1, fontSize: 14, fontWeight: 500 }}>{topic.name}</div>
-                        <input type="number" min="0" value={topic.problems} onChange={e => updateProblems(topic.name, e.target.value)}
-                          style={{ width: 60, padding: '4px 8px', border: '1px solid var(--border)', borderRadius: 6, fontSize: 13, textAlign: 'center', background: 'rgba(255,255,255,0.04)', color: 'var(--text)' }} />
-                        <span className="text-muted" style={{ fontSize: 12 }}>probs</span>
-                      </div>
-                    ))}
+                  <div className="card" style={{ marginBottom: 0, marginTop: 16 }}>
+                    <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, marginBottom: 12 }}>
+                      <ClipboardList size={15} color="var(--color-accent)" />
+                      DSA topic tracker
+                    </div>
+                    <div className="grid-2">
+                      {career.dsaTopics.map(topic => (
+                        <div key={topic.name} style={{
+                          display: 'flex', alignItems: 'center', gap: 10,
+                          padding: '8px 10px', borderRadius: 8, marginBottom: 6,
+                          background: topic.completed ? 'rgba(34,197,94,0.06)' : 'rgba(255,255,255,0.01)',
+                          border: `1px solid ${topic.completed ? 'rgba(34,197,94,0.2)' : 'var(--border)'}`,
+                        }}>
+                          <input type="checkbox" checked={topic.completed} onChange={e => toggleTopic(topic.name, e.target.checked)}
+                            style={{ width: 14, height: 14, cursor: 'pointer', accentColor: 'var(--color-accent)' }} />
+                          <div style={{ flex: 1, fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)' }}>{topic.name}</div>
+                          <input type="number" min="0" value={topic.problems} onChange={e => updateProblems(topic.name, e.target.value)}
+                            style={{ width: 56, padding: '4px', border: '1px solid var(--border)', borderRadius: 6, fontSize: 12, textAlign: 'center', background: 'rgba(255,255,255,0.02)', color: 'var(--color-text-primary)' }} />
+                          <span style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>solved</span>
+                        </div>
+                      ))}
+                    </div>
+                    <p style={{ fontSize: 11.5, color: 'var(--color-text-tertiary)', marginTop: 12, marginBottom: 0 }}>
+                      Changes auto-save instantly in the background.
+                    </p>
                   </div>
-                  <p className="text-muted" style={{ fontSize: 12, marginTop: 12, marginBottom: 0 }}>
-                    Changes apply after you click <strong>Save Progress</strong> in the page header.
-                  </p>
                 </div>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
           )}
 
-          {/* ── Daily Action Plan (rule-based; hidden when AI coach active) ── */}
+          {/* Today's Action Plan */}
           {plan && !hasAiCoach && (
             <div className="card mb-4">
-              <div className="card-title">📅 Today's Action Plan</div>
+              <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Calendar size={18} color="var(--color-accent)" />
+                Today's action plan
+              </div>
               {plan.dailyTasks.length === 0 ? (
-                <p className="text-muted">🎉 All topics on track! Keep solving.</p>
+                <p style={{ color: 'var(--color-text-secondary)', fontSize: 13, margin: '12px 0 0 0' }}>All topics on track! Keep solving.</p>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
                   {plan.dailyTasks.map((task, i) => (
                     <div key={i} style={{
                       display:      'flex',
                       alignItems:   'center',
                       gap:          12,
-                      background:   'rgba(129,140,248,0.07)',
-                      border:       '1px solid rgba(129,140,248,0.18)',
+                      background:   'var(--color-accent-muted)',
+                      border:       '1px solid rgba(99,102,241,0.18)',
                       borderRadius: 10,
                       padding:      '12px 14px',
                     }}>
                       <span style={{
                         width: 26, height: 26, borderRadius: '50%',
-                        background: 'rgba(129,140,248,0.2)', color: 'var(--primary)',
+                        background: 'rgba(99,102,241,0.2)', color: 'var(--color-accent)',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         fontSize: 12, fontWeight: 700, flexShrink: 0,
                       }}>{i + 1}</span>
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text)' }}>
+                        <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--color-text-primary)' }}>
                           {task.task}
                         </div>
-                        <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 3 }}>
+                        <div style={{ fontSize: 11.5, color: 'var(--color-text-secondary)', marginTop: 3 }}>
                           {task.done}/{task.target} done · {task.gap} remaining
                         </div>
                       </div>
                       <span className={`badge ${task.gap >= 20 ? 'badge-danger' : task.gap >= 10 ? 'badge-warning' : 'badge-success'}`}>
-                        {task.gap >= 20 ? '🔥 Urgent' : task.gap >= 10 ? '⚡ Active' : '✅ Near'}
+                        {task.gap >= 20 ? 'Urgent' : task.gap >= 10 ? 'Active' : 'Near'}
                       </span>
                     </div>
                   ))}
@@ -628,17 +740,20 @@ export default function Career() {
             </div>
           )}
 
-          {/* ── Level Progression + Focus Mode ── */}
+          {/* Level Progression + Focus Mode */}
           {plan && (
             <div className="grid-2 mb-4">
               <div className="card">
-                <div className="card-title">🏆 Level Progression</div>
-                <div style={{ textAlign: 'center', padding: '8px 0 16px' }}>
-                  <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--primary)', fontFamily: 'Space Grotesk, sans-serif' }}>
+                <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Award size={18} color="var(--color-accent)" />
+                  Level progression
+                </div>
+                <div style={{ textAlign: 'center', padding: '12px 0' }}>
+                  <div style={{ fontSize: 26, fontWeight: 600, color: 'var(--color-accent)' }}>
                     {plan.progressStats.currentLevel}
                   </div>
                   {plan.progressStats.nextLevel && (
-                    <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>
+                    <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 4 }}>
                       Next: {plan.progressStats.nextLevel} at {plan.progressStats.nextLevelAt} problems
                     </div>
                   )}
@@ -658,11 +773,11 @@ export default function Career() {
                       )
                     : 1}
                 />
-                <div style={{ textAlign: 'center', marginTop: 8 }}>
-                  <span style={{ fontSize: 13, color: 'var(--muted)' }}>
+                <div style={{ textAlign: 'center', marginTop: 10 }}>
+                  <span style={{ fontSize: 12.5, color: 'var(--color-text-secondary)' }}>
                     {plan.progressStats.toNextLevel > 0
                       ? `${plan.progressStats.toNextLevel} more problems to next level`
-                      : '🎉 Max level reached!'}
+                      : 'Max level reached!'}
                   </span>
                 </div>
               </div>
@@ -671,16 +786,19 @@ export default function Career() {
             </div>
           )}
 
-          {/* ── Topic Targets ── */}
+          {/* Topic Targets */}
           {plan && (
             <div className="card mb-4">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                <div className="card-title" style={{ marginBottom: 0 }}>🎯 Topic Targets</div>
-                <span style={{ fontSize: 12, color: 'var(--muted)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <div className="card-title" style={{ marginBottom: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Target size={18} color="var(--color-accent)" />
+                  Topic targets
+                </div>
+                <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
                   DSA: {plan.progressStats.problemsSolved} / {plan.progressStats.totalTarget} problems
                 </span>
               </div>
-              <div className="grid-2">
+              <div className="grid-2" style={{ gap: '4px 16px' }}>
                 {plan.topicProgress.map(t => (
                   <CareerProgressBar key={t.name} label={t.name} done={t.done} target={t.target} />
                 ))}
@@ -688,16 +806,20 @@ export default function Career() {
             </div>
           )}
 
-          {/* ── Weekly Plan (rule-based; hidden when AI coach active) ── */}
+          {/* Weekly Plan */}
           {plan && !hasAiCoach && (
             <div className="card mb-4">
-              <div className="card-title">📅 Weekly Plan</div>
-              <div style={{ display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap' }}>
+              <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Calendar size={18} color="var(--color-accent)" />
+                Weekly plan
+              </div>
+              <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap', marginTop: 12 }}>
                 {plan.weeklyPlan.map((d, i) => (
                   <button
                     key={i}
                     onClick={() => setActiveDay(i)}
                     className={`btn btn-sm ${activeDay === i ? 'btn-primary' : 'btn-outline'}`}
+                    style={{ minHeight: 'auto', height: 28, fontSize: 12, padding: '0 10px', background: activeDay === i ? 'var(--color-accent)' : 'transparent' }}
                   >
                     {d.day}
                   </button>
@@ -710,40 +832,36 @@ export default function Career() {
                 const pct    = Math.min(100, Math.round((done / target) * 100));
                 return (
                   <div style={{
-                    background: 'rgba(129,140,248,0.07)',
-                    border: '1px solid rgba(129,140,248,0.2)',
-                    borderRadius: 10, padding: 16,
+                    background: 'var(--color-surface-2)',
+                    border: '1.5px solid var(--border)',
+                    borderRadius: 10, padding: 14,
                   }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                      <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, alignItems: 'center' }}>
+                      <div style={{ fontSize: 14.5, fontWeight: 600, color: 'var(--color-text-primary)' }}>
                         {day.day} — {day.topic}
                       </div>
                       <span className={`badge ${pct >= 100 ? 'badge-success' : pct >= 50 ? 'badge-warning' : 'badge-danger'}`}>
-                        {pct >= 100 ? '✔ Done' : `${pct}%`}
+                        {pct >= 100 ? 'Done' : `${pct}%`}
                       </span>
                     </div>
-                    <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 12 }}>
-                      📝 {day.task}
+                    <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginBottom: 12 }}>
+                      Task: {day.task}
                     </div>
-                    {/* Progress */}
+                    
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
-                      <span style={{ fontSize: 12, color: 'var(--muted)' }}>Progress</span>
-                      <span style={{ fontSize: 12, color: 'var(--muted)' }}>{day.done}/{day.target} solved</span>
+                      <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>Progress</span>
+                      <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>{day.done}/{day.target} solved</span>
                     </div>
                     <div style={{
-                      background: 'rgba(255,255,255,0.07)',
+                      background: 'rgba(255,255,255,0.04)',
                       borderRadius: 99, height: 6, overflow: 'hidden',
                     }}>
                       <div style={{
                         width:      `${pct}%`,
                         height:     '100%',
                         borderRadius: 99,
-                        background: pct >= 100
-                          ? 'linear-gradient(90deg,#34d399,#10b981)'
-                          : pct >= 50
-                            ? 'linear-gradient(90deg,#fbbf24,#f59e0b)'
-                            : 'linear-gradient(90deg,#f87171,#ef4444)',
-                        transition: 'width 0.5s ease',
+                        background: pct >= 100 ? '#22c55e' : pct >= 50 ? '#f59e0b' : '#ef4444',
+                        transition: 'width 0.4s ease',
                       }} />
                     </div>
                   </div>
@@ -756,16 +874,21 @@ export default function Career() {
         <>
           {/* AI Career Prep View */}
           <div className="grid-2 mb-4">
+            
+            {/* Resume Scanner */}
             <div className="card" style={{ display: 'flex', flexDirection: 'column' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-                <div className="card-title" style={{ margin: 0 }}>🔍 Resume Scanner & Keyword Checker</div>
+                <div className="card-title" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <FileText size={18} color="var(--color-accent)" />
+                  Resume scanner & keyword checker
+                </div>
                 {(resumeFile || resumeText.trim() || resumeAnalysis) && (
                   <button
                     className="btn btn-outline btn-sm"
-                    style={{ minHeight: 'auto', height: 28, padding: '4px 10px', fontSize: 11 }}
+                    style={{ minHeight: 'auto', height: 26, padding: '4px 10px', fontSize: 11, background: 'transparent' }}
                     onClick={handleResetScanner}
                   >
-                    🔄 Reset Scanner
+                    Reset
                   </button>
                 )}
               </div>
@@ -778,18 +901,18 @@ export default function Career() {
                 <button
                   type="button"
                   className={`btn btn-sm ${scanMethod === 'pdf' ? 'btn-primary' : 'btn-outline'}`}
+                  style={{ minHeight: 'auto', height: 30, background: scanMethod === 'pdf' ? 'var(--color-accent)' : 'transparent' }}
                   onClick={() => setScanMethod('pdf')}
-                  style={{ minHeight: 'auto', height: 32 }}
                 >
-                  📄 Upload File (PDF/Image)
+                  Upload file (PDF/Image)
                 </button>
                 <button
                   type="button"
                   className={`btn btn-sm ${scanMethod === 'text' ? 'btn-primary' : 'btn-outline'}`}
+                  style={{ minHeight: 'auto', height: 30, background: scanMethod === 'text' ? 'var(--color-accent)' : 'transparent' }}
                   onClick={() => setScanMethod('text')}
-                  style={{ minHeight: 'auto', height: 32 }}
                 >
-                  ✏️ Paste Text
+                  Paste text
                 </button>
               </div>
 
@@ -797,15 +920,15 @@ export default function Career() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                   <div
                     style={{
-                      border: isDragging ? '2px dashed var(--primary)' : '2px dashed var(--border)',
-                      borderRadius: 10,
-                      padding: '24px 16px',
+                      border: isDragging ? '1.5px solid var(--color-accent)' : '1.5px dashed var(--border)',
+                      borderRadius: 'var(--radius-lg)',
+                      padding: '28px 16px',
                       textAlign: 'center',
-                      background: isDragging ? 'rgba(129,140,248,0.05)' : 'rgba(255,255,255,0.01)',
+                      background: isDragging ? 'rgba(99,102,241,0.06)' : 'rgba(255,255,255,0.01)',
                       display: 'flex',
                       flexDirection: 'column',
                       alignItems: 'center',
-                      gap: 8,
+                      gap: 6,
                       cursor: 'pointer',
                       transition: 'all 0.2s ease'
                     }}
@@ -814,11 +937,11 @@ export default function Career() {
                     onDragLeave={handleDragLeave}
                     onDrop={handleDrop}
                   >
-                    <span style={{ fontSize: 24 }}>📤</span>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>
-                      {resumeFile ? resumeFile.name : 'Select or Drop your Resume PDF/Image'}
+                    <Upload size={24} color="var(--color-accent)" />
+                    <span style={{ fontSize: 13.5, fontWeight: 500, color: 'var(--color-text-primary)' }}>
+                      {resumeFile ? resumeFile.name : 'Select or drop your resume PDF/image'}
                     </span>
-                    <span style={{ fontSize: 11, color: 'var(--muted)' }}>Supports PDF, PNG, JPG formats up to 5MB</span>
+                    <span style={{ fontSize: 11.5, color: 'var(--color-text-tertiary)' }}>Supports PDF, PNG, JPG formats up to 5MB</span>
                     <input
                       id="resume-pdf-input"
                       type="file"
@@ -834,8 +957,9 @@ export default function Career() {
                     className="btn btn-primary"
                     disabled={resumeLoading || !resumeFile}
                     onClick={handleUploadResume}
+                    style={{ height: 38, fontSize: 13 }}
                   >
-                    {resumeLoading ? 'Scanning File...' : '⚡ Scan Resume'}
+                    {resumeLoading ? 'Scanning file...' : 'Scan resume'}
                   </button>
                 </div>
               ) : (
@@ -853,43 +977,50 @@ export default function Career() {
                     className="btn btn-primary"
                     disabled={resumeLoading || !resumeText.trim()}
                     onClick={handleAnalyzeResume}
+                    style={{ height: 38, fontSize: 13 }}
                   >
-                    {resumeLoading ? 'Scanning Text...' : '⚡ Scan Plain Text'}
+                    {resumeLoading ? 'Scanning text...' : 'Scan plain text'}
                   </button>
                 </div>
               )}
             </div>
 
-            {/* Resume Score and Feedback Card */}
+            {/* Resume Score and Feedback */}
             <div className="card">
-              <div className="card-title">📊 Analysis Results</div>
+              <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Activity size={18} color="var(--color-accent)" />
+                Analysis results
+              </div>
               {resumeAnalysis ? (
-                <div>
+                <div style={{ marginTop: 14 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16 }}>
                     <div style={{
-                      width: 70,
-                      height: 70,
+                      width: 64,
+                      height: 64,
                       borderRadius: '50%',
-                      background: 'rgba(129,140,248,0.1)',
-                      border: '2.5px solid var(--primary)',
+                      background: 'var(--color-accent-muted)',
+                      border: '2px solid var(--color-accent)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      fontSize: 22,
-                      fontWeight: 800,
-                      color: 'var(--primary)'
+                      fontSize: 20,
+                      fontWeight: 600,
+                      color: 'var(--color-accent)'
                     }}>
                       {resumeAnalysis.score}
                     </div>
                     <div>
-                      <div style={{ fontSize: 14, fontWeight: 700 }}>Resume Matching Score</div>
-                      <div className="text-muted" style={{ marginTop: 2 }}>Targeting {career.targetCompany} · {career.targetRole}</div>
+                      <div style={{ fontSize: 14.5, fontWeight: 600, color: 'var(--color-text-primary)' }}>Resume match score</div>
+                      <div className="text-muted" style={{ marginTop: 2, fontSize: 12.5 }}>Targeting {career.targetCompany} · {career.targetRole}</div>
                     </div>
                   </div>
 
                   {/* Missing Keywords */}
                   <div style={{ marginBottom: 14 }}>
-                    <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text)', marginBottom: 6 }}>🎯 Missing Target Keywords</div>
+                    <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <Target size={14} color="var(--color-accent)" />
+                      Missing target keywords
+                    </div>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                       {resumeAnalysis.missingKeywords?.length > 0 ? (
                         resumeAnalysis.missingKeywords.map(kw => (
@@ -901,10 +1032,13 @@ export default function Career() {
                     </div>
                   </div>
 
-                  {/* Feedback Bullet Points */}
+                  {/* Feedback Points */}
                   <div>
-                    <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text)', marginBottom: 6 }}>💡 Key Feedback</div>
-                    <ul style={{ paddingLeft: 16, fontSize: 13, color: 'var(--text-2)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <Lightbulb size={14} color="var(--color-accent)" />
+                      Key feedback
+                    </div>
+                    <ul style={{ paddingLeft: 16, fontSize: 13, color: 'var(--color-text-secondary)', display: 'flex', flexDirection: 'column', gap: 5 }}>
                       {resumeAnalysis.feedback?.map((f, i) => (
                         <li key={i}>{f}</li>
                       ))}
@@ -912,35 +1046,36 @@ export default function Career() {
                   </div>
                 </div>
               ) : (
-                <div className="empty-state">
-                  <div className="icon">📄</div>
-                  <p style={{ fontWeight: 600, color: 'var(--text-2)', marginBottom: 4 }}>No Scan Done Yet</p>
-                  <p className="text-muted">Paste your resume and click scan to calculate your match score.</p>
-                  {career.resumeScore > 0 && (
-                    <div style={{ marginTop: 14, fontSize: 13, color: 'var(--primary)', fontWeight: 600 }}>
-                      Last Saved Score: {career.resumeScore}/100
-                    </div>
-                  )}
-                </div>
+                <EmptyState
+                  illustration="marks"
+                  title="No scan completed yet"
+                  subtitle="Upload your resume file or paste plain text and click scan to calculate matching score."
+                  actionLabel={career.resumeScore > 0 ? `Last Saved Score: ${career.resumeScore}/100` : null}
+                  onAction={() => {}}
+                />
               )}
             </div>
           </div>
 
+          {/* AI Mock Interview Simulator */}
           <div className="card">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-              <div className="card-title" style={{ margin: 0 }}>🤖 AI Mock Interview Simulator</div>
+              <div className="card-title" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Bot size={18} color="var(--color-accent)" />
+                AI mock interview simulator
+              </div>
               {questions.length > 0 && (
                 <button
                   className="btn btn-outline btn-sm"
-                  style={{ minHeight: 'auto', height: 28, padding: '4px 10px', fontSize: 11 }}
+                  style={{ minHeight: 'auto', height: 26, padding: '4px 10px', fontSize: 11, background: 'transparent' }}
                   onClick={handleResetInterview}
                 >
-                  🔄 Reset Session
+                  Reset session
                 </button>
               )}
             </div>
             <p className="text-muted" style={{ marginBottom: 16 }}>
-              Practice custom technical coding and behavioral interview questions generated specifically for you.
+              Practice technical coding and behavioral interview questions generated specifically for your target role.
             </p>
 
             {/* Select Topic & Generate button */}
@@ -965,8 +1100,10 @@ export default function Career() {
                   className="btn btn-primary"
                   onClick={handleGenerateQuestions}
                   disabled={questionsLoading}
+                  style={{ height: 38, fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}
                 >
-                  {questionsLoading ? 'Generating Questions...' : '🎲 Generate 3 Questions'}
+                  <Brain size={14} />
+                  {questionsLoading ? 'Generating...' : 'Generate 3 questions'}
                 </button>
               )}
             </div>
@@ -980,9 +1117,8 @@ export default function Career() {
                 flexDirection: 'column',
                 gap: 16
               }}>
-                {/* Question header */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--primary)' }}>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-accent)' }}>
                     Question {activeQuestionIndex + 1} of {questions.length}
                   </span>
                   <span className={`badge ${questions[activeQuestionIndex].type === 'behavioral' ? 'badge-info' : 'badge-warning'}`}>
@@ -992,55 +1128,41 @@ export default function Career() {
 
                 {/* The Question Text */}
                 <div style={{
-                  background: 'rgba(255,255,255,0.02)',
-                  border: '1px solid var(--card-border)',
-                  borderRadius: 8,
+                  background: 'var(--color-surface-2)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 'var(--radius-md)',
                   padding: 16,
                   fontSize: 14,
-                  fontWeight: 600,
-                  color: 'var(--text)'
+                  fontWeight: 500,
+                  color: 'var(--color-text-primary)'
                 }}>
                   {questions[activeQuestionIndex].question}
                 </div>
 
                 {/* Answer Area */}
                 <div className="form-group" style={{ marginBottom: 0 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                     <label className="form-label" style={{ margin: 0 }}>Your Response</label>
                     {!questions[activeQuestionIndex].isEvaluated && (
                       <button
                         type="button"
-                        className="btn btn-sm btn-outline"
+                        className="btn btn-outline"
                         style={{
-                          padding: '2px 8px',
+                          padding: '4px 10px',
                           minHeight: 'auto',
                           height: 26,
+                          fontSize: 12,
                           borderColor: isListening ? '#ef4444' : 'var(--border)',
-                          background: isListening ? 'rgba(239,68,68,0.1)' : 'transparent',
-                          color: isListening ? '#ef4444' : 'var(--text-2)',
+                          background: isListening ? 'rgba(239,68,68,0.06)' : 'transparent',
+                          color: isListening ? '#ef4444' : 'var(--color-text-secondary)',
                           display: 'flex',
                           alignItems: 'center',
                           gap: 4
                         }}
                         onClick={handleVoiceAnswer}
                       >
-                        {isListening ? (
-                          <>
-                            <svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor" style={{ display: 'inline-block', verticalAlign: 'middle', animation: 'voicePulse 1.2s infinite' }}>
-                              <rect x="4" y="4" width="16" height="16" />
-                            </svg>
-                            Stop Listening
-                          </>
-                        ) : (
-                          <>
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block', verticalAlign: 'middle' }}>
-                              <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
-                              <path d="M19 10v1a7 7 0 0 1-14 0v-1" />
-                              <line x1="12" x2="12" y1="19" y2="22" />
-                            </svg>
-                            &nbsp;Speak Answer
-                          </>
-                        )}
+                        <Mic size={13} />
+                        {isListening ? 'Stop listening' : 'Speak answer'}
                       </button>
                     )}
                   </div>
@@ -1052,31 +1174,26 @@ export default function Career() {
                     onChange={e => setUserAnswer(e.target.value)}
                     disabled={questions[activeQuestionIndex].isEvaluated}
                   />
-                  <style>{`
-                    @keyframes voicePulse {
-                      0% { opacity: 0.4; transform: scale(0.9); }
-                      50% { opacity: 1; transform: scale(1.1); }
-                      100% { opacity: 0.4; transform: scale(0.9); }
-                    }
-                  `}</style>
                 </div>
 
                 {/* Action Buttons */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                   <div style={{ display: 'flex', gap: 8 }}>
                     <button
-                      className="btn btn-outline btn-sm"
+                      className="btn btn-outline"
+                      style={{ padding: '0 12px', height: 32, fontSize: 12, background: 'transparent' }}
                       disabled={activeQuestionIndex === 0}
                       onClick={() => handleNavQuestion(activeQuestionIndex - 1)}
                     >
-                      ◀ Prev
+                      Prev
                     </button>
                     <button
-                      className="btn btn-outline btn-sm"
+                      className="btn btn-outline"
+                      style={{ padding: '0 12px', height: 32, fontSize: 12, background: 'transparent' }}
                       disabled={activeQuestionIndex === questions.length - 1}
                       onClick={() => handleNavQuestion(activeQuestionIndex + 1)}
                     >
-                      Next ▶
+                      Next
                     </button>
                   </div>
 
@@ -1085,8 +1202,9 @@ export default function Career() {
                       className="btn btn-primary"
                       disabled={evaluating || !userAnswer.trim()}
                       onClick={handleEvaluateAnswer}
+                      style={{ height: 32, fontSize: 12.5 }}
                     >
-                      {evaluating ? 'Evaluating Answer...' : '✨ Submit Answer for AI Review'}
+                      {evaluating ? 'Evaluating...' : 'Submit answer for review'}
                     </button>
                   )}
                 </div>
@@ -1094,54 +1212,57 @@ export default function Career() {
                 {/* AI Evaluation feedback */}
                 {evaluationResult && (
                   <div style={{
-                    background: 'rgba(165,180,252,0.05)',
-                    border: '1px solid rgba(165,180,252,0.15)',
+                    background: 'rgba(99, 102, 241, 0.04)',
+                    border: '1.5px solid rgba(99, 102, 241, 0.15)',
                     borderRadius: 10,
                     padding: 16,
                     marginTop: 10
                   }}>
-                    {/* Header */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--primary)' }}>🧠 AI Evaluation & Feedback</span>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-accent)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <Award size={15} />
+                        AI evaluation & feedback
+                      </span>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span className="text-muted" style={{ fontSize: 12 }}>Score:</span>
+                        <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>Score:</span>
                         <span style={{
-                          fontSize: 14,
-                          fontWeight: 800,
-                          padding: '3px 9px',
-                          borderRadius: 99,
-                          background: evaluationResult.score >= 8 ? 'rgba(52,211,153,0.15)' : evaluationResult.score >= 5 ? 'rgba(251,191,36,0.15)' : 'rgba(248,113,113,0.15)',
-                          color: evaluationResult.score >= 8 ? '#34d399' : evaluationResult.score >= 5 ? '#fbbf24' : '#f87171'
+                          fontSize: 13,
+                          fontWeight: 700,
+                          padding: '2px 8px',
+                          borderRadius: 'var(--radius-pill)',
+                          background: evaluationResult.score >= 8 ? 'rgba(34,197,94,0.1)' : evaluationResult.score >= 5 ? 'rgba(245,158,11,0.1)' : 'rgba(239,68,68,0.1)',
+                          color: evaluationResult.score >= 8 ? '#22c55e' : evaluationResult.score >= 5 ? '#f59e0b' : '#ef4444',
+                          border: `1px solid ${evaluationResult.score >= 8 ? 'rgba(34,197,94,0.15)' : evaluationResult.score >= 5 ? 'rgba(245,158,11,0.15)' : 'rgba(239,68,68,0.15)'}`
                         }}>
                           {evaluationResult.score}/10
                         </span>
                       </div>
                     </div>
 
-                    <p style={{ margin: 0, fontSize: 13, color: 'var(--text-2)', lineHeight: 1.5 }}>
+                    <p style={{ margin: 0, fontSize: 13, color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
                       {evaluationResult.feedback}
                     </p>
 
                     {/* Model Answer Toggle */}
-                    <div style={{ marginTop: 14, borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 12 }}>
+                    <div style={{ marginTop: 14, borderTop: '1px solid var(--border)', paddingTop: 12 }}>
                       <button
-                        className="btn btn-outline btn-sm"
-                        style={{ padding: '4px 10px', minHeight: 'auto', height: 28, fontSize: 11 }}
+                        className="btn btn-outline"
+                        style={{ padding: '4px 10px', minHeight: 'auto', height: 28, fontSize: 11, background: 'transparent' }}
                         onClick={() => setShowModelAnswer(!showModelAnswer)}
                       >
-                        {showModelAnswer ? 'Hide Reference Answer' : '💡 Show Reference Answer'}
+                        {showModelAnswer ? 'Hide reference answer' : 'Show reference answer'}
                       </button>
                       {showModelAnswer && (
                         <div style={{
-                          background: '#0d1117',
-                          border: '1px solid rgba(255,255,255,0.08)',
+                          background: 'var(--color-surface-3)',
+                          border: '1px solid var(--border)',
                           borderRadius: 8,
                           padding: 12,
                           marginTop: 10,
                           fontSize: 12.5,
-                          color: 'var(--text-2)',
+                          color: 'var(--color-text-secondary)',
                           lineHeight: 1.55,
-                          fontFamily: 'inherit'
+                          fontFamily: 'monospace'
                         }}>
                           {evaluationResult.modelAnswer}
                         </div>
@@ -1151,18 +1272,21 @@ export default function Career() {
                 )}
               </div>
             ) : (
-              <div className="empty-state">
-                <div className="icon">🎮</div>
-                <p style={{ fontWeight: 600, color: 'var(--text-2)', marginBottom: 4 }}>Questions Not Generated</p>
-                <p className="text-muted">Select a topic above and generate practice questions to start the simulation.</p>
-              </div>
+              <EmptyState
+                illustration="default"
+                title="Mock interview not generated"
+                subtitle="Select an interview topic and click generate questions above to start practicing."
+              />
             )}
           </div>
 
           {/* Past Mock Interviews Log */}
           {career.mockInterviews && career.mockInterviews.length > 0 && (
             <div className="card" style={{ marginTop: 24 }}>
-              <div className="card-title">📜 Mock Interview Performance History Logs</div>
+              <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                <ClipboardList size={18} color="var(--color-accent)" />
+                Mock interview logs
+              </div>
               <p className="text-muted" style={{ marginBottom: 16 }}>
                 Review feedback and reference model answers from your previous mock interviews.
               </p>
@@ -1170,38 +1294,42 @@ export default function Career() {
                 <table className="table" style={{ width: '100%', minWidth: '560px', borderCollapse: 'collapse' }}>
                   <thead>
                     <tr style={{ borderBottom: '1px solid var(--border)', textAlign: 'left' }}>
-                      <th style={{ padding: '10px 8px', fontSize: 12, color: 'var(--muted)', fontWeight: 600 }}>TOPIC</th>
-                      <th style={{ padding: '10px 8px', fontSize: 12, color: 'var(--muted)', fontWeight: 600 }}>QUESTION</th>
-                      <th style={{ padding: '10px 8px', fontSize: 12, color: 'var(--muted)', fontWeight: 600 }}>AI SCORE</th>
-                      <th style={{ padding: '10px 8px', fontSize: 12, color: 'var(--muted)', fontWeight: 600 }}>DATE</th>
-                      <th style={{ padding: '10px 8px', fontSize: 12, color: 'var(--muted)', fontWeight: 600 }}>ACTION</th>
+                      <th style={{ padding: '10px 8px', fontSize: 12, color: 'var(--color-text-secondary)', fontWeight: 500 }}>Topic</th>
+                      <th style={{ padding: '10px 8px', fontSize: 12, color: 'var(--color-text-secondary)', fontWeight: 500 }}>Question</th>
+                      <th style={{ padding: '10px 8px', fontSize: 12, color: 'var(--color-text-secondary)', fontWeight: 500 }}>AI score</th>
+                      <th style={{ padding: '10px 8px', fontSize: 12, color: 'var(--color-text-secondary)', fontWeight: 500 }}>Date</th>
+                      <th style={{ padding: '10px 8px', fontSize: 12, color: 'var(--color-text-secondary)', fontWeight: 500 }}>Action</th>
                     </tr>
                   </thead>
                   <tbody>
                     {career.mockInterviews.map((item, idx) => (
-                      <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                        <td style={{ padding: '12px 8px', fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{item.topic}</td>
-                        <td style={{ padding: '12px 8px', fontSize: 13, color: 'var(--text-2)', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <tr key={idx} style={{ borderBottom: '1px solid var(--border)', transition: 'background 0.15s' }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.01)'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                      >
+                        <td style={{ padding: '12px 8px', fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)' }}>{item.topic}</td>
+                        <td style={{ padding: '12px 8px', fontSize: 13, color: 'var(--color-text-secondary)', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {item.question}
                         </td>
                         <td style={{ padding: '12px 8px' }}>
                           <span className="badge" style={{
-                            background: item.score >= 8 ? 'rgba(52,211,153,0.15)' : item.score >= 5 ? 'rgba(251,191,36,0.15)' : 'rgba(248,113,113,0.15)',
-                            color: item.score >= 8 ? '#34d399' : item.score >= 5 ? '#fbbf24' : '#f87171'
+                            background: item.score >= 8 ? 'rgba(34,197,94,0.1)' : item.score >= 5 ? 'rgba(245,158,11,0.1)' : 'rgba(239,68,68,0.1)',
+                            color: item.score >= 8 ? '#22c55e' : item.score >= 5 ? '#f59e0b' : '#ef4444',
+                            border: `1px solid ${item.score >= 8 ? 'rgba(34,197,94,0.15)' : item.score >= 5 ? 'rgba(245,158,11,0.15)' : 'rgba(239,68,68,0.15)'}`
                           }}>
                             {item.score}/10
                           </span>
                         </td>
-                        <td style={{ padding: '12px 8px', fontSize: 12, color: 'var(--muted)' }}>
+                        <td style={{ padding: '12px 8px', fontSize: 12, color: 'var(--color-text-secondary)' }}>
                           {new Date(item.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                         </td>
                         <td style={{ padding: '12px 8px' }}>
                           <button
                             className="btn btn-outline btn-sm"
-                            style={{ minHeight: 'auto', height: 26, padding: '2px 8px', fontSize: 11 }}
+                            style={{ minHeight: 'auto', height: 26, padding: '2px 8px', fontSize: 11, background: 'transparent' }}
                             onClick={() => setSelectedHistoryItem(item)}
                           >
-                            🔍 Review
+                            Review
                           </button>
                         </td>
                       </tr>
@@ -1228,15 +1356,15 @@ export default function Career() {
             onClick={() => setSelectedHistoryItem(null)}
             >
               <div style={{
-                background: 'var(--card)',
-                border: '1px solid var(--card-border)',
-                borderRadius: 'var(--radius)',
+                background: 'var(--color-surface-2)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-lg)',
                 padding: 24,
                 maxWidth: 600,
                 width: '100%',
                 maxHeight: '90vh',
                 overflowY: 'auto',
-                boxShadow: '0 20px 25px -5px rgba(0,0,0,0.3)',
+                boxShadow: '0 20px 25px -5px rgba(0,0,0,0.5)',
                 position: 'relative'
               }}
               onClick={e => e.stopPropagation()}
@@ -1244,11 +1372,11 @@ export default function Career() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
                   <div>
                     <span className="badge badge-primary" style={{ marginBottom: 6 }}>{selectedHistoryItem.topic}</span>
-                    <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>Mock Interview Response Review</h3>
+                    <h3 style={{ fontSize: 16, fontWeight: 600, margin: 0, color: 'var(--color-text-primary)' }}>Mock interview logs review</h3>
                   </div>
                   <button
-                    className="btn btn-outline btn-sm"
-                    style={{ minWidth: 'auto', padding: '4px 8px', height: 28 }}
+                    className="btn btn-outline"
+                    style={{ minWidth: 'auto', padding: '4px 8px', height: 28, background: 'transparent' }}
                     onClick={() => setSelectedHistoryItem(null)}
                   >
                     ✕
@@ -1257,42 +1385,43 @@ export default function Career() {
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                   <div>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', marginBottom: 4 }}>QUESTION</div>
-                    <div style={{ background: 'rgba(255,255,255,0.02)', padding: 12, borderRadius: 6, fontSize: 13, border: '1px solid var(--border)' }}>
+                    <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-secondary)', marginBottom: 4 }}>QUESTION</div>
+                    <div style={{ background: 'var(--color-surface-3)', padding: 12, borderRadius: 6, fontSize: 13, border: '1px solid var(--border)', color: 'var(--color-text-primary)' }}>
                       {selectedHistoryItem.question}
                     </div>
                   </div>
 
                   <div>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', marginBottom: 4 }}>YOUR RESPONSE</div>
-                    <div style={{ background: 'rgba(255,255,255,0.01)', padding: 12, borderRadius: 6, fontSize: 13, border: '1px solid var(--border)', whiteSpace: 'pre-wrap' }}>
+                    <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-secondary)', marginBottom: 4 }}>YOUR RESPONSE</div>
+                    <div style={{ background: 'rgba(255,255,255,0.01)', padding: 12, borderRadius: 6, fontSize: 13, border: '1px solid var(--border)', whiteSpace: 'pre-wrap', color: 'var(--color-text-secondary)' }}>
                       {selectedHistoryItem.userAnswer}
                     </div>
                   </div>
 
                   <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)' }}>AI RATING:</div>
+                    <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-secondary)' }}>AI RATING:</div>
                     <span className="badge" style={{
                       fontSize: 13,
-                      fontWeight: 800,
-                      background: selectedHistoryItem.score >= 8 ? 'rgba(52,211,153,0.15)' : selectedHistoryItem.score >= 5 ? 'rgba(251,191,36,0.15)' : 'rgba(248,113,113,0.15)',
-                      color: selectedHistoryItem.score >= 8 ? '#34d399' : selectedHistoryItem.score >= 5 ? '#fbbf24' : '#f87171'
+                      fontWeight: 700,
+                      background: selectedHistoryItem.score >= 8 ? 'rgba(34,197,94,0.1)' : selectedHistoryItem.score >= 5 ? 'rgba(245,158,11,0.1)' : 'rgba(239,68,68,0.1)',
+                      color: selectedHistoryItem.score >= 8 ? '#22c55e' : selectedHistoryItem.score >= 5 ? '#f59e0b' : '#ef4444',
+                      border: `1px solid ${selectedHistoryItem.score >= 8 ? 'rgba(34,197,94,0.15)' : selectedHistoryItem.score >= 5 ? 'rgba(245,158,11,0.15)' : 'rgba(239,68,68,0.15)'}`
                     }}>
                       {selectedHistoryItem.score}/10
                     </span>
                   </div>
 
                   <div>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', marginBottom: 4 }}>AI FEEDBACK</div>
-                    <p style={{ margin: 0, fontSize: 13, color: 'var(--text-2)', lineHeight: 1.5 }}>
+                    <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-secondary)', marginBottom: 4 }}>AI FEEDBACK</div>
+                    <p style={{ margin: 0, fontSize: 13, color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
                       {selectedHistoryItem.feedback}
                     </p>
                   </div>
 
                   {selectedHistoryItem.modelAnswer && (
                     <div>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', marginBottom: 4 }}>REFERENCE MODEL ANSWER</div>
-                      <div style={{ background: '#0d1117', padding: 12, borderRadius: 6, fontSize: 12, color: 'var(--text-2)', border: '1px solid rgba(255,255,255,0.06)', lineHeight: 1.5 }}>
+                      <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-secondary)', marginBottom: 4 }}>REFERENCE MODEL ANSWER</div>
+                      <div style={{ background: 'var(--color-surface-3)', padding: 12, borderRadius: 6, fontSize: 12.5, color: 'var(--color-text-secondary)', border: '1px solid var(--border)', lineHeight: 1.5, fontFamily: 'monospace' }}>
                         {selectedHistoryItem.modelAnswer}
                       </div>
                     </div>

@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { userService } from '../services/apiServices';
-import toast from 'react-hot-toast';
+import toast from '../context/ToastContext';
+import { Lock, Eye, EyeOff, User, Mail, Zap, ArrowRight, Shield, GraduationCap, Info } from 'lucide-react';
 import './ProfileSettings.css';
 
 function getPasswordStrength(pw) {
@@ -40,7 +41,7 @@ function PasswordInput({ label, name, value, onChange, placeholder }) {
     <div className="ps-field">
       <label className="ps-label">{label}</label>
       <div className="ps-input-wrap">
-        <span className="ps-icon">🔒</span>
+        <span className="ps-icon" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Lock size={16} /></span>
         <input
           className="ps-input"
           type={show ? 'text' : 'password'}
@@ -50,8 +51,8 @@ function PasswordInput({ label, name, value, onChange, placeholder }) {
           placeholder={placeholder}
           autoComplete="new-password"
         />
-        <button type="button" className="ps-eye-btn" onClick={() => setShow(s => !s)}>
-          {show ? '🙈' : '👁'}
+        <button type="button" className="ps-eye-btn" onClick={() => setShow(s => !s)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {show ? <EyeOff size={16} /> : <Eye size={16} />}
         </button>
       </div>
     </div>
@@ -206,7 +207,9 @@ export default function ProfileSettings() {
         {/* Card 1 — Update Profile */}
         <div className="ps-card">
           <div className="ps-card-hdr">
-            <div className="ps-card-icon ps-card-icon--indigo">👤</div>
+            <div className="ps-card-icon ps-card-icon--indigo" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-accent)' }}>
+              <User size={18} />
+            </div>
             <div>
               <div className="ps-card-title">Update Profile</div>
               <div className="ps-card-sub">Change your name and email address</div>
@@ -219,7 +222,7 @@ export default function ProfileSettings() {
             <div className="ps-field">
               <label className="ps-label">Full Name</label>
               <div className="ps-input-wrap">
-                <span className="ps-icon">👤</span>
+                <span className="ps-icon" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}><User size={16} /></span>
                 <input
                   className="ps-input"
                   type="text"
@@ -233,7 +236,7 @@ export default function ProfileSettings() {
             <div className="ps-field">
               <label className="ps-label">Email Address</label>
               <div className="ps-input-wrap">
-                <span className="ps-icon">✉️</span>
+                <span className="ps-icon" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Mail size={16} /></span>
                 <input
                   className="ps-input"
                   type="email"
@@ -242,11 +245,19 @@ export default function ProfileSettings() {
                   placeholder="you@example.com"
                 />
               </div>
-              <p className="ps-hint">⚡ A new login token is issued when email changes.</p>
+              <p className="ps-hint" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <Zap size={12} style={{ color: 'var(--color-accent)' }} />
+                A new login token is issued when email changes.
+              </p>
             </div>
 
-            <button type="submit" className="ps-btn ps-btn--indigo" disabled={profileLoading}>
-              {profileLoading ? <><span className="ps-spinner" />Saving…</> : <>Save Profile →</>}
+            <button type="submit" className="ps-btn ps-btn--indigo" disabled={profileLoading} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+              {profileLoading ? <><span className="ps-spinner" />Saving…</> : (
+                <>
+                  <span>Save Profile</span>
+                  <ArrowRight size={14} />
+                </>
+              )}
             </button>
           </form>
         </div>
@@ -254,7 +265,9 @@ export default function ProfileSettings() {
         {/* Card 2 — Change Password */}
         <div className="ps-card">
           <div className="ps-card-hdr">
-            <div className="ps-card-icon ps-card-icon--teal">🛡️</div>
+            <div className="ps-card-icon ps-card-icon--teal" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#14b8a6' }}>
+              <Shield size={18} />
+            </div>
             <div>
               <div className="ps-card-title">Change Password</div>
               <div className="ps-card-sub">Keep your account secure</div>
@@ -315,8 +328,15 @@ export default function ProfileSettings() {
               </p>
             )}
 
-            <button type="submit" className="ps-btn ps-btn--teal" disabled={passwordLoading}>
-              {passwordLoading ? <><span className="ps-spinner" />Updating…</> : <>🛡️ Change Password</>}
+            <button type="submit" className="ps-btn ps-btn--teal" disabled={passwordLoading} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+              {passwordLoading ? (
+                <>Updating…</>
+              ) : (
+                <>
+                  <Shield size={14} />
+                  Change Password
+                </>
+              )}
             </button>
           </form>
         </div>
@@ -324,7 +344,9 @@ export default function ProfileSettings() {
   {/* Card 3 — Update SID */}
         <div className="ps-card">
           <div className="ps-card-hdr">
-            <div className="ps-card-icon ps-card-icon--amber">🎓</div>
+            <div className="ps-card-icon ps-card-icon--amber" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#f59e0b' }}>
+              <GraduationCap size={18} />
+            </div>
             <div>
               <div className="ps-card-title">Student ID (SID)</div>
               <div className="ps-card-sub">Update your unique student identifier</div>
@@ -337,7 +359,7 @@ export default function ProfileSettings() {
             <div className="ps-field">
               <label className="ps-label">Student ID</label>
               <div className="ps-input-wrap">
-                <span className="ps-icon">🎓</span>
+                <span className="ps-icon" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}><GraduationCap size={16} /></span>
                 <input
                   className="ps-input"
                   type="text"
@@ -346,11 +368,21 @@ export default function ProfileSettings() {
                   placeholder="e.g. 2023CS001"
                 />
               </div>
-              <p className="ps-hint">⚡ SID must be unique across all users.</p>
+              <p className="ps-hint" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <Info size={12} style={{ color: '#f59e0b' }} />
+                SID must be unique across all users.
+              </p>
             </div>
 
-            <button type="submit" className="ps-btn ps-btn--amber" disabled={sidLoading}>
-              {sidLoading ? <><span className="ps-spinner" />Saving…</> : <>🎓 Update SID</>}
+            <button type="submit" className="ps-btn ps-btn--amber" disabled={sidLoading} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+              {sidLoading ? (
+                <>Saving…</>
+              ) : (
+                <>
+                  <GraduationCap size={14} />
+                  Update SID
+                </>
+              )}
             </button>
           </form>
         </div>
