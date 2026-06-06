@@ -1,1147 +1,558 @@
-// components/StudentAttendanceView.jsx — Enhanced UI/UX with modern design
+// components/StudentAttendanceView.jsx — Premium SaaS Redesign
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import axios from 'axios';
 import {
   BarChart3, Clipboard, X, TrendingUp, TrendingDown, AlertTriangle,
-  CheckCircle2, Calendar, Filter, Zap
+  CheckCircle2, Calendar, Filter, ChevronUp, ChevronDown, Search,
+  BookOpen, Activity, Clock, Shield
 } from 'lucide-react';
 import EmptyState from '../components/EmptyState';
 import Skeleton from '../components/Skeleton';
 
-/* ═══════════════════════════════════════════════════════════════════════════ */
-// ENHANCED DESIGN TOKENS
-/* ═══════════════════════════════════════════════════════════════════════════ */
+/* ─────────────────────────────────────────────────────────────────────────── */
+// DESIGN TOKENS
+/* ─────────────────────────────────────────────────────────────────────────── */
 
-const COLORS = {
-  bg: '#0a0e16',
-  surface: '#0f1219',
-  surface2: '#15191f',
-  surface3: '#1a2028',
-  border: 'rgba(255,255,255,0.05)',
-  border2: 'rgba(255,255,255,0.1)',
-  accent: '#6366f1',
-  accentLight: '#818cf8',
-  success: '#10b981',
-  successLight: '#34d399',
-  warning: '#f59e0b',
-  warningLight: '#fbbf24',
-  danger: '#ef4444',
-  dangerLight: '#f87171',
-  text: '#f1f5f9',
-  textSub: '#cbd5e1',
-  textMute: '#64748b',
-  textDim: '#475569',
+const T = {
+  // Backgrounds
+  bg:        '#f8f7f4',
+  surface:   '#ffffff',
+  surfaceAlt:'#f3f2ef',
+  hover:     '#f0efe9',
+
+  // Borders
+  border:    '#e8e6e0',
+  borderMed: '#d4d1c9',
+
+  // Typography
+  ink:       '#1a1916',
+  inkSub:    '#4a4844',
+  inkMute:   '#8a8780',
+  inkDim:    '#b0ada6',
+
+  // Semantic
+  emerald:   '#059669',
+  emeraldBg: '#ecfdf5',
+  emeraldBd: '#a7f3d0',
+
+  crimson:   '#dc2626',
+  crimsonBg: '#fef2f2',
+  crimsonBd: '#fecaca',
+
+  amber:     '#d97706',
+  amberBg:   '#fffbeb',
+  amberBd:   '#fde68a',
+
+  indigo:    '#4f46e5',
+  indigoBg:  '#eef2ff',
+  indigoBd:  '#c7d2fe',
+
+  // Accents
+  accent:    '#1a1916',
+  accentSub: '#4a4844',
 };
 
-const ATTENDANCE_THRESHOLD = 75;
+const THRESHOLD = 75;
 
-const STATUS_CONFIG = {
-  present: {
-    bg: 'rgba(16,185,129,0.1)',
-    border: 'rgba(16,185,129,0.3)',
-    color: '#34d399',
-    label: 'Present',
-    icon: '✓',
-  },
-  absent: {
-    bg: 'rgba(239,68,68,0.1)',
-    border: 'rgba(239,68,68,0.3)',
-    color: '#f87171',
-    label: 'Absent',
-    icon: '✕',
-  },
-  cancelled: {
-    bg: 'rgba(245,158,11,0.1)',
-    border: 'rgba(245,158,11,0.3)',
-    color: '#fbbf24',
-    label: 'Cancelled',
-    icon: '○',
-  },
+const STATUS = {
+  present:   { bg: T.emeraldBg, border: T.emeraldBd, color: T.emerald,  dot: '#10b981', label: 'Present'   },
+  absent:    { bg: T.crimsonBg, border: T.crimsonBd, color: T.crimson,  dot: '#ef4444', label: 'Absent'    },
+  cancelled: { bg: T.amberBg,   border: T.amberBd,   color: T.amber,    dot: '#f59e0b', label: 'Cancelled' },
 };
 
-/**
- * Enhanced card style with glassmorphism and depth
- */
-const cardStyle = (extras = {}) => ({
-  background: `linear-gradient(135deg, ${COLORS.surface} 0%, ${COLORS.surface2} 100%)`,
-  border: `1px solid ${COLORS.border2}`,
-  borderRadius: 20,
-  padding: '24px',
-  marginBottom: 20,
-  backdropFilter: 'blur(10px)',
-  boxShadow: '0 8px 32px rgba(0,0,0,0.1)',
-  ...extras,
+/* ─────────────────────────────────────────────────────────────────────────── */
+// HELPERS
+/* ─────────────────────────────────────────────────────────────────────────── */
+
+const pctColor  = p => p >= THRESHOLD ? T.emerald  : p >= 50 ? T.amber  : T.crimson;
+const pctBg     = p => p >= THRESHOLD ? T.emeraldBg: p >= 50 ? T.amberBg: T.crimsonBg;
+const pctBorder = p => p >= THRESHOLD ? T.emeraldBd: p >= 50 ? T.amberBd: T.crimsonBd;
+const pctLight  = p => p >= THRESHOLD ? '#34d399'  : p >= 50 ? '#fbbf24': '#f87171';
+
+const fmtDate = d => new Date(d).toLocaleDateString('en-IN', {
+  day: '2-digit', month: 'short', year: 'numeric'
 });
 
-/* ═══════════════════════════════════════════════════════════════════════════ */
-// UTILITIES
-/* ═══════════════════════════════════════════════════════════════════════════ */
+/* ─────────────────────────────────────────────────────────────────────────── */
+// STAT CARD
+/* ─────────────────────────────────────────────────────────────────────────── */
 
-const getAttendanceColor = (percentage) => {
-  if (percentage >= ATTENDANCE_THRESHOLD) return COLORS.success;
-  if (percentage >= 50) return COLORS.warning;
-  return COLORS.danger;
-};
-
-const getAttendanceColorLight = (percentage) => {
-  if (percentage >= ATTENDANCE_THRESHOLD) return COLORS.successLight;
-  if (percentage >= 50) return COLORS.warningLight;
-  return COLORS.dangerLight;
-};
-
-const getAttendanceBg = (percentage) => {
-  if (percentage >= ATTENDANCE_THRESHOLD) return 'rgba(16,185,129,0.12)';
-  if (percentage >= 50) return 'rgba(245,158,11,0.12)';
-  return 'rgba(239,68,68,0.12)';
-};
-
-const getAttendanceBorder = (percentage) => {
-  if (percentage >= ATTENDANCE_THRESHOLD) return 'rgba(16,185,129,0.3)';
-  if (percentage >= 50) return 'rgba(245,158,11,0.3)';
-  return 'rgba(239,68,68,0.3)';
-};
-
-const formatDate = (dateStr) => {
-  return new Date(dateStr).toLocaleDateString('en-IN', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
-};
-
-/* ═══════════════════════════════════════════════════════════════════════════ */
-// ENHANCED SUBCOMPONENTS
-/* ═══════════════════════════════════════════════════════════════════════════ */
-
-/**
- * Enhanced StatCard with hover animation
- */
-function StatCard({ icon: Icon, label, value, color }) {
+function StatCard({ icon: Icon, label, value, color, bg, border }) {
+  const [hov, setHov] = useState(false);
   return (
     <div
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
       style={{
-        background: `linear-gradient(135deg, ${COLORS.surface2} 0%, ${COLORS.surface3} 100%)`,
-        border: `1px solid ${COLORS.border2}`,
+        background: hov ? bg : T.surface,
+        border: `1.5px solid ${hov ? border : T.border}`,
         borderRadius: 16,
-        padding: '16px 14px',
-        textAlign: 'center',
-        cursor: 'pointer',
-        transition: 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
-        transform: 'translateY(0)',
-        position: 'relative',
-        overflow: 'hidden',
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.transform = 'translateY(-4px)';
-        e.currentTarget.style.boxShadow = `0 12px 24px ${color}20`;
-        e.currentTarget.style.borderColor = color;
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.transform = 'translateY(0)';
-        e.currentTarget.style.boxShadow = 'none';
-        e.currentTarget.style.borderColor = COLORS.border2;
+        padding: '20px 18px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 14,
+        cursor: 'default',
+        transition: 'all 0.2s ease',
       }}
     >
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'center',
-          marginBottom: 10,
-          position: 'relative',
-          zIndex: 2,
-        }}
-      >
-        <div
-          style={{
-            width: 40,
-            height: 40,
-            borderRadius: 12,
-            background: `${color}15`,
-            border: `1px solid ${color}30`,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            transition: 'all 0.3s ease',
-          }}
-        >
-          <Icon size={18} color={color} strokeWidth={2.5} />
+      <div style={{
+        width: 36, height: 36, borderRadius: 10,
+        background: bg, border: `1px solid ${border}`,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        <Icon size={16} color={color} strokeWidth={2} />
+      </div>
+      <div>
+        <div style={{ fontSize: 28, fontWeight: 700, color: T.ink, lineHeight: 1, letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums' }}>
+          {value}
         </div>
-      </div>
-      <div
-        style={{
-          fontSize: 28,
-          fontWeight: 800,
-          color,
-          lineHeight: 1,
-          fontVariantNumeric: 'tabular-nums',
-          marginBottom: 6,
-        }}
-      >
-        {value}
-      </div>
-      <div
-        style={{
-          fontSize: 11,
-          color: COLORS.textMute,
-          textTransform: 'uppercase',
-          letterSpacing: '0.06em',
-          fontWeight: 600,
-        }}
-      >
-        {label}
+        <div style={{ fontSize: 12, color: T.inkMute, marginTop: 5, fontWeight: 500, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+          {label}
+        </div>
       </div>
     </div>
   );
 }
 
-/**
- * Enhanced OverallBadge with circular progress
- */
-function OverallBadge({ percentage }) {
-  const circumference = 2 * Math.PI * 45;
-  const offset = circumference - (percentage / 100) * circumference;
-  const color = getAttendanceColor(percentage);
+/* ─────────────────────────────────────────────────────────────────────────── */
+// CIRCULAR PROGRESS
+/* ─────────────────────────────────────────────────────────────────────────── */
+
+function RingProgress({ percentage }) {
+  const r = 52;
+  const circ = 2 * Math.PI * r;
+  const offset = circ - (percentage / 100) * circ;
+  const color = pctColor(percentage);
 
   return (
-    <div style={{ marginLeft: 'auto', textAlign: 'center' }}>
-      <div
-        style={{
-          position: 'relative',
-          width: 140,
-          height: 140,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        {/* Outer glow */}
-        <div
-          style={{
-            position: 'absolute',
-            width: 140,
-            height: 140,
-            borderRadius: '50%',
-            background: `radial-gradient(circle, ${color}15, transparent)`,
-            animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-          }}
+    <div style={{ position: 'relative', width: 140, height: 140, flexShrink: 0 }}>
+      <svg width="140" height="140" style={{ transform: 'rotate(-90deg)' }}>
+        <circle cx="70" cy="70" r={r} fill="none" stroke={T.surfaceAlt} strokeWidth="8" />
+        <circle
+          cx="70" cy="70" r={r} fill="none"
+          stroke={color} strokeWidth="8"
+          strokeDasharray={circ}
+          strokeDashoffset={offset}
+          strokeLinecap="round"
+          style={{ transition: 'stroke-dashoffset 1s cubic-bezier(0.4,0,0.2,1)' }}
         />
-
-        {/* SVG Circle Progress */}
-        <svg
-          width="140"
-          height="140"
-          style={{
-            position: 'absolute',
-            transform: 'rotate(-90deg)',
-          }}
-        >
-          {/* Background circle */}
-          <circle
-            cx="70"
-            cy="70"
-            r="45"
-            fill="none"
-            stroke={COLORS.border2}
-            strokeWidth="3"
-          />
-          {/* Progress circle */}
-          <circle
-            cx="70"
-            cy="70"
-            r="45"
-            fill="none"
-            stroke={color}
-            strokeWidth="3"
-            strokeDasharray={circumference}
-            strokeDashoffset={offset}
-            strokeLinecap="round"
-            style={{
-              transition: 'stroke-dashoffset 0.8s cubic-bezier(0.34, 1.56, 0.64, 1)',
-              filter: `drop-shadow(0 0 8px ${color}40)`,
-            }}
-          />
-        </svg>
-
-        {/* Inner content */}
-        <div
-          style={{
-            textAlign: 'center',
-            position: 'relative',
-            zIndex: 2,
-          }}
-        >
-          <div
-            style={{
-              fontSize: 32,
-              fontWeight: 900,
-              color,
-              lineHeight: 1,
-              fontVariantNumeric: 'tabular-nums',
-            }}
-          >
-            {percentage}%
-          </div>
-          <div
-            style={{
-              fontSize: 11,
-              color: COLORS.textMute,
-              marginTop: 4,
-              fontWeight: 600,
-              textTransform: 'uppercase',
-              letterSpacing: '0.05em',
-            }}
-          >
-            Overall
-          </div>
-        </div>
-      </div>
-
-      <style>{`
-        @keyframes pulse {
-          0%, 100% { transform: scale(1); opacity: 0.3; }
-          50% { transform: scale(1.1); opacity: 0.1; }
-        }
-      `}</style>
-    </div>
-  );
-}
-
-/**
- * Enhanced ProgressBar with gradient and animation
- */
-function ProgressBar({ percentage, label, showThreshold = false }) {
-  const color = getAttendanceColor(percentage);
-  const isAtRisk = percentage < ATTENDANCE_THRESHOLD;
-
-  return (
-    <div style={{ marginTop: 20 }}>
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          fontSize: 13,
-          color: COLORS.textSub,
-          marginBottom: 8,
-          fontWeight: 500,
-        }}
-      >
-        <span>{label}</span>
-        <span
-          style={{
-            color,
-            fontWeight: 700,
-            fontSize: 14,
-            fontVariantNumeric: 'tabular-nums',
-          }}
-        >
+      </svg>
+      <div style={{
+        position: 'absolute', inset: 0,
+        display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+      }}>
+        <span style={{ fontSize: 26, fontWeight: 800, color, lineHeight: 1, letterSpacing: '-0.04em', fontVariantNumeric: 'tabular-nums' }}>
           {percentage}%
         </span>
+        <span style={{ fontSize: 10, color: T.inkMute, marginTop: 3, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+          overall
+        </span>
       </div>
-      <div
-        style={{
-          height: 12,
-          borderRadius: 8,
-          background: COLORS.surface3,
-          overflow: 'hidden',
-          border: `1px solid ${COLORS.border2}`,
-          position: 'relative',
-        }}
-      >
-        <div
-          style={{
-            height: '100%',
-            width: `${percentage}%`,
-            borderRadius: 8,
-            background: `linear-gradient(90deg, ${color}, ${getAttendanceColorLight(percentage)})`,
-            transition: 'width 0.8s cubic-bezier(0.34, 1.56, 0.64, 1)',
-            boxShadow: `0 0 16px ${color}40, inset 0 0 8px ${color}20`,
-          }}
-        />
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────── */
+// PROGRESS BAR
+/* ─────────────────────────────────────────────────────────────────────────── */
+
+function ProgressBar({ percentage, showThreshold }) {
+  const color = pctColor(percentage);
+  const colorLight = pctLight(percentage);
+  const isRisk = percentage < THRESHOLD;
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+        <span style={{ fontSize: 13, color: T.inkSub, fontWeight: 500 }}>Overall attendance</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {showThreshold && (
+            isRisk
+              ? <TrendingDown size={13} color={T.crimson} strokeWidth={2} />
+              : <TrendingUp size={13} color={T.emerald} strokeWidth={2} />
+          )}
+          <span style={{ fontSize: 14, fontWeight: 700, color, fontVariantNumeric: 'tabular-nums' }}>
+            {percentage}%
+          </span>
+        </div>
+      </div>
+      <div style={{ height: 8, borderRadius: 99, background: T.surfaceAlt, overflow: 'hidden', border: `1px solid ${T.border}` }}>
+        <div style={{
+          height: '100%', width: `${percentage}%`,
+          background: `linear-gradient(90deg, ${color}, ${colorLight})`,
+          borderRadius: 99,
+          transition: 'width 1s cubic-bezier(0.4,0,0.2,1)',
+        }} />
       </div>
       {showThreshold && (
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'flex-end',
-            fontSize: 11,
-            color: COLORS.textMute,
-            marginTop: 6,
-            alignItems: 'center',
-            gap: 4,
-          }}
-        >
-          <span>Safe zone: {ATTENDANCE_THRESHOLD}%</span>
-          {isAtRisk ? (
-            <TrendingDown size={12} color={COLORS.danger} strokeWidth={2.5} />
-          ) : (
-            <TrendingUp size={12} color={COLORS.success} strokeWidth={2.5} />
-          )}
+        <div style={{ fontSize: 11, color: T.inkDim, marginTop: 5, textAlign: 'right' }}>
+          Minimum required: {THRESHOLD}%
         </div>
       )}
     </div>
   );
 }
 
-/**
- * Enhanced SubjectRow with animated progress
- */
+/* ─────────────────────────────────────────────────────────────────────────── */
+// SUBJECT ROW
+/* ─────────────────────────────────────────────────────────────────────────── */
+
 function SubjectRow({ subject, code, present, total, percentage }) {
+  const [hov, setHov] = useState(false);
+  const color = pctColor(percentage);
+
   return (
     <div
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
       style={{
-        marginBottom: 18,
-        padding: 14,
-        borderRadius: 14,
-        background: COLORS.surface3,
-        border: `1px solid ${COLORS.border}`,
-        transition: 'all 0.3s ease',
-        cursor: 'pointer',
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.borderColor = getAttendanceColor(percentage);
-        e.currentTarget.style.background = COLORS.surface2;
-        e.currentTarget.style.boxShadow = `0 0 16px ${getAttendanceColor(percentage)}15`;
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.borderColor = COLORS.border;
-        e.currentTarget.style.background = COLORS.surface3;
-        e.currentTarget.style.boxShadow = 'none';
+        padding: '14px 16px',
+        borderRadius: 12,
+        background: hov ? T.hover : 'transparent',
+        border: `1px solid ${hov ? T.borderMed : 'transparent'}`,
+        transition: 'all 0.15s ease',
+        cursor: 'default',
       }}
     >
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: 10,
-        }}
-      >
-        <div>
-          <span
-            style={{
-              fontSize: 14,
-              fontWeight: 700,
-              color: COLORS.text,
-              display: 'block',
-              marginBottom: 4,
-            }}
-          >
-            {subject}
-          </span>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ fontSize: 14, fontWeight: 600, color: T.ink }}>{subject}</span>
           {code && (
-            <span
-              style={{
-                fontSize: 11,
-                color: COLORS.textMute,
-                padding: '2px 8px',
-                background: COLORS.surface2,
-                borderRadius: 6,
-                display: 'inline-block',
-                fontWeight: 600,
-                fontFamily: 'monospace',
-              }}
-            >
+            <span style={{
+              fontSize: 10, color: T.inkMute, background: T.surfaceAlt,
+              border: `1px solid ${T.border}`, borderRadius: 5,
+              padding: '2px 7px', fontFamily: 'monospace', fontWeight: 700, letterSpacing: '0.04em',
+            }}>
               {code}
             </span>
           )}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span
-            style={{
-              fontSize: 13,
-              color: COLORS.textSub,
-              fontWeight: 600,
-              fontVariantNumeric: 'tabular-nums',
-            }}
-          >
-            {present}/{total}
-          </span>
-          <div
-            style={{
-              padding: '4px 12px',
-              borderRadius: 20,
-              fontSize: 13,
-              fontWeight: 800,
-              background: getAttendanceBg(percentage),
-              color: getAttendanceColor(percentage),
-              border: `1.5px solid ${getAttendanceBorder(percentage)}`,
-              minWidth: 56,
-              textAlign: 'center',
-              boxShadow: `0 0 12px ${getAttendanceColor(percentage)}20`,
-              fontVariantNumeric: 'tabular-nums',
-            }}
-          >
+          <span style={{ fontSize: 12, color: T.inkMute, fontVariantNumeric: 'tabular-nums' }}>{present}/{total} classes</span>
+          <span style={{
+            fontSize: 12, fontWeight: 700,
+            background: pctBg(percentage),
+            color,
+            border: `1px solid ${pctBorder(percentage)}`,
+            borderRadius: 99,
+            padding: '3px 10px',
+            fontVariantNumeric: 'tabular-nums',
+            minWidth: 52,
+            textAlign: 'center',
+          }}>
             {percentage}%
-          </div>
+          </span>
         </div>
       </div>
-      <div
-        style={{
-          height: 6,
-          borderRadius: 6,
-          background: COLORS.surface2,
-          overflow: 'hidden',
-          border: `1px solid ${COLORS.border}`,
-        }}
-      >
-        <div
-          style={{
-            height: '100%',
-            width: `${percentage}%`,
-            borderRadius: 6,
-            background: `linear-gradient(90deg, ${getAttendanceColor(percentage)}, ${getAttendanceColorLight(percentage)})`,
-            transition: 'width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)',
-            boxShadow: `0 0 12px ${getAttendanceColor(percentage)}40`,
-          }}
-        />
+      <div style={{ height: 5, borderRadius: 99, background: T.surfaceAlt, overflow: 'hidden' }}>
+        <div style={{
+          height: '100%', width: `${percentage}%`,
+          background: color, borderRadius: 99,
+          transition: 'width 0.8s cubic-bezier(0.4,0,0.2,1)',
+        }} />
       </div>
     </div>
   );
 }
 
-/**
- * Enhanced AtRiskAlert with animation
- */
-function AtRiskAlert({ subjects }) {
-  if (!subjects || subjects.length === 0) return null;
+/* ─────────────────────────────────────────────────────────────────────────── */
+// AT-RISK BANNER
+/* ─────────────────────────────────────────────────────────────────────────── */
 
+function AtRiskBanner({ subjects }) {
+  if (!subjects?.length) return null;
   return (
-    <div
-      style={{
-        ...cardStyle({
-          padding: '16px 20px',
-        }),
-        background: `linear-gradient(135deg, rgba(245,158,11,0.08) 0%, rgba(245,158,11,0.04) 100%)`,
-        border: '1px solid rgba(245,158,11,0.25)',
-        display: 'flex',
-        alignItems: 'flex-start',
-        gap: 14,
-        animation: 'slideIn 0.4s ease',
-      }}
-    >
-      <div
-        style={{
-          width: 40,
-          height: 40,
-          borderRadius: 12,
-          background: 'rgba(245,158,11,0.15)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexShrink: 0,
-          marginTop: 2,
-        }}
-      >
-        <AlertTriangle size={20} color={COLORS.warning} strokeWidth={2.5} />
-      </div>
+    <div style={{
+      background: T.amberBg, border: `1px solid ${T.amberBd}`,
+      borderRadius: 14, padding: '14px 18px',
+      display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 20,
+    }}>
+      <AlertTriangle size={18} color={T.amber} strokeWidth={2} style={{ flexShrink: 0, marginTop: 1 }} />
       <div style={{ flex: 1 }}>
-        <div
-          style={{
-            fontSize: 14,
-            fontWeight: 700,
-            color: COLORS.text,
-            marginBottom: 8,
-          }}
-        >
-          ⚠️ {subjects.length} subject{subjects.length > 1 ? 's' : ''} need attention
-        </div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        <p style={{ margin: '0 0 8px', fontSize: 13, fontWeight: 600, color: T.inkSub }}>
+          {subjects.length} subject{subjects.length > 1 ? 's' : ''} below {THRESHOLD}% attendance
+        </p>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
           {subjects.map((s, i) => (
-            <span
-              key={i}
-              style={{
-                padding: '4px 11px',
-                borderRadius: 20,
-                fontSize: 12,
-                fontWeight: 700,
-                background: 'rgba(239,68,68,0.12)',
-                color: COLORS.dangerLight,
-                border: '1px solid rgba(239,68,68,0.3)',
-                animation: `fadeIn 0.4s ease ${i * 50}ms backwards`,
-                fontVariantNumeric: 'tabular-nums',
-              }}
-            >
-              {s.subject} • {s.percentage}%
+            <span key={i} style={{
+              fontSize: 12, fontWeight: 600,
+              background: T.crimsonBg, color: T.crimson,
+              border: `1px solid ${T.crimsonBd}`,
+              borderRadius: 99, padding: '2px 10px',
+              fontVariantNumeric: 'tabular-nums',
+            }}>
+              {s.subject} · {s.percentage}%
             </span>
           ))}
         </div>
       </div>
-
-      <style>{`
-        @keyframes slideIn {
-          from { transform: translateY(-10px); opacity: 0; }
-          to { transform: translateY(0); opacity: 1; }
-        }
-        @keyframes fadeIn {
-          from { opacity: 0; transform: scale(0.9); }
-          to { opacity: 1; transform: scale(1); }
-        }
-      `}</style>
     </div>
   );
 }
 
-/**
- * Enhanced FilterPill with smooth transitions
- */
-function FilterPill({ status, isActive, onClick }) {
-  const config = STATUS_CONFIG[status] || {};
-  const isAllFilter = status === 'all';
+/* ─────────────────────────────────────────────────────────────────────────── */
+// RECORDS TABLE
+/* ─────────────────────────────────────────────────────────────────────────── */
 
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        padding: '6px 14px',
-        borderRadius: 20,
-        cursor: 'pointer',
-        fontSize: 12,
-        fontWeight: 700,
-        background: isActive
-          ? isAllFilter
-            ? `linear-gradient(135deg, ${COLORS.accent}, ${COLORS.accentLight})`
-            : config.bg
-          : COLORS.surface3,
-        color: isActive ? (isAllFilter ? COLORS.text : config.color) : COLORS.textMute,
-        border: `1.5px solid ${
-          isActive
-            ? isAllFilter
-              ? COLORS.accent
-              : config.color
-            : COLORS.border
-        }`,
-        textTransform: 'capitalize',
-        transition: 'all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1)',
-        transform: isActive ? 'scale(1.05)' : 'scale(1)',
-        boxShadow: isActive ? `0 0 12px ${isAllFilter ? COLORS.accent : config.color}30` : 'none',
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.transform = 'scale(1.08)';
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.transform = isActive ? 'scale(1.05)' : 'scale(1)';
-      }}
-    >
-      {status}
-    </button>
-  );
-}
-
-/**
- * Enhanced SearchBar with icon animation
- */
-function SearchBar({ value, onChange }) {
-  const [isFocused, setIsFocused] = useState(false);
-
-  return (
-    <div style={{ marginBottom: 16, position: 'relative' }}>
-      <Filter
-        size={14}
-        color={isFocused ? COLORS.accentLight : COLORS.textMute}
-        style={{
-          position: 'absolute',
-          left: 12,
-          top: '50%',
-          transform: 'translateY(-50%)',
-          pointerEvents: 'none',
-          transition: 'color 0.3s ease',
-        }}
-      />
-      <input
-        style={{
-          width: '100%',
-          paddingLeft: 38,
-          padding: '10px 14px 10px 38px',
-          background: COLORS.surface3,
-          border: `1.5px solid ${isFocused ? COLORS.accent : COLORS.border2}`,
-          borderRadius: 12,
-          color: COLORS.text,
-          fontSize: 13,
-          outline: 'none',
-          boxSizing: 'border-box',
-          transition: 'all 0.3s ease',
-          boxShadow: isFocused ? `0 0 16px ${COLORS.accent}20` : 'none',
-          fontWeight: 500,
-        }}
-        placeholder="Search by subject…"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        onFocus={() => setIsFocused(true)}
-        onBlur={() => setIsFocused(false)}
-      />
-    </div>
-  );
-}
-
-/**
- * Enhanced RecordRow with hover effects
- */
-function RecordRow({ date, subject, code, status }) {
-  const config = STATUS_CONFIG[status] || STATUS_CONFIG.absent;
-
-  return (
-    <tr
-      style={{
-        transition: 'all 0.25s ease',
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.background = COLORS.surface3;
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.background = 'transparent';
-      }}
-    >
-      <td
-        style={{
-          padding: '12px 14px',
-          borderBottom: `1px solid ${COLORS.border}`,
-          color: COLORS.textSub,
-          fontSize: 13,
-          whiteSpace: 'nowrap',
-          fontWeight: 500,
-          fontVariantNumeric: 'tabular-nums',
-        }}
-      >
-        {formatDate(date)}
-      </td>
-      <td
-        style={{
-          padding: '12px 14px',
-          borderBottom: `1px solid ${COLORS.border}`,
-          color: COLORS.text,
-          fontWeight: 600,
-        }}
-      >
-        {subject}
-        {code && (
-          <span
-            style={{
-              marginLeft: 8,
-              fontSize: 11,
-              color: COLORS.textMute,
-              padding: '2px 6px',
-              background: COLORS.surface2,
-              borderRadius: 4,
-              fontFamily: 'monospace',
-              fontWeight: 600,
-            }}
-          >
-            {code}
-          </span>
-        )}
-      </td>
-      <td
-        style={{
-          padding: '12px 14px',
-          borderBottom: `1px solid ${COLORS.border}`,
-        }}
-      >
-        <span
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 6,
-            padding: '4px 12px',
-            borderRadius: 20,
-            fontSize: 12,
-            fontWeight: 700,
-            background: config.bg,
-            color: config.color,
-            border: `1.5px solid ${config.border}`,
-            boxShadow: `0 0 12px ${config.color}20`,
-            textTransform: 'capitalize',
-          }}
-        >
-          <span
-            style={{
-              width: 7,
-              height: 7,
-              borderRadius: '50%',
-              background: config.color,
-              display: 'inline-block',
-              boxShadow: `0 0 8px ${config.color}60`,
-            }}
-          />
-          {config.label}
-        </span>
-      </td>
-    </tr>
-  );
-}
-
-/**
- * Enhanced RecordsTable
- */
 function RecordsTable({ records, filter, search, sortDir, onSortChange, onFilterChange, onSearchChange }) {
-  const filteredRecords = useMemo(() => {
+  const filtered = useMemo(() => {
     if (!records) return [];
     return records
-      .filter((r) => filter === 'all' || r.status === filter)
-      .filter((r) => !search || r.subject?.toLowerCase().includes(search.toLowerCase()))
+      .filter(r => filter === 'all' || r.status === filter)
+      .filter(r => !search || r.subject?.toLowerCase().includes(search.toLowerCase()))
       .sort((a, b) => {
-        const da = new Date(a.date);
-        const db = new Date(b.date);
-        return sortDir === 'desc' ? db - da : da - db;
+        const diff = new Date(a.date) - new Date(b.date);
+        return sortDir === 'desc' ? -diff : diff;
       });
   }, [records, filter, search, sortDir]);
 
   return (
-    <div style={cardStyle()}>
+    <div style={{
+      background: T.surface, border: `1px solid ${T.border}`,
+      borderRadius: 20, overflow: 'hidden',
+    }}>
       {/* Header */}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: 12,
-          marginBottom: 18,
-        }}
-      >
-        <div
-          style={{
-            fontSize: 15,
-            fontWeight: 700,
-            color: COLORS.text,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-          }}
-        >
-          <div
-            style={{
-              width: 36,
-              height: 36,
-              borderRadius: 10,
-              background: `${COLORS.accent}15`,
-              border: `1px solid ${COLORS.accent}30`,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Clipboard size={16} color={COLORS.accent} strokeWidth={2.5} />
-          </div>
-          Attendance Records
-          <span
-            style={{
-              padding: '3px 10px',
-              borderRadius: 20,
-              fontSize: 11,
-              background: `${COLORS.accent}15`,
-              color: COLORS.accentLight,
-              fontWeight: 700,
-              fontVariantNumeric: 'tabular-nums',
-              minWidth: 32,
-              textAlign: 'center',
-            }}
-          >
-            {filteredRecords.length}
+      <div style={{
+        padding: '20px 24px',
+        borderBottom: `1px solid ${T.border}`,
+        display: 'flex', justifyContent: 'space-between',
+        alignItems: 'center', flexWrap: 'wrap', gap: 12,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <Clipboard size={16} color={T.inkMute} strokeWidth={2} />
+          <span style={{ fontSize: 15, fontWeight: 700, color: T.ink }}>Attendance records</span>
+          <span style={{
+            fontSize: 11, fontWeight: 700, color: T.inkMute,
+            background: T.surfaceAlt, border: `1px solid ${T.border}`,
+            borderRadius: 99, padding: '2px 9px', fontVariantNumeric: 'tabular-nums',
+          }}>
+            {filtered.length}
           </span>
         </div>
-
-        {/* Filter pills */}
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-          {['all', 'present', 'absent', 'cancelled'].map((status) => (
-            <FilterPill
-              key={status}
-              status={status}
-              isActive={filter === status}
-              onClick={() => onFilterChange(status)}
-            />
+        <div style={{ display: 'flex', gap: 6 }}>
+          {['all', 'present', 'absent', 'cancelled'].map(s => (
+            <button
+              key={s}
+              onClick={() => onFilterChange(s)}
+              style={{
+                padding: '5px 13px', borderRadius: 99, fontSize: 12, fontWeight: 600,
+                cursor: 'pointer', border: '1px solid',
+                background: filter === s
+                  ? s === 'all' ? T.ink : pctBg(s === 'present' ? 100 : s === 'cancelled' ? 60 : 0)
+                  : 'transparent',
+                color: filter === s
+                  ? s === 'all' ? '#fff' : pctColor(s === 'present' ? 100 : s === 'cancelled' ? 60 : 0)
+                  : T.inkMute,
+                borderColor: filter === s
+                  ? s === 'all' ? T.ink : pctBorder(s === 'present' ? 100 : s === 'cancelled' ? 60 : 0)
+                  : T.border,
+                transition: 'all 0.15s ease',
+                textTransform: 'capitalize',
+              }}
+            >
+              {s}
+            </button>
           ))}
         </div>
       </div>
 
       {/* Search */}
-      <SearchBar value={search} onChange={onSearchChange} />
+      <div style={{ padding: '14px 24px', borderBottom: `1px solid ${T.border}`, position: 'relative' }}>
+        <Search size={14} color={T.inkDim} style={{ position: 'absolute', left: 38, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+        <input
+          value={search}
+          onChange={e => onSearchChange(e.target.value)}
+          placeholder="Search subjects…"
+          style={{
+            width: '100%', padding: '9px 14px 9px 36px',
+            background: T.surfaceAlt, border: `1px solid ${T.border}`,
+            borderRadius: 10, fontSize: 13, color: T.ink,
+            outline: 'none', boxSizing: 'border-box', fontWeight: 500,
+          }}
+          onFocus={e => { e.target.style.borderColor = T.borderMed; e.target.style.background = T.surface; }}
+          onBlur={e => { e.target.style.borderColor = T.border; e.target.style.background = T.surfaceAlt; }}
+        />
+      </div>
 
       {/* Table */}
-      <div style={{ overflowX: 'auto', borderRadius: 12, border: `1px solid ${COLORS.border}` }}>
-        <table
-          style={{
-            width: '100%',
-            borderCollapse: 'collapse',
-            fontSize: 13.5,
-          }}
-        >
-          <thead style={{ background: COLORS.surface3 }}>
-            <tr>
-              <th
-                style={{
-                  padding: '12px 14px',
-                  textAlign: 'left',
-                  color: COLORS.textMute,
-                  fontWeight: 700,
-                  fontSize: 11.5,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.08em',
-                  borderBottom: `1px solid ${COLORS.border}`,
-                }}
-              >
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr style={{ background: T.surfaceAlt }}>
+              <th style={{ padding: '10px 24px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: T.inkMute, textTransform: 'uppercase', letterSpacing: '0.07em', borderBottom: `1px solid ${T.border}` }}>
                 <button
                   onClick={onSortChange}
                   style={{
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer',
-                    color: COLORS.textMute,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 5,
-                    fontSize: 11.5,
-                    fontWeight: 700,
-                    padding: 0,
-                    transition: 'color 0.2s ease',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.08em',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.color = COLORS.accentLight;
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.color = COLORS.textMute;
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', gap: 4,
+                    fontSize: 11, fontWeight: 700, color: T.inkMute,
+                    textTransform: 'uppercase', letterSpacing: '0.07em', padding: 0,
                   }}
                 >
                   Date
-                  <span style={{ fontSize: 12, marginLeft: 2 }}>
-                    {sortDir === 'desc' ? '↓' : '↑'}
-                  </span>
+                  {sortDir === 'desc' ? <ChevronDown size={12} strokeWidth={2.5} /> : <ChevronUp size={12} strokeWidth={2.5} />}
                 </button>
               </th>
-              <th
-                style={{
-                  padding: '12px 14px',
-                  textAlign: 'left',
-                  color: COLORS.textMute,
-                  fontWeight: 700,
-                  fontSize: 11.5,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.08em',
-                  borderBottom: `1px solid ${COLORS.border}`,
-                }}
-              >
-                Subject
-              </th>
-              <th
-                style={{
-                  padding: '12px 14px',
-                  textAlign: 'left',
-                  color: COLORS.textMute,
-                  fontWeight: 700,
-                  fontSize: 11.5,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.08em',
-                  borderBottom: `1px solid ${COLORS.border}`,
-                }}
-              >
-                Status
-              </th>
+              <th style={{ padding: '10px 24px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: T.inkMute, textTransform: 'uppercase', letterSpacing: '0.07em', borderBottom: `1px solid ${T.border}` }}>Subject</th>
+              <th style={{ padding: '10px 24px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: T.inkMute, textTransform: 'uppercase', letterSpacing: '0.07em', borderBottom: `1px solid ${T.border}` }}>Status</th>
             </tr>
           </thead>
           <tbody>
-            {filteredRecords.length === 0 ? (
+            {filtered.length === 0 ? (
               <tr>
                 <td colSpan={3} style={{ padding: 0 }}>
                   <EmptyState
                     title="No records found"
-                    subtitle={`No ${
-                      filter !== 'all' ? filter : ''
-                    } records${search ? ` matching "${search}"` : ''}.`}
+                    subtitle={`No ${filter !== 'all' ? filter : ''} records${search ? ` matching "${search}"` : ''}.`}
                     illustration="attendance"
                   />
                 </td>
               </tr>
             ) : (
-              filteredRecords.map((r, i) => (
-                <RecordRow
-                  key={i}
-                  date={r.date}
-                  subject={r.subject}
-                  code={r.code}
-                  status={r.status}
-                />
-              ))
+              filtered.map((r, i) => {
+                const cfg = STATUS[r.status] || STATUS.absent;
+                return (
+                  <tr
+                    key={i}
+                    onMouseEnter={e => e.currentTarget.style.background = T.hover}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                    style={{ transition: 'background 0.12s ease' }}
+                  >
+                    <td style={{ padding: '13px 24px', borderBottom: `1px solid ${T.border}`, fontSize: 13, color: T.inkSub, fontWeight: 500, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+                      {fmtDate(r.date)}
+                    </td>
+                    <td style={{ padding: '13px 24px', borderBottom: `1px solid ${T.border}`, fontSize: 13, color: T.ink, fontWeight: 600 }}>
+                      {r.subject}
+                      {r.code && (
+                        <span style={{
+                          marginLeft: 8, fontSize: 10, color: T.inkMute,
+                          background: T.surfaceAlt, border: `1px solid ${T.border}`,
+                          borderRadius: 4, padding: '1px 6px', fontFamily: 'monospace', fontWeight: 700,
+                        }}>
+                          {r.code}
+                        </span>
+                      )}
+                    </td>
+                    <td style={{ padding: '13px 24px', borderBottom: `1px solid ${T.border}` }}>
+                      <span style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 6,
+                        padding: '4px 11px', borderRadius: 99, fontSize: 12, fontWeight: 600,
+                        background: cfg.bg, color: cfg.color, border: `1px solid ${cfg.border}`,
+                      }}>
+                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: cfg.dot, flexShrink: 0 }} />
+                        {cfg.label}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>
       </div>
 
-      {/* Footer */}
-      {filteredRecords.length > 0 && (
-        <div
-          style={{
-            marginTop: 14,
-            fontSize: 12,
-            color: COLORS.textMute,
-            textAlign: 'right',
-            fontWeight: 500,
-          }}
-        >
-          Showing {filteredRecords.length} of {records.length} record{records.length !== 1 ? 's' : ''}
+      {filtered.length > 0 && (
+        <div style={{ padding: '12px 24px', fontSize: 12, color: T.inkDim, textAlign: 'right', borderTop: `1px solid ${T.border}` }}>
+          Showing {filtered.length} of {records.length} records
         </div>
       )}
     </div>
   );
 }
 
-/**
- * LoadingSkeleton
- */
+/* ─────────────────────────────────────────────────────────────────────────── */
+// LOADING SKELETON
+/* ─────────────────────────────────────────────────────────────────────────── */
+
 function LoadingSkeleton() {
   return (
-    <div
-      style={{
-        maxWidth: 800,
-        margin: '0 auto',
-        padding: 24,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 20,
-      }}
-    >
-      {/* Header skeleton */}
-      <div style={cardStyle()}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-          <Skeleton variant="circle" width="48px" height="48px" />
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1 }}>
-            <Skeleton width="200px" height="20px" />
-            <Skeleton width="280px" height="14px" />
-          </div>
+    <div style={{ maxWidth: 860, margin: '0 auto', padding: 28, display: 'flex', flexDirection: 'column', gap: 20 }}>
+      {[180, 260, 320].map((h, i) => (
+        <div key={i} style={{
+          background: '#fff', border: `1px solid ${T.border}`, borderRadius: 20,
+          height: h, overflow: 'hidden', position: 'relative',
+        }}>
+          <div style={{
+            position: 'absolute', inset: 0,
+            background: 'linear-gradient(90deg, transparent 0%, rgba(0,0,0,0.03) 50%, transparent 100%)',
+            animation: 'shimmer 1.5s infinite',
+            backgroundSize: '200% 100%',
+          }} />
         </div>
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(4,1fr)',
-            gap: 12,
-            marginTop: 22,
-          }}
-        >
-          {[1, 2, 3, 4].map((i) => (
-            <div
-              key={i}
-              style={{
-                background: COLORS.surface2,
-                borderRadius: 14,
-                padding: 18,
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: 10,
-              }}
-            >
-              <Skeleton width="60px" height="32px" />
-              <Skeleton width="80px" height="12px" />
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Subject breakdown skeleton */}
-      <div style={cardStyle()}>
-        <Skeleton width="180px" height="18px" style={{ marginBottom: 20 }} />
-        {[1, 2, 3].map((i) => (
-          <div key={i} style={{ marginBottom: 18 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-              <Skeleton width="140px" height="14px" />
-              <Skeleton width="80px" height="14px" />
-            </div>
-            <Skeleton height="8px" style={{ borderRadius: 6 }} />
-          </div>
-        ))}
-      </div>
-
-      {/* Table skeleton */}
-      <div style={cardStyle()}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 18 }}>
-          <Skeleton width="160px" height="18px" />
-          <div style={{ display: 'flex', gap: 8 }}>
-            <Skeleton variant="pill" width="60px" height="32px" />
-            <Skeleton variant="pill" width="70px" height="32px" />
-            <Skeleton variant="pill" width="64px" height="32px" />
-          </div>
-        </div>
-        {[1, 2, 3, 4, 5].map((i) => (
-          <div
-            key={i}
-            style={{
-              display: 'flex',
-              gap: 16,
-              padding: '14px 0',
-              borderBottom: `1px solid ${COLORS.border}`,
-            }}
-          >
-            <Skeleton width="90px" height="14px" />
-            <Skeleton width="130px" height="14px" />
-            <Skeleton variant="pill" width="80px" height="24px" />
-          </div>
-        ))}
-      </div>
+      ))}
+      <style>{`@keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }`}</style>
     </div>
   );
 }
 
-/**
- * ErrorState
- */
+/* ─────────────────────────────────────────────────────────────────────────── */
+// ERROR STATE
+/* ─────────────────────────────────────────────────────────────────────────── */
+
 function ErrorState({ message }) {
   return (
-    <div
-      style={{
-        maxWidth: 800,
-        margin: '0 auto',
-        padding: 48,
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        gap: 14,
-      }}
-    >
-      <div
-        style={{
-          width: 56,
-          height: 56,
-          borderRadius: 14,
-          background: 'rgba(239,68,68,0.1)',
-          border: '1.5px solid rgba(239,68,68,0.3)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        <X size={24} color={COLORS.danger} strokeWidth={2.5} />
+    <div style={{
+      maxWidth: 860, margin: '0 auto', padding: 80,
+      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12,
+    }}>
+      <div style={{
+        width: 48, height: 48, borderRadius: 14,
+        background: T.crimsonBg, border: `1px solid ${T.crimsonBd}`,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        <X size={22} color={T.crimson} strokeWidth={2} />
       </div>
       <div style={{ textAlign: 'center' }}>
-        <div style={{ fontSize: 15, color: COLORS.danger, fontWeight: 700, marginBottom: 4 }}>
-          Unable to load attendance
-        </div>
-        <div style={{ fontSize: 13, color: COLORS.textMute }}>
-          {message}
-        </div>
+        <p style={{ margin: '0 0 4px', fontSize: 15, fontWeight: 700, color: T.ink }}>Unable to load attendance</p>
+        <p style={{ margin: 0, fontSize: 13, color: T.inkMute }}>{message}</p>
       </div>
     </div>
   );
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════ */
+/* ─────────────────────────────────────────────────────────────────────────── */
+// SECTION CARD WRAPPER
+/* ─────────────────────────────────────────────────────────────────────────── */
+
+function Card({ children, style = {} }) {
+  return (
+    <div style={{
+      background: T.surface, border: `1px solid ${T.border}`,
+      borderRadius: 20, padding: '24px',
+      ...style,
+    }}>
+      {children}
+    </div>
+  );
+}
+
+function SectionLabel({ icon: Icon, label }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
+      <Icon size={15} color={T.inkMute} strokeWidth={2} />
+      <span style={{ fontSize: 13, fontWeight: 700, color: T.inkSub, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</span>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────── */
 // MAIN COMPONENT
-/* ═══════════════════════════════════════════════════════════════════════════ */
+/* ─────────────────────────────────────────────────────────────────────────── */
 
 export default function StudentAttendanceView({ sid }) {
-  const [data, setData] = useState(null);
+  const [data, setData]       = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [filter, setFilter] = useState('all');
-  const [search, setSearch] = useState('');
+  const [error, setError]     = useState('');
+  const [filter, setFilter]   = useState('all');
+  const [search, setSearch]   = useState('');
   const [sortDir, setSortDir] = useState('desc');
 
   useEffect(() => {
     if (!sid) return;
-
-    const loadData = async () => {
+    (async () => {
       try {
-        setLoading(true);
-        setError('');
+        setLoading(true); setError('');
         const token = localStorage.getItem('token');
         const res = await axios.get(
           `${process.env.REACT_APP_API_URL}/attendance/student/${sid}`,
@@ -1149,162 +560,89 @@ export default function StudentAttendanceView({ sid }) {
         );
         setData(res.data);
       } catch (err) {
-        const message = err.response?.data?.message || 'Failed to load attendance.';
-        setError(message);
+        setError(err.response?.data?.message || 'Failed to load attendance.');
       } finally {
         setLoading(false);
       }
-    };
-
-    loadData();
+    })();
   }, [sid]);
 
   const stats = useMemo(() => {
     if (!data) return null;
-    const present = data.records.filter((r) => r.status === 'present').length;
-    const absent = data.total - present;
-    const atRisk = data.summary.filter((s) => s.percentage < ATTENDANCE_THRESHOLD);
+    const present    = data.records.filter(r => r.status === 'present').length;
+    const cancelled  = data.records.filter(r => r.status === 'cancelled').length;
+    const absent     = data.total - present - cancelled;
+    const atRisk     = data.summary.filter(s => s.percentage < THRESHOLD);
     const overallPct = data.total ? Math.round((present / data.total) * 100) : 0;
-
-    return { present, absent, atRisk, overallPct };
+    return { present, absent, cancelled, atRisk, overallPct };
   }, [data]);
 
-  const handleFilterChange = useCallback((newFilter) => {
-    setFilter(newFilter);
-  }, []);
-
-  const handleSearchChange = useCallback((newSearch) => {
-    setSearch(newSearch);
-  }, []);
-
-  const handleSortToggle = useCallback(() => {
-    setSortDir((d) => (d === 'desc' ? 'asc' : 'desc'));
-  }, []);
+  const handleFilterChange = useCallback(f => setFilter(f), []);
+  const handleSearchChange = useCallback(s => setSearch(s), []);
+  const handleSortToggle   = useCallback(() => setSortDir(d => d === 'desc' ? 'asc' : 'desc'), []);
 
   if (loading) return <LoadingSkeleton />;
-  if (error) return <ErrorState message={error} />;
+  if (error)   return <ErrorState message={error} />;
   if (!data || !stats) return null;
 
-  return (
-    <div style={{ background: COLORS.bg, minHeight: '100vh', padding: '24px' }}>
-      <div style={{ maxWidth: 800, margin: '0 auto' }}>
-        <style>{`
-          * {
-            box-sizing: border-box;
-          }
-          body {
-            background: ${COLORS.bg};
-          }
-        `}</style>
+  const initials = data.student.name
+    ? data.student.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
+    : '?';
 
-        {/* Student header */}
-        <div style={cardStyle({ marginBottom: 20 })}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16, marginBottom: 24 }}>
-            <div
-              style={{
-                width: 54,
-                height: 54,
-                borderRadius: 16,
-                flexShrink: 0,
-                background: `linear-gradient(135deg, ${COLORS.accent}20, ${COLORS.accent}05)`,
-                border: `1.5px solid ${COLORS.accent}40`,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <BarChart3 size={24} color={COLORS.accent} strokeWidth={2} />
+  return (
+    <div style={{ background: T.bg, minHeight: '100vh', padding: '28px 24px', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
+      <div style={{ maxWidth: 860, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+        {/* ── HEADER CARD ── */}
+        <Card>
+          {/* Student identity row */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 28 }}>
+            <div style={{
+              width: 50, height: 50, borderRadius: 14, flexShrink: 0,
+              background: T.indigoBg, border: `1.5px solid ${T.indigoBd}`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 16, fontWeight: 800, color: T.indigo, letterSpacing: '-0.02em',
+            }}>
+              {initials}
             </div>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 18, fontWeight: 800, color: COLORS.text, marginBottom: 3 }}>
+              <div style={{ fontSize: 17, fontWeight: 800, color: T.ink, letterSpacing: '-0.02em' }}>
                 {data.student.name}
               </div>
-              <div style={{ fontSize: 13, color: COLORS.textMute, marginTop: 2 }}>
-                {data.student.email}
+              <div style={{ fontSize: 12, color: T.inkMute, marginTop: 2, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span>{data.student.email}</span>
                 {data.student.sid && (
-                  <span
-                    style={{
-                      marginLeft: 10,
-                      padding: '2px 10px',
-                      background: COLORS.surface3,
-                      borderRadius: 6,
-                      fontSize: 11,
-                      fontWeight: 700,
-                      fontFamily: 'monospace',
-                    }}
-                  >
+                  <span style={{
+                    background: T.surfaceAlt, border: `1px solid ${T.border}`,
+                    borderRadius: 5, padding: '1px 8px', fontFamily: 'monospace',
+                    fontSize: 11, fontWeight: 700, color: T.inkSub,
+                  }}>
                     {data.student.sid}
                   </span>
                 )}
               </div>
             </div>
-            <OverallBadge percentage={stats.overallPct} />
+            <RingProgress percentage={stats.overallPct} />
           </div>
 
-          {/* Stats grid */}
+          {/* Stat cards */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 24 }}>
-            <StatCard
-              icon={Calendar}
-              label="Total Classes"
-              value={data.total}
-              color={COLORS.accent}
-            />
-            <StatCard
-              icon={CheckCircle2}
-              label="Present"
-              value={stats.present}
-              color={COLORS.success}
-            />
-            <StatCard
-              icon={X}
-              label="Absent"
-              value={stats.absent}
-              color={COLORS.danger}
-            />
-            <StatCard
-              icon={AlertTriangle}
-              label="At Risk Subs"
-              value={stats.atRisk.length}
-              color={stats.atRisk.length > 0 ? COLORS.warning : COLORS.textMute}
-            />
+            <StatCard icon={Calendar}      label="Total classes"   value={data.total}          color={T.indigo}  bg={T.indigoBg}  border={T.indigoBd} />
+            <StatCard icon={CheckCircle2}  label="Present"         value={stats.present}        color={T.emerald} bg={T.emeraldBg} border={T.emeraldBd} />
+            <StatCard icon={X}             label="Absent"          value={stats.absent}         color={T.crimson} bg={T.crimsonBg} border={T.crimsonBd} />
+            <StatCard icon={Shield}        label="At-risk subjects" value={stats.atRisk.length} color={stats.atRisk.length > 0 ? T.amber : T.inkMute} bg={T.amberBg} border={T.amberBd} />
           </div>
 
-          {/* Overall progress */}
-          <ProgressBar percentage={stats.overallPct} label="Overall attendance" showThreshold />
-        </div>
+          {/* Overall progress bar */}
+          <ProgressBar percentage={stats.overallPct} showThreshold />
+        </Card>
 
-        {/* At-risk alert */}
-        <AtRiskAlert subjects={stats.atRisk} />
+        {/* ── AT-RISK BANNER ── */}
+        <AtRiskBanner subjects={stats.atRisk} />
 
-        {/* Subject breakdown */}
-        <div style={cardStyle()}>
-          <div
-            style={{
-              fontSize: 15,
-              fontWeight: 700,
-              color: COLORS.text,
-              marginBottom: 20,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-            }}
-          >
-            <div
-              style={{
-                width: 36,
-                height: 36,
-                borderRadius: 10,
-                background: `${COLORS.accent}15`,
-                border: `1px solid ${COLORS.accent}30`,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <BarChart3 size={16} color={COLORS.accent} strokeWidth={2.5} />
-            </div>
-            Subject-wise Breakdown
-          </div>
+        {/* ── SUBJECT BREAKDOWN ── */}
+        <Card>
+          <SectionLabel icon={BookOpen} label="Subject breakdown" />
           {data.summary.map((s, i) => (
             <SubjectRow
               key={i}
@@ -1315,9 +653,9 @@ export default function StudentAttendanceView({ sid }) {
               percentage={s.percentage}
             />
           ))}
-        </div>
+        </Card>
 
-        {/* Records table */}
+        {/* ── RECORDS TABLE ── */}
         <RecordsTable
           records={data.records}
           filter={filter}
@@ -1327,6 +665,7 @@ export default function StudentAttendanceView({ sid }) {
           onFilterChange={handleFilterChange}
           onSearchChange={handleSearchChange}
         />
+
       </div>
     </div>
   );

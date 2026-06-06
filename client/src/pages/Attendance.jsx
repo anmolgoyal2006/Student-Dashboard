@@ -406,7 +406,7 @@ export default function Attendance() {
     isStudent ? TABS.MY_ATTENDANCE : TABS.BULK_UPLOAD
   );
 
-  const loadTeacherData = useCallback(async () => {
+ const loadTeacherData = useCallback(async () => {
     if (!isTeacher) {
       setLoading(false);
       return;
@@ -418,16 +418,17 @@ export default function Attendance() {
       setClassSummary(response.data.students || []);
     } catch (err) {
       console.error('Failed to load class summary:', err);
-      setError(err.message || 'Failed to load class summary.');
-      toast.error(error || 'Failed to load class summary.');
+      const msg = err.message || 'Failed to load class summary.';
+      setError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
-  }, [isTeacher, error]);
+  }, [isTeacher]);
 
   useEffect(() => {
     loadTeacherData();
-  }, [user, loadTeacherData]);
+  }, [loadTeacherData]);
 
   const handleTabChange = useCallback((tabId) => {
     setActiveTab(tabId);
