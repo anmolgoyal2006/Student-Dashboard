@@ -9,6 +9,8 @@ import { Target, CheckCircle, BookOpen, AlertTriangle, Bot, Bell, GraduationCap 
 import { attendanceService, marksService, aiService, notificationService, subjectService } from '../services/apiServices';
 import { useAuth } from '../context/AuthContext';
 import SmartPlanCard from '../components/SmartPlanCard';
+import EmptyState from '../components/EmptyState';
+import Skeleton, { StatsSkeleton } from '../components/Skeleton';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Tooltip, Legend);
 
@@ -19,34 +21,41 @@ const getGreeting = () => {
   return 'Good evening';
 };
 
-function EmptyState({ title, description, buttonText, buttonLink }) {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px', textAlign: 'center', gap: '8px' }}>
-      <svg width="80" height="60" viewBox="0 0 120 90" fill="none" style={{ opacity: 0.4, marginBottom: '8px' }}>
-        <rect x="10" y="10" width="100" height="70" rx="8" fill="var(--color-surface-3)" stroke="var(--border)" strokeWidth="2" />
-        <circle cx="60" cy="40" r="16" fill="var(--color-accent-muted)" stroke="var(--color-accent)" strokeWidth="2" strokeDasharray="4 4" />
-        <path d="M40 70h40" stroke="var(--color-text-tertiary)" strokeWidth="2" strokeLinecap="round" />
-      </svg>
-      <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-primary)' }}>{title}</div>
-      <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)', maxWidth: '240px' }}>{description}</div>
-      {buttonText && (
-        <Link to={buttonLink} className="btn btn-primary btn-sm" style={{ marginTop: '12px', textDecoration: 'none' }}>
-          {buttonText}
-        </Link>
-      )}
-    </div>
-  );
-}
+/* ─── colour helpers ─────────────────────────────────────────────────────── */
+const getCgpaColor = (val) => {
+  if (val === '—' || val == null) return '#94a3b8';
+  const n = parseFloat(val);
+  if (n > 8)  return '#22c55e';
+  if (n >= 6) return '#f59e0b';
+  return '#ef4444';
+};
 
+const getAttColor = (val) => {
+  if (val === '—' || val == null) return '#94a3b8';
+  const n = parseFloat(val);
+  if (n > 75) return '#22c55e';
+  if (n >= 50) return '#f59e0b';
+  return '#ef4444';
+};
+
+/* ─── tiny inline styles so nothing depends on external CSS vars ─────────── */
+const card = {
+  background: '#13161f',
+  border: '1px solid rgba(255,255,255,0.07)',
+  borderRadius: 14,
+  padding: '20px 22px',
+};
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
 export default function Dashboard() {
-  const { user }  = useAuth();
-  const [summary, setSummary]         = useState([]);
-  const [cgpa, setCgpa]               = useState(null);
-  const [recs, setRecs]               = useState([]);
-  const [notifs, setNotifs]           = useState([]);
-  const [subjects, setSubjects]       = useState([]);
+  const { user } = useAuth();
+  const [summary,      setSummary]      = useState([]);
+  const [cgpa,         setCgpa]         = useState(null);
+  const [recs,         setRecs]         = useState([]);
+  const [notifs,       setNotifs]       = useState([]);
+  const [subjects,     setSubjects]     = useState([]);
   const [subjectCount, setSubjectCount] = useState(0);
-  const [loading, setLoading]         = useState(true);
+  const [loading,      setLoading]      = useState(true);
   const [classSummary, setClassSummary] = useState([]);
 
   useEffect(() => {
@@ -58,28 +67,27 @@ export default function Dashboard() {
       notificationService.getAll(),
       subjectService.getAll(),
     ];
+    if (isTeacher) promises.push(attendanceService.getClassSummary());
 
-    if (isTeacher) {
-      promises.push(attendanceService.getClassSummary());
-    }
-
-    Promise.all(promises).then(([a, m, r, n, s, cs]) => {
-      setSummary(a.data.summary || []);
-      setCgpa(m.data.cgpa);
-      setRecs(r.data.suggestions || []);
-      setNotifs(n.data.notifications || []);
-      setSubjects(s.data.subjects || []);
-      setSubjectCount((s.data.subjects || []).length);
-      if (cs) {
-        setClassSummary(cs.data.students || []);
-      }
-    }).catch(() => {
-      // 401 is handled globally; swallow
-    }).finally(() => setLoading(false));
+    Promise.all(promises)
+      .then(([a, m, r, n, s, cs]) => {
+        setSummary(a.data.summary || []);
+        setCgpa(m.data.cgpa);
+        setRecs(r.data.suggestions || []);
+        setNotifs(n.data.notifications || []);
+        setSubjects(s.data.subjects || []);
+        setSubjectCount((s.data.subjects || []).length);
+        if (cs) setClassSummary(cs.data.students || []);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, [user]);
 
+  /* ── derived values ────────────────────────────────────────────────────── */
+  const isStudent = user?.role !== 'teacher';
+
   const overallAttendance = summary.length
-    ? (summary.reduce((s, i) => s + parseFloat(i.percentage), 0) / summary.length).toFixed(1)
+    ? (summary.reduce((s, i) => s + parseFloat(i.percentage || 0), 0) / summary.length).toFixed(1)
     : 0;
 
   const classSummaryList = classSummary || [];
@@ -88,356 +96,548 @@ export default function Dashboard() {
     : 0;
 
   const subjectAverages = {};
-  classSummaryList.forEach(student => {
+  classSummaryList.forEach(student =>
     (student.subjects || []).forEach(sub => {
-      if (!subjectAverages[sub.subject]) {
-        subjectAverages[sub.subject] = { sum: 0, count: 0 };
-      }
-      subjectAverages[sub.subject].sum += parseFloat(sub.percentage || 0);
+      if (!subjectAverages[sub.subject]) subjectAverages[sub.subject] = { sum: 0, count: 0 };
+      subjectAverages[sub.subject].sum   += parseFloat(sub.percentage || 0);
       subjectAverages[sub.subject].count += 1;
-    });
-  });
-
+    })
+  );
   const classSubjectLabels = Object.keys(subjectAverages);
-  const classSubjectData = classSubjectLabels.map(label => 
-    (subjectAverages[label].sum / subjectAverages[label].count).toFixed(1)
+  const classSubjectData   = classSubjectLabels.map(l =>
+    (subjectAverages[l].sum / subjectAverages[l].count).toFixed(1)
   );
 
-  const getCgpaColor = (val) => {
-    if (val === '—' || val == null) return 'var(--color-text-primary)';
-    const num = parseFloat(val);
-    if (num > 8) return 'var(--color-success)';
-    if (num >= 6) return 'var(--color-warning)';
-    return 'var(--color-danger)';
-  };
+  const attVal  = isStudent ? overallAttendance : classAvgAttendance;
+  const lowCnt  = isStudent
+    ? summary.filter(s => s.isLow).length
+    : classSummaryList.filter(s => parseFloat(s.overall || 0) < 75).length;
 
-  const getAttendanceColor = (val) => {
-    if (val === '—' || val == null) return 'var(--color-text-primary)';
-    const num = parseFloat(val);
-    if (num > 75) return 'var(--color-success)';
-    if (num >= 50) return 'var(--color-warning)';
-    return 'var(--color-danger)';
-  };
-
+  /* ── schedule ──────────────────────────────────────────────────────────── */
   const dayNames  = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   const todayName = dayNames[new Date().getDay()];
-
   const todayClasses = [];
-  subjects.forEach(sub => {
-    (sub.schedule || []).filter(sl => sl.day === todayName).forEach(sl => {
-      todayClasses.push({ ...sl, name: sub.name });
-    });
-  });
-
+  subjects.forEach(sub =>
+    (sub.schedule || []).filter(sl => sl.day === todayName).forEach(sl =>
+      todayClasses.push({ ...sl, name: sub.name })
+    )
+  );
   const todayScheduleSummary = todayClasses.length > 0
-    ? `Today: ${todayClasses.length} class${todayClasses.length > 1 ? 'es' : ''} scheduled (${todayClasses.map(c => c.name).join(', ')})`
+    ? `Today · ${todayClasses.length} class${todayClasses.length > 1 ? 'es' : ''}: ${todayClasses.map(c => c.name).join(', ')}`
     : 'No classes scheduled for today';
 
-  const isStudent = user?.role === 'student';
+  /* ── stat cards ────────────────────────────────────────────────────────── */
+  const stats = [
+    { label: 'CGPA',
+      value: cgpa ?? '—',
+      icon: Target,
+      color: getCgpaColor(cgpa),
+      accent: true },
+    { label: isStudent ? 'Attendance' : 'Class Attendance',
+      value: `${attVal}%`,
+      icon: CheckCircle,
+      color: getAttColor(attVal) },
+    { label: 'Subjects',
+      value: subjectCount,
+      icon: BookOpen,
+      color: '#6366f1' },
+    { label: isStudent ? 'Low Alerts' : 'Class Low Alerts',
+      value: lowCnt,
+      icon: AlertTriangle,
+      color: lowCnt > 0 ? '#ef4444' : '#64748b' },
+  ];
 
-  const attendanceChartData = isStudent ? {
-    labels: summary.map(s => s.subject),
+  /* ── bar chart ─────────────────────────────────────────────────────────── */
+  const barLabels = isStudent ? summary.map(s => s.subject) : classSubjectLabels;
+  const barValues = isStudent ? summary.map(s => parseFloat(s.percentage || 0)) : classSubjectData.map(Number);
+
+  // Generate per-bar colours based on value
+  const barBg = barValues.map(v =>
+    v < 50 ? 'rgba(239,68,68,0.75)' : v < 75 ? 'rgba(245,158,11,0.75)' : 'rgba(99,102,241,0.80)'
+  );
+  const barBorder = barValues.map(v =>
+    v < 50 ? 'rgba(239,68,68,1)' : v < 75 ? 'rgba(245,158,11,1)' : 'rgba(99,102,241,1)'
+  );
+
+  const attendanceChartData = {
+    labels: barLabels,
     datasets: [{
       label: 'Attendance %',
-      data: summary.map(s => s.percentage),
-      backgroundColor: summary.map(s =>
-        s.isLow ? 'rgba(239, 68, 68, 0.7)' : 'rgba(99, 102, 241, 0.7)'
-      ),
-      borderColor: summary.map(s =>
-        s.isLow ? 'rgba(239, 68, 68, 1)' : 'rgba(99, 102, 241, 1)'
-      ),
-      borderWidth: 1,
-      borderRadius: 6,
-    }],
-  } : {
-    labels: classSubjectLabels,
-    datasets: [{
-      label: 'Class Avg Attendance %',
-      data: classSubjectData,
-      backgroundColor: 'rgba(99, 102, 241, 0.7)',
-      borderColor: 'rgba(99, 102, 241, 1)',
-      borderWidth: 1,
-      borderRadius: 6,
+      data: barValues,
+      backgroundColor: barBg,
+      borderColor: barBorder,
+      borderWidth: 1.5,
+      borderRadius: 7,
+      borderSkipped: false,
     }],
   };
 
   const chartOptions = {
     responsive: true,
+    animation: { duration: 800, easing: 'easeOutQuart' },
     plugins: {
       legend: { display: false },
       tooltip: {
-        backgroundColor: 'rgba(19, 22, 31, 0.95)',
-        borderColor: 'rgba(255,255,255,0.06)',
+        backgroundColor: '#0d0f17',
+        borderColor: 'rgba(255,255,255,0.10)',
         borderWidth: 1,
-        titleColor: 'var(--color-text-primary)',
-        bodyColor: 'var(--color-text-secondary)',
-        padding: 10,
-      }
+        titleColor: '#f1f5f9',
+        bodyColor: '#94a3b8',
+        padding: 12,
+        callbacks: {
+          label: function(ctx) { return ' ' + ctx.parsed.y.toFixed(1) + '%'; },
+        },
+      },
     },
     scales: {
       y: {
-        min: 0, max: 100,
-        grid: { color: 'rgba(255,255,255,0.04)' },
-        ticks: { color: 'var(--color-text-secondary)', font: { size: 11 } },
+        min: 0,
+        max: 100,
+        grid:  { color: 'rgba(255,255,255,0.05)' },
+        ticks: { color: '#64748b', font: { size: 11 }, callback: function(v) { return v + '%'; } },
+        border: { display: false },
       },
       x: {
-        grid: { display: false },
-        ticks: { color: 'var(--color-text-secondary)', font: { size: 11 } },
-      }
-    }
+        grid:  { display: false },
+        ticks: {
+          color: '#94a3b8',
+          font:  { size: 11 },
+          maxRotation: 30,
+          callback: function(_, idx) {
+            const lbl = this.getLabelForValue(idx);
+            return lbl && lbl.length > 14 ? lbl.slice(0, 13) + '…' : (lbl || '');
+          },
+        },
+        border: { display: false },
+      },
+    },
   };
+
+  /* ── CGPA doughnut ─────────────────────────────────────────────────────── */
+  const cgpaNum    = cgpa != null ? Math.min(parseFloat(cgpa) || 0, 10) : 0;
+  const cgpaRemain = Math.max(0, 10 - cgpaNum);
+  const cgpaColor  = getCgpaColor(cgpa);
+
+  // Capture in stable locals so closures inside chartjs options don't reference stale outer vars
+  const _cgpaNum    = cgpaNum;
+  const _cgpaRemain = cgpaRemain;
 
   const cgpaGaugeData = {
     labels: ['CGPA', 'Remaining'],
     datasets: [{
-      data: [cgpa || 0, 10 - (cgpa || 0)],
-      backgroundColor: ['var(--color-accent)', 'rgba(255,255,255,0.05)'],
+      data: [cgpaNum, cgpaRemain],
+      backgroundColor: [cgpaColor, 'rgba(255,255,255,0.06)'],
+      hoverBackgroundColor: [cgpaColor, 'rgba(255,255,255,0.08)'],
       borderWidth: 0,
     }],
   };
 
-  const stats = [
-    { label: 'CGPA',        value: cgpa ?? '—',                  icon: Target,        color: getCgpaColor(cgpa), isPrimary: true },
-    { 
-      label: isStudent ? 'Attendance' : 'Class Attendance',  
-      value: isStudent ? `${overallAttendance}%` : `${classAvgAttendance}%`,      
-      icon: CheckCircle,   
-      color: getAttendanceColor(isStudent ? overallAttendance : classAvgAttendance) 
+  const doughnutOptions = {
+    cutout: '76%',
+    animation: { duration: 900, easing: 'easeOutQuart' },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#0d0f17',
+        borderColor: 'rgba(255,255,255,0.10)',
+        borderWidth: 1,
+        titleColor: '#f1f5f9',
+        bodyColor: '#94a3b8',
+        padding: 12,
+        callbacks: {
+          label: function(ctx) {
+            if (ctx.label === 'CGPA') return ' ' + _cgpaNum.toFixed(2) + ' / 10';
+            return ' ' + _cgpaRemain.toFixed(2) + ' remaining';
+          },
+        },
+      },
     },
-    { label: 'Subjects',    value: subjectCount,                 icon: BookOpen,      color: 'var(--color-text-primary)' },
-    { 
-      label: isStudent ? 'Low Alerts' : 'Class Low Alerts',  
-      value: isStudent ? summary.filter(s => s.isLow).length : classSummaryList.filter(s => parseFloat(s.overall || 0) < 75).length, 
-      icon: AlertTriangle, 
-      color: (isStudent ? summary.filter(s => s.isLow).length : classSummaryList.filter(s => parseFloat(s.overall || 0) < 75).length) > 0 ? 'var(--color-danger)' : 'var(--color-text-secondary)' 
-    },
-  ];
+  };
 
+  /* ── loading skeleton ──────────────────────────────────────────────────── */
   if (loading) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <div className="shimmer" style={{ height: 60, width: '40%', borderRadius: 8 }} />
-        <div className="grid-4">
-          {[1,2,3,4].map(i => <div key={i} className="card shimmer" style={{ height: 100 }} />)}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+        {/* Header skeleton */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <Skeleton width="220px" height="26px" />
+            <Skeleton width="300px" height="14px" />
+          </div>
+          <Skeleton width="110px" height="30px" variant="pill" />
         </div>
-        <div className="grid-2">
-          <div className="card shimmer" style={{ height: 240 }} />
-          <div className="card shimmer" style={{ height: 240 }} />
+
+        {/* Stat cards skeleton — reuses StatsSkeleton with count=4 */}
+        <StatsSkeleton count={4} />
+
+        {/* Charts row skeleton */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+          {/* Bar chart card */}
+          <div style={{
+            background: 'var(--color-surface-2)',
+            borderRadius: 'var(--radius-lg)',
+            padding: '20px 22px',
+            border: '1px solid var(--border)',
+            display: 'flex', flexDirection: 'column', gap: 14,
+          }}>
+            <Skeleton width="55%" height="18px" />
+            {/* Legend chips row */}
+            <div style={{ display: 'flex', gap: 10 }}>
+              <Skeleton variant="pill" width="60px" height="18px" />
+              <Skeleton variant="pill" width="60px" height="18px" />
+              <Skeleton variant="pill" width="60px" height="18px" />
+            </div>
+            {/* Fake bar columns */}
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, height: 160, paddingTop: 12 }}>
+              {[72, 45, 90, 60, 80, 55].map((h, i) => (
+                <Skeleton key={i} width="100%" height={`${h}%`} style={{ borderRadius: '6px 6px 0 0' }} />
+              ))}
+            </div>
+            {/* X-axis labels */}
+            <div style={{ display: 'flex', gap: 10 }}>
+              {[60, 80, 50, 70, 65, 55].map((w, i) => (
+                <Skeleton key={i} width={`${w}%`} height="11px" />
+              ))}
+            </div>
+          </div>
+
+          {/* CGPA gauge card */}
+          <div style={{
+            background: 'var(--color-surface-2)',
+            borderRadius: 'var(--radius-lg)',
+            padding: '20px 22px',
+            border: '1px solid var(--border)',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16,
+          }}>
+            <Skeleton width="120px" height="18px" style={{ alignSelf: 'flex-start' }} />
+            {/* Doughnut ring approximation */}
+            <Skeleton variant="circle" width="170px" height="170px" style={{ borderRadius: '50%' }} />
+            {/* Grade band chips */}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <Skeleton variant="pill" width="80px"  height="24px" />
+              <Skeleton variant="pill" width="64px"  height="24px" />
+              <Skeleton variant="pill" width="72px"  height="24px" />
+            </div>
+          </div>
         </div>
+
+        {/* AI promo banner skeleton */}
+        <div style={{
+          background: 'var(--color-surface-2)',
+          borderRadius: 'var(--radius-lg)',
+          padding: '18px 22px',
+          border: '1px solid var(--border)',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <Skeleton variant="rect" width="46px" height="46px" style={{ borderRadius: 12 }} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+              <Skeleton width="170px" height="16px" />
+              <Skeleton width="280px" height="13px" />
+            </div>
+          </div>
+          <Skeleton variant="pill" width="150px" height="36px" />
+        </div>
+
+        {/* Bottom row skeleton */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+          {[3, 4].map(rowCount => (
+            <div key={rowCount} style={{
+              background: 'var(--color-surface-2)',
+              borderRadius: 'var(--radius-lg)',
+              padding: '20px 22px',
+              border: '1px solid var(--border)',
+              display: 'flex', flexDirection: 'column', gap: 14,
+            }}>
+              <Skeleton width="50%" height="18px" />
+              {Array.from({ length: rowCount }).map((_, i) => (
+                <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', paddingBottom: 12,
+                  borderBottom: i < rowCount - 1 ? '1px solid var(--border)' : 'none' }}>
+                  <Skeleton variant="circle" width="32px" height="32px" />
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <Skeleton width="65%" height="14px" />
+                    <Skeleton width="90%" height="12px" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+
       </div>
     );
   }
 
+  /* ═══════════════════════════════════════════════════════════════════════ */
   return (
-    <div>
-      {/* Header */}
-      <div className="page-header">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+      {/* ── Header ── */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 10 }}>
         <div>
-          <h1 className="page-title" style={{ fontSize: '20px', fontWeight: 500 }}>
-            {getGreeting()}, {user?.name?.split(' ')[0]}
+          <h1 style={{ margin: 0, fontSize: 20, fontWeight: 600, color: '#f1f5f9', letterSpacing: '-0.3px' }}>
+            {getGreeting()}, {user?.name?.split(' ')[0]} 👋
           </h1>
-          <p className="page-subtitle">{todayScheduleSummary}</p>
+          <p style={{ margin: '4px 0 0', fontSize: 13, color: '#64748b' }}>{todayScheduleSummary}</p>
         </div>
         <div style={{
-          fontSize: 12, color: 'var(--color-text-secondary)',
-          background: 'var(--color-surface-2)',
-          border: '1px solid var(--border)',
-          borderRadius: 'var(--radius-md)', padding: '6px 14px',
-          fontWeight: 500,
+          fontSize: 12, color: '#94a3b8',
+          background: '#1e2230',
+          border: '1px solid rgba(255,255,255,0.08)',
+          borderRadius: 8, padding: '6px 14px', fontWeight: 500,
         }}>
           {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
         </div>
       </div>
 
-      {/* Stat row */}
-      <div className="grid-4 mb-4">
+      {/* ── Stat cards ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14 }}>
         {stats.map(stat => {
-          const IconComponent = stat.icon;
+          const Icon = stat.icon;
           return (
-            <div 
-              className="card stat-card" 
+            <div
               key={stat.label}
-              style={stat.isPrimary ? { borderLeft: '2px solid var(--color-accent)' } : undefined}
+              style={{
+                ...card,
+                borderLeft: stat.accent ? `3px solid ${stat.color}` : undefined,
+                display: 'flex', flexDirection: 'column', alignItems: 'center',
+                padding: '22px 16px', gap: 8, transition: 'transform 0.18s',
+              }}
+              onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'}
+              onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
             >
-              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
-                <div style={{
-                  width: 36, height: 36, borderRadius: '50%',
-                  background: 'var(--color-accent-muted)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  color: 'var(--color-accent)',
-                }}>
-                  <IconComponent size={18} />
-                </div>
+              <div style={{
+                width: 38, height: 38, borderRadius: '50%',
+                background: 'rgba(99,102,241,0.12)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <Icon size={18} color={stat.color} />
               </div>
-              <div className="stat-value" style={{ color: stat.color, fontSize: '28px' }}>{stat.value}</div>
-              <div className="stat-label">{stat.label}</div>
+              <div style={{ fontSize: 30, fontWeight: 700, color: stat.color, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
+                {stat.value}
+              </div>
+              <div style={{ fontSize: 11.5, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 500 }}>
+                {stat.label}
+              </div>
             </div>
           );
         })}
       </div>
 
-      {/* Charts row */}
-      <div className="grid-2 mb-4">
-        <div className="card">
-          <div className="card-title">
-            {isStudent ? 'Attendance per Subject' : 'Class Avg Attendance per Subject'}
-          </div>
-          {isStudent ? (
-            summary.length > 0
-              ? <Bar data={attendanceChartData} options={chartOptions} />
-              : <EmptyState 
-                  title="No Attendance Data" 
-                  description="Import your attendance report or mark attendance manually to unlock metrics." 
-                  buttonText="Add Attendance" 
-                  buttonLink="/attendance" 
-                />
-          ) : (
-            classSummaryList.length > 0
-              ? <Bar data={attendanceChartData} options={chartOptions} />
-              : <EmptyState 
-                  title="No Class Summary Data" 
-                  description="Upload attendance register sheets to view class metrics." 
-                  buttonText="Upload Attendance" 
-                  buttonLink="/attendance" 
-                />
-          )}
-        </div>
+      {/* ── Charts row ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
 
-        <div className="card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <div className="card-title" style={{ alignSelf: 'flex-start', display: "inline-flex", alignItems: "center", gap: "6px" }}><GraduationCap size={16} color="var(--color-accent)" /> CGPA Gauge</div>
-          {cgpa != null && cgpa > 0
-            ? <>
-                <Doughnut
-                  data={cgpaGaugeData}
-                  options={{
-                    cutout: '76%',
-                    plugins: {
-                      legend: { display: false },
-                      tooltip: {
-                        backgroundColor: 'rgba(19, 22, 31, 0.95)',
-                        borderColor: 'rgba(255,255,255,0.06)',
-                        borderWidth: 1,
-                        titleColor: 'var(--color-text-primary)',
-                        bodyColor: 'var(--color-text-secondary)',
-                      }
-                    }
-                  }}
-                  style={{ maxWidth: 180 }}
-                />
-                <p style={{ marginTop: 14, fontFamily: 'inherit', fontSize: 28, fontWeight: 500, color: 'var(--color-accent)' }}>
-                  {cgpa}
-                </p>
-                <p className="text-muted">out of 10.0</p>
-              </>
-            : <EmptyState 
-                title="No CGPA Data" 
-                description="Add your semesters or exam marks to compute your gauge score." 
-                buttonText="Add Marks" 
-                buttonLink="/marks" 
+        {/* Attendance bar chart */}
+        <div style={{ ...card }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+            <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#6366f1' }} />
+            <span style={{ fontSize: 14, fontWeight: 600, color: '#e2e8f0' }}>
+              {isStudent ? 'Attendance per Subject' : 'Class Avg Attendance'}
+            </span>
+          </div>
+
+          {/* Legend chips */}
+          <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
+            {[
+              { color: 'rgba(99,102,241,0.80)',  label: '≥ 75%' },
+              { color: 'rgba(245,158,11,0.75)',  label: '50–74%' },
+              { color: 'rgba(239,68,68,0.75)',   label: '< 50%' },
+            ].map(leg => (
+              <span key={leg.label} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: '#94a3b8' }}>
+                <span style={{ width: 10, height: 10, borderRadius: 3, background: leg.color, display: 'inline-block' }} />
+                {leg.label}
+              </span>
+            ))}
+          </div>
+
+          {barLabels.length > 0
+            ? <Bar data={attendanceChartData} options={chartOptions} />
+            : <EmptyState
+                title="No Attendance Data"
+                subtitle="Import your attendance report or mark attendance manually."
+                actionLabel="Add Attendance"
+                onAction={() => window.location.href = '/attendance'}
+                illustration="attendance"
               />
           }
         </div>
+
+        {/* CGPA Gauge */}
+        <div style={{ ...card, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20, alignSelf: 'flex-start' }}>
+            <GraduationCap size={16} color="#6366f1" />
+            <span style={{ fontSize: 14, fontWeight: 600, color: '#e2e8f0' }}>CGPA Gauge</span>
+          </div>
+
+          {cgpa != null && cgpa > 0 ? (
+            <div style={{ position: 'relative', width: 180, height: 180 }}>
+              <Doughnut data={cgpaGaugeData} options={doughnutOptions} />
+              {/* centre label */}
+              <div style={{
+                position: 'absolute', inset: 0,
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                pointerEvents: 'none',
+              }}>
+                <span style={{ fontSize: 30, fontWeight: 700, color: cgpaColor, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
+                  {parseFloat(cgpa).toFixed(2)}
+                </span>
+                <span style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>out of 10.0</span>
+              </div>
+            </div>
+          ) : (
+            <EmptyState
+              title="No CGPA Data"
+              subtitle="Add your semesters or exam marks to compute your gauge score."
+              actionLabel="Add Marks"
+              onAction={() => window.location.href = '/marks'}
+              illustration="marks"
+            />
+          )}
+
+          {/* grade band indicator */}
+          {cgpa != null && cgpa > 0 && (
+            <div style={{
+              marginTop: 16, display: 'flex', gap: 8, fontSize: 12,
+            }}>
+              {[
+                { label: 'Excellent', range: '> 8', active: cgpa > 8,    color: '#22c55e' },
+                { label: 'Good',      range: '6–8', active: cgpa >= 6 && cgpa <= 8, color: '#f59e0b' },
+                { label: 'At Risk',   range: '< 6', active: cgpa < 6,    color: '#ef4444' },
+              ].map(band => (
+                <span key={band.label} style={{
+                  padding: '3px 10px', borderRadius: 20,
+                  background: band.active ? `${band.color}22` : 'rgba(255,255,255,0.04)',
+                  color: band.active ? band.color : '#475569',
+                  border: `1px solid ${band.active ? band.color + '55' : 'transparent'}`,
+                  fontWeight: band.active ? 600 : 400,
+                  transition: 'all 0.2s',
+                }}>
+                  {band.label}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Dashboard AI Promo Banner */}
-      <div className="card mb-4" style={{
-        background: 'linear-gradient(135deg, rgba(99,102,241,0.15) 0%, rgba(129,140,248,0.05) 100%)',
-        border: '1px solid rgba(129,140,248,0.25)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        flexWrap: 'wrap',
-        gap: 16,
-        padding: '18px 22px',
+      {/* ── AI Promo Banner ── */}
+      <div style={{
+        ...card,
+        background: 'linear-gradient(135deg, rgba(99,102,241,0.15) 0%, rgba(129,140,248,0.04) 100%)',
+        border: '1px solid rgba(129,140,248,0.22)',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        flexWrap: 'wrap', gap: 16, padding: '18px 22px',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           <div style={{
-            background: 'var(--color-accent-muted)',
-            color: 'var(--color-accent)',
-            borderRadius: 'var(--radius-md)',
-            width: 46,
-            height: 46,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
+            background: 'rgba(99,102,241,0.15)', color: '#818cf8',
+            borderRadius: 12, width: 46, height: 46,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
-            <Bot size={24} />
+            <Bot size={22} />
           </div>
           <div>
-            <h3 style={{ margin: 0, fontSize: 15, fontWeight: 500, color: 'var(--color-text-primary)' }}>Talk to Dashboard AI</h3>
-            <p style={{ margin: '3px 0 0', fontSize: 12.5, color: 'var(--color-text-secondary)', lineHeight: 1.4 }}>
-              Ask questions, predict CGPA, add subjects or marks with natural language commands.
+            <h3 style={{ margin: 0, fontSize: 15, fontWeight: 600, color: '#e2e8f0' }}>Talk to Dashboard AI</h3>
+            <p style={{ margin: '3px 0 0', fontSize: 12.5, color: '#64748b', lineHeight: 1.45 }}>
+              Ask questions, predict CGPA, add subjects or marks with natural language.
             </p>
           </div>
         </div>
-        <Link to="/ai-assistant?mode=assistant" className="btn btn-primary" style={{ padding: '8px 16px', textDecoration: 'none' }}>
+        <Link
+          to="/ai-assistant?mode=assistant"
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            padding: '9px 18px', borderRadius: 10,
+            background: '#6366f1', color: '#fff',
+            fontWeight: 600, fontSize: 13.5, textDecoration: 'none',
+            transition: 'background 0.18s, transform 0.15s',
+            boxShadow: '0 0 0 0 rgba(99,102,241,0.4)',
+          }}
+          onMouseEnter={e => { e.currentTarget.style.background = '#4f46e5'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+          onMouseLeave={e => { e.currentTarget.style.background = '#6366f1'; e.currentTarget.style.transform = 'translateY(0)'; }}
+        >
           Open Dashboard AI ➔
         </Link>
       </div>
 
-      {/* Bottom row */}
-      <div className="grid-2">
-        <div className="card">
+      {/* ── Bottom row: AI recs + Notifications ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+
+        {/* AI Recommendations */}
+        <div style={{ ...card }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-            <div className="card-title" style={{ margin: 0, display: "inline-flex", alignItems: "center", gap: "6px" }}><Bot size={16} color="var(--color-accent)" /> AI Recommendations</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 14, fontWeight: 600, color: '#e2e8f0' }}>
+              <Bot size={16} color="#6366f1" /> AI Recommendations
+            </div>
             <Link
               to="/ai-assistant?mode=assistant"
-              style={{
-                fontSize: 12,
-                color: 'var(--color-accent)',
-                textDecoration: 'none',
-                fontWeight: 500,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 4,
-                transition: 'opacity 0.2s',
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.opacity = 0.8}
-              onMouseLeave={(e) => e.currentTarget.style.opacity = 1}
+              style={{ fontSize: 12, color: '#6366f1', textDecoration: 'none', fontWeight: 500 }}
             >
-              Ask Dashboard AI ➔
+              Ask AI ➔
             </Link>
           </div>
+
           {recs.length > 0
             ? recs.map((r, i) => (
-                <div key={i} className={`suggestion ${r.priority}`}>
-                  <span className="suggestion-icon">{r.icon}</span>
+                <div key={i} style={{
+                  display: 'flex', gap: 12, alignItems: 'flex-start',
+                  padding: '10px 12px', borderRadius: 10, marginBottom: 8,
+                  background: r.priority === 'high'
+                    ? 'rgba(239,68,68,0.07)'
+                    : r.priority === 'medium'
+                      ? 'rgba(245,158,11,0.07)'
+                      : 'rgba(99,102,241,0.07)',
+                  border: `1px solid ${
+                    r.priority === 'high'   ? 'rgba(239,68,68,0.18)' :
+                    r.priority === 'medium' ? 'rgba(245,158,11,0.18)' :
+                                              'rgba(99,102,241,0.15)'}`,
+                }}>
+                  <span style={{ fontSize: 18 }}>{r.icon}</span>
                   <div>
-                    <div className="suggestion-title">{r.title}</div>
-                    <div className="suggestion-msg">{r.message}</div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: '#e2e8f0' }}>{r.title}</div>
+                    <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>{r.message}</div>
                   </div>
                 </div>
               ))
-            : <EmptyState 
-                title="No Recommendations" 
-                description="Get personalized AI advice by chatting with the assistant." 
-                buttonText="Go to Assistant" 
-                buttonLink="/ai-assistant" 
+            : <EmptyState
+                title="No Recommendations"
+                subtitle="Chat with the AI assistant to get personalised advice."
+                actionLabel="Go to Assistant"
+                onAction={() => window.location.href = '/ai-assistant'}
               />
           }
         </div>
 
-        <div className="card">
-          <div className="card-title" style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}><Bell size={16} color="var(--color-accent)" /> Notifications</div>
+        {/* Notifications */}
+        <div style={{ ...card }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 14, fontWeight: 600, color: '#e2e8f0', marginBottom: 16 }}>
+            <Bell size={16} color="#6366f1" /> Notifications
+          </div>
+
           {notifs.length > 0
             ? notifs.map((n, i) => (
-                <div key={i} className="notification-item">
-                  <div className={`notif-dot ${n.type}`} />
+                <div key={i} style={{
+                  display: 'flex', gap: 12, alignItems: 'flex-start',
+                  padding: '10px 0',
+                  borderBottom: i < notifs.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none',
+                }}>
+                  <span style={{
+                    width: 9, height: 9, borderRadius: '50%', marginTop: 4, flexShrink: 0,
+                    background: n.type === 'warning' ? '#f59e0b' : n.type === 'danger' ? '#ef4444' : '#6366f1',
+                  }} />
                   <div>
-                    <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)' }}>{n.title}</div>
-                    <div className="text-muted">{n.message}</div>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: '#e2e8f0' }}>{n.title}</div>
+                    <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>{n.message}</div>
                   </div>
                 </div>
               ))
-            : <EmptyState 
-                title="All Caught Up" 
-                description="No new notifications at this time. Check back later!" 
-              />
+            : <EmptyState title="All Caught Up" subtitle="No new notifications at this time." />
           }
         </div>
       </div>
 
-      {/* Smart Study Plan */}
+      {/* ── Smart Study Plan ── */}
       <SmartPlanCard />
     </div>
   );

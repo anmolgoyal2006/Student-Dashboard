@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { BarChart3, Clipboard, Loader2, X } from 'lucide-react';
+import EmptyState from '../components/EmptyState';
 
 const styles = {
   container:  { maxWidth: 800, margin: '0 auto', padding: 24, fontFamily: 'sans-serif' },
@@ -150,8 +151,12 @@ export default function StudentAttendanceView({ sid }) {
             <tbody>
               {filteredRecords.length === 0 ? (
                 <tr>
-                  <td colSpan={3} style={{ ...styles.td, textAlign: 'center', color: 'var(--color-text-secondary)' }}>
-                    No records found.
+                  <td colSpan={3} style={{ ...styles.td, padding: 0 }}>
+                    <EmptyState
+                      title="No attendance records"
+                      subtitle={`No records found for the selected filter (${filter}).`}
+                      illustration="attendance"
+                    />
                   </td>
                 </tr>
               ) : (

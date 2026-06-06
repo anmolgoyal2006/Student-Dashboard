@@ -1,63 +1,109 @@
 import { useState, useRef } from 'react';
-import { subjectService } from '../services/apiServices';
+import { aiChatService } from '../services/apiServices';
 import { apiRequest }     from '../api/axios';
 import toast from '../context/ToastContext';
 import { Brain } from 'lucide-react';
 
 // ── Voice support detection ───────────────────────────────────────────────
-const SpeechRecognition =
-  window.SpeechRecognition || window.webkitSpeechRecognition || null;
-
 export default function AICommandBar({ onRefresh }) {
   const [input,      setInput]      = useState('');
   const [loading,    setLoading]    = useState(false);
   const [listening,  setListening]  = useState(false);
   const [lastResult, setLastResult] = useState(null);
-  const recogRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+  const audioStreamRef = useRef(null);
+  const voiceTimerRef = useRef(null);
 
   // ── Voice handler ─────────────────────────────────────────────────────
-  const startVoice = () => {
-    if (!SpeechRecognition) {
-      toast.error('Voice not supported in this browser. Try Chrome.');
+  const cleanupVoiceRecording = () => {
+    if (voiceTimerRef.current) {
+      clearTimeout(voiceTimerRef.current);
+      voiceTimerRef.current = null;
+    }
+    audioStreamRef.current?.getTracks().forEach(track => track.stop());
+    audioStreamRef.current = null;
+    mediaRecorderRef.current = null;
+  };
+
+  const transcribeAndRun = async (audioBlob) => {
+    if (!audioBlob || audioBlob.size < 1000) {
+      toast.info('No speech detected. Try again closer to the mic.');
       return;
     }
-    const recog          = new SpeechRecognition();
-    recog.lang           = 'en-US';
-    recog.interimResults = true;
-    recog.continuous     = false;
-    recogRef.current     = recog;
 
-    let currentText = '';
+    try {
+      const { data } = await aiChatService.transcribeAudio(audioBlob);
+      const cmd = (data.text || '').trim();
+      if (!cmd) {
+        toast.info('No speech detected. Try again closer to the mic.');
+        return;
+      }
+      setInput(cmd);
+      handleCommand(cmd);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Voice transcription failed. Please try again.');
+    }
+  };
 
-    recog.onstart  = () => setListening(true);
-    recog.onend    = () => {
+  const startVoice = async () => {
+    if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
+      toast.error('Voice recording is not supported in this browser. Try Chrome.');
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus'
+        : MediaRecorder.isTypeSupported('audio/webm')
+        ? 'audio/webm'
+        : '';
+
+      audioChunksRef.current = [];
+      audioStreamRef.current = stream;
+
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      mediaRecorderRef.current = recorder;
+
+      recorder.ondataavailable = (event) => {
+        if (event.data?.size > 0) audioChunksRef.current.push(event.data);
+      };
+
+      recorder.onstop = () => {
+        const chunks = audioChunksRef.current;
+        const blobType = chunks[0]?.type || mimeType || 'audio/webm';
+        const audioBlob = new Blob(chunks, { type: blobType });
+        audioChunksRef.current = [];
+        setListening(false);
+        cleanupVoiceRecording();
+        transcribeAndRun(audioBlob);
+      };
+
+      recorder.start();
+      setListening(true);
+      toast.info('Listening... click the mic again to stop.');
+      voiceTimerRef.current = setTimeout(() => {
+        if (mediaRecorderRef.current?.state === 'recording') {
+          mediaRecorderRef.current.stop();
+        }
+      }, 8000);
+    } catch (err) {
+      cleanupVoiceRecording();
       setListening(false);
-      const cmd = currentText.trim();
-      if (cmd) {
-        handleCommand(cmd);
+      if (err.name === 'NotAllowedError' || err.name === 'SecurityError') {
+        toast.error('Microphone access is blocked. Allow mic access for localhost in the browser.');
+      } else if (err.name === 'NotFoundError') {
+        toast.error('No microphone was found. Check your input device.');
+      } else {
+        console.warn('Voice recording error:', err);
+        toast.error('Voice recording could not start. Please try again.');
       }
-    };
-    recog.onerror  = (e) => {
-      setListening(false);
-      if (e.error !== 'aborted') {
-        toast.error('Voice error: ' + e.error);
-      }
-    };
-    recog.onresult = (e) => {
-      let resultText = '';
-      for (let i = 0; i < e.results.length; ++i) {
-        resultText += e.results[i][0].transcript;
-      }
-      currentText = resultText;
-      setInput(resultText);
-    };
-
-    recog.start();
+    }
   };
 
   const stopVoice = () => {
-    recogRef.current?.stop();
-    setListening(false);
+    mediaRecorderRef.current?.stop();
   };
 
   // ── Command handler ───────────────────────────────────────────────────

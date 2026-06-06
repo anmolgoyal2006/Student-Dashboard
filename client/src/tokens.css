@@ -29,6 +29,10 @@
   --color-violet: #8b5cf6;
   --color-dark-cyan: #0e7490;
   --color-light-indigo: #a5b4fc;
+  --color-indigo-light: #818cf8;
+  --color-green-light: #34d399;
+  --color-blue: #3b82f6;
+  --color-green: #22c55e;
 
   /* Radius Tokens */
   --radius-sm: 6px;

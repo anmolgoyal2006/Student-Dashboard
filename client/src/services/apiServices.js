@@ -156,6 +156,15 @@ export const aiChatService = {
     });
   },
 
+  transcribeAudio: (blob) => {
+    const ext = blob.type?.includes('ogg') ? 'ogg' : blob.type?.includes('wav') ? 'wav' : 'webm';
+    const form = new FormData();
+    form.append('file', blob, `voice.${ext}`);
+    return API.post('/ai/transcribe', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+
   getNotes: () =>
     apiRequest('get', `/ai/notes?t=${Date.now()}`),
 

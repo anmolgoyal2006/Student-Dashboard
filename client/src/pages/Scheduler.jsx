@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { taskService, subjectService } from '../services/apiServices';
 import toast from '../context/ToastContext';
 import EmptyState from '../components/EmptyState';
+import { CardSkeleton, StatsSkeleton } from '../components/Skeleton';
 import { Calendar, Clock, ListTodo, Play, AlertTriangle, Edit3, Plus, Trash2, ClipboardList, BookOpen, Rocket, RefreshCw, Pin } from 'lucide-react';
 
 const PRIORITY_COLOR = {
@@ -173,7 +174,14 @@ export default function Scheduler() {
     overdue:   tasks.filter(t => t.status !== 'completed' && new Date(t.dueDate) < new Date()).length,
   };
 
-  if (loading) return <div className="spinner" />;
+  if (loading) return (
+    <div>
+      <StatsSkeleton count={4} />
+      <div style={{ marginTop: 16 }}>
+        <CardSkeleton count={3} />
+      </div>
+    </div>
+  );
 
   return (
     <div>

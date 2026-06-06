@@ -3,7 +3,7 @@ const router      = express.Router();
 const multer      = require('multer');
 const { protect } = require('../middleware/authMiddleware');
 const {
-  chat, uploadNotes, getNotes, deleteNote
+  chat, uploadNotes, getNotes, deleteNote, transcribeVoice
 } = require('../controllers/aiChatController');
 
 const upload = multer({
@@ -18,10 +18,15 @@ const upload = multer({
       'image/jpg',
       'image/png',
       'image/webp',
+      'audio/webm',
+      'audio/wav',
+      'audio/mpeg',
+      'audio/mp4',
+      'audio/ogg',
     ];
     if (
       allowed.includes(file.mimetype) ||
-      file.originalname.match(/\.(txt|md|pdf|jpg|jpeg|png|webp)$/i)
+      file.originalname.match(/\.(txt|md|pdf|jpg|jpeg|png|webp|webm|wav|mp3|m4a|ogg)$/i)
     ) {
       cb(null, true);
     } else {
@@ -44,6 +49,7 @@ router.use(protect);
 
 router.post('/chat',              chat);
 router.post('/upload',            handleUpload, uploadNotes);
+router.post('/transcribe',        handleUpload, transcribeVoice);
 router.get ('/notes',             getNotes);
 router.delete('/notes/:filename', deleteNote);
 
