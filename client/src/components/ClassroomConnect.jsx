@@ -24,7 +24,7 @@ export default function ClassroomConnect({ onSync }) {
   const handleConnect = async () => {
     try {
       const res = await API.get('/classroom/auth');
-      if (res.data?.url) window.open(res.data.url, '_blank');
+      if (res.data?.url) window.location.href = res.data.url;
     } catch {
       toast.error('Failed to connect Google Classroom');
     }
