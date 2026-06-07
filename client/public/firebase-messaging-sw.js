@@ -30,24 +30,24 @@ messaging.onBackgroundMessage((payload) => {
   const { title, body, icon } = payload.notification || {};
   const data = payload.data || {};
 
+  const isAttendance = !!data.subjectId;
+
   self.registration.showNotification(title || 'StudentAI', {
-    body: body || 'Mark your attendance',
+    body: body || (isAttendance ? 'Mark your attendance' : ''),
     icon: icon || '/logo192.png',
     badge: '/logo192.png',
 
-    // 👇 IMPORTANT: pass data for click handling
-   data: {
+    data: {
       subjectId: data.subjectId || '',
       date: data.date || new Date().toISOString().split('T')[0],
-      url: `/?markAttendance=1&subjectId=${data.subjectId}&date=${data.date}`,
+      url: isAttendance ? `/?markAttendance=1&subjectId=${data.subjectId}&date=${data.date}` : '/',
     },
 
-    // 🔥 ACTION BUTTONS
-    actions: [
+    actions: isAttendance ? [
       { action: 'attended',     title: '✅ Attended' },
       { action: 'not_attended', title: '❌ Not Attended' },
-      { action: 'not_held',     title: '⏸ Not Held' }
-    ]
+      { action: 'not_held',     title: '⏸ Not Held' },
+    ] : [],
   });
 });
 

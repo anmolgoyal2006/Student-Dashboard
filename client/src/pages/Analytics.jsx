@@ -70,15 +70,15 @@ export default function Analytics() {
       </div>
 
       {/* Stats row */}
-      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2,1fr)' : 'repeat(5,1fr)', gap: isMobile ? 10 : 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(3,1fr)' : 'repeat(5,1fr)', gap: isMobile ? 8 : 14 }}>
         {statCards.map(s => (
-          <div key={s.label} style={{ ...card(isMobile), display: 'flex', flexDirection: 'column', alignItems: 'center', padding: isMobile ? '12px 8px' : '18px 12px', gap: isMobile ? 4 : 6 }}>
-            <div style={{ width: isMobile ? 30 : 36, height: isMobile ? 30 : 36, borderRadius: '50%', background: 'rgba(99,102,241,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <s.icon size={isMobile ? 14 : 16} color={s.color} />
+          <div key={s.label} style={{ ...card(isMobile), display: 'flex', flexDirection: 'column', alignItems: 'center', padding: isMobile ? '10px 4px' : '18px 12px', gap: isMobile ? 3 : 6 }}>
+            <div style={{ width: isMobile ? 26 : 36, height: isMobile ? 26 : 36, borderRadius: '50%', background: 'rgba(99,102,241,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <s.icon size={isMobile ? 12 : 16} color={s.color} />
             </div>
-            <div style={{ fontSize: isMobile ? 18 : 22, fontWeight: 700, color: s.color, lineHeight: 1, fontVariantNumeric: 'tabular-nums', textAlign: 'center', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={s.value}>{s.value}</div>
-            <div style={{ fontSize: isMobile ? 9 : 10.5, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 500, textAlign: 'center' }}>{s.label}</div>
-            {s.sub && <div style={{ fontSize: isMobile ? 9 : 10, color: '#64748b', marginTop: -2 }}>{s.sub}</div>}
+            <div style={{ fontSize: isMobile ? 15 : 22, fontWeight: 700, color: s.color, lineHeight: 1.2, fontVariantNumeric: 'tabular-nums', textAlign: 'center', width: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '0 2px' }} title={s.value}>{s.value}</div>
+            <div style={{ fontSize: isMobile ? 8 : 10.5, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.02em', fontWeight: 500, textAlign: 'center', lineHeight: 1.2 }}>{s.label}</div>
+            {s.sub && <div style={{ fontSize: isMobile ? 8 : 10, color: '#64748b', marginTop: -1, lineHeight: 1.1 }}>{s.sub}</div>}
           </div>
         ))}
       </div>

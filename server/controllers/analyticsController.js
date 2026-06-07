@@ -31,8 +31,10 @@ exports.getAnalytics = async (req, res) => {
     // ── Most demanding subject ──
     const subjectCounts = {};
     dataSource.forEach(a => {
-      const name = a.courseName || a.subject || 'Unknown';
-      subjectCounts[name] = (subjectCounts[name] || 0) + 1;
+      const name = a.courseName || a.subject;
+      if (name && name !== 'Unknown' && name !== 'unknown') {
+        subjectCounts[name] = (subjectCounts[name] || 0) + 1;
+      }
     });
     const mostDemanding = Object.entries(subjectCounts)
       .sort((a, b) => b[1] - a[1])
