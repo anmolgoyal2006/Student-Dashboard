@@ -4,12 +4,12 @@ import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, AreaChart, Area, X
 import { BarChart3, Clock, CheckCircle, AlertTriangle, BookOpen, TrendingUp, Target } from 'lucide-react';
 import useResponsive from '../utils/useResponsive';
 
-const card = {
+const card = (isMobile) => ({
   background: '#13161f',
   border: '1px solid rgba(255,255,255,0.07)',
   borderRadius: 14,
-  padding: '20px 22px',
-};
+  padding: isMobile ? '14px 14px' : '20px 22px',
+});
 
 const tooltipStyle = {
   background: '#0d0f17',
@@ -33,8 +33,8 @@ export default function Analytics() {
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-        <div style={{ height: 28, width: 200, background: 'rgba(255,255,255,0.05)', borderRadius: 6 }} />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? 14 : 20 }}>
+        <div style={{ height: 28, width: isMobile ? 140 : 200, background: 'rgba(255,255,255,0.05)', borderRadius: 6 }} />
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2,1fr)' : 'repeat(4,1fr)', gap: 14 }}>
           {[1,2,3,4].map(i => <div key={i} style={{ height: 100, background: 'rgba(255,255,255,0.03)', borderRadius: 14 }} />)}
         </div>
@@ -60,25 +60,25 @@ export default function Analytics() {
   ];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? 14 : 20, padding: isMobile ? '0 2px' : 0 }}>
       <div>
-        <h1 style={{ margin: 0, fontSize: 20, fontWeight: 600, color: '#f1f5f9', letterSpacing: '-0.3px' }}>
-          <BarChart3 size={20} style={{ display: 'inline', marginRight: 8, color: '#6366f1', verticalAlign: -2 }} />
+        <h1 style={{ margin: 0, fontSize: isMobile ? 18 : 20, fontWeight: 600, color: '#f1f5f9', letterSpacing: '-0.3px' }}>
+          <BarChart3 size={isMobile ? 18 : 20} style={{ display: 'inline', marginRight: 8, color: '#6366f1', verticalAlign: -2 }} />
           Analytics
         </h1>
-        <p style={{ margin: '4px 0 0', fontSize: 13, color: '#64748b' }}>Assignment trends, workload distribution, and productivity insights</p>
+        <p style={{ margin: '4px 0 0', fontSize: isMobile ? 12 : 13, color: '#64748b' }}>Assignment trends, workload distribution, and productivity insights</p>
       </div>
 
       {/* Stats row */}
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2,1fr)' : 'repeat(5,1fr)', gap: isMobile ? 10 : 14 }}>
         {statCards.map(s => (
-          <div key={s.label} style={{ ...card, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '18px 12px', gap: 6 }}>
-            <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(99,102,241,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <s.icon size={16} color={s.color} />
+          <div key={s.label} style={{ ...card(isMobile), display: 'flex', flexDirection: 'column', alignItems: 'center', padding: isMobile ? '12px 8px' : '18px 12px', gap: isMobile ? 4 : 6 }}>
+            <div style={{ width: isMobile ? 30 : 36, height: isMobile ? 30 : 36, borderRadius: '50%', background: 'rgba(99,102,241,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <s.icon size={isMobile ? 14 : 16} color={s.color} />
             </div>
-            <div style={{ fontSize: 22, fontWeight: 700, color: s.color, lineHeight: 1, fontVariantNumeric: 'tabular-nums', textAlign: 'center', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={s.value}>{s.value}</div>
-            <div style={{ fontSize: 10.5, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 500, textAlign: 'center' }}>{s.label}</div>
-            {s.sub && <div style={{ fontSize: 10, color: '#64748b', marginTop: -2 }}>{s.sub}</div>}
+            <div style={{ fontSize: isMobile ? 18 : 22, fontWeight: 700, color: s.color, lineHeight: 1, fontVariantNumeric: 'tabular-nums', textAlign: 'center', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={s.value}>{s.value}</div>
+            <div style={{ fontSize: isMobile ? 9 : 10.5, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 500, textAlign: 'center' }}>{s.label}</div>
+            {s.sub && <div style={{ fontSize: isMobile ? 9 : 10, color: '#64748b', marginTop: -2 }}>{s.sub}</div>}
           </div>
         ))}
       </div>
@@ -86,7 +86,7 @@ export default function Analytics() {
       {/* Charts row */}
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: isMobile ? 12 : 16 }}>
         {/* Weekly completion trend */}
-        <div style={card}>
+        <div style={card(isMobile)}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
             <TrendingUp size={16} color="#6366f1" />
             <span style={{ fontSize: isMobile ? 13 : 14, fontWeight: 600, color: '#e2e8f0' }}>Weekly Completion Trend</span>
@@ -105,7 +105,7 @@ export default function Analytics() {
         </div>
 
         {/* Subject workload distribution */}
-        <div style={card}>
+        <div style={card(isMobile)}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
             <BookOpen size={16} color="#818cf8" />
             <span style={{ fontSize: isMobile ? 13 : 14, fontWeight: 600, color: '#e2e8f0' }}>Subject Workload</span>
@@ -138,7 +138,7 @@ export default function Analytics() {
       {/* Second row */}
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: isMobile ? 12 : 16 }}>
         {/* Deadline timeline */}
-        <div style={card}>
+        <div style={card(isMobile)}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
             <Clock size={16} color="#f59e0b" />
             <span style={{ fontSize: isMobile ? 13 : 14, fontWeight: 600, color: '#e2e8f0' }}>Deadline Timeline</span>
@@ -159,7 +159,7 @@ export default function Analytics() {
         </div>
 
         {/* Weekly productivity */}
-        <div style={card}>
+        <div style={card(isMobile)}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
             <TrendingUp size={16} color="#22c55e" />
             <span style={{ fontSize: isMobile ? 13 : 14, fontWeight: 600, color: '#e2e8f0' }}>Weekly Productivity</span>
@@ -178,12 +178,12 @@ export default function Analytics() {
 
       {/* At-risk subjects */}
       {atRiskSubjects.length > 0 && (
-        <div style={card}>
+        <div style={card(isMobile)}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
             <AlertTriangle size={16} color="#ef4444" />
             <span style={{ fontSize: 14, fontWeight: 600, color: '#e2e8f0' }}>Attendance Risk Subjects</span>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 10 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(${isMobile ? '140px' : '200px'}, 1fr))`, gap: isMobile ? 8 : 10 }}>
             {atRiskSubjects.map(s => (
               <div key={s.subject} style={{
                 padding: '10px 14px', borderRadius: 10,
