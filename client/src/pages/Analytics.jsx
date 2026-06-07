@@ -110,13 +110,13 @@ export default function Analytics() {
             <BookOpen size={16} color="#818cf8" />
             <span style={{ fontSize: isMobile ? 13 : 14, fontWeight: 600, color: '#e2e8f0' }}>Subject Workload</span>
           </div>
-          <ResponsiveContainer width="100%" height={isMobile ? 280 : 260}>
-            <PieChart>
-              <Pie
-                data={charts.subjectWorkload}
-                cx="50%" cy="50%"
-                outerRadius={isMobile ? 80 : 80}
-                innerRadius={isMobile ? 40 : 45}
+        <ResponsiveContainer width="100%" height={isMobile ? 320 : 260}>
+          <PieChart width={isMobile ? 300 : 400} height={isMobile ? 320 : 260}>
+            <Pie
+              data={charts.subjectWorkload}
+              cx="50%" cy="42%"
+              outerRadius={isMobile ? 85 : 80}
+              innerRadius={isMobile ? 42 : 45}
                 dataKey="assignments"
                 nameKey="subject"
                 label={false}
