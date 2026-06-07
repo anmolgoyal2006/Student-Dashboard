@@ -23,7 +23,16 @@ async function withRetry(fn, retries = 3, delayMs = 2000) {
 // Ensure base URL always includes /api (avoids "Route not found" on misconfigured .env)
 function resolveApiBaseUrl() {
   const raw = (process.env.REACT_APP_API_URL || 'http://localhost:5000/api').trim().replace(/\/$/, '');
-  return raw.endsWith('/api') ? raw : `${raw}/api`;
+  const url = raw.endsWith('/api') ? raw : `${raw}/api`;
+  // Auto-detect: if running on a different host (e.g. mobile via laptop IP), swap the hostname
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname === 'localhost' && typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+      parsed.hostname = window.location.hostname;
+      return parsed.toString().replace(/\/$/, '');
+    }
+  } catch {}
+  return url;
 }
 
 // ─── Axios instance ─────────────────────────────────────────────────────────
