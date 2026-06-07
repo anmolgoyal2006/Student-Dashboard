@@ -110,13 +110,13 @@ export default function Analytics() {
             <BookOpen size={16} color="#818cf8" />
             <span style={{ fontSize: isMobile ? 13 : 14, fontWeight: 600, color: '#e2e8f0' }}>Subject Workload</span>
           </div>
-          <ResponsiveContainer width="100%" height={isMobile ? 200 : 260}>
+          <ResponsiveContainer width="100%" height={isMobile ? 250 : 260}>
             <PieChart>
               <Pie
                 data={charts.subjectWorkload}
-                cx="50%" cy="45%"
-                outerRadius={isMobile ? 60 : 80}
-                innerRadius={isMobile ? 30 : 45}
+                cx="50%" cy={isMobile ? "40%" : "45%"}
+                outerRadius={isMobile ? 70 : 80}
+                innerRadius={isMobile ? 35 : 45}
                 dataKey="assignments"
                 nameKey="subject"
                 label={false}
@@ -126,7 +126,7 @@ export default function Analytics() {
                 ))}
               </Pie>
               <Tooltip contentStyle={tooltipStyle} formatter={(value, name, props) => [value, props.payload.subject]} />
-              <Legend wrapperStyle={{ fontSize: isMobile ? 10 : 11, color: '#94a3b8' }} formatter={(value) => {
+              <Legend verticalAlign="bottom" wrapperStyle={{ fontSize: isMobile ? 9 : 11, color: '#94a3b8', paddingTop: 8 }} formatter={(value) => {
                 const item = charts.subjectWorkload.find(s => s.subject === value);
                 return `${value} (${item ? item.assignments : 0})`;
               }} />
