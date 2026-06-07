@@ -620,8 +620,10 @@ export default function Scheduler() {
                         <td>
                           <div style={{ fontWeight: 600, color: isOverdue ? 'var(--color-danger)' : 'var(--text)', fontSize: 13 }}>
                             {task.title}
-                            {isOverdue && <span style={{ fontSize: 10, marginLeft: 6, color: 'var(--color-danger)' }}>OVERDUE</span>}
                           </div>
+                          {isOverdue && (
+                            <span style={{ fontSize: 10, color: 'var(--color-danger)', fontWeight: 600, display: 'inline-block', marginTop: 2 }}>⚠ OVERDUE</span>
+                          )}
                           {task.description && (
                             <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{task.description}</div>
                           )}
