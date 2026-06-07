@@ -5,8 +5,8 @@ const jwt           = require('jsonwebtoken');
 const User          = require('../models/User');
 
 passport.use(new GoogleStrategy({
-  clientID:     process.env.GOOGLE_CLIENT_ID,
-  clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+  clientID:     process.env.GOOGLE_AUTH_CLIENT_ID,
+  clientSecret: process.env.GOOGLE_AUTH_CLIENT_SECRET,
   callbackURL: process.env.NODE_ENV === 'production'
   ? 'https://student-dashboard-irm9.onrender.com/auth/google/callback'
   : 'http://localhost:5000/auth/google/callback'
