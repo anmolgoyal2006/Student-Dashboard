@@ -14,6 +14,7 @@ const RISK_CONFIG = {
 
 /* ─── Priority → accent colour ─────────────────────────────────────── */
 const PRIORITY_COLOR = {
+  critical:'var(--color-danger)',
   high:   'var(--color-danger)',
   medium: 'var(--color-warning)',
   low:    'var(--color-accent)',

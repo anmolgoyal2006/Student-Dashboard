@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { LayoutDashboard, Calendar, CheckSquare, BarChart3, Rocket, Clock, User, Bot, LineChart, Users, ChevronLeft, ChevronRight, LogOut, GraduationCap, Menu, X } from 'lucide-react';
+import { LayoutDashboard, Calendar, CheckSquare, BarChart3, Rocket, Clock, User, Bot, LineChart, Users, ChevronLeft, ChevronRight, LogOut, GraduationCap, Menu, X, TrendingUp } from 'lucide-react';
 
 const baseLinks = [
   { to: '/',             label: 'Dashboard',    icon: LayoutDashboard },
@@ -13,6 +13,7 @@ const baseLinks = [
   { to: '/profile',      label: 'Profile',      icon: User },
   { to: '/ai-assistant', label: 'AI Assistant', icon: Bot },
   { to: '/prediction',   label: 'Predictor',    icon: LineChart },
+  { to: '/analytics',    label: 'Analytics',    icon: TrendingUp },
 ];
 
 export default function Sidebar() {

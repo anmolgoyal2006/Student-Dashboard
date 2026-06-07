@@ -3,9 +3,11 @@ import { taskService, subjectService } from '../services/apiServices';
 import toast from '../context/ToastContext';
 import EmptyState from '../components/EmptyState';
 import { CardSkeleton, StatsSkeleton } from '../components/Skeleton';
+import ClassroomConnect from '../components/ClassroomConnect';
 import { Calendar, Clock, ListTodo, Play, AlertTriangle, Edit3, Plus, Trash2, ClipboardList, BookOpen, Rocket, RefreshCw, Pin } from 'lucide-react';
 
 const PRIORITY_COLOR = {
+  critical:{ bg: 'rgba(239,68,68,0.15)',  border: 'rgba(239,68,68,0.4)',   text: 'var(--color-danger)', badge: 'badge-danger'  },
   high:   { bg: 'rgba(248,113,113,0.12)', border: 'rgba(248,113,113,0.35)', text: 'var(--color-danger)', badge: 'badge-danger'  },
   medium: { bg: 'rgba(251,191,36,0.12)',  border: 'rgba(251,191,36,0.35)',  text: 'var(--color-warning)', badge: 'badge-warning' },
   low:    { bg: 'rgba(52,211,153,0.12)',  border: 'rgba(52,211,153,0.35)',  text: 'var(--color-success)', badge: 'badge-success' },
@@ -195,6 +197,11 @@ export default function Scheduler() {
           <p className="page-subtitle">Manage tasks, deadlines and your weekly plan</p>
         </div>
         <button className="btn btn-primary" onClick={openAdd}>+ Add Task</button>
+      </div>
+
+      {/* ── Google Classroom ── */}
+      <div style={{ marginBottom: 16 }}>
+        <ClassroomConnect />
       </div>
 
       {/* ── Stat row ── */}
@@ -394,6 +401,7 @@ export default function Scheduler() {
             >
               <option value="">All Priority</option>
               <option value="high">High</option>
+              <option value="critical">Critical</option>
               <option value="medium">Medium</option>
               <option value="low">Low</option>
             </select>

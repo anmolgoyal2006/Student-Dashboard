@@ -1,0 +1,122 @@
+const cron = require('node-cron');
+const ClassroomAssignment = require('../models/ClassroomAssignment');
+const Task = require('../models/Task');
+const Attendance = require('../models/Attendance');
+const User = require('../models/User');
+const { sendDigestNotification } = require('../services/notificationEngine');
+
+async function sendDailyDigest() {
+  try {
+    const users = await User.find({ role: 'student' }).select('_id').lean();
+
+    for (const u of users) {
+      const userId = u._id;
+
+      const pendingAssignments = await ClassroomAssignment.countDocuments({
+        userId, status: { $in: ['assigned', 'missing'] },
+      });
+
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(23, 59, 59, 999);
+
+      const dueTomorrow = await ClassroomAssignment.countDocuments({
+        userId, status: { $in: ['assigned', 'missing'] },
+        dueDate: { $lte: tomorrow },
+      });
+
+      const todaySessions = await Task.countDocuments({
+        user: userId,
+        dueDate: {
+          $gte: new Date(new Date().toISOString().slice(0, 10)),
+          $lte: new Date(new Date().toISOString().slice(0, 10) + 'T23:59:59.999Z'),
+        },
+      });
+
+      const highestPriority = await ClassroomAssignment.findOne({
+        userId, status: { $in: ['assigned', 'missing'] },
+        priority: 'CRITICAL',
+      }).sort({ dueDate: 1 }).lean();
+
+      const title = '📅 StudentAI Daily Summary';
+      const body = [
+        `Pending Assignments: ${pendingAssignments}`,
+        `Due Tomorrow: ${dueTomorrow}`,
+        `Today's Study Sessions: ${todaySessions}`,
+        highestPriority ? `Highest Priority: ${highestPriority.title}` : '',
+      ].filter(Boolean).join('\n');
+
+      await sendDigestNotification(userId, title, body);
+    }
+
+    console.log('[Digest] Daily digest sent.');
+  } catch (err) {
+    console.error('[DailyDigest]', err.message);
+  }
+}
+
+async function sendWeeklyDigest() {
+  try {
+    const users = await User.find({ role: 'student' }).select('_id').lean();
+
+    for (const u of users) {
+      const userId = u._id;
+
+      const weekEnd = new Date();
+      weekEnd.setDate(weekEnd.getDate() + 7);
+      weekEnd.setHours(23, 59, 59, 999);
+
+      const dueThisWeek = await ClassroomAssignment.countDocuments({
+        userId, status: { $in: ['assigned', 'missing'] },
+        dueDate: { $lte: weekEnd },
+      });
+
+      const subjectsAtRisk = await Attendance.aggregate([
+        { $match: { userId: userId } },
+        { $lookup: { from: 'subjects', localField: 'subjectId', foreignField: '_id', as: 'subject' } },
+        { $unwind: { path: '$subject', preserveNullAndEmptyArrays: true } },
+        { $group: { _id: '$subject.name', total: { $sum: 1 }, present: { $sum: { $cond: [{ $eq: ['$status', 'present'] }, 1, 0] } } } },
+        { $addFields: { pct: { $multiply: [{ $divide: ['$present', { $max: ['$total', 1] }] }, 100] } } },
+        { $match: { pct: { $lt: 75 } } },
+      ]);
+
+      const placementSessions = await Task.countDocuments({
+        user: userId,
+        type: 'placement',
+        dueDate: { $lte: weekEnd },
+      });
+
+      const title = '🤖 Weekly Academic Plan Ready';
+      const body = [
+        `Assignments Due This Week: ${dueThisWeek}`,
+        `Subjects At Risk: ${subjectsAtRisk.length}`,
+        `Placement Sessions Planned: ${placementSessions}`,
+        'Tap to view your full roadmap.',
+      ].join('\n');
+
+      await sendDigestNotification(userId, title, body);
+    }
+
+    console.log('[Digest] Weekly digest sent.');
+  } catch (err) {
+    console.error('[WeeklyDigest]', err.message);
+  }
+}
+
+function startDigestJobs() {
+  // Daily at 6 PM
+  cron.schedule('0 18 * * *', () => {
+    console.log('[Cron] Sending daily digest...');
+    sendDailyDigest();
+  }, { timezone: 'Asia/Kolkata' });
+
+  // Every Sunday at 10 AM
+  cron.schedule('0 10 * * 0', () => {
+    console.log('[Cron] Sending weekly digest...');
+    sendWeeklyDigest();
+  }, { timezone: 'Asia/Kolkata' });
+
+  console.log('[Cron] Digest jobs scheduled.');
+}
+
+module.exports = { startDigestJobs, sendDailyDigest, sendWeeklyDigest };

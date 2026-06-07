@@ -2,7 +2,10 @@ const express  = require('express');
 const cors     = require('cors');
 const mongoose = require('mongoose');
 require('dotenv').config({ path: require('path').join(__dirname, '.env') });
-const { sendTodayNotifications } = require('./services/notificationService');
+const { startDailyNotificationJob } = require('./jobs/dailyNotificationJob');
+const { startClassroomSyncJob } = require('./jobs/classroomSyncJob');
+const { startNotificationJobs } = require('./jobs/notificationSyncJob');
+const { startDigestJobs } = require('./jobs/digestJobs');
 
 const app = express();
 
@@ -13,7 +16,6 @@ const passport = require('./config/passport');
 app.use(passport.initialize());
 
 // ─── Jobs ─────────────────────────────────────────────────────────────────
-const { startDailyNotificationJob } = require('./jobs/dailyNotificationJob'); // ← ADDED
 
 // REPLACE WITH:
 const allowedOrigins = [
@@ -86,11 +88,15 @@ app.use('/api/decision',        require('./routes/decisionRoutes'));
 app.use('/api/predict',         require('./routes/predictionRoutes'));
 app.use('/api/ai-command',      require('./routes/aiCommandRoutes'));
 app.use('/api/admin',           require('./routes/adminRoutes'));
+app.use('/api/classroom',       require('./routes/classroomRoutes'));
+app.use('/api/analytics',       require('./routes/analyticsRoutes'));
+app.use('/api',                 require('./routes/riskRoutes'));
 
 
 // 🔥 ADD HERE
 app.get('/api/test-notification', async (req, res) => {
   try {
+    const { sendTodayNotifications } = require('./services/notificationService');
     await sendTodayNotifications();
     res.json({ message: 'Test notification triggered' });
   } catch (err) {
@@ -137,6 +143,9 @@ mongoose.connect(process.env.MONGO_URI, {
       .then(() => console.log('[Index] Dropped stale attendance index userId_1_subjectId_1_date_1'))
       .catch(() => {}); // ignore if already gone
     startDailyNotificationJob();
+    startClassroomSyncJob();
+    startNotificationJobs();
+    startDigestJobs();
     startServer();
   })
   .catch((err) => {

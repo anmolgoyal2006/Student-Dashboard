@@ -5,6 +5,7 @@ const { protect } = require('../middleware/authMiddleware');
 const {
   chat, uploadNotes, getNotes, deleteNote, transcribeVoice
 } = require('../controllers/aiChatController');
+const { generatePlan } = require('../controllers/studyPlannerController');
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -52,5 +53,6 @@ router.post('/upload',            handleUpload, uploadNotes);
 router.post('/transcribe',        handleUpload, transcribeVoice);
 router.get ('/notes',             getNotes);
 router.delete('/notes/:filename', deleteNote);
+router.post('/generate-study-plan', generatePlan);
 
 module.exports = router;

@@ -17,6 +17,7 @@ import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword  from './pages/ResetPassword';
 import AIAssistant from './pages/AIAssistant';
 import Prediction from './pages/Prediction';
+import Analytics from './pages/Analytics';
 import AttendancePrompt from './components/AttendancePrompt';
 import AdminPanel from './pages/AdminPanel';
 import LoginSuccess from './pages/LoginSuccess';
@@ -162,6 +163,9 @@ export default function App() {
           } />
           <Route path="/admin" element={
             <ProtectedRoute><AppLayout><AdminPanel /></AppLayout></ProtectedRoute>
+          } />
+          <Route path="/analytics" element={
+            <ProtectedRoute><AppLayout><Analytics /></AppLayout></ProtectedRoute>
           } />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

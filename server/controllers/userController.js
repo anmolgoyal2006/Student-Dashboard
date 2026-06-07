@@ -167,13 +167,18 @@ exports.resetPassword = async (req, res) => {
 
 exports.saveToken = async (req, res) => {
   try {
-    console.log("👉 BODY:", req.body);     // ✅ ADD THIS
-  console.log("👉 USER:", req.user);     // ✅ ADD THIS
-
     const { token } = req.body;
     if (!token) return res.status(400).json({ message: 'Token required' });
 
     await User.findByIdAndUpdate(req.user._id, { fcmToken: token });
+
+    const NotificationToken = require('../models/NotificationToken');
+    await NotificationToken.findOneAndUpdate(
+      { userId: req.user._id, token },
+      { userId: req.user._id, token, platform: 'web', lastSeen: new Date() },
+      { upsert: true, new: true }
+    );
+
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ message: 'Failed to save token' });

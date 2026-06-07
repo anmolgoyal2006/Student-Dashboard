@@ -9,6 +9,9 @@ import { Target, BookOpen, AlertTriangle, Bot, Bell, GraduationCap, Clock } from
 import { attendanceService, marksService, aiService, notificationService, subjectService } from '../services/apiServices';
 import { useAuth } from '../context/AuthContext';
 import SmartPlanCard from '../components/SmartPlanCard';
+import UpcomingDeadlines from '../components/UpcomingDeadlines';
+import RiskAlertsCard from '../components/RiskAlertsCard';
+import ClassroomConnect from '../components/ClassroomConnect';
 import EmptyState from '../components/EmptyState';
 import Skeleton, { StatsSkeleton } from '../components/Skeleton';
 
@@ -626,6 +629,13 @@ export default function Dashboard() {
             : <EmptyState title="All Caught Up" subtitle="No new notifications at this time." />
           }
         </div>
+      </div>
+
+      {/* ── Classroom + Deadlines + Risks ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+        <UpcomingDeadlines />
+        <RiskAlertsCard />
+        <ClassroomConnect />
       </div>
 
       {/* ── Smart Study Plan ── */}
