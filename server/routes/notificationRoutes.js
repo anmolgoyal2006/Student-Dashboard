@@ -46,6 +46,25 @@ router.patch('/:id/read', protect, async (req, res) => {
   }
 });
 
+// ── POST /notifications/test ────────────────────────────────────────────
+// Sends a test push notification to verify Firebase + FCM are working.
+const { sendNotification } = require('../services/notificationEngine');
+
+router.post('/test', protect, async (req, res) => {
+  try {
+    const result = await sendNotification(
+      req.user._id,
+      '🔔 Test Notification',
+      'This is a test notification sent from the dashboard.',
+      { type: 'TEST' }
+    );
+    res.json(result);
+  } catch (err) {
+    console.error('[Notifications] POST /test error:', err.message);
+    res.status(500).json({ message: 'Server error sending test notification', error: err.message });
+  }
+});
+
 // ── PATCH /notifications/read-all ────────────────────────────────────────
 // Mark ALL notifications as read in one click.
 router.patch('/read-all', protect, async (req, res) => {

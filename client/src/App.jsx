@@ -97,22 +97,22 @@ export default function App() {
       const { title, body } = payload?.notification || {};
       const data = payload?.data || {};
 
-      if (Notification.permission === 'granted' && data.subjectId) {
+      if (Notification.permission === 'granted') {
         navigator.serviceWorker.ready.then(reg => {
-          reg.showNotification(title || 'Attendance', {
-            body: body || 'Mark your attendance',
+          reg.showNotification(title || 'StudentAI', {
+            body: body || '',
             icon: '/logo192.png',
             badge: '/logo192.png',
             data: {
-              subjectId: data.subjectId,
-              date: data.date,
-              url: `/?markAttendance=1&subjectId=${data.subjectId}&date=${data.date}`,
+              subjectId: data.subjectId || '',
+              date: data.date || '',
+              url: data.url || '/',
             },
-            actions: [
+            actions: data.subjectId ? [
               { action: 'attended',     title: '✅ Attended'    },
               { action: 'not_attended', title: '❌ Not Attended' },
               { action: 'not_held',     title: '⏸ Not Held'     },
-            ],
+            ] : [],
           });
         });
       } else if (title || body) {

@@ -122,6 +122,7 @@ export const aiService = {
 // ─── Notifications ────────────────────────────────────────────────────────
 export const notificationService = {
   getAll: () => apiRequest('get', '/notifications'),
+  sendTest: () => apiRequest('post', '/notifications/test'),
 };
 
 // ─── Tasks / Scheduler ───────────────────────────────────────────────────

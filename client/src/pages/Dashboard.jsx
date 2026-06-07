@@ -7,6 +7,7 @@ import {
 } from 'chart.js';
 import { Target, BookOpen, AlertTriangle, Bot, Bell, GraduationCap, Clock } from 'lucide-react';
 import { attendanceService, marksService, aiService, notificationService, subjectService } from '../services/apiServices';
+import toast from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
 import SmartPlanCard from '../components/SmartPlanCard';
 import UpcomingDeadlines from '../components/UpcomingDeadlines';
@@ -54,6 +55,7 @@ export default function Dashboard() {
   const [subjectCount, setSubjectCount] = useState(0);
   const [loading,      setLoading]      = useState(true);
   const [classSummary, setClassSummary] = useState([]);
+  const [testLoading, setTestLoading] = useState(false);
 
   useEffect(() => {
     const isTeacher = user?.role === 'teacher';
@@ -607,8 +609,75 @@ export default function Dashboard() {
 
         {/* Notifications */}
         <div style={{ ...card }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 14, fontWeight: 600, color: '#e2e8f0', marginBottom: 16 }}>
-            <Bell size={16} color="#6366f1" /> Notifications
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 14, fontWeight: 600, color: '#e2e8f0' }}>
+              <Bell size={16} color="#6366f1" /> Notifications
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={async () => {
+                  if (Notification.permission !== 'granted') {
+                    toast.error('Notification permission not granted. Allow notifications in your browser settings.');
+                    return;
+                  }
+                  try {
+                    const reg = await navigator.serviceWorker.ready;
+                    await reg.showNotification('🔔 Test Notification', {
+                      body: 'This is a local test notification from StudentAI',
+                      icon: '/logo192.png',
+                      badge: '/logo192.png',
+                      requireInteraction: true,
+                      tag: 'test-' + Date.now(),
+                    });
+                    toast.success('Local notification shown!');
+                  } catch (err) {
+                    toast.error('Notification failed: ' + err.message);
+                  }
+                }}
+                style={{
+                  background: '#374151',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: 8,
+                  padding: '6px 14px',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Local Test
+              </button>
+              <button
+                onClick={async () => {
+                  setTestLoading(true);
+                  try {
+                    await notificationService.sendTest();
+                    toast.success('Test notification sent! Check your system notifications.');
+                  } catch (err) {
+                    toast.error('Failed to send test notification');
+                  } finally {
+                    setTestLoading(false);
+                  }
+                }}
+                disabled={testLoading}
+                style={{
+                  background: testLoading ? '#374151' : '#6366f1',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: 8,
+                  padding: '6px 14px',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: testLoading ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  opacity: testLoading ? 0.6 : 1,
+                }}
+              >
+                {testLoading ? 'Sending...' : 'FCM Test'}
+              </button>
+            </div>
           </div>
 
           {notifs.length > 0
