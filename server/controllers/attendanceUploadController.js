@@ -330,10 +330,13 @@ const getAttendanceBySid = async (req, res) => {
       total:   records.length,
       summary,
       records: records.map(r => ({
-        date:    r.date,
-        status:  r.status,
-        subject: r.subjectId?.name || 'Unknown',
-        code:    r.subjectId?.code || '',
+        date:      r.date,
+        status:    r.status,
+        subject:   r.subjectId?.name || 'Unknown',
+        code:      r.subjectId?.code || '',
+        subjectId: r.subjectId?._id?.toString() || null,
+        slot:      r.slot || null,
+        time:      r.time || null,
       })),
     });
 

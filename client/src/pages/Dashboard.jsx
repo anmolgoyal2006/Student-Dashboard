@@ -5,7 +5,7 @@ import {
   Chart as ChartJS, CategoryScale, LinearScale,
   BarElement, ArcElement, Tooltip, Legend
 } from 'chart.js';
-import { Target, CheckCircle, BookOpen, AlertTriangle, Bot, Bell, GraduationCap } from 'lucide-react';
+import { Target, BookOpen, AlertTriangle, Bot, Bell, GraduationCap, Clock } from 'lucide-react';
 import { attendanceService, marksService, aiService, notificationService, subjectService } from '../services/apiServices';
 import { useAuth } from '../context/AuthContext';
 import SmartPlanCard from '../components/SmartPlanCard';
@@ -27,14 +27,6 @@ const getCgpaColor = (val) => {
   const n = parseFloat(val);
   if (n > 8)  return '#22c55e';
   if (n >= 6) return '#f59e0b';
-  return '#ef4444';
-};
-
-const getAttColor = (val) => {
-  if (val === '—' || val == null) return '#94a3b8';
-  const n = parseFloat(val);
-  if (n > 75) return '#22c55e';
-  if (n >= 50) return '#f59e0b';
   return '#ef4444';
 };
 
@@ -86,14 +78,7 @@ export default function Dashboard() {
   /* ── derived values ────────────────────────────────────────────────────── */
   const isStudent = user?.role !== 'teacher';
 
-  const overallAttendance = summary.length
-    ? (summary.reduce((s, i) => s + parseFloat(i.percentage || 0), 0) / summary.length).toFixed(1)
-    : 0;
-
   const classSummaryList = classSummary || [];
-  const classAvgAttendance = classSummaryList.length
-    ? (classSummaryList.reduce((acc, s) => acc + parseFloat(s.overall || 0), 0) / classSummaryList.length).toFixed(1)
-    : 0;
 
   const subjectAverages = {};
   classSummaryList.forEach(student =>
@@ -108,7 +93,6 @@ export default function Dashboard() {
     (subjectAverages[l].sum / subjectAverages[l].count).toFixed(1)
   );
 
-  const attVal  = isStudent ? overallAttendance : classAvgAttendance;
   const lowCnt  = isStudent
     ? summary.filter(s => s.isLow).length
     : classSummaryList.filter(s => parseFloat(s.overall || 0) < 75).length;
@@ -126,6 +110,8 @@ export default function Dashboard() {
     ? `Today · ${todayClasses.length} class${todayClasses.length > 1 ? 'es' : ''}: ${todayClasses.map(c => c.name).join(', ')}`
     : 'No classes scheduled for today';
 
+  const totalToday = todayClasses.length;
+
   /* ── stat cards ────────────────────────────────────────────────────────── */
   const stats = [
     { label: 'CGPA',
@@ -133,10 +119,10 @@ export default function Dashboard() {
       icon: Target,
       color: getCgpaColor(cgpa),
       accent: true },
-    { label: isStudent ? 'Attendance' : 'Class Attendance',
-      value: `${attVal}%`,
-      icon: CheckCircle,
-      color: getAttColor(attVal) },
+    { label: 'CLASSES TODAY',
+      value: totalToday,
+      icon: Clock,
+      color: totalToday > 0 ? '#6366f1' : '#64748b' },
     { label: 'Subjects',
       value: subjectCount,
       icon: BookOpen,
@@ -417,6 +403,11 @@ export default function Dashboard() {
               <div style={{ fontSize: 30, fontWeight: 700, color: stat.color, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
                 {stat.value}
               </div>
+              {stat.subLabel && (
+                <div style={{ fontSize: 11, color: stat.color, fontWeight: 500, marginTop: -4 }}>
+                  {stat.subLabel}
+                </div>
+              )}
               <div style={{ fontSize: 11.5, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 500 }}>
                 {stat.label}
               </div>

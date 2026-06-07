@@ -162,46 +162,30 @@ export default function TodayScheduleCard({ todayClasses, existingRecords, onQui
                     {cls.code && <span className="ts-code-badge">{cls.code}</span>}
                   </div>
                   <div className="ts-action-col">
-                    {status ? (
-                      <span
-                        className="ts-status-badge"
-                        style={{
-                          background: status === 'present' ? 'var(--color-success-muted)' : 'var(--color-danger-muted)',
-                          color: status === 'present' ? 'var(--color-success)' : 'var(--color-danger)',
-                          border: `1px solid ${status === 'present' ? 'var(--color-success-muted)' : 'var(--color-danger-muted)'}`,
-                        }}
-                      >
-                        <span className="ts-status-dot" style={{ background: status === 'present' ? 'var(--color-success)' : 'var(--color-danger)' }} />
-                        {status === 'present' ? 'Present' : 'Absent'}
-                      </span>
-                    ) : (
-                      <>
-                        <button
-                          className="ts-toggle-btn ts-present"
-                          onClick={() => handleMark(cls.subjectId, 'present', slotIndex)}
-                          title="Mark present"
-                          disabled={!!markingSlots[`${cls.subjectId}_${slotIndex}`]}
-                          style={{
-                            opacity: markingSlots[`${cls.subjectId}_${slotIndex}`] ? 0.5 : 1,
-                            cursor: markingSlots[`${cls.subjectId}_${slotIndex}`] ? 'not-allowed' : 'pointer'
-                          }}
-                        >
-                          <Check size={12} strokeWidth={2.5} />
-                        </button>
-                        <button
-                          className="ts-toggle-btn ts-absent"
-                          onClick={() => handleMark(cls.subjectId, 'absent', slotIndex)}
-                          title="Mark absent"
-                          disabled={!!markingSlots[`${cls.subjectId}_${slotIndex}`]}
-                          style={{
-                            opacity: markingSlots[`${cls.subjectId}_${slotIndex}`] ? 0.5 : 1,
-                            cursor: markingSlots[`${cls.subjectId}_${slotIndex}`] ? 'not-allowed' : 'pointer'
-                          }}
-                        >
-                          <X size={12} strokeWidth={2.5} />
-                        </button>
-                      </>
-                    )}
+                    <button
+                      className={`ts-toggle-btn ${status === 'present' ? 'ts-present' : ''}`}
+                      onClick={() => handleMark(cls.subjectId, 'present', slotIndex)}
+                      title={status === 'present' ? 'Already present (click to keep)' : 'Mark present'}
+                      disabled={!!markingSlots[`${cls.subjectId}_${slotIndex}`]}
+                      style={{
+                        opacity: markingSlots[`${cls.subjectId}_${slotIndex}`] ? 0.5 : 1,
+                        cursor: markingSlots[`${cls.subjectId}_${slotIndex}`] ? 'not-allowed' : 'pointer'
+                      }}
+                    >
+                      <Check size={12} strokeWidth={2.5} />
+                    </button>
+                    <button
+                      className={`ts-toggle-btn ${status === 'absent' ? 'ts-absent' : ''}`}
+                      onClick={() => handleMark(cls.subjectId, 'absent', slotIndex)}
+                      title={status === 'absent' ? 'Already absent (click to keep)' : 'Mark absent'}
+                      disabled={!!markingSlots[`${cls.subjectId}_${slotIndex}`]}
+                      style={{
+                        opacity: markingSlots[`${cls.subjectId}_${slotIndex}`] ? 0.5 : 1,
+                        cursor: markingSlots[`${cls.subjectId}_${slotIndex}`] ? 'not-allowed' : 'pointer'
+                      }}
+                    >
+                      <X size={12} strokeWidth={2.5} />
+                    </button>
                   </div>
                 </div>
               );
