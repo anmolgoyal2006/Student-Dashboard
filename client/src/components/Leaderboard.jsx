@@ -95,8 +95,12 @@ export default function Leaderboard({
 }) {
   const [panelExpanded, setPanelExpanded] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [page, setPage] = useState(0);
+  const PAGE_SIZE = 50;
 
   const leaderboard = data?.leaderboard?.[0]?.students || [];
+
+  useEffect(() => { setPage(0); }, [searchQuery, leaderboard.length]);
 
   const filteredLeaderboard = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -107,6 +111,12 @@ export default function Leaderboard({
         (s.roll && String(s.roll).toLowerCase().includes(q))
     );
   }, [leaderboard, searchQuery]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredLeaderboard.length / PAGE_SIZE));
+  const pagedStudents = useMemo(
+    () => filteredLeaderboard.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE),
+    [filteredLeaderboard, page]
+  );
 
   useEffect(() => {
     if (leaderboard.length > 0 && setGradeCounts) {
@@ -498,7 +508,9 @@ export default function Leaderboard({
             </tr>
           </thead>
           <tbody>
-            {filteredLeaderboard.map((s, i) => (
+            {pagedStudents.length === 0 ? (
+              <tr><td colSpan={99} style={{ textAlign: 'center', padding: 24, color: 'var(--muted)' }}>No students found</td></tr>
+            ) : pagedStudents.map((s, i) => (
               <tr
                 key={s.roll || s.name || i}
                 style={{ background: s.rank <= 3 ? 'rgba(250,204,21,0.04)' : 'transparent' }}
@@ -537,6 +549,53 @@ export default function Leaderboard({
           </tbody>
         </table>
       </div>
+
+      {/* ── Pagination ── */}
+      {filteredLeaderboard.length > PAGE_SIZE && (
+        <div style={{
+          display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8,
+          marginTop: 16, flexWrap: 'wrap',
+        }}>
+          <button
+            className="btn btn-outline btn-sm"
+            disabled={page === 0}
+            onClick={() => setPage(p => Math.max(0, p - 1))}
+            style={{ fontSize: 12, padding: '4px 12px' }}
+          >
+            ‹ Prev
+          </button>
+          {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
+            const start = Math.max(0, Math.min(page - 3, totalPages - 7));
+            const pageNum = start + i;
+            if (pageNum >= totalPages) return null;
+            return (
+              <button
+                key={pageNum}
+                className="btn btn-outline btn-sm"
+                style={{
+                  fontSize: 12, padding: '4px 10px', minWidth: 32,
+                  background: page === pageNum ? 'var(--color-accent-muted)' : 'transparent',
+                  border: page === pageNum ? '1px solid rgba(99,102,241,0.4)' : '1px solid var(--border)',
+                }}
+                onClick={() => setPage(pageNum)}
+              >
+                {pageNum + 1}
+              </button>
+            );
+          })}
+          <button
+            className="btn btn-outline btn-sm"
+            disabled={page >= totalPages - 1}
+            onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+            style={{ fontSize: 12, padding: '4px 12px' }}
+          >
+            Next ›
+          </button>
+          <span style={{ fontSize: 11, color: 'var(--muted)' }}>
+            {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, filteredLeaderboard.length)} of {filteredLeaderboard.length}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

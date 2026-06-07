@@ -417,7 +417,7 @@ export default function Marks() {
       )}
 
       {activeTab === 'upload' && (
-        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+        <div className="card" style={{ padding: 0 }}>
           <div style={{ padding: '16px 24px 24px' }}>
             <UploadMarks onResult={() => {}} />
           </div>
