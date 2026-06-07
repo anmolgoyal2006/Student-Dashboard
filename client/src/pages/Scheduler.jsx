@@ -580,6 +580,7 @@ export default function Scheduler() {
               );
             })}
           </div>
+        )}
         </div>
       )}
 
