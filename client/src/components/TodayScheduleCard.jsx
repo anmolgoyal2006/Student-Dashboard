@@ -6,8 +6,8 @@ export default function TodayScheduleCard({ todayClasses, existingRecords, onQui
   const dateStr = todayDate.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' });
   const isoDate = todayDate.toISOString().slice(0, 10);
 
-  const displayClasses = todayClasses?.slice(0, 4) || [];
-  const moreCount = Math.max(0, (todayClasses?.length || 0) - 4);
+  const displayClasses = todayClasses || [];
+  const moreCount = 0;
   const [markingSlots, setMarkingSlots] = useState({});
   const [optimisticMarks, setOptimisticMarks] = useState({});
 
@@ -158,56 +158,47 @@ export default function TodayScheduleCard({ todayClasses, existingRecords, onQui
                     {cls.code && <span className="ts-code-badge">{cls.code}</span>}
                   </div>
                   <div className="ts-action-col">
-                    {status ? (
-                      <span
-                        className="ts-status-badge"
+                    <>
+                      <button
+                        className={`ts-toggle-btn ts-present ${status === 'present' ? 'ts-active' : ''}`}
+                        onClick={() => handleMark(cls.subjectId, 'present', slotIndex)}
+                        title="Mark present"
+                        disabled={!!markingSlots[`${cls.subjectId}_${slotIndex}`]}
                         style={{
-                          background: status === 'present' ? 'var(--color-success-muted)' : 'var(--color-danger-muted)',
-                          color: status === 'present' ? 'var(--color-success)' : 'var(--color-danger)',
-                          border: `1px solid ${status === 'present' ? 'var(--color-success-muted)' : 'var(--color-danger-muted)'}`,
+                          opacity: markingSlots[`${cls.subjectId}_${slotIndex}`] ? 0.5 : 1,
+                          cursor: markingSlots[`${cls.subjectId}_${slotIndex}`] ? 'not-allowed' : 'pointer',
+                          ...(status === 'present' ? {
+                            background: 'var(--color-success)',
+                            border: 'var(--color-success)',
+                            color: 'white'
+                          } : {})
                         }}
                       >
-                        <span className="ts-status-dot" style={{ background: status === 'present' ? 'var(--color-success)' : 'var(--color-danger)' }} />
-                        {status === 'present' ? 'Present' : 'Absent'}
-                      </span>
-                    ) : (
-                      <>
-                        <button
-                          className="ts-toggle-btn ts-present"
-                          onClick={() => handleMark(cls.subjectId, 'present', slotIndex)}
-                          title="Mark present"
-                          disabled={!!markingSlots[`${cls.subjectId}_${slotIndex}`]}
-                          style={{
-                            opacity: markingSlots[`${cls.subjectId}_${slotIndex}`] ? 0.5 : 1,
-                            cursor: markingSlots[`${cls.subjectId}_${slotIndex}`] ? 'not-allowed' : 'pointer'
-                          }}
-                        >
-                          <Check size={12} strokeWidth={2.5} />
-                        </button>
-                        <button
-                          className="ts-toggle-btn ts-absent"
-                          onClick={() => handleMark(cls.subjectId, 'absent', slotIndex)}
-                          title="Mark absent"
-                          disabled={!!markingSlots[`${cls.subjectId}_${slotIndex}`]}
-                          style={{
-                            opacity: markingSlots[`${cls.subjectId}_${slotIndex}`] ? 0.5 : 1,
-                            cursor: markingSlots[`${cls.subjectId}_${slotIndex}`] ? 'not-allowed' : 'pointer'
-                          }}
-                        >
-                          <X size={12} strokeWidth={2.5} />
-                        </button>
-                      </>
-                    )}
+                        <Check size={12} strokeWidth={2.5} />
+                      </button>
+                      <button
+                        className={`ts-toggle-btn ts-absent ${status === 'absent' ? 'ts-active' : ''}`}
+                        onClick={() => handleMark(cls.subjectId, 'absent', slotIndex)}
+                        title="Mark absent"
+                        disabled={!!markingSlots[`${cls.subjectId}_${slotIndex}`]}
+                        style={{
+                          opacity: markingSlots[`${cls.subjectId}_${slotIndex}`] ? 0.5 : 1,
+                          cursor: markingSlots[`${cls.subjectId}_${slotIndex}`] ? 'not-allowed' : 'pointer',
+                          ...(status === 'absent' ? {
+                            background: 'var(--color-danger)',
+                            border: 'var(--color-danger)',
+                            color: 'white'
+                          } : {})
+                        }}
+                      >
+                        <X size={12} strokeWidth={2.5} />
+                      </button>
+                    </>
                   </div>
                 </div>
               );
             });
           })()}
-
-          {/* More classes chip */}
-          {moreCount > 0 && (
-            <div className="ts-more-chip">+{moreCount} more class{moreCount > 1 ? 'es' : ''}</div>
-          )}
         </>
       )}
     </div>
