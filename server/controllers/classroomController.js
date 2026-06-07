@@ -27,10 +27,11 @@ function getOAuth2Client() {
 // GET /api/classroom/auth
 exports.auth = (req, res) => {
   const oauth2 = getOAuth2Client();
+  const origin = req.query.origin || process.env.FRONTEND_URL || 'http://localhost:3000';
   const url = oauth2.generateAuthUrl({
     access_type: 'offline',
     scope: SCOPES,
-    state: req.user.id,
+    state: JSON.stringify({ userId: req.user.id, origin }),
     prompt: 'consent',
   });
   res.json({ url });
@@ -43,6 +44,16 @@ exports.callback = async (req, res) => {
     const oauth2 = getOAuth2Client();
     const { tokens } = await oauth2.getToken(code);
     oauth2.setCredentials(tokens);
+
+    let userId, origin;
+    try {
+      const parsed = JSON.parse(state);
+      userId = parsed.userId;
+      origin = parsed.origin;
+    } catch {
+      userId = state;
+      origin = null;
+    }
 
     let email = '';
     let googleId = '';
@@ -69,11 +80,11 @@ exports.callback = async (req, res) => {
     }
 
     await GoogleIntegration.findOneAndUpdate(
-      { userId: state },
+      { userId },
       {
-        userId: state,
-        email: email,
-        googleId: googleId,
+        userId,
+        email,
+        googleId,
         accessToken: tokens.access_token,
         refreshToken: tokens.refresh_token || null,
         tokenExpiry: tokens.expiry_date ? new Date(tokens.expiry_date) : null,
@@ -82,7 +93,7 @@ exports.callback = async (req, res) => {
       { upsert: true, new: true }
     );
 
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const frontendUrl = origin || process.env.FRONTEND_URL || 'http://localhost:3000';
     res.redirect(`${frontendUrl}/scheduler?classroom=connected`);
   } catch (err) {
     console.error('[Classroom Callback]', err.message);
