@@ -220,6 +220,11 @@ exports.sync = async (req, res) => {
     const { classroom, integration } = await getAuthenticatedClient(req.user.id);
     const userId = req.user.id;
 
+    // Clear all previous classroom data before re-importing
+    await ClassroomCourse.deleteMany({ userId });
+    await ClassroomAssignment.deleteMany({ userId });
+    await Task.deleteMany({ user: userId, type: 'assignment' });
+
     // Fetch courses
     const coursesRes = await classroom.courses.list({
       courseStates: ['ACTIVE'],
@@ -347,18 +352,6 @@ exports.sync = async (req, res) => {
     // Send notifications for new assignments
     for (const a of allAssignments) {
       await sendAssignmentNotification(a, userId);
-    }
-
-    // Clean up old courses & assignments not in current selection
-    if (courseIds && Array.isArray(courseIds) && courseIds.length > 0) {
-      const oldCourses = await ClassroomCourse.find({ userId, courseId: { $nin: courseIds } }).lean();
-      const oldCourseIds = oldCourses.map(c => c.courseId);
-      if (oldCourseIds.length > 0) {
-        await ClassroomAssignment.deleteMany({ userId, courseId: { $in: oldCourseIds } });
-        await ClassroomCourse.deleteMany({ userId, courseId: { $in: oldCourseIds } });
-        await Task.deleteMany({ user: userId, subject: { $in: oldCourses.map(c => c.courseName) }, type: 'assignment' });
-        console.log(`[Classroom Sync] Cleaned up ${oldCourseIds.length} deselected courses for user ${userId}`);
-      }
     }
 
     res.json({ message: 'Sync completed', courses: courses.length, assignments: allAssignments.length });
