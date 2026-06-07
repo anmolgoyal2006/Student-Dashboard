@@ -348,6 +348,18 @@ exports.sync = async (req, res) => {
       await sendAssignmentNotification(a, userId);
     }
 
+    // Clean up old courses & assignments not in current selection
+    if (courseIds && Array.isArray(courseIds) && courseIds.length > 0) {
+      const oldCourses = await ClassroomCourse.find({ userId, courseId: { $nin: courseIds } }).lean();
+      const oldCourseIds = oldCourses.map(c => c.courseId);
+      if (oldCourseIds.length > 0) {
+        await ClassroomAssignment.deleteMany({ userId, courseId: { $in: oldCourseIds } });
+        await ClassroomCourse.deleteMany({ userId, courseId: { $in: oldCourseIds } });
+        await Task.deleteMany({ user: userId, subject: { $in: oldCourses.map(c => c.courseName) }, type: 'assignment' });
+        console.log(`[Classroom Sync] Cleaned up ${oldCourseIds.length} deselected courses for user ${userId}`);
+      }
+    }
+
     res.json({ message: 'Sync completed', courses: courses.length, assignments: allAssignments.length });
   } catch (err) {
     console.error('[Classroom Sync]', err.message);

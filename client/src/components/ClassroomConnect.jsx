@@ -38,6 +38,7 @@ export default function ClassroomConnect({ onSync }) {
       setSelectedCourses({});
       setShowPicker(false);
       toast.success('Disconnected Google Classroom');
+      window.dispatchEvent(new Event('classroom-changed'));
     } catch {
       toast.error('Failed to disconnect');
     }
@@ -73,6 +74,7 @@ export default function ClassroomConnect({ onSync }) {
       toast.success(`Synced! ${res.data.assignments} assignments imported`);
       setShowPicker(false);
       await checkStatus();
+      window.dispatchEvent(new Event('classroom-changed'));
       if (onSync) onSync();
     } catch {
       toast.error('Sync failed');

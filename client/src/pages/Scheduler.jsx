@@ -96,7 +96,7 @@ export default function Scheduler() {
     }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); window.addEventListener('classroom-changed', load); return () => window.removeEventListener('classroom-changed', load); }, []);
 
   const handleChange = e =>
     setForm(p => ({ ...p, [e.target.name]: e.target.value }));

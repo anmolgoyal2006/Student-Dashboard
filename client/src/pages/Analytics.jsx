@@ -25,10 +25,15 @@ export default function Analytics() {
   const { isMobile } = useResponsive();
 
   useEffect(() => {
-    API.get('/analytics')
-      .then(res => setData(res.data))
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    const fetchData = () => {
+      API.get('/analytics')
+        .then(res => setData(res.data))
+        .catch(() => {})
+        .finally(() => setLoading(false));
+    };
+    fetchData();
+    window.addEventListener('classroom-changed', fetchData);
+    return () => window.removeEventListener('classroom-changed', fetchData);
   }, []);
 
   if (loading) {
@@ -110,13 +115,13 @@ export default function Analytics() {
             <BookOpen size={16} color="#818cf8" />
             <span style={{ fontSize: isMobile ? 13 : 14, fontWeight: 600, color: '#e2e8f0' }}>Subject Workload</span>
           </div>
-        <ResponsiveContainer width="100%" height={isMobile ? 340 : 260}>
+        <ResponsiveContainer width="100%" height={isMobile ? 300 : 260}>
           <PieChart>
             <Pie
               data={charts.subjectWorkload}
               cx="50%" cy="50%"
-              outerRadius={isMobile ? 80 : 80}
-              innerRadius={isMobile ? 40 : 45}
+              outerRadius={isMobile ? 75 : 80}
+              innerRadius={isMobile ? 38 : 45}
                 dataKey="assignments"
                 nameKey="subject"
                 label={false}
@@ -126,7 +131,7 @@ export default function Analytics() {
                 ))}
               </Pie>
               <Tooltip contentStyle={tooltipStyle} formatter={(value, name, props) => [value, props.payload.subject]} />
-              <Legend verticalAlign="bottom" wrapperStyle={{ fontSize: isMobile ? 10 : 11, color: '#94a3b8', paddingTop: isMobile ? 14 : 10, paddingBottom: 4 }} formatter={(value) => {
+              <Legend verticalAlign="bottom" wrapperStyle={{ fontSize: isMobile ? 9 : 11, color: '#94a3b8', paddingTop: isMobile ? 10 : 10, paddingBottom: 4 }} formatter={(value) => {
                 const item = charts.subjectWorkload.find(s => s.subject === value);
                 return `${value} (${item ? item.assignments : 0})`;
               }} />
