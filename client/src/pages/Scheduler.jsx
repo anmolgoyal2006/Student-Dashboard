@@ -5,6 +5,7 @@ import EmptyState from '../components/EmptyState';
 import { CardSkeleton, StatsSkeleton } from '../components/Skeleton';
 import ClassroomConnect from '../components/ClassroomConnect';
 import { Calendar, Clock, ListTodo, Play, AlertTriangle, Edit3, Plus, Trash2, ClipboardList, BookOpen, Rocket, RefreshCw, Pin } from 'lucide-react';
+import useResponsive from '../utils/useResponsive';
 
 const PRIORITY_COLOR = {
   critical:{ bg: 'rgba(239,68,68,0.15)',  border: 'rgba(239,68,68,0.4)',   text: 'var(--color-danger)', badge: 'badge-danger'  },
@@ -71,6 +72,7 @@ export default function Scheduler() {
   const [subjects, setSubjects] = useState([]);
   const [loading,  setLoading]  = useState(true);
   const [view,     setView]     = useState('week');   // 'week' | 'list'
+  const { isMobile } = useResponsive();
   const [weekOff,  setWeekOff]  = useState(0);
   const [showForm, setShowForm] = useState(false);
   const [editing,  setEditing]  = useState(null);
@@ -439,6 +441,59 @@ export default function Scheduler() {
           </div>
 
           {/* Calendar grid */}
+          {isMobile ? (
+            <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 8 }}>
+              {weekDates.map((date, i) => {
+                const isToday    = isSameDay(date, new Date());
+                const dayTasks   = filteredTasks.filter(t => isSameDay(new Date(t.dueDate), date));
+                return (
+                  <div key={i} style={{
+                    minWidth: 140, flexShrink: 0,
+                    background: isToday ? 'rgba(129,140,248,0.08)' : 'rgba(255,255,255,0.02)',
+                    border: `1px solid ${isToday ? 'rgba(129,140,248,0.3)' : 'var(--border)'}`,
+                    borderRadius: 10, padding: '10px 8px', minHeight: 120,
+                  }}>
+                    <div style={{ textAlign: 'center', marginBottom: 8 }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                        {DAYS[date.getDay()]}
+                      </div>
+                      <div style={{
+                        fontSize: 18, fontWeight: 700, color: isToday ? 'var(--primary)' : 'var(--text)',
+                        width: 32, height: 32, borderRadius: '50%',
+                        background: isToday ? 'rgba(129,140,248,0.15)' : 'transparent',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        margin: '4px auto 0',
+                      }}>
+                        {date.getDate()}
+                      </div>
+                    </div>
+                    {dayTasks.length === 0 ? (
+                      <div style={{ fontSize: 11, color: 'var(--muted)', textAlign: 'center', marginTop: 8 }}>—</div>
+                    ) : (
+                      dayTasks.map(task => {
+                        const pc = PRIORITY_COLOR[task.priority];
+                        const isOverdue = task.status !== 'completed' && new Date(task.dueDate) < new Date();
+                        return (
+                          <div key={task._id} onClick={() => openEdit(task)}
+                            style={{
+                              background: isOverdue ? 'rgba(248,113,113,0.1)' : pc.bg,
+                              border: `1px solid ${isOverdue ? 'rgba(248,113,113,0.3)' : pc.border}`,
+                              borderRadius: 6, padding: '5px 7px', marginBottom: 5, cursor: 'pointer',
+                            }}
+                          >
+                            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text)', lineHeight: 1.3 }}>
+                              {renderTypeIcon(task.type)} {task.title.length > 12 ? task.title.slice(0, 12) + '…' : task.title}
+                            </div>
+                            <div style={{ fontSize: 10, color: pc.text, marginTop: 2 }}>{task.dueTime}</div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
           <div style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(7, minmax(110px, 1fr))',

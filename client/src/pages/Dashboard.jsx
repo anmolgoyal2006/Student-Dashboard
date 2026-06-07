@@ -14,6 +14,7 @@ import RiskAlertsCard from '../components/RiskAlertsCard';
 import ClassroomConnect from '../components/ClassroomConnect';
 import EmptyState from '../components/EmptyState';
 import Skeleton, { StatsSkeleton } from '../components/Skeleton';
+import useResponsive from '../utils/useResponsive';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Tooltip, Legend);
 
@@ -44,6 +45,7 @@ const card = {
 /* ═══════════════════════════════════════════════════════════════════════════ */
 export default function Dashboard() {
   const { user } = useAuth();
+  const { isMobile } = useResponsive();
   const [summary,      setSummary]      = useState([]);
   const [cgpa,         setCgpa]         = useState(null);
   const [recs,         setRecs]         = useState([]);
@@ -261,7 +263,7 @@ export default function Dashboard() {
         <StatsSkeleton count={4} />
 
         {/* Charts row skeleton */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 16 }}>
           {/* Bar chart card */}
           <div style={{
             background: 'var(--color-surface-2)',
@@ -330,7 +332,7 @@ export default function Dashboard() {
         </div>
 
         {/* Bottom row skeleton */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 16 }}>
           {[3, 4].map(rowCount => (
             <div key={rowCount} style={{
               background: 'var(--color-surface-2)',
@@ -381,7 +383,7 @@ export default function Dashboard() {
       </div>
 
       {/* ── Stat cards ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 20 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2,1fr)' : 'repeat(4,1fr)', gap: isMobile ? 12 : 20 }}>
         {stats.map(stat => {
           const Icon = stat.icon;
           return (
@@ -420,7 +422,7 @@ export default function Dashboard() {
       </div>
 
       {/* ── Charts row ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 20 }}>
 
         {/* Attendance bar chart */}
         <div style={{ ...card }}>
@@ -556,7 +558,7 @@ export default function Dashboard() {
       </div>
 
       {/* ── Bottom row: AI recs + Notifications ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 20 }}>
 
         {/* AI Recommendations */}
         <div style={{ ...card }}>
@@ -642,9 +644,9 @@ export default function Dashboard() {
       </div>
 
       {/* ── Classroom + Deadlines + Risks ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 20 }}>
         <UpcomingDeadlines />
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? 16 : 24, padding: isMobile ? '0 4px' : 0 }}>
           <RiskAlertsCard />
           <ClassroomConnect />
         </div>

@@ -6,6 +6,7 @@ import {
   Chart as ChartJS, CategoryScale, LinearScale,
   PointElement, LineElement, Tooltip, Legend, Filler,
 } from 'chart.js';
+import useResponsive from '../utils/useResponsive';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend, Filler);
 
@@ -18,6 +19,7 @@ export default function Prediction() {
   const [semCredits,         setSemCredits]        = useState(DEFAULT_CREDITS);
   const [showCredits,        setShowCredits]       = useState(false);
   const [manualCGPA,         setManualCGPA]        = useState('');
+  const { isMobile } = useResponsive();
   const [completedManual,    setCompletedManual]   = useState('');
   const [data,               setData]              = useState(null);
   const [loading,            setLoading]           = useState(false);
@@ -554,7 +556,7 @@ export default function Prediction() {
 
       {/* Controls Card with 2-Column Grid */}
       <div className="card mb-4" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)', gap: 16 }}>
           
           <div className="form-group" style={{ margin: 0 }}>
             <label className="form-label" style={{ marginBottom: 4 }}>Current CGPA</label>
@@ -672,7 +674,7 @@ export default function Prediction() {
       {data && data.currentCGPA != null && (
         <>
           {/* Result metric cards: 2x2 grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: isMobile ? 12 : 16, marginBottom: 16 }}>
             
             <div className="card stat-card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
               <div className="stat-value" style={{ color: 'var(--color-accent)', fontSize: '28px', fontWeight: 500 }}>

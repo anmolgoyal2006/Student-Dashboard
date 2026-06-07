@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import API from '../api/axios';
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { BarChart3, Clock, CheckCircle, AlertTriangle, BookOpen, TrendingUp, Target } from 'lucide-react';
+import useResponsive from '../utils/useResponsive';
 
 const card = {
   background: '#13161f',
@@ -21,6 +22,7 @@ const tooltipStyle = {
 export default function Analytics() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const { isMobile } = useResponsive();
 
   useEffect(() => {
     API.get('/analytics')
@@ -33,10 +35,10 @@ export default function Analytics() {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
         <div style={{ height: 28, width: 200, background: 'rgba(255,255,255,0.05)', borderRadius: 6 }} />
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2,1fr)' : 'repeat(4,1fr)', gap: 14 }}>
           {[1,2,3,4].map(i => <div key={i} style={{ height: 100, background: 'rgba(255,255,255,0.03)', borderRadius: 14 }} />)}
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: isMobile ? 12 : 16 }}>
           <div style={{ height: 300, background: 'rgba(255,255,255,0.03)', borderRadius: 14 }} />
           <div style={{ height: 300, background: 'rgba(255,255,255,0.03)', borderRadius: 14 }} />
         </div>
@@ -68,7 +70,7 @@ export default function Analytics() {
       </div>
 
       {/* Stats row */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2,1fr)' : 'repeat(5,1fr)', gap: isMobile ? 10 : 14 }}>
         {statCards.map(s => (
           <div key={s.label} style={{ ...card, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '18px 12px', gap: 6 }}>
             <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(99,102,241,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -82,20 +84,20 @@ export default function Analytics() {
       </div>
 
       {/* Charts row */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: isMobile ? 12 : 16 }}>
         {/* Weekly completion trend */}
         <div style={card}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
             <TrendingUp size={16} color="#6366f1" />
-            <span style={{ fontSize: 14, fontWeight: 600, color: '#e2e8f0' }}>Weekly Completion Trend</span>
+            <span style={{ fontSize: isMobile ? 13 : 14, fontWeight: 600, color: '#e2e8f0' }}>Weekly Completion Trend</span>
           </div>
-          <ResponsiveContainer width="100%" height={260}>
+          <ResponsiveContainer width="100%" height={isMobile ? 200 : 260}>
             <LineChart data={charts.weeklyTrend}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-              <XAxis dataKey="week" tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} />
+              <XAxis dataKey="week" tick={{ fill: '#64748b', fontSize: isMobile ? 10 : 11 }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fill: '#64748b', fontSize: isMobile ? 10 : 11 }} axisLine={false} tickLine={false} />
               <Tooltip contentStyle={tooltipStyle} />
-              <Legend wrapperStyle={{ fontSize: 12, color: '#94a3b8' }} />
+              <Legend wrapperStyle={{ fontSize: isMobile ? 10 : 12, color: '#94a3b8' }} />
               <Line type="monotone" dataKey="assigned" stroke="#64748b" strokeWidth={2} dot={false} />
               <Line type="monotone" dataKey="completed" stroke="#22c55e" strokeWidth={2.5} dot={{ r: 4, fill: '#22c55e' }} />
             </LineChart>
@@ -106,15 +108,15 @@ export default function Analytics() {
         <div style={card}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
             <BookOpen size={16} color="#818cf8" />
-            <span style={{ fontSize: 14, fontWeight: 600, color: '#e2e8f0' }}>Subject Workload</span>
+            <span style={{ fontSize: isMobile ? 13 : 14, fontWeight: 600, color: '#e2e8f0' }}>Subject Workload</span>
           </div>
-          <ResponsiveContainer width="100%" height={260}>
+          <ResponsiveContainer width="100%" height={isMobile ? 200 : 260}>
             <PieChart>
               <Pie
                 data={charts.subjectWorkload}
                 cx="50%" cy="45%"
-                outerRadius={80}
-                innerRadius={45}
+                outerRadius={isMobile ? 60 : 80}
+                innerRadius={isMobile ? 30 : 45}
                 dataKey="assignments"
                 nameKey="subject"
                 label={false}
@@ -123,35 +125,29 @@ export default function Analytics() {
                   <Cell key={i} fill={COLORS[i % COLORS.length]} />
                 ))}
               </Pie>
-              <Tooltip
-                contentStyle={tooltipStyle}
-                formatter={(value, name, props) => [value, props.payload.subject]}
-              />
-              <Legend
-                wrapperStyle={{ fontSize: 11, color: '#94a3b8' }}
-                formatter={(value, entry) => {
-                  const item = charts.subjectWorkload.find(s => s.subject === value);
-                  return `${value} (${item ? item.assignments : 0})`;
-                }}
-              />
+              <Tooltip contentStyle={tooltipStyle} formatter={(value, name, props) => [value, props.payload.subject]} />
+              <Legend wrapperStyle={{ fontSize: isMobile ? 10 : 11, color: '#94a3b8' }} formatter={(value) => {
+                const item = charts.subjectWorkload.find(s => s.subject === value);
+                return `${value} (${item ? item.assignments : 0})`;
+              }} />
             </PieChart>
           </ResponsiveContainer>
         </div>
       </div>
 
       {/* Second row */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: isMobile ? 12 : 16 }}>
         {/* Deadline timeline */}
         <div style={card}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
             <Clock size={16} color="#f59e0b" />
-            <span style={{ fontSize: 14, fontWeight: 600, color: '#e2e8f0' }}>Deadline Timeline</span>
+            <span style={{ fontSize: isMobile ? 13 : 14, fontWeight: 600, color: '#e2e8f0' }}>Deadline Timeline</span>
           </div>
-          <ResponsiveContainer width="100%" height={260}>
+          <ResponsiveContainer width="100%" height={isMobile ? 200 : 260}>
             <BarChart data={charts.deadlineTimeline}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-              <XAxis dataKey="week" tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} />
+              <XAxis dataKey="week" tick={{ fill: '#64748b', fontSize: isMobile ? 10 : 11 }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fill: '#64748b', fontSize: isMobile ? 10 : 11 }} axisLine={false} tickLine={false} />
               <Tooltip contentStyle={tooltipStyle} />
               <Bar dataKey="count" name="Assignments Due" radius={[6,6,0,0]}>
                 {charts.deadlineTimeline.map((_, i) => (
@@ -166,13 +162,13 @@ export default function Analytics() {
         <div style={card}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
             <TrendingUp size={16} color="#22c55e" />
-            <span style={{ fontSize: 14, fontWeight: 600, color: '#e2e8f0' }}>Weekly Productivity</span>
+            <span style={{ fontSize: isMobile ? 13 : 14, fontWeight: 600, color: '#e2e8f0' }}>Weekly Productivity</span>
           </div>
-          <ResponsiveContainer width="100%" height={260}>
+          <ResponsiveContainer width="100%" height={isMobile ? 200 : 260}>
             <AreaChart data={charts.productivity}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-              <XAxis dataKey="day" tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} />
+              <XAxis dataKey="day" tick={{ fill: '#64748b', fontSize: isMobile ? 10 : 11 }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fill: '#64748b', fontSize: isMobile ? 10 : 11 }} axisLine={false} tickLine={false} />
               <Tooltip contentStyle={tooltipStyle} />
               <Area type="monotone" dataKey="tasks" name="Tasks Completed" stroke="#22c55e" fill="rgba(34,197,94,0.15)" strokeWidth={2} />
             </AreaChart>

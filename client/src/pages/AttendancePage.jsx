@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import EmptyState from '../components/EmptyState';
 import Skeleton from '../components/Skeleton';
+import useResponsive from '../utils/useResponsive';
 
 /* ─────────────────────────────────────────────────────────────────────────── */
 // DESIGN TOKENS
@@ -544,6 +545,7 @@ export default function StudentAttendanceView({ sid }) {
   const [data, setData]       = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState('');
+  const { isMobile } = useResponsive();
   const [filter, setFilter]   = useState('all');
   const [search, setSearch]   = useState('');
   const [sortDir, setSortDir] = useState('desc');
@@ -596,7 +598,7 @@ export default function StudentAttendanceView({ sid }) {
         {/* ── HEADER CARD ── */}
         <Card>
           {/* Student identity row */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 28 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 28, flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
             <div style={{
               width: 50, height: 50, borderRadius: 14, flexShrink: 0,
               background: T.indigoBg, border: `1.5px solid ${T.indigoBd}`,
@@ -626,7 +628,7 @@ export default function StudentAttendanceView({ sid }) {
           </div>
 
           {/* Stat cards */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 24 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2,1fr)' : 'repeat(4,1fr)', gap: isMobile ? 10 : 12, marginBottom: isMobile ? 16 : 24 }}>
             <StatCard icon={Calendar}      label="Total classes"   value={data.total}          color={T.indigo}  bg={T.indigoBg}  border={T.indigoBd} />
             <StatCard icon={CheckCircle2}  label="Present"         value={stats.present}        color={T.emerald} bg={T.emeraldBg} border={T.emeraldBd} />
             <StatCard icon={X}             label="Absent"          value={stats.absent}         color={T.crimson} bg={T.crimsonBg} border={T.crimsonBd} />
