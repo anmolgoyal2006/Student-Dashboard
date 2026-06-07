@@ -91,7 +91,7 @@ export default function Analytics() {
             <TrendingUp size={16} color="#6366f1" />
             <span style={{ fontSize: isMobile ? 13 : 14, fontWeight: 600, color: '#e2e8f0' }}>Weekly Completion Trend</span>
           </div>
-          <ResponsiveContainer width="100%" height={isMobile ? 200 : 260}>
+          <ResponsiveContainer width="100%" height={isMobile ? 220 : 260}>
             <LineChart data={charts.weeklyTrend}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
               <XAxis dataKey="week" tick={{ fill: '#64748b', fontSize: isMobile ? 10 : 11 }} axisLine={false} tickLine={false} />
@@ -110,11 +110,11 @@ export default function Analytics() {
             <BookOpen size={16} color="#818cf8" />
             <span style={{ fontSize: isMobile ? 13 : 14, fontWeight: 600, color: '#e2e8f0' }}>Subject Workload</span>
           </div>
-        <ResponsiveContainer width="100%" height={isMobile ? 320 : 260}>
-          <PieChart width={isMobile ? 300 : 400} height={isMobile ? 320 : 260}>
+        <ResponsiveContainer width="100%" height={isMobile ? 340 : 260}>
+          <PieChart width={isMobile ? 300 : 400} height={isMobile ? 340 : 260}>
             <Pie
               data={charts.subjectWorkload}
-              cx="50%" cy="42%"
+              cx="50%" cy="40%"
               outerRadius={isMobile ? 85 : 80}
               innerRadius={isMobile ? 42 : 45}
                 dataKey="assignments"
@@ -126,7 +126,7 @@ export default function Analytics() {
                 ))}
               </Pie>
               <Tooltip contentStyle={tooltipStyle} formatter={(value, name, props) => [value, props.payload.subject]} />
-              <Legend verticalAlign="bottom" wrapperStyle={{ fontSize: isMobile ? 9 : 11, color: '#94a3b8', paddingTop: 10, paddingBottom: 4 }} formatter={(value) => {
+              <Legend verticalAlign="bottom" wrapperStyle={{ fontSize: isMobile ? 10 : 11, color: '#94a3b8', paddingTop: isMobile ? 14 : 10, paddingBottom: 4 }} formatter={(value) => {
                 const item = charts.subjectWorkload.find(s => s.subject === value);
                 return `${value} (${item ? item.assignments : 0})`;
               }} />
@@ -143,7 +143,7 @@ export default function Analytics() {
             <Clock size={16} color="#f59e0b" />
             <span style={{ fontSize: isMobile ? 13 : 14, fontWeight: 600, color: '#e2e8f0' }}>Deadline Timeline</span>
           </div>
-          <ResponsiveContainer width="100%" height={isMobile ? 200 : 260}>
+          <ResponsiveContainer width="100%" height={isMobile ? 220 : 260}>
             <BarChart data={charts.deadlineTimeline}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
               <XAxis dataKey="week" tick={{ fill: '#64748b', fontSize: isMobile ? 10 : 11 }} axisLine={false} tickLine={false} />
@@ -164,7 +164,7 @@ export default function Analytics() {
             <TrendingUp size={16} color="#22c55e" />
             <span style={{ fontSize: isMobile ? 13 : 14, fontWeight: 600, color: '#e2e8f0' }}>Weekly Productivity</span>
           </div>
-          <ResponsiveContainer width="100%" height={isMobile ? 200 : 260}>
+          <ResponsiveContainer width="100%" height={isMobile ? 220 : 260}>
             <AreaChart data={charts.productivity}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
               <XAxis dataKey="day" tick={{ fill: '#64748b', fontSize: isMobile ? 10 : 11 }} axisLine={false} tickLine={false} />
