@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { userService } from '../services/apiServices';
 import toast from '../context/ToastContext';
-import { Lock, Eye, EyeOff, User, Mail, Zap, ArrowRight, Shield, GraduationCap, Info } from 'lucide-react';
+import { Lock, Eye, EyeOff, User, Mail, Zap, ArrowRight, Shield, GraduationCap, Info, LogOut } from 'lucide-react';
 import './ProfileSettings.css';
 
 function getPasswordStrength(pw) {
@@ -385,6 +385,28 @@ export default function ProfileSettings() {
               )}
             </button>
           </form>
+        </div>
+
+        {/* Card 4 — Logout */}
+        <div className="ps-card">
+          <div className="ps-card-hdr">
+            <div className="ps-card-icon ps-card-icon--danger" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-danger)' }}>
+              <LogOut size={18} />
+            </div>
+            <div>
+              <div className="ps-card-title">Logout</div>
+              <div className="ps-card-sub">Sign out of your account</div>
+            </div>
+          </div>
+
+          <button
+            onClick={logout}
+            className="ps-btn ps-btn--danger"
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', background: 'var(--color-danger)', border: 'none' }}
+          >
+            <LogOut size={14} />
+            Logout
+          </button>
         </div>
 
       </div>

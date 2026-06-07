@@ -74,36 +74,14 @@ export default function Sidebar() {
           <GraduationCap size={18} color="var(--color-accent)" />
           StudentAI
         </span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <button
-            onClick={logout}
-            style={{
-              background: 'rgba(248, 113, 113, 0.1)',
-              border: 'none',
-              borderRadius: '8px',
-              color: 'var(--danger, var(--color-danger))',
-              padding: '6px 10px',
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 4
-            }}
-            title="Logout"
-          >
-            <LogOut size={14} />
-            <span style={{ fontSize: 11 }}>Logout</span>
-          </button>
-          <button
-            className="mobile-menu-btn"
-            onClick={() => setOpen(o => !o)}
-            aria-label="Toggle menu"
-            style={{ margin: 0 }}
-          >
-            {open ? <X size={18} /> : <Menu size={18} />}
-          </button>
-        </div>
+        <button
+          className="mobile-menu-btn"
+          onClick={() => setOpen(o => !o)}
+          aria-label="Toggle menu"
+          style={{ margin: 0 }}
+        >
+          {open ? <X size={18} /> : <Menu size={18} />}
+        </button>
       </nav>
 
       {/* Overlay */}
@@ -168,51 +146,7 @@ export default function Sidebar() {
                 <div className="sidebar-user-email">{user?.email}</div>
               </div>
             )}
-            {!collapsed && (
-              <button
-                onClick={logout}
-                style={{
-                  background: 'rgba(248, 113, 113, 0.1)',
-                  border: 'none',
-                  borderRadius: '8px',
-                  color: 'var(--danger, var(--color-danger))',
-                  width: 28,
-                  height: 28,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  flexShrink: 0,
-                  transition: 'background 0.2s',
-                }}
-                title="Logout"
-              >
-                <LogOut size={14} />
-              </button>
-            )}
           </div>
-          {collapsed && (
-            <button
-              onClick={logout}
-              style={{
-                background: 'rgba(248, 113, 113, 0.1)',
-                border: 'none',
-                borderRadius: '8px',
-                color: 'var(--danger, var(--color-danger))',
-                width: 32,
-                height: 32,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-                marginTop: 8,
-                width: '100%',
-              }}
-              title="Logout"
-            >
-              <LogOut size={16} />
-            </button>
-          )}
         </div>
       </aside>
     </>
