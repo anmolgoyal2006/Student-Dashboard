@@ -123,6 +123,7 @@ exports.disconnect = async (req, res) => {
     await GoogleIntegration.findOneAndDelete({ userId: req.user.id });
     await ClassroomCourse.deleteMany({ userId: req.user.id });
     await ClassroomAssignment.deleteMany({ userId: req.user.id });
+    await Task.deleteMany({ user: req.user.id, type: 'assignment' });
     res.json({ message: 'Google Classroom disconnected.' });
   } catch (err) {
     console.error('[Classroom Disconnect]', err.message);
