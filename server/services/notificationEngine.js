@@ -1,4 +1,4 @@
-const admin = require('firebase-admin');
+const admin = require('../config/firebaseAdmin');
 const NotificationToken = require('../models/NotificationToken');
 const Notification = require('../models/Notification');
 
@@ -10,9 +10,16 @@ async function sendNotification(userId, title, body, data = {}) {
       const user = await User.findById(userId).select('fcmToken');
       if (user?.fcmToken) {
         tokens.push({ token: user.fcmToken, platform: 'web' });
+      } else {
+        console.log(`[FCM] No tokens found for user ${userId}`);
       }
     }
-    if (!tokens.length) return { success: false, reason: 'No tokens' };
+    if (!tokens.length) {
+      console.log(`[FCM] Skipping push — no tokens for user ${userId}`);
+      // Still save the notification to DB
+      await Notification.create({ userId, title, body, type: data.type || 'CLASSROOM', courseName: data.courseName || null });
+      return { success: false, reason: 'No tokens' };
+    }
 
     const message = {
       notification: { title, body },
@@ -33,7 +40,7 @@ async function sendNotification(userId, title, body, data = {}) {
       }
     }
 
-    await Notification.create({ userId, title, body, type: data.type || 'CLASSROOM' });
+    await Notification.create({ userId, title, body, type: data.type || 'CLASSROOM', courseName: data.courseName || null });
 
     return { success: true, results };
   } catch (err) {
@@ -43,21 +50,25 @@ async function sendNotification(userId, title, body, data = {}) {
 }
 
 async function sendAssignmentNotification(assignment, userId) {
+  // Skip if already submitted or completed
+  if (assignment.status === 'submitted' || assignment.status === 'returned' || assignment.status === 'completed') return { skipped: true };
+
   const dueDate = new Date(assignment.dueDate);
   const now = new Date();
   const diffMs = dueDate.getTime() - now.getTime();
   const diffHrs = diffMs / (1000 * 60 * 60);
+  const courseName = assignment.courseName || assignment.subject || 'Classroom';
 
   if (diffHrs < 0) {
-    return sendNotification(userId, '❌ Overdue', `${assignment.title} — submit immediately`, { type: 'OVERDUE', assignmentId: assignment.assignmentId });
+    return sendNotification(userId, '❌ Overdue', `[${courseName}] ${assignment.title} — submit immediately`, { type: 'OVERDUE', assignmentId: assignment.assignmentId, courseName });
   }
   if (diffHrs < 6) {
-    return sendNotification(userId, '🚨 Urgent Deadline', `${assignment.title} due in 6 hours`, { type: 'URGENT', assignmentId: assignment.assignmentId });
+    return sendNotification(userId, '🚨 Urgent Deadline', `[${courseName}] ${assignment.title} due in 6 hours`, { type: 'URGENT', assignmentId: assignment.assignmentId, courseName });
   }
   if (diffHrs < 24) {
-    return sendNotification(userId, '⚠️ Due Tomorrow', `${assignment.title} · Est. ${assignment.estimatedHours} hrs`, { type: 'DUE_SOON', assignmentId: assignment.assignmentId });
+    return sendNotification(userId, '⚠️ Due Tomorrow', `[${courseName}] ${assignment.title} · Est. ${assignment.estimatedHours} hrs`, { type: 'DUE_SOON', assignmentId: assignment.assignmentId, courseName });
   }
-  return sendNotification(userId, '📚 New Assignment', `${assignment.title} · Due ${dueDate.toLocaleDateString()}`, { type: 'NEW_ASSIGNMENT', assignmentId: assignment.assignmentId });
+  return sendNotification(userId, '📚 New Assignment', `[${courseName}] ${assignment.title} · Due ${dueDate.toLocaleDateString()}`, { type: 'NEW_ASSIGNMENT', assignmentId: assignment.assignmentId, courseName });
 }
 
 async function sendSessionNotification(task, userId, minutesBefore) {

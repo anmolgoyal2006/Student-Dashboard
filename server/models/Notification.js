@@ -21,11 +21,15 @@ const notificationSchema = new mongoose.Schema(
       ref:     'Subject',
       default: null,
     },
-    type: {
-      type:    String,
-      default: 'ATTENDANCE_MARK',
-    },
-    read: {
+  type: {
+    type:    String,
+    default: 'ATTENDANCE_MARK',
+  },
+  courseName: {
+    type:    String,
+    default: null,
+  },
+  read: {
       type:    Boolean,
       default: false,
     },

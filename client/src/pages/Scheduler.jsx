@@ -201,7 +201,7 @@ export default function Scheduler() {
 
       {/* ── Google Classroom ── */}
       <div style={{ marginBottom: 16 }}>
-        <ClassroomConnect />
+        <ClassroomConnect onSync={load} />
       </div>
 
       {/* ── Stat row ── */}

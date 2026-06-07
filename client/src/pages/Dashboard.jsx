@@ -381,7 +381,7 @@ export default function Dashboard() {
       </div>
 
       {/* ── Stat cards ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 20 }}>
         {stats.map(stat => {
           const Icon = stat.icon;
           return (
@@ -420,7 +420,7 @@ export default function Dashboard() {
       </div>
 
       {/* ── Charts row ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
 
         {/* Attendance bar chart */}
         <div style={{ ...card }}>
@@ -556,7 +556,7 @@ export default function Dashboard() {
       </div>
 
       {/* ── Bottom row: AI recs + Notifications ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
 
         {/* AI Recommendations */}
         <div style={{ ...card }}>
@@ -610,32 +610,44 @@ export default function Dashboard() {
           </div>
 
           {notifs.length > 0
-            ? notifs.map((n, i) => (
-                <div key={i} style={{
-                  display: 'flex', gap: 12, alignItems: 'flex-start',
-                  padding: '10px 0',
-                  borderBottom: i < notifs.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none',
-                }}>
-                  <span style={{
-                    width: 9, height: 9, borderRadius: '50%', marginTop: 4, flexShrink: 0,
-                    background: n.type === 'warning' ? '#f59e0b' : n.type === 'danger' ? '#ef4444' : '#6366f1',
-                  }} />
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 500, color: '#e2e8f0' }}>{n.title}</div>
-                    <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>{n.message}</div>
+            ? notifs.map((n, i) => {
+                const isClassroom = ['NEW_ASSIGNMENT', 'OVERDUE', 'URGENT', 'DUE_SOON'].includes(n.type);
+                const dotColor = n.type === 'OVERDUE' ? '#ef4444' : n.type === 'URGENT' ? '#f59e0b' : n.type === 'DUE_SOON' ? '#818cf8' : n.type === 'NEW_ASSIGNMENT' ? '#22c55e' : n.type === 'warning' ? '#f59e0b' : n.type === 'danger' ? '#ef4444' : '#6366f1';
+                return (
+                  <div key={i} style={{
+                    display: 'flex', gap: 12, alignItems: 'flex-start',
+                    padding: '10px 0',
+                    borderBottom: i < notifs.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none',
+                  }}>
+                    <span style={{
+                      width: 9, height: 9, borderRadius: '50%', marginTop: 5, flexShrink: 0,
+                      background: dotColor,
+                    }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 500, color: '#e2e8f0' }}>{n.title}</div>
+                      <div style={{ fontSize: 12, color: '#64748b', marginTop: 2, lineHeight: 1.4 }}>{n.body}</div>
+                      {n.courseName && (
+                        <span style={{ fontSize: 10.5, color: '#818cf8', marginTop: 3, display: 'inline-block', fontWeight: 500 }}>{n.courseName}</span>
+                      )}
+                    </div>
+                    <span style={{ fontSize: 10, color: '#475569', whiteSpace: 'nowrap' }}>
+                      {new Date(n.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    </span>
                   </div>
-                </div>
-              ))
+                );
+              })
             : <EmptyState title="All Caught Up" subtitle="No new notifications at this time." />
           }
         </div>
       </div>
 
       {/* ── Classroom + Deadlines + Risks ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
         <UpcomingDeadlines />
-        <RiskAlertsCard />
-        <ClassroomConnect />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+          <RiskAlertsCard />
+          <ClassroomConnect />
+        </div>
       </div>
 
       {/* ── Smart Study Plan ── */}

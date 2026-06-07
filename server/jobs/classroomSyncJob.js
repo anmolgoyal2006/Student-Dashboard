@@ -54,6 +54,9 @@ async function syncAllUsers() {
             const coursework = workRes.data.courseWork || [];
 
             for (const w of coursework) {
+              // Skip MATERIAL type (announcements, resources)
+              if (w.workType === 'MATERIAL') continue;
+
               const dueDate = w.dueDate
                 ? new Date(w.dueDate.year, w.dueDate.month - 1, w.dueDate.day,
                     w.dueTime?.hours || 23, w.dueTime?.minutes || 59)
@@ -62,13 +65,28 @@ async function syncAllUsers() {
               const points = w.maxPoints || 0;
               const estimated = points >= 80 ? 4 : points >= 50 ? 3 : points >= 20 ? 2 : 1;
 
+              // Check student submission status
+              let submitted = false;
+              try {
+                const subRes = await classroom.courses.courseWork.studentSubmissions.list({
+                  courseId: c.id,
+                  courseWorkId: w.id,
+                });
+                const submissions = subRes.data.studentSubmissions || [];
+                submitted = submissions.some(s => s.state === 'TURNED_IN' || s.state === 'RETURNED');
+              } catch (e) {
+                // Submission check may fail — proceed with default status
+              }
+
+              const status = submitted ? 'submitted' : (w.state === 'PUBLISHED' ? 'assigned' : w.state?.toLowerCase() || 'assigned');
+
               const assignment = await ClassroomAssignment.findOneAndUpdate(
                 { userId, courseId: c.id, assignmentId: w.id },
                 {
                   userId, courseId: c.id, courseName: c.name, assignmentId: w.id,
                   title: w.title, description: w.description || '', dueDate,
                   dueTime: w.dueTime ? `${String(w.dueTime.hours || 23).padStart(2, '0')}:${String(w.dueTime.minutes || 59).padStart(2, '0')}` : '23:59',
-                  status: w.state === 'PUBLISHED' ? 'assigned' : w.state?.toLowerCase() || 'assigned',
+                  status,
                   points, maxPoints: points,
                   assignmentUrl: w.alternateLink || '',
                   estimatedHours: estimated,

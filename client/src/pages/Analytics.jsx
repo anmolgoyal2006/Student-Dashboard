@@ -68,7 +68,7 @@ export default function Analytics() {
       </div>
 
       {/* Stats row */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 14 }}>
         {statCards.map(s => (
           <div key={s.label} style={{ ...card, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '18px 12px', gap: 6 }}>
             <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(99,102,241,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

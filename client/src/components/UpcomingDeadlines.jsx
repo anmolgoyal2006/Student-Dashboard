@@ -25,7 +25,11 @@ export default function UpcomingDeadlines() {
 
   useEffect(() => {
     API.get('/classroom/assignments')
-      .then(res => setAssignments((res.data.assignments || []).slice(0, 5)))
+      .then(res => {
+        const all = res.data.assignments || [];
+        const upcoming = all.filter(a => a.dueDate && new Date(a.dueDate) >= new Date(new Date().toDateString()));
+        setAssignments(upcoming.slice(0, 5));
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);

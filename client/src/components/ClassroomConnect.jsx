@@ -3,7 +3,7 @@ import { BookOpen, CheckCircle, XCircle, RefreshCw, ChevronDown } from 'lucide-r
 import API from '../api/axios';
 import toast from '../context/ToastContext';
 
-export default function ClassroomConnect() {
+export default function ClassroomConnect({ onSync }) {
   const [status, setStatus] = useState({ connected: false, loading: true });
   const [syncing, setSyncing] = useState(false);
   const [courses, setCourses] = useState([]);
@@ -73,6 +73,7 @@ export default function ClassroomConnect() {
       toast.success(`Synced! ${res.data.assignments} assignments imported`);
       setShowPicker(false);
       await checkStatus();
+      if (onSync) onSync();
     } catch {
       toast.error('Sync failed');
     } finally {
