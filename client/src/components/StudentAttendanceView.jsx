@@ -1,19 +1,20 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import API from "../api/axios";
 import toast from "../context/ToastContext";
 import {
-  Calendar, Check, X, Flame, BarChart2, BookOpen,
-  ChevronLeft, ChevronRight, ShieldAlert,
-  CalendarCheck, CheckCircle, XCircle, TrendingUp, BarChart3,
-  AlertTriangle,
+  Calendar, Check, X, Flame, BookOpen,
+  ChevronLeft, ChevronRight, ShieldAlert, ShieldCheck,
+  CalendarCheck, CheckCircle, XCircle,
+  AlertTriangle, CalendarDays, ClipboardList,
 } from "lucide-react";
 import EmptyState from "./EmptyState";
+import TodayScheduleCard from "./TodayScheduleCard";
+import MonthlyCalendarCard from "./MonthlyCalendarCard";
 
-/* ─── helpers (pure logic, no colors) ─── */
-const pctColorVar  = (p) => p >= 75 ? "var(--color-success)"        : p >= 50 ? "var(--color-warning)"        : "var(--color-danger)";
-const pctMutedVar  = (p) => p >= 75 ? "var(--color-success-muted)"  : p >= 50 ? "var(--color-warning-muted)"  : "var(--color-danger-muted)";
-const pctBorderVar = (p) => p >= 75 ? "rgba(16,185,129,0.25)"       : p >= 50 ? "rgba(245,158,11,0.25)"       : "rgba(239,68,68,0.25)";
+/* ─── helpers ─── */
+const pctColorVar = (p) => p >= 75 ? "var(--color-success)" : p >= 50 ? "var(--color-warning)" : "var(--color-danger)";
+const pctMutedVar = (p) => p >= 75 ? "var(--color-success-muted)" : p >= 50 ? "var(--color-warning-muted)" : "var(--color-danger-muted)";
 
 const fmtDate = (d) =>
   new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
@@ -31,7 +32,7 @@ const IconBadge = ({ icon: Icon, colorVar, mutedVar, size = 18 }) => (
 );
 
 /* ─── Stat card ─── */
-const StatCard = ({ label, value, icon: Icon, colorVar, mutedVar }) => (
+const StatCard = ({ label, value, icon: Icon, colorVar, mutedVar, subLabel, valueFontSize = 28 }) => (
   <div
     style={{
       background: "var(--color-surface-2)",
@@ -55,7 +56,7 @@ const StatCard = ({ label, value, icon: Icon, colorVar, mutedVar }) => (
   >
     <IconBadge icon={Icon} colorVar={colorVar} mutedVar={mutedVar} />
     <div style={{ lineHeight: 1 }}>
-      <div style={{ fontSize: 28, fontWeight: 700, color: colorVar, letterSpacing: "-0.5px" }}>
+      <div style={{ fontSize: valueFontSize, fontWeight: 700, color: colorVar, letterSpacing: "-0.5px" }}>
         {value}
       </div>
       <div style={{
@@ -65,17 +66,19 @@ const StatCard = ({ label, value, icon: Icon, colorVar, mutedVar }) => (
       }}>
         {label}
       </div>
+      {subLabel && (
+        <div style={{ fontSize: 8, fontWeight: 500, color: "var(--color-text-tertiary)", marginTop: 2 }}>
+          {subLabel}
+        </div>
+      )}
     </div>
   </div>
 );
 
-/* ─── Section header with dot + icon ─── */
+/* ─── Section header ─── */
 const SectionHeader = ({ icon: Icon, children }) => (
   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
-    <span style={{
-      width: 7, height: 7, borderRadius: "50%",
-      background: "var(--color-accent)", flexShrink: 0,
-    }} />
+    <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--color-accent)", flexShrink: 0 }} />
     <Icon size={14} color="var(--color-accent)" strokeWidth={2} />
     <span style={{ fontSize: 13.5, fontWeight: 600, color: "var(--color-text-primary)", letterSpacing: "-0.1px" }}>
       {children}
@@ -83,7 +86,7 @@ const SectionHeader = ({ icon: Icon, children }) => (
   </div>
 );
 
-/* ─── Smart insight banner ─── */
+/* ─── Insight banner ─── */
 const Insight = ({ present, total }) => {
   if (!total) return null;
   const pct = (present / total) * 100;
@@ -120,6 +123,27 @@ const Insight = ({ present, total }) => {
   );
 };
 
+/* ─── Card shell ─── */
+const Card = ({ children, style = {} }) => (
+  <div style={{
+    background: "var(--color-surface-2)",
+    border: "1px solid rgba(255,255,255,0.06)",
+    borderRadius: "var(--radius-lg)",
+    padding: "var(--space-5)",
+    ...style,
+  }}>
+    {children}
+  </div>
+);
+
+/* ─── Legend chip ─── */
+const LegendChip = ({ colorVar, label }) => (
+  <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "var(--color-text-secondary)" }}>
+    <span style={{ width: 8, height: 8, borderRadius: 2, background: colorVar, flexShrink: 0 }} />
+    {label}
+  </div>
+);
+
 /* ═══════════════════════════════════════════════════════ */
 const StudentAttendanceView = ({ sid }) => {
   const [data,        setData]        = useState(null);
@@ -130,12 +154,27 @@ const StudentAttendanceView = ({ sid }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const recordsPerPage = 10;
 
-  const [markForm, setMarkForm] = useState({
-    subjectId: "",
-    date: new Date().toISOString().slice(0, 10),
-    status: "present",
-  });
-  const [marking, setMarking] = useState(false);
+  /* ── today's scheduled classes from timetable ── */
+  const todayClasses = useMemo(() => {
+    if (!subjects?.length) return [];
+    const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const todayName = dayNames[new Date().getDay()];
+    const classes = [];
+    subjects.forEach(s => {
+      (s.schedule || [])
+        .filter(sl => sl.day === todayName)
+        .forEach(sl => {
+          classes.push({
+            subjectId: s._id,
+            name: s.name,
+            code: s.code,
+            time: sl.startTime || "",
+            slot: sl.day || "",
+          });
+        });
+    });
+    return classes.slice(0, 6);
+  }, [subjects]);
 
   /* ── fetch ── */
   const fetchAttendance = async () => {
@@ -153,34 +192,25 @@ const StudentAttendanceView = ({ sid }) => {
   };
 
   useEffect(() => {
-    sid ? fetchAttendance() : (setLoading(false), setError("Please update your Student ID (SID) in Profile Settings to track your attendance."));
+    sid
+      ? fetchAttendance()
+      : (setLoading(false), setError("Please update your Student ID (SID) in Profile Settings to track your attendance."));
   }, [sid]);
 
   useEffect(() => { setCurrentPage(1); }, [filter]);
 
-  /* ── mark ── */
-  const handleMark = async (e) => {
-    e.preventDefault();
-    if (!markForm.subjectId) { toast.error("Please select a subject."); return; }
-    setMarking(true);
+  /* ── quick mark (from TodayScheduleCard) ── */
+  const handleQuickMark = async (subjectId, date, status, slot) => {
     try {
-      await API.post(`/attendance`, markForm);
-      toast.success("Attendance marked!");
+      await API.post(`/attendance`, { subjectId, date, status, slot });
+      toast.success(`Marked ${status}!`);
       fetchAttendance();
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to mark attendance.");
-    } finally { setMarking(false); }
+    }
   };
 
-  /* ── stats ── */
-  const getOverallStats = () => {
-    if (!data) return { present: 0, absent: 0, total: 0, percentage: 0 };
-    const present = data.records.filter(r => r.status === "present").length;
-    const absent  = data.records.filter(r => r.status === "absent").length;
-    const total   = present + absent;
-    return { present, absent, total, percentage: total > 0 ? Math.round(present / total * 100) : 0 };
-  };
-
+  /* ── subject streak ── */
   const getSubjectStreak = (code) => {
     if (!data?.records) return 0;
     const recs = data.records
@@ -193,16 +223,7 @@ const StudentAttendanceView = ({ sid }) => {
     return s;
   };
 
-  const getOverallStreak = (records) => {
-    if (!records?.length) return 0;
-    const sorted = [...records]
-      .filter(r => r.status !== "cancelled")
-      .sort((a, b) => new Date(b.date) - new Date(a.date));
-    let s = 0;
-    for (const r of sorted) { if (r.status === "present") s++; else break; }
-    return s;
-  };
-
+  /* ── filtered + paginated records ── */
   const filteredRecords = data?.records.filter(r => filter === "all" || r.status === filter) || [];
   const totalPages  = Math.ceil(filteredRecords.length / recordsPerPage) || 1;
   const pageRecords = filteredRecords.slice((currentPage - 1) * recordsPerPage, currentPage * recordsPerPage);
@@ -235,10 +256,9 @@ const StudentAttendanceView = ({ sid }) => {
       }}>
         <ShieldAlert size={22} color="var(--color-danger)" strokeWidth={1.8} />
       </div>
-      <p style={{
-        color: "var(--color-text-secondary)", fontSize: 14,
-        textAlign: "center", maxWidth: 380, lineHeight: 1.6,
-      }}>{error}</p>
+      <p style={{ color: "var(--color-text-secondary)", fontSize: 14, textAlign: "center", maxWidth: 380, lineHeight: 1.6 }}>
+        {error}
+      </p>
       {!sid && (
         <Link to="/profile" style={{
           padding: "9px 20px",
@@ -252,100 +272,121 @@ const StudentAttendanceView = ({ sid }) => {
     </div>
   );
 
-  /* ── derived ── */
-  const stats         = getOverallStats();
-  const overallStreak = getOverallStreak(data?.records);
+  /* ════════════════════════════════════════
+     STAT CARD COMPUTATIONS
+     ════════════════════════════════════════ */
+  const todayDate = new Date().toISOString().slice(0, 10);
 
-  /* SVG donut */
-  const donutR    = 54;
-  const donutSW   = 9;
-  const donutCirc = 2 * Math.PI * donutR;
-  const donutOff  = donutCirc - (stats.percentage / 100) * donutCirc;
+  /* Card 1 — Classes Today: count from timetable schedule, not marked records */
+  const classesToday = todayClasses.length;
+
+  /* Card 2 — Can Still Miss */
+  const presentCount  = data?.records?.filter(r => r.status === "present").length || 0;
+  const absentCount   = data?.records?.filter(r => r.status === "absent").length || 0;
+  const totalClasses  = presentCount + absentCount;
+  const rawMaxMiss    = totalClasses > 0 ? Math.floor(presentCount / 0.75 - totalClasses) : 0;
+  const canStillMiss  = Math.max(0, rawMaxMiss);
+  const canMissColor  = rawMaxMiss <= 0 ? "var(--color-danger)" : rawMaxMiss <= 3 ? "var(--color-warning)" : "var(--color-success)";
+  const canMissMuted  = rawMaxMiss <= 0 ? "var(--color-danger-muted)" : rawMaxMiss <= 3 ? "var(--color-warning-muted)" : "var(--color-success-muted)";
+
+  /* Card 3 — Subjects At Risk */
+  const atRiskSubjects  = data?.summary?.filter(s => s.percentage < 75) || [];
+  const criticalSubjects = data?.summary?.filter(s => s.percentage < 50) || [];
+  const atRiskCount     = atRiskSubjects.length;
+  const criticalCount   = criticalSubjects.length;
+  const atRiskColor     = criticalCount > 0 ? "var(--color-danger)" : atRiskCount > 0 ? "var(--color-warning)" : "var(--color-success)";
+  const atRiskMuted     = criticalCount > 0 ? "var(--color-danger-muted)" : atRiskCount > 0 ? "var(--color-warning-muted)" : "var(--color-success-muted)";
+  const atRiskValue     = atRiskCount === 0 ? "All Safe" : `${atRiskCount}`;
+  const atRiskFontSize  = atRiskCount === 0 ? 20 : 28;
+  const atRiskSubLabel  = criticalCount > 0
+    ? `${criticalCount} critical`
+    : atRiskCount === 0 ? "above 75%" : "";
+
+  /* Card 4 — Unmarked Today: count unmarked slots using todayClasses (slot-level, not subject-level) */
+  const markedTodayBySubject = {};
+  (data?.records?.filter(r => new Date(r.date).toISOString().slice(0, 10) === todayDate) || []).forEach(r => {
+    const key = r.subjectId || r.code;
+    markedTodayBySubject[key] = (markedTodayBySubject[key] || 0) + 1;
+  });
+
+  // Count how many slots are still unmarked
+  const slotCounter = {};
+  let unmarkedCount = 0;
+  const unmarkedSlots = [];
+  todayClasses.forEach(cls => {
+    const key = cls.subjectId || cls.code;
+    slotCounter[key] = (slotCounter[key] || 0) + 1;
+    const markedCount = markedTodayBySubject[key] || 0;
+    if (slotCounter[key] > markedCount) {
+      unmarkedCount++;
+      unmarkedSlots.push(cls);
+    }
+  });
+
+  const unmarkedColor = unmarkedCount === 0 
+    ? "var(--color-success)" 
+    : unmarkedCount <= 2 
+      ? "var(--color-warning)" 
+      : "var(--color-danger)";
+  const unmarkedMuted = unmarkedCount === 0 
+    ? "var(--color-success-muted)" 
+    : unmarkedCount <= 2 
+      ? "var(--color-warning-muted)" 
+      : "var(--color-danger-muted)";
+  const unmarkedValue = unmarkedCount === 0 ? "All Done" : `${unmarkedCount}`;
+  const unmarkedFontSize = unmarkedCount === 0 ? 18 : 28;
+  const uniqueUnmarkedNames = [...new Set(unmarkedSlots.map(s => s.name))];
+  const firstName = uniqueUnmarkedNames[0] || "";
+  const unmarkedSubLabel = unmarkedCount === 0
+    ? "great job!"
+    : `${firstName.slice(0, 10)}${firstName.length > 10 ? "…" : ""}${
+        uniqueUnmarkedNames.length > 1
+          ? ` +${uniqueUnmarkedNames.length - 1} more`
+          : unmarkedCount > 1
+            ? ` (${unmarkedCount} slots)`
+            : ""
+      }`;
 
   const statCards = [
-    { label: "Total Classes", value: stats.total,              icon: Calendar,    colorVar: "var(--color-indigo-light)", mutedVar: "var(--color-accent-muted)" },
-    { label: "Present",       value: stats.present,            icon: CheckCircle, colorVar: "var(--color-success)",      mutedVar: "var(--color-success-muted)" },
-    { label: "Absent",        value: stats.absent,             icon: XCircle,     colorVar: "var(--color-danger)",       mutedVar: "var(--color-danger-muted)"  },
-    { label: "Attendance",    value: `${stats.percentage}%`,   icon: TrendingUp,  colorVar: pctColorVar(stats.percentage), mutedVar: pctMutedVar(stats.percentage) },
+    {
+      label: "CLASSES TODAY",
+      value: classesToday,
+      icon: CalendarDays,
+      colorVar: "var(--color-accent)",
+      mutedVar: "var(--color-accent-muted)",
+    },
+    {
+      label: "CAN STILL MISS",
+      value: canStillMiss,
+      icon: ShieldCheck,
+      colorVar: canMissColor,
+      mutedVar: canMissMuted,
+      subLabel: "before 75% drops",
+    },
+    {
+      label: "SUBJECTS AT RISK",
+      value: atRiskValue,
+      icon: AlertTriangle,
+      colorVar: atRiskColor,
+      mutedVar: atRiskMuted,
+      subLabel: atRiskSubLabel,
+      valueFontSize: atRiskFontSize,
+    },
+    {
+      label: "UNMARKED TODAY",
+      value: unmarkedValue,
+      icon: ClipboardList,
+      colorVar: unmarkedColor,
+      mutedVar: unmarkedMuted,
+      subLabel: unmarkedSubLabel,
+      valueFontSize: unmarkedFontSize,
+    },
   ];
-
-  const LegendChip = ({ colorVar, label }) => (
-    <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "var(--color-text-secondary)" }}>
-      <span style={{ width: 8, height: 8, borderRadius: 2, background: colorVar, flexShrink: 0 }} />
-      {label}
-    </div>
-  );
-
-  /* ── card shell ── */
-  const Card = ({ children, style = {} }) => (
-    <div style={{
-      background: "var(--color-surface-2)",
-      border: "1px solid rgba(255,255,255,0.06)",
-      borderRadius: "var(--radius-lg)",
-      padding: "var(--space-5)",
-      ...style,
-    }}>
-      {children}
-    </div>
-  );
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
       <style>{`
         @keyframes sa-spin { to { transform: rotate(360deg); } }
-        @keyframes sa-pulse-warn {
-          0%,100% { box-shadow: 0 0 0 0 rgba(245,158,11,0); }
-          50%      { box-shadow: 0 0 0 5px rgba(245,158,11,0.10); }
-        }
-
-        .sa-select, .sa-input {
-          width: 100%;
-          padding: 9px 12px;
-          background: var(--color-surface-3);
-          border: 1px solid rgba(255,255,255,0.07);
-          border-radius: var(--radius-md);
-          color: var(--color-text-primary);
-          font-size: 13px;
-          font-family: inherit;
-          outline: none;
-          transition: border-color 0.15s;
-        }
-        .sa-select:focus, .sa-input:focus {
-          border-color: var(--color-accent);
-        }
-        .sa-select option { background: var(--color-surface-2); }
-
-        .sa-toggle {
-          flex: 1; padding: 9px 8px;
-          border-radius: var(--radius-md);
-          border: 1px solid rgba(255,255,255,0.08);
-          background: var(--color-surface-3);
-          color: var(--color-text-secondary);
-          font-size: 13px; font-family: inherit; font-weight: 500;
-          cursor: pointer;
-          display: flex; align-items: center; justify-content: center; gap: 6px;
-          transition: all 0.15s;
-        }
-        .sa-toggle.is-present {
-          background: var(--color-success-muted);
-          border-color: rgba(16,185,129,0.32);
-          color: var(--color-success);
-        }
-        .sa-toggle.is-absent {
-          background: var(--color-danger-muted);
-          border-color: rgba(239,68,68,0.32);
-          color: var(--color-danger);
-        }
-
-        .sa-submit {
-          width: 100%; padding: 11px;
-          border: none; border-radius: var(--radius-md);
-          background: var(--color-accent); color: #fff;
-          font-size: 13.5px; font-weight: 600; font-family: inherit;
-          cursor: pointer; transition: opacity 0.15s; letter-spacing: 0.01em;
-        }
-        .sa-submit:hover:not(:disabled) { opacity: 0.87; }
-        .sa-submit:disabled { opacity: 0.50; cursor: not-allowed; }
 
         .sa-ftab {
           background: none; border: none;
@@ -362,7 +403,10 @@ const StudentAttendanceView = ({ sid }) => {
         }
         .sa-ftab:hover:not(.active) { color: var(--color-text-secondary); }
 
-        .sa-tr { border-bottom: 1px solid rgba(255,255,255,0.03); transition: background 0.12s; }
+        .sa-tr {
+          border-bottom: 1px solid rgba(255,255,255,0.03);
+          transition: background 0.12s;
+        }
         .sa-tr:hover { background: rgba(255,255,255,0.016); }
 
         .sa-pg-btn {
@@ -406,151 +450,14 @@ const StudentAttendanceView = ({ sid }) => {
         {statCards.map(s => <StatCard key={s.label} {...s} />)}
       </div>
 
-      {/* ── MARK FORM + DONUT ── */}
+      {/* ── TODAY'S SCHEDULE + MONTHLY CALENDAR ── */}
       <div className="sa-2col">
-
-        {/* Mark attendance */}
-        <Card>
-          <SectionHeader icon={CalendarCheck}>Mark today's class</SectionHeader>
-
-          {subjects.length === 0 ? (
-            <EmptyState
-              illustration="default"
-              title="No subjects added"
-              subtitle="Add subjects in Timetable first to start tracking attendance."
-            />
-          ) : (
-            <form onSubmit={handleMark} style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
-
-              {/* Subject */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-1)" }}>
-                <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-text-tertiary)", textTransform: "uppercase", letterSpacing: "0.07em" }}>
-                  Subject
-                </label>
-                <select
-                  className="sa-select"
-                  value={markForm.subjectId}
-                  onChange={e => setMarkForm(p => ({ ...p, subjectId: e.target.value }))}
-                  required
-                >
-                  <option value="">Select subject…</option>
-                  {subjects.map(s => (
-                    <option key={s._id} value={s._id}>{s.name} ({s.code})</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Date */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-1)" }}>
-                <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-text-tertiary)", textTransform: "uppercase", letterSpacing: "0.07em" }}>
-                  Date
-                </label>
-                <input
-                  type="date"
-                  className="sa-input"
-                  value={markForm.date}
-                  onChange={e => setMarkForm(p => ({ ...p, date: e.target.value }))}
-                />
-              </div>
-
-              {/* Status toggle */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-1)" }}>
-                <label style={{ fontSize: 11, fontWeight: 600, color: "var(--color-text-tertiary)", textTransform: "uppercase", letterSpacing: "0.07em" }}>
-                  Status
-                </label>
-                <div style={{ display: "flex", gap: "var(--space-2)" }}>
-                  <button type="button"
-                    className={`sa-toggle ${markForm.status === "present" ? "is-present" : ""}`}
-                    onClick={() => setMarkForm(p => ({ ...p, status: "present" }))}>
-                    <Check size={13} strokeWidth={2.5} /> Present
-                  </button>
-                  <button type="button"
-                    className={`sa-toggle ${markForm.status === "absent" ? "is-absent" : ""}`}
-                    onClick={() => setMarkForm(p => ({ ...p, status: "absent" }))}>
-                    <X size={13} strokeWidth={2.5} /> Absent
-                  </button>
-                </div>
-              </div>
-
-              <button type="submit" className="sa-submit" disabled={marking}>
-                {marking ? "Saving…" : "Submit record"}
-              </button>
-            </form>
-          )}
-        </Card>
-
-        {/* Overall donut */}
-        <Card>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
-            <SectionHeader icon={BarChart2}>Overall attendance</SectionHeader>
-            {overallStreak >= 2 && (
-              <div style={{
-                display: "inline-flex", alignItems: "center", gap: 5,
-                background: "var(--color-warning-muted)",
-                border: "1px solid rgba(245,158,11,0.22)",
-                color: "var(--color-warning)",
-                fontSize: 11, fontWeight: 700,
-                padding: "4px 10px", borderRadius: "var(--radius-pill)",
-                animation: "sa-pulse-warn 2.4s infinite",
-              }}>
-                <Flame size={12} fill="var(--color-warning)" />
-                {overallStreak}-day streak
-              </div>
-            )}
-          </div>
-
-          {stats.total > 0 ? (
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "var(--space-5)" }}>
-              {/* Donut */}
-              <div style={{ position: "relative", width: 130, height: 130, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <svg width={130} height={130} style={{ transform: "rotate(-90deg)", position: "absolute", top: 0, left: 0 }}>
-                  <circle cx={65} cy={65} r={donutR} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={donutSW} />
-                  <circle cx={65} cy={65} r={donutR} fill="none"
-                    stroke={pctColorVar(stats.percentage)}
-                    strokeWidth={donutSW}
-                    strokeDasharray={`${donutCirc} ${donutCirc}`}
-                    strokeDashoffset={donutOff}
-                    strokeLinecap="round"
-                    style={{ transition: "stroke-dashoffset 0.5s cubic-bezier(.4,0,.2,1)" }}
-                  />
-                </svg>
-                <div style={{ textAlign: "center", position: "relative", zIndex: 1 }}>
-                  <div style={{ fontSize: 28, fontWeight: 700, color: pctColorVar(stats.percentage), letterSpacing: "-1px", lineHeight: 1 }}>
-                    {stats.percentage}%
-                  </div>
-                  <div style={{ fontSize: 9, fontWeight: 600, color: "var(--color-text-tertiary)", textTransform: "uppercase", letterSpacing: "0.1em", marginTop: 4 }}>
-                    Attendance
-                  </div>
-                </div>
-              </div>
-
-              {/* Legend */}
-              <div style={{ display: "flex", gap: "var(--space-5)" }}>
-                {[
-                  { dot: "var(--color-success)", label: "Present", val: stats.present },
-                  { dot: "var(--color-danger)",  label: "Absent",  val: stats.absent  },
-                ].map(l => (
-                  <div key={l.label} style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12, color: "var(--color-text-secondary)" }}>
-                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: l.dot, flexShrink: 0 }} />
-                    {l.label} <strong style={{ color: "var(--color-text-primary)" }}>{l.val}</strong>
-                  </div>
-                ))}
-              </div>
-
-              <Insight present={stats.present} total={stats.total} />
-            </div>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: 200, gap: "var(--space-3)", textAlign: "center" }}>
-              <div style={{ width: 52, height: 52, borderRadius: "50%", background: "var(--color-accent-muted)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <BarChart3 size={22} color="var(--color-accent)" strokeWidth={1.8} />
-              </div>
-              <div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: "var(--color-text-primary)", marginBottom: 4 }}>No records yet</div>
-                <div style={{ fontSize: 12, color: "var(--color-text-secondary)", lineHeight: 1.5 }}>Mark your first class to start tracking</div>
-              </div>
-            </div>
-          )}
-        </Card>
+        <TodayScheduleCard
+          todayClasses={todayClasses}
+          existingRecords={data.records}
+          onQuickMark={handleQuickMark}
+        />
+        <MonthlyCalendarCard records={data.records} />
       </div>
 
       {/* ── SUBJECT BREAKDOWN + RECORDS ── */}
@@ -580,10 +487,8 @@ const StudentAttendanceView = ({ sid }) => {
                 .map(subject => {
                   const streak = getSubjectStreak(subject.code);
                   const col    = pctColorVar(subject.percentage);
-
                   return (
                     <div key={subject.code} className="sa-sub-card">
-                      {/* Row */}
                       <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", marginBottom: 8, flexWrap: "wrap" }}>
                         <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: "var(--color-text-primary)", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                           {subject.subject}
@@ -595,7 +500,6 @@ const StudentAttendanceView = ({ sid }) => {
                           padding: "2px 7px", borderRadius: "var(--radius-sm)",
                           fontFamily: "monospace", whiteSpace: "nowrap",
                         }}>{subject.code}</span>
-
                         {streak >= 2 && (
                           <span style={{
                             display: "inline-flex", alignItems: "center", gap: 3,
@@ -607,7 +511,6 @@ const StudentAttendanceView = ({ sid }) => {
                             <Flame size={9} fill="var(--color-warning)" /> {streak}
                           </span>
                         )}
-
                         <span style={{ fontSize: 11, color: "var(--color-text-tertiary)", whiteSpace: "nowrap" }}>
                           {subject.present}/{subject.total}
                         </span>
@@ -615,8 +518,6 @@ const StudentAttendanceView = ({ sid }) => {
                           {subject.percentage}%
                         </span>
                       </div>
-
-                      {/* Progress bar */}
                       <div style={{ height: 4, background: "rgba(255,255,255,0.05)", borderRadius: "var(--radius-pill)", overflow: "hidden" }}>
                         <div style={{
                           height: "100%", width: `${subject.percentage}%`,
@@ -624,7 +525,6 @@ const StudentAttendanceView = ({ sid }) => {
                           transition: "width 0.45s cubic-bezier(.4,0,.2,1)",
                         }} />
                       </div>
-
                       <Insight present={subject.present} total={subject.total} />
                     </div>
                   );
@@ -637,7 +537,6 @@ const StudentAttendanceView = ({ sid }) => {
         <Card>
           <SectionHeader icon={Calendar}>Attendance records</SectionHeader>
 
-          {/* Filter tabs */}
           <div style={{ display: "flex", borderBottom: "1px solid rgba(255,255,255,0.06)", marginBottom: "var(--space-4)" }}>
             {["all", "present", "absent"].map(f => (
               <button key={f}
@@ -648,7 +547,6 @@ const StudentAttendanceView = ({ sid }) => {
             ))}
           </div>
 
-          {/* Table */}
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
@@ -710,7 +608,6 @@ const StudentAttendanceView = ({ sid }) => {
             </table>
           </div>
 
-          {/* Pagination */}
           {totalPages > 1 && (
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "var(--space-4)" }}>
               <button className="sa-pg-btn" disabled={currentPage === 1}

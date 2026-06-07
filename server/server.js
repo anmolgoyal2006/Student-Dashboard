@@ -131,6 +131,11 @@ mongoose.connect(process.env.MONGO_URI, {
 })
   .then(() => {
     console.log('MongoDB connected');
+    // Drop stale 3-field unique index on attendances if it exists from an older schema
+    const Attendance = require('./models/Attendance');
+    Attendance.collection.dropIndex('userId_1_subjectId_1_date_1')
+      .then(() => console.log('[Index] Dropped stale attendance index userId_1_subjectId_1_date_1'))
+      .catch(() => {}); // ignore if already gone
     startDailyNotificationJob();
     startServer();
   })

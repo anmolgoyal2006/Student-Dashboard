@@ -11,6 +11,7 @@
 const Attendance = require('../models/Attendance');
 const Subject    = require('../models/Subject');
 const User       = require('../models/User');
+const mongoose   = require('mongoose');
 
 // ── Shared pure helpers ───────────────────────────────────────────────────────
 
@@ -41,9 +42,9 @@ const statusLabel = pct =>
 // ─────────────────────────────────────────────────────────────────────────────
 
 // POST /api/attendance
-// [CHANGED] Validates subjectId belongs to user; rejects future dates
+// [CHANGED] Validates subjectId belongs to user; rejects future dates; supports slot-level marking
 exports.markAttendance = async (req, res) => {
-  const { subjectId, date, status } = req.body;
+  const { subjectId, date, status, slot, time } = req.body;
   const userId = req.user.id;
 
   // [CHANGED] Input validation
@@ -61,7 +62,11 @@ exports.markAttendance = async (req, res) => {
   if (isNaN(parsedDate.getTime())) {
     return res.status(400).json({ message: 'Invalid date format.' });
   }
-  if (parsedDate > new Date()) {
+  // Normalize to midnight UTC to avoid timezone-related date shifts
+  parsedDate.setUTCHours(0, 0, 0, 0);
+  const nowUTC = new Date();
+  nowUTC.setUTCHours(23, 59, 59, 999); // allow marking for today
+  if (parsedDate > nowUTC) {
     return res.status(400).json({ message: 'Cannot mark attendance for a future date.' });
   }
 
@@ -72,11 +77,30 @@ exports.markAttendance = async (req, res) => {
       return res.status(404).json({ message: 'Subject not found.' });
     }
 
-    const record = await Attendance.findOneAndUpdate(
-      { userId, subjectId, date: parsedDate },
-      { status },
-      { upsert: true, new: true, setDefaultsOnInsert: true }
-    );
+    // slot is always provided from frontend (slot_0, slot_1, etc.)
+    // unique index on { userId, subjectId, date, slot } handles deduplication
+    // re-marking same slot correctly updates the existing record
+    const updateData = { status };
+    if (slot) updateData.slot = slot;
+    if (time) updateData.time = time;
+
+    let record;
+    try {
+      record = await Attendance.findOneAndUpdate(
+        { userId, subjectId, date: parsedDate, slot: slot || null },
+        updateData,
+        { upsert: true, new: true, setDefaultsOnInsert: true }
+      );
+    } catch (upsertErr) {
+      // E11000 = duplicate key (stale 3-field index or concurrent request)
+      if (upsertErr.code !== 11000) throw upsertErr;
+      record = await Attendance.findOneAndUpdate(
+        { userId, subjectId, date: parsedDate },
+        { $set: updateData },
+        { new: true }
+      );
+      if (!record) throw upsertErr;
+    }
 
     res.status(201).json({ message: 'Attendance marked', attendance: record });
   } catch (err) {
@@ -225,6 +249,7 @@ exports.getBySubject = async (req, res) => {
 
     const records = await Attendance
       .find(filter)
+      .populate('subjectId', 'name code')
       .sort({ date: -1 })
       .skip(skip)
       .limit(parseInt(limit, 10));
@@ -314,7 +339,7 @@ exports.getMonthlyTrends = async (req, res) => {
  // 🔔 Mark attendance from notification
 exports.markFromNotification = async (req, res) => {
   try {
-    const { subjectId, status, date } = req.body;
+    const { subjectId, status, date, slot, time } = req.body;
     const userId = req.user.id || req.user._id;
 
     // Map notification status → your system status
@@ -331,27 +356,36 @@ exports.markFromNotification = async (req, res) => {
     }
 
     const attendanceDate = date ? new Date(date) : new Date();
-    attendanceDate.setHours(0, 0, 0, 0);
+    attendanceDate.setUTCHours(0, 0, 0, 0);
 
     // 🔒 Ensure subject belongs to user (same as your existing logic)
-   const mongoose = require('mongoose');
-const isValidId = mongoose.Types.ObjectId.isValid(subjectId);
-const subject = isValidId
-  ? await Subject.findOne({ $or: [{ _id: subjectId }, { name: subjectId }], userId })
-  : await Subject.findOne({ name: subjectId, userId });
-if (!subject) {
-  return res.status(404).json({ message: 'Subject not found' });
-}
+    const isValidId = mongoose.Types.ObjectId.isValid(subjectId);
+    const subject = isValidId
+      ? await Subject.findOne({ $or: [{ _id: subjectId }, { name: subjectId }], userId })
+      : await Subject.findOne({ name: subjectId, userId });
+    if (!subject) {
+      return res.status(404).json({ message: 'Subject not found' });
+    }
+
+    // [CHANGED] Build query with slot if provided for slot-level attendance
+    const query = { userId, subjectId, date: attendanceDate };
+    if (slot) {
+      query.slot = slot;
+    }
+
+    const updateData = {
+      userId,
+      subjectId,
+      status: mappedStatus,
+      date: attendanceDate,
+      markedAt: new Date()
+    };
+    if (slot) updateData.slot = slot;
+    if (time) updateData.time = time;
 
     const record = await Attendance.findOneAndUpdate(
-      { userId, subjectId, date: attendanceDate },
-      {
-        userId,
-        subjectId,
-        status: mappedStatus,
-        date: attendanceDate,
-        markedAt: new Date()
-      },
+      query,
+      updateData,
       { upsert: true, new: true }
     );
 
@@ -374,19 +408,33 @@ exports.getStudentBySid = async (req, res) => {
 
     const rawRecords = await Attendance.find({ userId: student._id })
       .populate('subjectId', 'name code')
-      .sort({ date: -1 });
+      .sort({ date: -1, createdAt: -1 });
+
+    // Deduplicate records by { subjectId, date, slot }
+    // Keep only the most recent record if duplicates exist
+    const dedupMap = new Map();
+    rawRecords.forEach(r => {
+      const key = `${r.subjectId?._id?.toString()}_${r.date.toISOString().slice(0, 10)}_${r.slot || 'null'}`;
+      if (!dedupMap.has(key)) {
+        dedupMap.set(key, r);
+      }
+    });
+    const dedupedRecords = Array.from(dedupMap.values());
 
     // Flatten records for the table
-    const records = rawRecords.map(r => ({
-      date:    r.date,
-      status:  r.status,
-      subject: r.subjectId?.name || 'Unknown',
-      code:    r.subjectId?.code || '—',
+    const records = dedupedRecords.map(r => ({
+      date:      r.date,
+      status:    r.status,
+      subject:   r.subjectId?.name || 'Unknown',
+      code:      r.subjectId?.code || '—',
+      subjectId: r.subjectId?._id?.toString() || null,
+      slot:      r.slot || null,
+      time:      r.time || null,
     }));
 
     // Per-subject summary for the breakdown bars
     const subjectMap = {};
-    for (const r of rawRecords) {
+    for (const r of dedupedRecords) {
       if (r.status === 'cancelled') continue;
       const key  = r.subjectId?._id?.toString() || 'unknown';
       const name = r.subjectId?.name || 'Unknown';
@@ -398,7 +446,9 @@ exports.getStudentBySid = async (req, res) => {
 
     const summary = Object.values(subjectMap).map(s => ({
       ...s,
-      percentage: s.total ? +((s.present / s.total) * 100).toFixed(1) : 0,
+      percentage: s.total 
+        ? Math.round((s.present / s.total) * 100) 
+        : 0,
     }));
 
     const present = records.filter(r => r.status === 'present').length;
