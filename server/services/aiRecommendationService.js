@@ -1,9 +1,10 @@
-const Attendance     = require('../models/Attendance');
-const Marks          = require('../models/Marks');
-const CareerProgress = require('../models/CareerProgress');
-const Subject        = require('../models/Subject');
-const Task           = require('../models/Task');
-const Groq           = require('groq-sdk');
+const Attendance          = require('../models/Attendance');
+const Marks               = require('../models/Marks');
+const CareerProgress      = require('../models/CareerProgress');
+const Subject             = require('../models/Subject');
+const Task                = require('../models/Task');
+const ClassroomAssignment = require('../models/ClassroomAssignment');
+const Groq                = require('groq-sdk');
 
 const groq = new Groq({ apiKey: process.env.GROQ_CHAT_KEY || process.env.GROQ_API_KEY });
 
@@ -128,6 +129,33 @@ const getCareerSuggestions = async (userId) => {
 
   const suggestions = [];
   const { problemsSolved, targetCompany, dsaTopics, readiness } = career;
+  const lc = career.leetcodeSync || {};
+
+  if (career.leetcodeUsername && (lc.easy > 30 && lc.medium < 20)) {
+    suggestions.push({
+      type:     'dsa',
+      priority: 'medium',
+      icon:     '💡',
+      title:    'Focus on Medium Problems',
+      message:  `You've solved ${lc.easy} Easy but only ${lc.medium} Medium. Level up to medium difficulty for interview readiness.`,
+    });
+  } else if (career.leetcodeUsername && (lc.easy + lc.medium > 50 && lc.hard < 5)) {
+    suggestions.push({
+      type:     'dsa',
+      priority: 'medium',
+      icon:     '🔥',
+      title:    'Start Hard Problems',
+      message:  `Only ${lc.hard} Hard problems solved. Top companies ask Hard — start practicing.`,
+    });
+  } else if (!career.leetcodeUsername && problemsSolved > 0) {
+    suggestions.push({
+      type:     'dsa',
+      priority: 'info',
+      icon:     '🔗',
+      title:    'Link LeetCode Account',
+      message:  `You've solved ${problemsSolved} problems. Link your LeetCode profile for detailed tracking.`,
+    });
+  }
 
   if (problemsSolved < 50) {
     const incomplete = dsaTopics.filter(t => !t.completed).slice(0, 3).map(t => t.name);
@@ -173,14 +201,45 @@ const getCareerSuggestions = async (userId) => {
   return suggestions;
 };
 
+const getClassroomSuggestions = async (userId) => {
+  const assignments = await ClassroomAssignment.find({ userId, status: { $ne: 'submitted' } }).sort({ dueDate: 1 }).limit(5);
+  const suggestions = [];
+  const now = new Date();
+
+  for (const a of assignments) {
+    if (!a.dueDate) continue;
+    const diff = (new Date(a.dueDate) - now) / (1000 * 60 * 60 * 24);
+    if (diff < 0) {
+      suggestions.push({
+        type:     'warning',
+        priority: 'high',
+        icon:     '⚠️',
+        title:    `Overdue: ${a.title}`,
+        message:  `${a.courseName} assignment was due! Submit ASAP.`,
+      });
+    } else if (diff <= 3) {
+      suggestions.push({
+        type:     'study',
+        priority: 'high',
+        icon:     '📋',
+        title:    `Due Soon: ${a.title}`,
+        message:  `${a.courseName} due in ${Math.ceil(diff)} day(s). Start working on it.`,
+      });
+    }
+  }
+
+  return suggestions;
+};
+
 // Fallback logic aggregator
 async function getFallbackRecommendations(userId) {
-  const [attendanceSuggestions, cgpaSuggestions, careerSuggestions] = await Promise.all([
+  const [attendanceSuggestions, cgpaSuggestions, careerSuggestions, classroomSuggestions] = await Promise.all([
     getAttendanceSuggestions(userId),
     getCGPASuggestions(userId),
     getCareerSuggestions(userId),
+    getClassroomSuggestions(userId),
   ]);
-  const all = [...attendanceSuggestions, ...cgpaSuggestions, ...careerSuggestions];
+  const all = [...attendanceSuggestions, ...cgpaSuggestions, ...careerSuggestions, ...classroomSuggestions];
   const order = { high: 0, medium: 1, info: 2 };
   all.sort((a, b) => order[a.priority] - order[b.priority]);
   return all;
@@ -201,12 +260,13 @@ function extractJSONArray(raw) {
 exports.getRecommendations = async (userId) => {
   try {
     // 1. Gather all student datasets from Database
-    const [subjects, attendanceRecords, marksRecords, pendingTasks, careerProgress] = await Promise.all([
+    const [subjects, attendanceRecords, marksRecords, pendingTasks, careerProgress, classroomAssignments] = await Promise.all([
       Subject.find({ userId }),
       Attendance.find({ userId }).populate('subjectId', 'name'),
       Marks.find({ userId }).populate('subjectId', 'name'),
       Task.find({ user: userId, status: { $ne: 'completed' } }),
       CareerProgress.findOne({ userId }),
+      ClassroomAssignment.find({ userId, status: { $ne: 'submitted' } }).sort({ dueDate: 1 }).limit(10),
     ]);
 
     // Format Attendance Summary
@@ -237,11 +297,29 @@ exports.getRecommendations = async (userId) => {
       return `• [${t.priority.toUpperCase()}] ${t.title} (due ${due}) - subject: ${t.subject || 'General'}`;
     });
 
+    // Format LeetCode Data
+    let leetcodeSummary = "Not linked.";
+    if (careerProgress && careerProgress.leetcodeUsername) {
+      const lc = careerProgress.leetcodeSync || {};
+      const topTopics = Object.entries(lc.topicCounts || {})
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([t, c]) => `${t}: ${c}`)
+        .join(', ');
+      leetcodeSummary = `Username: ${careerProgress.leetcodeUsername}, Total: ${lc.totalOnLeetcode || 0}, Easy: ${lc.easy || 0}, Medium: ${lc.medium || 0}, Hard: ${lc.hard || 0}, Top Topics: ${topTopics || 'none'}`;
+    }
+
+    // Format Classroom Assignments
+    const assignmentsSummary = classroomAssignments.map(a => {
+      const due = a.dueDate ? new Date(a.dueDate).toISOString().slice(0, 10) : 'No due date';
+      return `• [${a.priority}] ${a.title} — ${a.courseName} (due ${due}, status: ${a.status})`;
+    });
+
     // Format Career Progress
     let careerSummary = "No placement profile set yet.";
     if (careerProgress) {
       const incompleteTopics = careerProgress.dsaTopics.filter(t => !t.completed).map(t => t.name).slice(0, 3).join(', ');
-      careerSummary = `Target Company: ${careerProgress.targetCompany}, LeetCode Solved: ${careerProgress.problemsSolved}, Placement Readiness: ${careerProgress.readiness}, Incomplete DSA Topics: ${incompleteTopics}`;
+      careerSummary = `Target Company: ${careerProgress.targetCompany}, Problems Solved: ${careerProgress.problemsSolved}, Placement Readiness: ${careerProgress.readiness}, Incomplete DSA Topics: ${incompleteTopics}`;
     }
 
     // Build the payload
@@ -250,7 +328,9 @@ exports.getRecommendations = async (userId) => {
       attendance: attendanceSummary,
       examMarks: marksSummary,
       pendingTasks: tasksSummary,
-      careerProfile: careerSummary
+      careerProfile: careerSummary,
+      leetcode: leetcodeSummary,
+      classroomAssignments: assignmentsSummary,
     };
 
     const systemPrompt = `
@@ -274,8 +354,12 @@ Critical Analysis Rules:
 1. If any subject's attendance is under 75%, add a "warning" item with high priority. Mention the subject and tell them they need to attend classes.
 2. If the student has low exam marks (e.g. under 60% or Grade Point <= 6) in any subject, add a "study" recommendation. Mention the subject.
 3. If they have outstanding tasks near deadlines, recommend working on them.
-4. If their LeetCode problem count is low (under 150), add a "dsa" recommendation. Mention specific incomplete topics to work on.
-5. Reference actual names of subjects, exam types, task titles, and target companies from the data. Do not make up mock data.
+4. If they have linked LeetCode, analyze their difficulty breakdown: if Easy is high but Medium is low, recommend focusing on Medium problems. If Hard is very low or zero, recommend starting Hard problems. Mention specific topic gaps from the Top Topics data.
+5. If they have not linked LeetCode but have problems solved in their career profile, recommend linking LeetCode for better tracking.
+6. If they have classroom assignments due within the next 3 days, add a "warning" or "study" item to complete them. Mention the assignment title and course name.
+7. If they have multiple submitted/returned classroom assignments pending grade review, suggest following up.
+8. If their overall DSA/career progress is strong (150+ problems, high readiness), suggest advanced topics like System Design or mock interviews.
+9. Reference actual names of subjects, exam types, task titles, target companies, LeetCode stats, and classroom assignment titles from the data. Do not make up mock data.
 `;
 
     // 2. Call Groq
