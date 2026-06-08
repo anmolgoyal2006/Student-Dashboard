@@ -87,19 +87,39 @@ function formatMarks(records) {
   }));
 }
 
+const PAST_TO_IMPERATIVE = [
+  [/^Solved\s+/i,    'Solve '],
+  [/^Completed\s+/i, 'Complete '],
+  [/^Attended\s+/i,  'Attend '],
+  [/^Finished\s+/i,  'Finish '],
+  [/^Submitted\s+/i, 'Submit '],
+  [/^Practiced\s+/i, 'Practice '],
+  [/^Reviewed\s+/i,  'Review '],
+  [/^Watched\s+/i,   'Watch '],
+  [/^Read\s+/i,      'Read '],
+  [/^Wrote\s+/i,     'Write '],
+];
+
+function toImperative(title) {
+  for (const [pattern, replacement] of PAST_TO_IMPERATIVE) {
+    if (pattern.test(title)) return title.replace(pattern, replacement);
+  }
+  return title;
+}
+
 function formatTasks(tasks) {
-  const now = new Date();
   return tasks.map(t => {
     const due = t.dueDate ? new Date(t.dueDate).toISOString().slice(0, 10) : 'No date';
     const diff = t.dueDate ? daysFromNow(t.dueDate) : null;
+    const cleanTitle = toImperative(t.title);
     return {
-      title: t.title,
-      priority: t.priority,
-      subject: t.subject || 'General',
+      title:        cleanTitle,
+      priority:     t.priority,
+      subject:      t.subject || 'General',
       daysUntilDue: diff !== null ? Math.ceil(diff) : null,
-      overdue: diff !== null && diff < 0,
-      dueSoon: diff !== null && diff >= 0 && diff <= 3,
-      summary: `[${t.priority.toUpperCase()}] ${t.title} — due ${due} (subject: ${t.subject || 'General'})`,
+      overdue:      diff !== null && diff < 0,
+      dueSoon:      diff !== null && diff >= 0 && diff <= 3,
+      summary:      `[${t.priority.toUpperCase()}] ${cleanTitle} — due ${due} (subject: ${t.subject || 'General'})`,
     };
   });
 }
