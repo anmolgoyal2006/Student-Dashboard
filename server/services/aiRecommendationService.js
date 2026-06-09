@@ -137,13 +137,24 @@ function formatLeetCode(career) {
   const weakTopics   = topicEntries.slice(0, 3).map(([t, c]) => `${t}(${c})`).join(', ');
   const strongTopics = topicEntries.slice(-3).reverse().map(([t, c]) => `${t}(${c})`).join(', ');
 
-  // Diagnose problem distribution
+  // Diagnose problem distribution — computed server-side with guaranteed correct numbers
   const diagnosis = [];
-  if (total < 50)              diagnosis.push('Very early stage — focus on Easy/Medium basics');
-  else if (total < 150)        diagnosis.push('Intermediate — push Medium problems hard');
-  else                         diagnosis.push('Strong base — tackle Hard + System Design');
-  if (easy > 0 && medium < easy * 0.4) diagnosis.push(`Too Easy-heavy (${easy}E vs ${medium}M) — shift to Medium`);
-  if (total > 50 && hard < 5)  diagnosis.push(`Almost no Hard problems (${hard}) — start attempting`);
+  if (total < 50) {
+    diagnosis.push('Very early stage — focus on Easy/Medium basics');
+  } else if (total >= 50 && total < 150) {
+    diagnosis.push('Intermediate — push Medium problems hard');
+  } else {
+    diagnosis.push('Strong base — tackle Hard + System Design');
+  }
+  if (easy > 0 && easy > 2 * medium) {
+    diagnosis.push(`Too many Easy solves (${easy} Easy vs ${medium} Medium) — shift to Medium`);
+  }
+  if (total >= 80 && hard < 10) {
+    diagnosis.push(`Only ${hard} Hard solved — start attempting Hard problems weekly`);
+  }
+  if (medium >= easy * 1.5) {
+    diagnosis.push(`Good Medium volume (${medium} Medium) — maintain with targeted Hard on weak topics`);
+  }
 
   return {
     linked: true,
@@ -152,7 +163,7 @@ function formatLeetCode(career) {
     weakTopics,
     strongTopics,
     diagnosis: diagnosis.join('; '),
-    summary: `User: ${career.leetcodeUsername} | Total: ${total} (E:${easy} M:${medium} H:${hard}) | Weak topics: ${weakTopics || 'none'} | Strong: ${strongTopics || 'none'} | ${diagnosis.join('; ')}`,
+    summary: `User: ${career.leetcodeUsername} | Total: ${total} (Easy:${easy}, Medium:${medium}, Hard:${hard}) | Weak topics: ${weakTopics || 'none'} | Strong: ${strongTopics || 'none'} | ${diagnosis.join('; ')}`,
   };
 }
 
@@ -308,6 +319,7 @@ exports.getRecommendations = async (userId) => {
       // Career & LeetCode
       careerProfile: careerData.summary,
       leetcode:      lcData.summary,
+      leetcodeDiagnosis: lcData.diagnosis || '',
       targetCompany: careerData.targetCompany || 'Not set',
       placementReadiness: careerData.readiness || 'Unknown',
       companyRoadmap: careerData.roadmap ? careerData.roadmap.join(' | ') : '',
@@ -351,10 +363,11 @@ TASKS:
 - Rephrase past-tense task titles to imperative form
 
 LEETCODE (only if linked):
-- Easy >> Medium (Easy > 2× Medium) → "Solve more Medium problems. Current: XE XM."
-- Hard < 5 and total > 50 → "Attempt Hard problems — only X solved."
-- Weak topics exist → mention top weak topic by name
+- Use the pre-computed leetcodeDiagnosis field for all difficulty advice — it is accurate
+- If leetcodeDiagnosis mentions "Too many Easy solves" -> "study" card: "Solve more Medium problems"
+- If leetcodeDiagnosis mentions "Hard solved" -> "study" card about attempting Hard problems
 - NEVER suggest linking LeetCode if username is already present
+- Do NOT recompute ratios or counts — trust the provided numbers exactly
 
 CAREER:
 - Always include 1 "career" card with target company roadmap next step
