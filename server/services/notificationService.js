@@ -2,30 +2,51 @@
 const admin        = require('../config/firebaseAdmin');
 const Subject      = require('../models/Subject');
 const User         = require('../models/User');
-const Notification = require('../models/Notification');   // ← NEW
+const Notification = require('../models/Notification');
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-function getTodayName() {
-  return DAYS[new Date().getDay()];
+// ─── IST-aware time helpers ──────────────────────────────────────
+// Server likely runs in UTC; all class times are in IST (Asia/Kolkata).
+// These helpers return correct IST values regardless of server timezone.
+
+function getISTDate() {
+  const now = new Date();
+  // IST offset = UTC +5:30
+  const istOffsetMs = 5.5 * 60 * 60 * 1000;
+  return new Date(now.getTime() + istOffsetMs);
 }
 
-async function fetchTodaySubjects() {
-  const today = getTodayName();
+function getISTDayShort() {
+  return DAYS[getISTDate().getUTCDay()];
+}
 
- if (today === 'Sat') {
-    console.log('[FCM] Weekend — no notifications sent.');
+function getISTTimeHHMM() {
+  const d = getISTDate();
+  return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
+}
+
+function getISTDateString() {
+  const d = getISTDate();
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+}
+
+// ─────────────────────────────────────────────────────────────────
+
+async function fetchTodaySubjects(dayShort) {
+  if (dayShort === 'Sat' || dayShort === 'Sun') {
+    console.log(`[FCM] ${dayShort} — no notifications sent.`);
     return [];
   }
 
   const subjects = await Subject.find({
-    schedule: { $elemMatch: { day: today } },
+    schedule: { $elemMatch: { day: dayShort } },
   }).lean();
 
   return subjects;
 }
 
-function buildPayload(subject, userId, startTime) {
+function buildPayload(subject, userId, startTime, dateStr) {
   return {
     notification: {
       title: `📚 ${subject.name}`,
@@ -39,7 +60,7 @@ function buildPayload(subject, userId, startTime) {
       userId:    String(userId),
       subject:   subject.name,
       time:      startTime || '',
-      date:      new Date().toISOString().split('T')[0],
+      date:      dateStr,
     },
     webpush: {
       notification: {
@@ -60,7 +81,7 @@ function buildPayload(subject, userId, startTime) {
           userId:    String(userId),
           subject:   subject.name,
           time:      startTime || '',
-          date:      new Date().toISOString().split('T')[0],
+          date:      dateStr,
         },
       },
       fcmOptions: {},
@@ -78,59 +99,42 @@ async function sendNotification(fcmToken, payload) {
   }
 }
 
-// ─── NEW: saves one Notification doc to MongoDB ───────────────────────────────
 async function saveNotificationToDB(userId, subjectId, title, body) {
   try {
     console.log("💾 Saving notification:", { userId, subjectId, title });
-
-    const saved = await Notification.create({
-      userId,
-      subjectId,
-      title,
-      body
-    });
-
+    const saved = await Notification.create({ userId, subjectId, title, body });
     console.log("✅ Saved to DB:", saved._id);
   } catch (err) {
     console.error("❌ DB SAVE ERROR:", err.message);
   }
 }
-// ─────────────────────────────────────────────────────────────────────────────
 
+// ─── Start-of-day reminder ───────────────────────────────────────
 async function sendTodayNotifications() {
-  const today    = getTodayName();
-  const subjects = await fetchTodaySubjects();
+  const dayShort = getISTDayShort();
+  const dateStr  = getISTDateString();
+  const subjects = await fetchTodaySubjects(dayShort);
 
   if (!subjects.length) {
-    console.log('[FCM] No subjects found for today.');
+    console.log(`[FCM] No subjects found for ${dayShort}.`);
     return;
   }
 
   let totalSent = 0;
 
   for (const subject of subjects) {
-    const { userId, schedule } = subject;
-
-    const todaySchedule = schedule.find((s) => s.day === today);
+    const todaySchedule = subject.schedule.find((s) => s.day === dayShort);
     if (!todaySchedule) continue;
 
     const startTime = todaySchedule.startTime || '';
 
-   const user = await User.findById(userId).select('fcmToken').lean();
-if (!user || !user.fcmToken) continue;
+    const user = await User.findById(subject.userId).select('fcmToken').lean();
+    if (!user || !user.fcmToken) continue;
 
-const tokens = [user.fcmToken];
+    const tokens = [user.fcmToken];
+    const payload = buildPayload(subject, subject.userId, startTime, dateStr);
 
-    const payload = buildPayload(subject, userId, startTime);
-
-    // ── NEW: save ONCE per subject (not once per token) ──────────────────────
-    await saveNotificationToDB(
-      userId,
-      subject._id,
-      payload.notification.title,
-      payload.notification.body
-    );
-    // ─────────────────────────────────────────────────────────────────────────
+    await saveNotificationToDB(subject.userId, subject._id, payload.notification.title, payload.notification.body);
 
     for (const token of tokens) {
       const sent = await sendNotification(token, payload);
@@ -138,44 +142,46 @@ const tokens = [user.fcmToken];
     }
   }
 
-  console.log(`[FCM] Total notifications sent today: ${totalSent}`);
+  console.log(`[FCM] Total start-of-day notifications sent: ${totalSent}`);
 }
 
+// ─── End-of-class "Did you attend?" prompt ───────────────────────
 async function sendEndOfClassNotifications() {
-  const now      = new Date();
-  const dayShort = DAYS[now.getDay()];
+  const dayShort = getISTDayShort();
+  const currentTime = getISTTimeHHMM();
+  const dateStr     = getISTDateString();
 
-  if (dayShort === 'Sat') return;
+  if (dayShort === 'Sat' || dayShort === 'Sun') return;
 
-  // Current time as "HH:MM" 24h format — must match your DB format
-  const currentTime = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-
-// Also build 12h format in case DB stores times as "4:00 PM"
-const hours12    = now.getHours() % 12 || 12;
-const ampm       = now.getHours() >= 12 ? 'PM' : 'AM';
-const currentTime12 = `${hours12}:${String(now.getMinutes()).padStart(2,'0')} ${ampm}`;
+  // Also build 12h format for safety
+  const [h, m] = currentTime.split(':').map(Number);
+  const hours12 = h % 12 || 12;
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const currentTime12 = `${hours12}:${String(m).padStart(2, '0')} ${ampm}`;
 
   const subjects = await Subject.find({
     schedule: {
       $elemMatch: {
         day    : dayShort,
-        endTime: { $in: [currentTime, currentTime12] }
-      }
-    }
+        endTime: { $in: [currentTime, currentTime12] },
+      },
+    },
   }).lean();
 
   if (!subjects.length) return;
 
-  console.log(`[FCM] ${subjects.length} class(es) ending at ${currentTime} on ${dayShort}`);
+  console.log(`[FCM] ${subjects.length} class(es) ending at ${currentTime} IST on ${dayShort}`);
 
   for (const subject of subjects) {
     const user = await User.findById(subject.userId).select('fcmToken').lean();
     if (!user?.fcmToken) continue;
 
-const slot = subject.schedule.find(s => s.day === dayShort && [currentTime, currentTime12].includes(s.endTime));
+    const slot = subject.schedule.find(
+      (s) => s.day === dayShort && [currentTime, currentTime12].includes(s.endTime)
+    );
 
     const title = `📋 Did you attend ${subject.name}?`;
-    const body  = `Class just ended${slot?.room ? ` in ${slot.room}` : ''}. Mark your attendance.`;
+    const body = `Class just ended${slot?.room ? ` in ${slot.room}` : ''}. Mark your attendance.`;
 
     const payload = {
       notification: { title, body },
@@ -184,7 +190,7 @@ const slot = subject.schedule.find(s => s.day === dayShort && [currentTime, curr
         subjectId: String(subject._id),
         userId   : String(subject.userId),
         subject  : subject.name,
-        date     : now.toISOString().split('T')[0],
+        date     : dateStr,
       },
       webpush: {
         notification: {
@@ -195,14 +201,14 @@ const slot = subject.schedule.find(s => s.day === dayShort && [currentTime, curr
           actions: [
             { action: 'attended',     title: '✅ Attended'    },
             { action: 'not_attended', title: '❌ Not Attended' },
-            { action: 'not_held',     title: '⏸️ Not Held'     },
+            { action: 'not_held',     title: '⏸️ Not Held'    },
           ],
           data: {
             type     : 'ATTENDANCE_MARK',
             subjectId: String(subject._id),
             userId   : String(subject.userId),
             subject  : subject.name,
-            date     : now.toISOString().split('T')[0],
+            date     : dateStr,
           },
         },
       },
@@ -211,7 +217,7 @@ const slot = subject.schedule.find(s => s.day === dayShort && [currentTime, curr
     await sendNotification(user.fcmToken, payload);
     await saveNotificationToDB(subject.userId, subject._id, title, body);
 
-    console.log(`[FCM] End-of-class notification sent: ${subject.name} at ${currentTime}`);
+    console.log(`[FCM] End-of-class notification sent: ${subject.name} at ${currentTime} IST`);
   }
 }
 
