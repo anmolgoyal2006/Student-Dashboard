@@ -15,16 +15,6 @@ export default function AdminPanel() {
   const [filter, setFilter]     = useState('all');
   const [updating, setUpdating] = useState(null);
 
-  // ── Guard ────────────────────────────────────────────────────────────────
-  if (user?.role !== 'teacher') {
-    return (
-      <div className="card" style={{ textAlign: 'center', padding: 40, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-        <Lock size={32} style={{ color: 'var(--color-accent)' }} />
-        <p style={{ fontWeight: 600 }}>Access denied — teachers only.</p>
-      </div>
-    );
-  }
-
   // ── Fetch users ──────────────────────────────────────────────────────────
   const fetchUsers = async () => {
     try {
@@ -32,10 +22,14 @@ export default function AdminPanel() {
       const res   = await fetch(`${API}/api/admin/users`, {
         headers: { Authorization: `Bearer ${token}` },
       });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || `Request failed (${res.status})`);
+      }
       const data  = await res.json();
       setUsers(data.users || []);
-    } catch {
-      toast.error('Failed to load users.');
+    } catch (err) {
+      toast.error(err.message || 'Failed to load users.');
     } finally {
       setLoading(false);
     }
