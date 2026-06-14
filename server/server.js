@@ -145,20 +145,13 @@ mongoose.connect(process.env.MONGO_URI, {
       console.log('[Index] Dropped stale attendance index');
     } catch (_) {}
 
+    // Drop the bad non-sparse unique sid_1 index — sid no longer has unique:true in schema
     try {
       const User = require('./models/User');
       await User.collection.dropIndex('sid_1');
-      console.log('[Index] Dropped stale non-sparse sid_1 index');
+      console.log('[Index] Dropped sid_1 index — sid uniqueness removed from schema');
     } catch (_) {}
-
-    // ── Sync indexes fresh (picks up sparse: true from schema) ────────
-    try {
-      const User = require('./models/User');
-      await User.syncIndexes();
-      console.log('[Index] User indexes synced');
-    } catch (e) {
-      console.warn('[Index] syncIndexes warning:', e.message);
-    }
+    // NOTE: do NOT call syncIndexes() — it would recreate indexes from schema
     startDailyNotificationJob();
     startClassroomSyncJob();
     startNotificationJobs();
