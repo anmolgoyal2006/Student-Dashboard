@@ -135,19 +135,30 @@ mongoose.connect(process.env.MONGO_URI, {
   retryWrites: true,
   w: 'majority',
 })
-  .then(() => {
+  .then(async () => {
     console.log('MongoDB connected');
-    // Drop stale 3-field unique index on attendances if it exists from an older schema
-    const Attendance = require('./models/Attendance');
-    Attendance.collection.dropIndex('userId_1_subjectId_1_date_1')
-      .then(() => console.log('[Index] Dropped stale attendance index userId_1_subjectId_1_date_1'))
-      .catch(() => {}); // ignore if already gone
 
-    // Drop stale non-sparse unique index on users.sid — causes E11000 when multiple users have sid: null
-    const User = require('./models/User');
-    User.collection.dropIndex('sid_1')
-      .then(() => console.log('[Index] Dropped stale sid_1 index — will be recreated as sparse'))
-      .catch(() => {}); // ignore if already gone or already sparse
+    // ── Drop stale indexes before starting server ──────────────────────
+    try {
+      const Attendance = require('./models/Attendance');
+      await Attendance.collection.dropIndex('userId_1_subjectId_1_date_1');
+      console.log('[Index] Dropped stale attendance index');
+    } catch (_) {}
+
+    try {
+      const User = require('./models/User');
+      await User.collection.dropIndex('sid_1');
+      console.log('[Index] Dropped stale non-sparse sid_1 index');
+    } catch (_) {}
+
+    // ── Sync indexes fresh (picks up sparse: true from schema) ────────
+    try {
+      const User = require('./models/User');
+      await User.syncIndexes();
+      console.log('[Index] User indexes synced');
+    } catch (e) {
+      console.warn('[Index] syncIndexes warning:', e.message);
+    }
     startDailyNotificationJob();
     startClassroomSyncJob();
     startNotificationJobs();
