@@ -24,22 +24,36 @@ router.get('/google',
 );
 
 router.get('/google/callback',
-  passport.authenticate('google', {
-    session:  false,
-    failureRedirect: 'https://student-dashboard-ashy-rho.vercel.app/login?error=google_failed',
-  }),
-  (req, res) => {
-    // Generate JWT same way as normal login
- const token = jwt.sign(
-      { id: req.user._id, email: req.user.email, name: req.user.name, role: req.user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: '7d' }
-    );
+  (req, res, next) => {
+    passport.authenticate('google', { session: false }, (err, user, info) => {
+      if (err) {
+        console.error('[Google OAuth] Strategy error:', err.message);
+        return res.redirect('https://student-dashboard-ashy-rho.vercel.app/login?error=google_failed');
+      }
+      if (!user) {
+        console.error('[Google OAuth] No user returned:', info);
+        return res.redirect('https://student-dashboard-ashy-rho.vercel.app/login?error=google_failed');
+      }
 
-    // Redirect to frontend with token
-    res.redirect(
-      `https://student-dashboard-ashy-rho.vercel.app/login-success?token=${token}`
-    );
+      if (!process.env.JWT_SECRET) {
+        console.error('[Google OAuth] JWT_SECRET is not set!');
+        return res.redirect('https://student-dashboard-ashy-rho.vercel.app/login?error=server_error');
+      }
+
+      try {
+        const token = jwt.sign(
+          { id: user._id, email: user.email, name: user.name, role: user.role },
+          process.env.JWT_SECRET,
+          { expiresIn: '7d' }
+        );
+        return res.redirect(
+          `https://student-dashboard-ashy-rho.vercel.app/login-success?token=${token}`
+        );
+      } catch (jwtErr) {
+        console.error('[Google OAuth] JWT sign error:', jwtErr.message);
+        return res.redirect('https://student-dashboard-ashy-rho.vercel.app/login?error=server_error');
+      }
+    })(req, res, next);
   }
 );
 

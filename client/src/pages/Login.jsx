@@ -20,6 +20,14 @@ export default function Login() {
   const { login } = useAuth();
   const navigate  = useNavigate();
 
+  // Show toast if redirected back with an OAuth error
+  useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    const error  = params.get('error');
+    if (error === 'google_failed') toast.error('Google sign-in failed. Please try again.');
+    if (error === 'server_error')  toast.error('Server error during sign-in. Please try again.');
+  });
+
   const handleChange = e => setForm(p => ({ ...p, [e.target.name]: e.target.value }));
 
   const handleSubmit = async e => {
