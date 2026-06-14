@@ -142,6 +142,12 @@ mongoose.connect(process.env.MONGO_URI, {
     Attendance.collection.dropIndex('userId_1_subjectId_1_date_1')
       .then(() => console.log('[Index] Dropped stale attendance index userId_1_subjectId_1_date_1'))
       .catch(() => {}); // ignore if already gone
+
+    // Drop stale non-sparse unique index on users.sid — causes E11000 when multiple users have sid: null
+    const User = require('./models/User');
+    User.collection.dropIndex('sid_1')
+      .then(() => console.log('[Index] Dropped stale sid_1 index — will be recreated as sparse'))
+      .catch(() => {}); // ignore if already gone or already sparse
     startDailyNotificationJob();
     startClassroomSyncJob();
     startNotificationJobs();
