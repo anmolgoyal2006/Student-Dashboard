@@ -10,6 +10,14 @@ async function saveEvents(events) {
   let updated = 0;
   let skipped = 0;
 
+  // First, delete expired events from the database
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const expiredEvents = await Event.deleteMany({
+    registrationDeadline: { $lt: today }
+  });
+  console.log(`🗑️ Deleted ${expiredEvents.deletedCount} expired events`);
+
   for (const event of events) {
     // Strip HTML from description
     event.description = stripHtml(event.description);

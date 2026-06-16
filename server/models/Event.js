@@ -20,7 +20,8 @@ const eventSchema = new mongoose.Schema({
   saveCount: { type: Number, default: 0 },
   // New fields for matching engine
   requiredSkills: { type: [String], default: [] },
-  difficulty: { type: String, enum: ['beginner', 'intermediate', 'advanced'], default: 'intermediate' }
+  difficulty: { type: String, enum: ['beginner', 'intermediate', 'advanced'], default: 'intermediate' },
+  banner: { type: String, trim: true }
 }, { timestamps: true });
 
 // Indexes
