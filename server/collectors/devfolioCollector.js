@@ -40,7 +40,7 @@ class DevfolioCollector {
         sourceEventId: "global-tech-2025",
         requiredSkills: ["Web Development", "Mobile Development", "AI/ML"],
         difficulty: "intermediate",
-        banner: "https://devfolio.co/images/community-hackathons-og.png"
+        banner: null
       },
       {
         title: "Student Innovation Challenge",
@@ -55,7 +55,7 @@ class DevfolioCollector {
         sourceEventId: "student-innovation-2025",
         requiredSkills: ["Python", "JavaScript", "UI/UX Design"],
         difficulty: "beginner",
-        banner: "https://devfolio.co/images/community-hackathons-og.png"
+        banner: null
       },
       {
         title: "AI & ML Summit Hack",
@@ -70,7 +70,7 @@ class DevfolioCollector {
         sourceEventId: "ai-ml-summit-2025",
         requiredSkills: ["Python", "TensorFlow", "PyTorch", "Data Science"],
         difficulty: "advanced",
-        banner: "https://devfolio.co/images/community-hackathons-og.png"
+        banner: null
       }
     ];
   }

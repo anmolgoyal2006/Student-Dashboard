@@ -60,6 +60,31 @@ async function getAllEvents(filters = {}, page = 1, limit = 20) {
   const query = {};
   if (filters.source) query.source = filters.source;
   if (filters.category) query.category = filters.category;
+  if (filters.difficulty) query.difficulty = filters.difficulty;
+  
+  // Date range filter
+  if (filters.startDate || filters.endDate) {
+    query.registrationDeadline = {};
+    if (filters.startDate) {
+      query.registrationDeadline.$gte = new Date(filters.startDate);
+    }
+    if (filters.endDate) {
+      const endDate = new Date(filters.endDate);
+      endDate.setHours(23, 59, 59, 999);
+      query.registrationDeadline.$lte = endDate;
+    }
+  }
+  
+  // Prize range filter
+  if (filters.minPrize !== undefined || filters.maxPrize !== undefined) {
+    query.prizePool = {};
+    if (filters.minPrize !== undefined) {
+      query.prizePool.$gte = parseFloat(filters.minPrize);
+    }
+    if (filters.maxPrize !== undefined) {
+      query.prizePool.$lte = parseFloat(filters.maxPrize);
+    }
+  }
 
   const events = await Event.find(query)
     .sort({ registrationDeadline: 1 })

@@ -112,13 +112,10 @@ export default function OpportunityCard({
         {/* Banner */}
         <div style={{
           height: 130,
-          background: opportunity.banner && opportunity.banner.startsWith('http') && !opportunity.banner.endsWith('_') 
-            ? `url(${opportunity.banner})` 
-            : getBannerImage(),
+          background: getBannerImage(),
           backgroundSize: 'contain',
           backgroundPosition: '50% 50%',
           backgroundRepeat: 'no-repeat',
-          backgroundAttachment: 'scroll',
           position: 'relative',
           overflow: 'hidden',
           width: '100%',
@@ -126,6 +123,21 @@ export default function OpportunityCard({
           alignItems: 'center',
           justifyContent: 'center'
         }}>
+          {opportunity.banner && opportunity.banner.startsWith('http') && !opportunity.banner.endsWith('_') && (
+            <img
+              src={opportunity.banner}
+              onError={e => { e.target.style.display = 'none' }}
+              alt=""
+              style={{
+                position: 'absolute',
+                inset: 0,
+                width: '100%',
+                height: '100%',
+                objectFit: 'contain',
+                pointerEvents: 'none'
+              }}
+            />
+          )}
         {showMatchScore && matchScore !== undefined && (
             <div style={{
               position: 'absolute',

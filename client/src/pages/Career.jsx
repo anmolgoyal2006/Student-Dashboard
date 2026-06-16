@@ -1,7 +1,8 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { careerService, opportunityService } from '../services/apiServices';
 import OpportunityCard from '../components/OpportunityCard';
 import FocusMode           from '../components/FocusMode';
+import CustomSelect        from '../components/CustomSelect';
 import CareerProgressBar   from '../components/CareerProgressBar';
 import DsaCoachPanel       from '../components/DsaCoachPanel';
 import CompanyQuestionsPanel from '../components/CompanyQuestionsPanel';
@@ -42,6 +43,30 @@ export default function Career() {
   const [savedEventIds, setSavedEventIds] = useState(new Set());
   const [hackathonView, setHackathonView] = useState('all'); // 'all' | 'recommended' | 'saved' | 'closing'
   const [searchQuery, setSearchQuery] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+  
+  // Filter state
+  const [filters, setFilters] = useState({
+    source: '',
+    category: '',
+    difficulty: '',
+    startDate: '',
+    endDate: '',
+    minPrize: '',
+    maxPrize: ''
+  });
+
+  // Dynamic filter options derived from loaded events
+  const filterOptions = useMemo(() => {
+    const sources = [...new Set(hackathons.map(e => e.source).filter(Boolean))];
+    const categories = [...new Set(hackathons.map(e => e.category).filter(Boolean))];
+    const difficulties = [...new Set(hackathons.map(e => e.difficulty).filter(Boolean))];
+    return {
+      sources: sources.map(v => ({ value: v, label: v.charAt(0).toUpperCase() + v.slice(1) })),
+      categories: categories.map(v => ({ value: v, label: v })),
+      difficulties: difficulties.map(v => ({ value: v, label: v.charAt(0).toUpperCase() + v.slice(1) }))
+    };
+  }, [hackathons]);
 
   // Function to load saved event IDs
   const loadSavedEventIds = async () => {
@@ -311,7 +336,12 @@ export default function Career() {
           data = (await opportunityService.getClosingSoon()).data;
           break;
         default:
-          data = (await opportunityService.getAll()).data;
+          // Build query params from filters
+          const params = { limit: 100 };
+          Object.entries(filters).forEach(([key, value]) => {
+            if (value) params[key] = value;
+          });
+          data = (await opportunityService.getAll(params)).data;
       }
       setHackathons(data.data || data.events || []);
     } catch (err) {
@@ -357,13 +387,13 @@ export default function Career() {
     }
   };
 
-  // Reload hackathons when view changes
+  // Reload hackathons when view or filters change
   useEffect(() => {
     if (activeTab === 'hackathons') {
       loadHackathons(hackathonView);
       loadSavedEventIds();
     }
-  }, [activeTab, hackathonView]);
+  }, [activeTab, hackathonView, filters]);
 
   useEffect(() => { load(); loadPlan(); }, []);
 
@@ -993,6 +1023,14 @@ export default function Career() {
                 </button>
               ))}
             </div>
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className="btn btn-sm btn-outline"
+              style={{ minHeight: 'auto', height: 30, display: 'flex', alignItems: 'center', gap: 6, background: 'transparent' }}
+            >
+              <Filter size={14} />
+              Filters
+            </button>
             <div style={{ flex: 1, minWidth: 200, maxWidth: 400 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', borderRadius: 8 }}>
                 <Search size={16} color="var(--color-text-secondary)" />
@@ -1013,6 +1051,167 @@ export default function Career() {
               </div>
             </div>
           </div>
+          
+          {/* Filters Section */}
+          {showFilters && (
+            <div style={{ 
+              background: 'var(--color-surface-2)', 
+              border: '1px solid var(--border)', 
+              borderRadius: 12, 
+              padding: 16, 
+              marginBottom: 16 
+            }}>
+              <div style={{ 
+                display: 'grid', 
+                gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', 
+                gap: 12 
+              }}>
+                {/* Source Filter */}
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-secondary)', display: 'block', marginBottom: 4 }}>
+                    Source
+                  </label>
+                  <CustomSelect
+                    value={filters.source}
+                    onChange={(v) => setFilters(f => ({ ...f, source: v }))}
+                    placeholder="All Sources"
+                    options={filterOptions.sources}
+                  />
+                </div>
+                
+                {/* Category Filter */}
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-secondary)', display: 'block', marginBottom: 4 }}>
+                    Category
+                  </label>
+                  <CustomSelect
+                    value={filters.category}
+                    onChange={(v) => setFilters(f => ({ ...f, category: v }))}
+                    placeholder="All Categories"
+                    options={filterOptions.categories}
+                  />
+                </div>
+                
+                {/* Difficulty Filter */}
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-secondary)', display: 'block', marginBottom: 4 }}>
+                    Difficulty
+                  </label>
+                  <CustomSelect
+                    value={filters.difficulty}
+                    onChange={(v) => setFilters(f => ({ ...f, difficulty: v }))}
+                    placeholder="All Difficulties"
+                    options={filterOptions.difficulties}
+                  />
+                </div>
+                
+                {/* Start Date Filter */}
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-secondary)', display: 'block', marginBottom: 4 }}>
+                    Deadline From
+                  </label>
+                  <input
+                    type="date"
+                    value={filters.startDate}
+                    onChange={(e) => setFilters(f => ({ ...f, startDate: e.target.value }))}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      background: 'rgba(255,255,255,0.02)',
+                      border: '1px solid var(--border)',
+                      borderRadius: 8,
+                      color: 'var(--color-text-primary)',
+                      fontSize: 13
+                    }}
+                  />
+                </div>
+                
+                {/* End Date Filter */}
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-secondary)', display: 'block', marginBottom: 4 }}>
+                    Deadline To
+                  </label>
+                  <input
+                    type="date"
+                    value={filters.endDate}
+                    onChange={(e) => setFilters(f => ({ ...f, endDate: e.target.value }))}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      background: 'rgba(255,255,255,0.02)',
+                      border: '1px solid var(--border)',
+                      borderRadius: 8,
+                      color: 'var(--color-text-primary)',
+                      fontSize: 13
+                    }}
+                  />
+                </div>
+                
+                {/* Min Prize Filter */}
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-secondary)', display: 'block', marginBottom: 4 }}>
+                    Min Prize
+                  </label>
+                  <input
+                    type="number"
+                    placeholder="0"
+                    value={filters.minPrize}
+                    onChange={(e) => setFilters(f => ({ ...f, minPrize: e.target.value }))}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      background: 'rgba(255,255,255,0.02)',
+                      border: '1px solid var(--border)',
+                      borderRadius: 8,
+                      color: 'var(--color-text-primary)',
+                      fontSize: 13
+                    }}
+                  />
+                </div>
+                
+                {/* Max Prize Filter */}
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-secondary)', display: 'block', marginBottom: 4 }}>
+                    Max Prize
+                  </label>
+                  <input
+                    type="number"
+                    placeholder="100000"
+                    value={filters.maxPrize}
+                    onChange={(e) => setFilters(f => ({ ...f, maxPrize: e.target.value }))}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      background: 'rgba(255,255,255,0.02)',
+                      border: '1px solid var(--border)',
+                      borderRadius: 8,
+                      color: 'var(--color-text-primary)',
+                      fontSize: 13
+                    }}
+                  />
+                </div>
+              </div>
+              
+              {/* Reset Filters Button */}
+              <div style={{ marginTop: 12, display: 'flex', justifyContent: 'flex-end' }}>
+                <button
+                  onClick={() => setFilters({
+                    source: '',
+                    category: '',
+                    difficulty: '',
+                    startDate: '',
+                    endDate: '',
+                    minPrize: '',
+                    maxPrize: ''
+                  })}
+                  className="btn btn-sm btn-outline"
+                  style={{ minHeight: 'auto', height: 28, padding: '4px 12px', background: 'transparent' }}
+                >
+                  Reset Filters
+                </button>
+              </div>
+            </div>
+          )}
 
           {hackathonLoading ? (
             <div style={{ display: 'flex', justifyContent: 'center', padding: '40px' }}>

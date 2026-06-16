@@ -18,8 +18,24 @@ const {
 // GET /api/opportunities - All events (paginated)
 router.get('/', async (req, res) => {
   try {
-    const { page = 1, limit = 20, source, category } = req.query;
-    const result = await getAllEvents({ source, category }, parseInt(page), parseInt(limit));
+    const { 
+      page = 1, 
+      limit = 20, 
+      source, 
+      category,
+      difficulty,
+      startDate,
+      endDate,
+      minPrize,
+      maxPrize
+    } = req.query;
+    
+    const result = await getAllEvents(
+      { source, category, difficulty, startDate, endDate, minPrize, maxPrize }, 
+      parseInt(page), 
+      parseInt(limit)
+    );
+    
     res.status(200).json({
       success: true,
       ...result
