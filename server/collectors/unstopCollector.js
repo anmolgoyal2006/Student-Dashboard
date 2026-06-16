@@ -98,15 +98,23 @@ class UnstopCollector {
           difficulty = 'beginner';
         }
 
-        // Extract banner image - try all possible fields
+        // Extract banner image - try all possible fields and only use valid ones
         let banner = null;
-        if (opp.logoUrl2 && opp.logoUrl2.startsWith('http')) {
+        
+        // Helper to check if URL is valid
+        const isValidImageUrl = (url) => {
+          if (!url || !url.startsWith('http')) return false;
+          if (url.endsWith('_')) return false; // Skip URLs ending with underscore
+          return true;
+        };
+        
+        if (isValidImageUrl(opp.logoUrl2)) {
           banner = opp.logoUrl2;
-        } else if (opp.organisation?.logoUrl && opp.organisation.logoUrl.startsWith('http')) {
+        } else if (isValidImageUrl(opp.organisation?.logoUrl)) {
           banner = opp.organisation.logoUrl;
-        } else if (opp.organisation?.logoUrl2 && opp.organisation.logoUrl2.startsWith('http')) {
+        } else if (isValidImageUrl(opp.organisation?.logoUrl2)) {
           banner = opp.organisation.logoUrl2;
-        } else if (opp.thumb && opp.thumb.startsWith('http')) {
+        } else if (isValidImageUrl(opp.thumb)) {
           banner = opp.thumb;
         }
 

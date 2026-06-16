@@ -95,7 +95,9 @@ export default function OpportunityCard({
           transition: 'all 0.2s ease',
           textDecoration: 'none',
           color: 'inherit',
-          cursor: 'pointer'
+          cursor: 'pointer',
+          maxWidth: '100%',
+          width: '100%'
         }}
         className="card"
         onMouseEnter={(e) => {
@@ -109,14 +111,22 @@ export default function OpportunityCard({
       >
         {/* Banner */}
         <div style={{
-          height: 120,
-          background: getBannerImage(),
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
+          height: 130,
+          background: opportunity.banner && opportunity.banner.startsWith('http') && !opportunity.banner.endsWith('_') 
+            ? `url(${opportunity.banner})` 
+            : getBannerImage(),
+          backgroundSize: 'contain',
+          backgroundPosition: '50% 50%',
+          backgroundRepeat: 'no-repeat',
+          backgroundAttachment: 'scroll',
           position: 'relative',
-          overflow: 'hidden'
+          overflow: 'hidden',
+          width: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
         }}>
-          {showMatchScore && matchScore !== undefined && (
+        {showMatchScore && matchScore !== undefined && (
             <div style={{
               position: 'absolute',
               top: 10,
