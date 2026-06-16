@@ -1,60 +1,89 @@
 
 const { stripHtml } = require('../utils/helpers');
 
+/**
+ * Devfolio Hackathon Collector
+ * 
+ * NOTE: Devfolio does NOT provide a public API for fetching hackathons.
+ * This collector currently uses placeholder data for demonstration purposes.
+ * 
+ * Possible enhancements:
+ * - Web scraping (check Devfolio's robots.txt and Terms of Service first)
+ * - Manual curation
+ * - Integration with Devfolio's partner program if available
+ */
 class DevfolioCollector {
   constructor() {
-    // Devfolio doesn't have a public API for hackathons, so we'll use placeholder data
-    // In a real app, you'd use their API or web scraping
+    this.baseUrl = 'https://devfolio.co';
   }
 
+  /**
+   * Fetch hackathons from Devfolio
+   * @returns {Array} Array of hackathon events
+   */
   async fetch() {
+    // Since Devfolio has no public API, we return placeholder events
+    // In production, you would implement web scraping or another method here
+    
+    // Placeholder events - these are for demonstration only
     return [
       {
-        title: "Rentits Global Hackathon 2026",
-        description: "Design. Build. Improve student life. Join the ultimate global, online hackathon designed for builders who prioritize real impact over hype.",
-        registrationUrl: "https://hackrent.devfolio.co/",
-        registrationDeadline: "2026-12-31",
-        category: "Student Life",
-        prizePool: 45000,
+        title: "Global Tech Hackathon 2025",
+        description: "Build innovative solutions for real-world problems. Open to all developers worldwide.",
+        registrationUrl: "https://devfolio.co/hackathons",
+        registrationDeadline: this.getFutureDate(30),
+        category: "Technology",
+        prizePool: 10000,
         currency: "USD",
-        registeredCount: 0,
+        registeredCount: 250,
         source: "devfolio",
-        sourceEventId: "hackrent-2026",
-        requiredSkills: ["Web Development", "React", "Node.js", "UI/UX"],
-        difficulty: "advanced",
-        banner: "https://devfolio.co/images/community-hackathons-og.png"
-      },
-      {
-        title: "CodeStorm 2026 #2",
-        description: "Create Websites That Feel Alive. Online hackathon.",
-        registrationUrl: "https://codestorm-week2-2026.devfolio.co/",
-        registrationDeadline: "2026-12-30",
-        category: "Web Development",
-        prizePool: 0,
-        currency: "INR",
-        registeredCount: 0,
-        source: "devfolio",
-        sourceEventId: "codestorm-2026-week2",
-        requiredSkills: ["HTML", "CSS", "JavaScript", "React"],
+        sourceEventId: "global-tech-2025",
+        requiredSkills: ["Web Development", "Mobile Development", "AI/ML"],
         difficulty: "intermediate",
         banner: "https://devfolio.co/images/community-hackathons-og.png"
       },
       {
-        title: "Girlathon 4.0",
-        description: "An event for them by them.",
-        registrationUrl: "https://girlathon26.devfolio.co/",
-        registrationDeadline: "2026-12-29",
-        category: "Women in Tech",
-        prizePool: 0,
-        currency: "INR",
-        registeredCount: 0,
+        title: "Student Innovation Challenge",
+        description: "Exclusive hackathon for students to showcase their creativity and technical skills.",
+        registrationUrl: "https://devfolio.co/hackathons",
+        registrationDeadline: this.getFutureDate(45),
+        category: "Student",
+        prizePool: 5000,
+        currency: "USD",
+        registeredCount: 180,
         source: "devfolio",
-        sourceEventId: "girlathon-4-0",
-        requiredSkills: ["Python", "AI", "Machine Learning", "Web Development"],
+        sourceEventId: "student-innovation-2025",
+        requiredSkills: ["Python", "JavaScript", "UI/UX Design"],
         difficulty: "beginner",
+        banner: "https://devfolio.co/images/community-hackathons-og.png"
+      },
+      {
+        title: "AI & ML Summit Hack",
+        description: "Dive deep into artificial intelligence and machine learning with this specialized hackathon.",
+        registrationUrl: "https://devfolio.co/hackathons",
+        registrationDeadline: this.getFutureDate(60),
+        category: "AI/ML",
+        prizePool: 15000,
+        currency: "USD",
+        registeredCount: 320,
+        source: "devfolio",
+        sourceEventId: "ai-ml-summit-2025",
+        requiredSkills: ["Python", "TensorFlow", "PyTorch", "Data Science"],
+        difficulty: "advanced",
         banner: "https://devfolio.co/images/community-hackathons-og.png"
       }
     ];
+  }
+
+  /**
+   * Helper function to get a future date
+   * @param {number} daysFromNow - Number of days from today
+   * @returns {string} ISO date string
+   */
+  getFutureDate(daysFromNow) {
+    const date = new Date();
+    date.setDate(date.getDate() + daysFromNow);
+    return date.toISOString().split('T')[0];
   }
 }
 

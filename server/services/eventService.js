@@ -4,6 +4,7 @@ const SavedEvent = require('../models/SavedEvent');
 const { scheduleReminders, cancelReminders } = require('./reminderService');
 const { getCachedRecommendations, generateAndCacheRecommendations } = require('./recommendationCache');
 const { stripHtml } = require('../utils/helpers');
+const stringSimilarity = require('string-similarity');
 
 async function saveEvents(events) {
   let inserted = 0;
@@ -167,8 +168,91 @@ async function getRecommendedEvents(userId, limit = 20) {
 
 async function detectDuplicates() {
   console.log('🔍 Checking for duplicate events...');
-  // Duplicate detection logic can be implemented here
-  return { duplicatesFound: 0 };
+  const allEvents = await Event.find().sort({ createdAt: -1 });
+  
+  const duplicates = [];
+  const processedEventIds = new Set();
+  
+  // Check all pairs of events for duplicates
+  for (let i = 0; i < allEvents.length; i++) {
+    const eventA = allEvents[i];
+    if (processedEventIds.has(eventA._id.toString())) continue;
+    
+    for (let j = i + 1; j < allEvents.length; j++) {
+      const eventB = allEvents[j];
+      if (processedEventIds.has(eventB._id.toString())) continue;
+      
+      // Check if they're potential duplicates
+      let isDuplicate = false;
+      let duplicateReason = '';
+      
+      // First check: same source and sourceEventId (exact duplicate)
+      if (eventA.source === eventB.source && eventA.sourceEventId === eventB.sourceEventId) {
+        isDuplicate = true;
+        duplicateReason = 'Exact match (same source and sourceEventId)';
+      } else {
+        // Check title similarity
+        const titleSimilarity = stringSimilarity.compareTwoStrings(
+          eventA.title.toLowerCase(), 
+          eventB.title.toLowerCase()
+        );
+        
+        // Check description similarity if descriptions exist
+        let descSimilarity = 0;
+        if (eventA.description && eventB.description) {
+          descSimilarity = stringSimilarity.compareTwoStrings(
+            stripHtml(eventA.description).toLowerCase(), 
+            stripHtml(eventB.description).toLowerCase()
+          );
+        }
+        
+        // Check if registration dates are close
+        const dateDiff = Math.abs(
+          new Date(eventA.registrationDeadline) - new Date(eventB.registrationDeadline)
+        );
+        const daysDiff = dateDiff / (1000 * 60 * 60 * 24);
+        
+        // If titles are very similar (>0.85), or titles and descriptions are both moderately similar (>0.7)
+        if (
+          titleSimilarity > 0.85 || 
+          (titleSimilarity > 0.7 && descSimilarity > 0.7 && daysDiff < 30)
+        ) {
+          isDuplicate = true;
+          duplicateReason = `Fuzzy match (title similarity: ${titleSimilarity.toFixed(2)}${descSimilarity > 0 ? `, description similarity: ${descSimilarity.toFixed(2)}` : ''})`;
+        }
+      }
+      
+      if (isDuplicate) {
+        duplicates.push({
+          eventA: {
+            id: eventA._id,
+            title: eventA.title,
+            source: eventA.source,
+            sourceEventId: eventA.sourceEventId
+          },
+          eventB: {
+            id: eventB._id,
+            title: eventB.title,
+            source: eventB.source,
+            sourceEventId: eventB.sourceEventId
+          },
+          reason: duplicateReason
+        });
+        
+        processedEventIds.add(eventB._id.toString());
+      }
+    }
+  }
+  
+  console.log(`🔍 Found ${duplicates.length} potential duplicate(s)!`);
+  if (duplicates.length > 0) {
+    console.log('📋 Duplicates:', duplicates);
+  }
+  
+  return { 
+    duplicatesFound: duplicates.length, 
+    duplicates 
+  };
 }
 
 module.exports = { 

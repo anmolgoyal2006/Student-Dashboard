@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
 import toast from '../../context/ToastContext';
 import EmptyState from '../../components/EmptyState';
-import { Lock, Trophy, TrendingUp, Clock, RefreshCw, AlertCircle, Activity, Users } from 'lucide-react';
+import { Lock, Trophy, TrendingUp, Clock, RefreshCw, AlertCircle, Activity, Users, Copy, CheckCircle, XCircle } from 'lucide-react';
 import { adminService } from '../../services/apiServices';
 
 export default function AdminOpportunities() {
@@ -16,6 +16,8 @@ export default function AdminOpportunities() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [sendingReminders, setSendingReminders] = useState(false);
+  const [checkingDuplicates, setCheckingDuplicates] = useState(false);
+  const [duplicates, setDuplicates] = useState(null);
 
   const fetchDashboard = async () => {
     try {
@@ -54,6 +56,23 @@ export default function AdminOpportunities() {
     }
   };
 
+  const checkDuplicates = async () => {
+    try {
+      setCheckingDuplicates(true);
+      const { data } = await adminService.runDuplicates();
+      setDuplicates(data);
+      if (data.duplicatesFound > 0) {
+        toast.warning(`Found ${data.duplicatesFound} potential duplicate(s)!`);
+      } else {
+        toast.success('No duplicates found!');
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to check duplicates.');
+    } finally {
+      setCheckingDuplicates(false);
+    }
+  };
+
   useEffect(() => {
     fetchDashboard();
   }, []);
@@ -79,6 +98,15 @@ export default function AdminOpportunities() {
           <p className="page-subtitle">Monitor collectors and event stats</p>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
+          <button
+            onClick={checkDuplicates}
+            disabled={checkingDuplicates}
+            className="btn btn-primary"
+            style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--color-warning)' }}
+          >
+            <Copy size={16} className={checkingDuplicates ? 'animate-spin' : ''} />
+            {checkingDuplicates ? 'Checking…' : 'Check Duplicates'}
+          </button>
           <button
             onClick={triggerReminders}
             disabled={sendingReminders}
@@ -267,6 +295,96 @@ export default function AdminOpportunities() {
           </div>
         )}
       </div>
+
+      {/* Duplicates Results */}
+      {duplicates && (
+        <div className="card" style={{ marginTop: 24 }}>
+          <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Copy size={16} style={{ color: duplicates.duplicatesFound > 0 ? 'var(--color-warning)' : 'var(--color-success)' }} />
+            Duplicate Detection Results
+          </div>
+          
+          {duplicates.duplicatesFound === 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, padding: 32 }}>
+              <CheckCircle size={40} style={{ color: 'var(--color-success)' }} />
+              <div style={{ textAlign: 'center' }}>
+                <p style={{ fontWeight: 600, fontSize: 16, margin: 0 }}>No duplicates found!</p>
+                <p style={{ color: 'var(--color-text-secondary)', margin: '8px 0 0 0' }}>All events appear to be unique.</p>
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <p style={{ color: 'var(--color-warning)', fontSize: 14, margin: 0 }}>
+                Found {duplicates.duplicatesFound} potential duplicate pair(s). Review them carefully.
+              </p>
+              
+              {duplicates.duplicates.map((dup, idx) => (
+                <div key={idx} style={{ 
+                  background: 'rgba(251,191,36,0.05)', 
+                  border: '1px solid rgba(251,191,36,0.2)', 
+                  borderRadius: 8, 
+                  padding: 16 
+                }}>
+                  <div style={{ 
+                    fontSize: 12, 
+                    color: 'var(--color-warning)', 
+                    fontWeight: 600, 
+                    marginBottom: 12,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}>
+                    {dup.reason}
+                  </div>
+                  
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                    <div style={{ 
+                      background: 'rgba(0,0,0,0.2)', 
+                      borderRadius: 6, 
+                      padding: 12 
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                        <span style={{ 
+                          fontSize: 11, 
+                          fontWeight: 600, 
+                          color: 'var(--color-text-tertiary)',
+                          textTransform: 'uppercase'
+                        }}>
+                          Event A
+                        </span>
+                      </div>
+                      <p style={{ fontSize: 14, fontWeight: 500, margin: '0 0 4px 0' }}>{dup.eventA.title}</p>
+                      <p style={{ fontSize: 12, color: 'var(--color-text-tertiary)', margin: 0 }}>
+                        {dup.eventA.source} • {dup.eventA.sourceEventId}
+                      </p>
+                    </div>
+                    
+                    <div style={{ 
+                      background: 'rgba(0,0,0,0.2)', 
+                      borderRadius: 6, 
+                      padding: 12 
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                        <span style={{ 
+                          fontSize: 11, 
+                          fontWeight: 600, 
+                          color: 'var(--color-text-tertiary)',
+                          textTransform: 'uppercase'
+                        }}>
+                          Event B
+                        </span>
+                      </div>
+                      <p style={{ fontSize: 14, fontWeight: 500, margin: '0 0 4px 0' }}>{dup.eventB.title}</p>
+                      <p style={{ fontSize: 12, color: 'var(--color-text-tertiary)', margin: 0 }}>
+                        {dup.eventB.source} • {dup.eventB.sourceEventId}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

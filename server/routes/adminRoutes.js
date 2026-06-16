@@ -7,6 +7,7 @@ const EventFetchLog = require('../models/EventFetchLog');
 const { protect } = require('../middleware/authMiddleware');
 const { runCollectors } = require('../jobs/collectorScheduler');
 const { sendDueReminders } = require('../services/reminderService');
+const { detectDuplicates } = require('../services/eventService');
 
 // Middleware: only teachers can access admin routes
 const teacherOnly = (req, res, next) => {
@@ -120,6 +121,17 @@ router.post('/reminders/run', protect, teacherOnly, async (req, res) => {
     sendDueReminders();
   } catch (err) {
     console.error('[Admin] Error triggering reminders:', err);
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// POST /api/admin/duplicates/run — manually run duplicate detection
+router.post('/duplicates/run', protect, teacherOnly, async (req, res) => {
+  try {
+    const results = await detectDuplicates();
+    res.json(results);
+  } catch (err) {
+    console.error('[Admin] Error running duplicate detection:', err);
     res.status(500).json({ message: err.message });
   }
 });

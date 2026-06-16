@@ -209,4 +209,5 @@ export const adminService = {
   updateUserRole: (userId, role) => apiRequest('patch', `/admin/users/${userId}/role`, { role }),
   triggerCollectors: () => apiRequest('post', '/admin/collectors/run'),
   triggerReminders: () => apiRequest('post', '/admin/reminders/run'),
+  runDuplicates: () => apiRequest('post', '/admin/duplicates/run'),
 };
