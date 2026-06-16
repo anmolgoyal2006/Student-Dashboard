@@ -20,6 +20,7 @@ import Prediction from './pages/Prediction';
 import Analytics from './pages/Analytics';
 import AttendancePrompt from './components/AttendancePrompt';
 import AdminPanel from './pages/AdminPanel';
+import AdminOpportunities from './pages/admin/Opportunities';
 import LoginSuccess from './pages/LoginSuccess';
 import { getFCMToken, getMessagingInstance } from './firebase';
 import { onMessage } from 'firebase/messaging';
@@ -163,6 +164,9 @@ export default function App() {
           } />
           <Route path="/admin" element={
             <ProtectedRoute><AppLayout><AdminPanel /></AppLayout></ProtectedRoute>
+          } />
+          <Route path="/admin/opportunities" element={
+            <ProtectedRoute><AppLayout><AdminOpportunities /></AppLayout></ProtectedRoute>
           } />
           <Route path="/analytics" element={
             <ProtectedRoute><AppLayout><Analytics /></AppLayout></ProtectedRoute>

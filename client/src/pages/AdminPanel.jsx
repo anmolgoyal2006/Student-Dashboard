@@ -1,19 +1,28 @@
 // src/pages/AdminPanel.jsx
 import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useNavigate, useLocation } from 'react-router-dom';
 import toast from '../context/ToastContext';
 import EmptyState from '../components/EmptyState';
-import { Lock, Users, GraduationCap, UserCheck, ListTodo } from 'lucide-react';
+import { Lock, Users, GraduationCap, UserCheck, ListTodo, Trophy } from 'lucide-react';
 
 const API = process.env.REACT_APP_API_URL.replace(/\/api$/, '');
 
 export default function AdminPanel() {
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  
   const [users, setUsers]       = useState([]);
   const [loading, setLoading]   = useState(true);
   const [search, setSearch]     = useState('');
   const [filter, setFilter]     = useState('all');
   const [updating, setUpdating] = useState(null);
+  
+  // Check if we're on opportunities subpage
+  if (location.pathname === '/admin/opportunities') {
+    return null; // Will be handled by separate route component
+  }
 
   // ── Fetch users ──────────────────────────────────────────────────────────
   const fetchUsers = async () => {
@@ -89,9 +98,59 @@ export default function AdminPanel() {
     <div>
       <div className="page-header">
         <div>
-          <h1 className="page-title">User Management</h1>
-          <p className="page-subtitle">Assign and manage student / teacher roles</p>
+          <h1 className="page-title">Admin Panel</h1>
+          <p className="page-subtitle">Manage users and monitor opportunities</p>
         </div>
+      </div>
+
+      {/* Tabs */}
+      <div style={{
+        display: 'flex',
+        borderBottom: '1px solid var(--border)',
+        marginBottom: 24,
+        gap: 24,
+        marginTop: 12
+      }}>
+        <button
+          onClick={() => navigate('/admin')}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: '12px 4px',
+            background: 'transparent',
+            border: 'none',
+            cursor: 'pointer',
+            color: location.pathname === '/admin' ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
+            borderBottom: location.pathname === '/admin' ? '2px solid var(--color-accent)' : '2px solid transparent',
+            fontSize: 13.5,
+            fontWeight: location.pathname === '/admin' ? 500 : 400,
+            transition: 'all 0.15s ease'
+          }}
+        >
+          <Users size={15} />
+          User Management
+        </button>
+        <button
+          onClick={() => navigate('/admin/opportunities')}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: '12px 4px',
+            background: 'transparent',
+            border: 'none',
+            cursor: 'pointer',
+            color: location.pathname === '/admin/opportunities' ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
+            borderBottom: location.pathname === '/admin/opportunities' ? '2px solid var(--color-accent)' : '2px solid transparent',
+            fontSize: 13.5,
+            fontWeight: location.pathname === '/admin/opportunities' ? 500 : 400,
+            transition: 'all 0.15s ease'
+          }}
+        >
+          <Trophy size={15} />
+          Opportunities
+        </button>
       </div>
 
       {/* Stats */}

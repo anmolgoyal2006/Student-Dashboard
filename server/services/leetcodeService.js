@@ -115,31 +115,60 @@ async function fetchRecentAcSubmissions(username, limit = 50) {
 async function fetchSolvedSlugs(username) {
   const slugs = new Set();
 
-  // Try recentAcSubmissionList with higher limit (this seems to be working)
-  const recentAcQuery = `
-    query recentAcSubmissionList($username: String!, $limit: Int!) {
-      recentAcSubmissionList(username: $username, limit: $limit) {
-        titleSlug
+  const acQuery = `
+    query acSubmissionList($username: String!, $limit: Int!) {
+      matchedUser(username: $username) {
+        acSubmissionList(limit: $limit) {
+          titleSlug
+        }
       }
     }
   `;
   try {
-    const data = await lcQuery(recentAcQuery, { username, limit: 500 });
-    for (const s of data?.recentAcSubmissionList || []) {
+    const data = await lcQuery(acQuery, { username, limit: 500 });
+    for (const s of data?.matchedUser?.acSubmissionList || []) {
       if (s.titleSlug) slugs.add(s.titleSlug);
     }
-    console.log(`[LeetCode] Fetched ${slugs.size} solved from recentAcSubmissionList`);
-  } catch (err) {
-    console.log('[LeetCode] recentAcSubmissionList failed:', err.message);
+  } catch {
+    /* fall through */
   }
 
-  // Fallback to fetchRecentAcSubmissions
-  const recent = await fetchRecentAcSubmissions(username, 200);
+  const listQuery = `
+    query submissionList($username: String!, $limit: Int!, $offset: Int!) {
+      submissionList(username: $username, limit: $limit, offset: $offset) {
+        hasNext
+        submissions {
+          titleSlug
+          statusDisplay
+        }
+      }
+    }
+  `;
+  try {
+    let offset = 0;
+    const limit = 20;
+    for (let page = 0; page < 40; page++) {
+      const data = await lcQuery(listQuery, { username, limit, offset });
+      const block = data?.submissionList;
+      const subs = block?.submissions || [];
+      for (const s of subs) {
+        if ((s.statusDisplay || '').toLowerCase() === 'accepted' && s.titleSlug) {
+          slugs.add(s.titleSlug);
+        }
+      }
+      offset += limit;
+      if (!block?.hasNext || subs.length < limit) break;
+      await new Promise((r) => setTimeout(r, 80));
+    }
+  } catch {
+    /* fall through */
+  }
+
+  const recent = await fetchRecentAcSubmissions(username, 50);
   for (const s of recent) {
     if (s.titleSlug) slugs.add(s.titleSlug);
   }
 
-  console.log(`[LeetCode] Total solved problems found: ${slugs.size}`);
   return slugs;
 }
 
@@ -449,587 +478,80 @@ const TOPIC_HARD_PICKS = {
 };
 
 const COMPANY_PROBLEMS = {
+  Google: {
+    Arrays: [
+      { title: 'Two Sum', slug: 'two-sum', difficulty: 'Easy', frequency: 'high' },
+      { title: '3Sum', slug: '3sum', difficulty: 'Medium', frequency: 'high' },
+      { title: 'Product of Array Except Self', slug: 'product-of-array-except-self', difficulty: 'Medium', frequency: 'high' },
+    ],
+    'Dynamic Programming': [
+      { title: 'Longest Increasing Subsequence', slug: 'longest-increasing-subsequence', difficulty: 'Medium', frequency: 'high' },
+      { title: 'Coin Change', slug: 'coin-change', difficulty: 'Medium', frequency: 'medium' },
+    ],
+    Graphs: [
+      { title: 'Number of Islands', slug: 'number-of-islands', difficulty: 'Medium', frequency: 'high' },
+      { title: 'Course Schedule', slug: 'course-schedule', difficulty: 'Medium', frequency: 'medium' },
+    ],
+  },
   Amazon: {
     Arrays: [
       { title: 'Two Sum', slug: 'two-sum', difficulty: 'Easy', frequency: 'high' },
       { title: 'Best Time to Buy and Sell Stock', slug: 'best-time-to-buy-and-sell-stock', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Contains Duplicate', slug: 'contains-duplicate', difficulty: 'Easy', frequency: 'medium' },
-      { title: 'Maximum Subarray', slug: 'maximum-subarray', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Product of Array Except Self', slug: 'product-of-array-except-self', difficulty: 'Medium', frequency: 'high' },
-      { title: '3Sum', slug: '3sum', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Search in Rotated Sorted Array', slug: 'search-in-rotated-sorted-array', difficulty: 'Medium', frequency: 'medium' },
-      { title: 'Trapping Rain Water', slug: 'trapping-rain-water', difficulty: 'Hard', frequency: 'high' },
-      { title: 'First Missing Positive', slug: 'first-missing-positive', difficulty: 'Hard', frequency: 'medium' },
-      { title: 'Merge Intervals', slug: 'merge-intervals', difficulty: 'Medium', frequency: 'high' },
-    ],
-    Strings: [
-      { title: 'Valid Parentheses', slug: 'valid-parentheses', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Valid Anagram', slug: 'valid-anagram', difficulty: 'Easy', frequency: 'medium' },
-      { title: 'Longest Substring Without Repeating Characters', slug: 'longest-substring-without-repeating-characters', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Longest Palindromic Substring', slug: 'longest-palindromic-substring', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Minimum Window Substring', slug: 'minimum-window-substring', difficulty: 'Hard', frequency: 'high' },
-      { title: 'String to Integer (atoi)', slug: 'string-to-integer-atoi', difficulty: 'Medium', frequency: 'medium' },
-      { title: 'Multiply Strings', slug: 'multiply-strings', difficulty: 'Medium', frequency: 'medium' },
+      { title: 'Container With Most Water', slug: 'container-with-most-water', difficulty: 'Medium', frequency: 'medium' },
     ],
     'Linked Lists': [
       { title: 'Reverse Linked List', slug: 'reverse-linked-list', difficulty: 'Easy', frequency: 'high' },
       { title: 'Merge Two Sorted Lists', slug: 'merge-two-sorted-lists', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Linked List Cycle', slug: 'linked-list-cycle', difficulty: 'Easy', frequency: 'medium' },
-      { title: 'Add Two Numbers', slug: 'add-two-numbers', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Remove Nth Node From End of List', slug: 'remove-nth-node-from-end-of-list', difficulty: 'Medium', frequency: 'medium' },
-      { title: 'Reorder List', slug: 'reorder-list', difficulty: 'Medium', frequency: 'medium' },
-      { title: 'Merge K Sorted Lists', slug: 'merge-k-sorted-lists', difficulty: 'Hard', frequency: 'high' },
     ],
     Trees: [
+      { title: 'Invert Binary Tree', slug: 'invert-binary-tree', difficulty: 'Easy', frequency: 'high' },
       { title: 'Maximum Depth of Binary Tree', slug: 'maximum-depth-of-binary-tree', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Binary Tree Level Order Traversal', slug: 'binary-tree-level-order-traversal', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Validate Binary Search Tree', slug: 'validate-binary-search-tree', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Symmetric Tree', slug: 'symmetric-tree', difficulty: 'Easy', frequency: 'medium' },
-      { title: 'Lowest Common Ancestor of a Binary Tree', slug: 'lowest-common-ancestor-of-a-binary-tree', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Binary Tree Maximum Path Sum', slug: 'binary-tree-maximum-path-sum', difficulty: 'Hard', frequency: 'high' },
-      { title: 'Serialize and Deserialize Binary Tree', slug: 'serialize-and-deserialize-binary-tree', difficulty: 'Hard', frequency: 'medium' },
-    ],
-    Graphs: [
-      { title: 'Number of Islands', slug: 'number-of-islands', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Clone Graph', slug: 'clone-graph', difficulty: 'Medium', frequency: 'medium' },
-      { title: 'Course Schedule', slug: 'course-schedule', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Word Ladder', slug: 'word-ladder', difficulty: 'Hard', frequency: 'medium' },
-      { title: 'Graph Valid Tree', slug: 'graph-valid-tree', difficulty: 'Medium', frequency: 'medium' },
-    ],
-    'Dynamic Programming': [
-      { title: 'Climbing Stairs', slug: 'climbing-stairs', difficulty: 'Easy', frequency: 'high' },
-      { title: 'House Robber', slug: 'house-robber', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Longest Palindromic Substring', slug: 'longest-palindromic-substring', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Coin Change', slug: 'coin-change', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Longest Increasing Subsequence', slug: 'longest-increasing-subsequence', difficulty: 'Medium', frequency: 'medium' },
-      { title: 'Edit Distance', slug: 'edit-distance', difficulty: 'Hard', frequency: 'medium' },
-      { title: 'Word Break', slug: 'word-break', difficulty: 'Medium', frequency: 'medium' },
-    ],
-    'Stacks & Queues': [
-      { title: 'Valid Parentheses', slug: 'valid-parentheses', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Min Stack', slug: 'min-stack', difficulty: 'Medium', frequency: 'medium' },
-      { title: 'Evaluate Reverse Polish Notation', slug: 'evaluate-reverse-polish-notation', difficulty: 'Medium', frequency: 'medium' },
-      { title: 'Daily Temperatures', slug: 'daily-temperatures', difficulty: 'Medium', frequency: 'medium' },
-      { title: 'Largest Rectangle in Histogram', slug: 'largest-rectangle-in-histogram', difficulty: 'Hard', frequency: 'medium' },
-    ],
-    Hashing: [
-      { title: 'Two Sum', slug: 'two-sum', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Group Anagrams', slug: 'group-anagrams', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Subarray Sum Equals K', slug: 'subarray-sum-equals-k', difficulty: 'Medium', frequency: 'high' },
-      { title: 'LRU Cache', slug: 'lru-cache', difficulty: 'Medium', frequency: 'high' },
-    ],
-  },
-  Google: {
-    Arrays: [
-      { title: 'Two Sum', slug: 'two-sum', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Best Time to Buy and Sell Stock', slug: 'best-time-to-buy-and-sell-stock', difficulty: 'Easy', frequency: 'high' },
-      { title: '3Sum', slug: '3sum', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Container With Most Water', slug: 'container-with-most-water', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Maximum Subarray', slug: 'maximum-subarray', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Search in Rotated Sorted Array', slug: 'search-in-rotated-sorted-array', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Trapping Rain Water', slug: 'trapping-rain-water', difficulty: 'Hard', frequency: 'high' },
-      { title: 'First Missing Positive', slug: 'first-missing-positive', difficulty: 'Hard', frequency: 'medium' },
-      { title: 'Merge Intervals', slug: 'merge-intervals', difficulty: 'Medium', frequency: 'high' },
-    ],
-    Strings: [
-      { title: 'Valid Parentheses', slug: 'valid-parentheses', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Valid Anagram', slug: 'valid-anagram', difficulty: 'Easy', frequency: 'medium' },
-      { title: 'Longest Palindromic Substring', slug: 'longest-palindromic-substring', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Longest Substring Without Repeating Characters', slug: 'longest-substring-without-repeating-characters', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Minimum Window Substring', slug: 'minimum-window-substring', difficulty: 'Hard', frequency: 'high' },
-      { title: 'Regular Expression Matching', slug: 'regular-expression-matching', difficulty: 'Hard', frequency: 'high' },
-      { title: 'Word Search', slug: 'word-search', difficulty: 'Medium', frequency: 'medium' },
-    ],
-    Trees: [
-      { title: 'Binary Tree Inorder Traversal', slug: 'binary-tree-inorder-traversal', difficulty: 'Easy', frequency: 'medium' },
-      { title: 'Maximum Depth of Binary Tree', slug: 'maximum-depth-of-binary-tree', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Validate Binary Search Tree', slug: 'validate-binary-search-tree', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Binary Tree Level Order Traversal', slug: 'binary-tree-level-order-traversal', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Binary Tree Maximum Path Sum', slug: 'binary-tree-maximum-path-sum', difficulty: 'Hard', frequency: 'high' },
-      { title: 'Serialize and Deserialize Binary Tree', slug: 'serialize-and-deserialize-binary-tree', difficulty: 'Hard', frequency: 'medium' },
-    ],
-    Graphs: [
-      { title: 'Number of Islands', slug: 'number-of-islands', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Course Schedule', slug: 'course-schedule', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Clone Graph', slug: 'clone-graph', difficulty: 'Medium', frequency: 'medium' },
-      { title: 'Alien Dictionary', slug: 'alien-dictionary', difficulty: 'Hard', frequency: 'high' },
-      { title: 'Word Ladder II', slug: 'word-ladder-ii', difficulty: 'Hard', frequency: 'medium' },
-      { title: 'Reconstruct Itinerary', slug: 'reconstruct-itinerary', difficulty: 'Medium', frequency: 'medium' },
-    ],
-    'Dynamic Programming': [
-      { title: 'Climbing Stairs', slug: 'climbing-stairs', difficulty: 'Easy', frequency: 'high' },
-      { title: 'House Robber', slug: 'house-robber', difficulty: 'Medium', frequency: 'medium' },
-      { title: 'Longest Increasing Subsequence', slug: 'longest-increasing-subsequence', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Edit Distance', slug: 'edit-distance', difficulty: 'Hard', frequency: 'high' },
-      { title: 'Coin Change', slug: 'coin-change', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Word Break', slug: 'word-break', difficulty: 'Medium', frequency: 'medium' },
-      { title: 'Best Time to Buy and Sell Stock II', slug: 'best-time-to-buy-and-sell-stock-ii', difficulty: 'Medium', frequency: 'medium' },
-    ],
-    'Sorting & Searching': [
-      { title: 'Merge Intervals', slug: 'merge-intervals', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Search in Rotated Sorted Array', slug: 'search-in-rotated-sorted-array', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Find Minimum in Rotated Sorted Array', slug: 'find-minimum-in-rotated-sorted-array', difficulty: 'Medium', frequency: 'medium' },
-      { title: 'Median of Two Sorted Arrays', slug: 'median-of-two-sorted-arrays', difficulty: 'Hard', frequency: 'high' },
-    ],
-    Design: [
-      { title: 'LRU Cache', slug: 'lru-cache', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Design Twitter', slug: 'design-twitter', difficulty: 'Medium', frequency: 'medium' },
-      { title: 'Insert Delete GetRandom O(1)', slug: 'insert-delete-getrandom-o1', difficulty: 'Medium', frequency: 'medium' },
-      { title: 'Design Add and Search Words Data Structure', slug: 'design-add-and-search-words-data-structure', difficulty: 'Medium', frequency: 'medium' },
     ],
   },
   Microsoft: {
     Arrays: [
       { title: 'Two Sum', slug: 'two-sum', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Best Time to Buy and Sell Stock', slug: 'best-time-to-buy-and-sell-stock', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Contains Duplicate', slug: 'contains-duplicate', difficulty: 'Easy', frequency: 'medium' },
-      { title: 'Product of Array Except Self', slug: 'product-of-array-except-self', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Spiral Matrix', slug: 'spiral-matrix', difficulty: 'Medium', frequency: 'high' },
-      { title: '3Sum', slug: '3sum', difficulty: 'Medium', frequency: 'medium' },
-      { title: 'Set Matrix Zeroes', slug: 'set-matrix-zeroes', difficulty: 'Medium', frequency: 'medium' },
-      { title: 'Search a 2D Matrix', slug: 'search-a-2d-matrix', difficulty: 'Medium', frequency: 'medium' },
+      { title: 'Rotate Array', slug: 'rotate-array', difficulty: 'Medium', frequency: 'medium' },
     ],
     Strings: [
-      { title: 'Valid Parentheses', slug: 'valid-parentheses', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Reverse String', slug: 'reverse-string', difficulty: 'Easy', frequency: 'medium' },
-      { title: 'Valid Anagram', slug: 'valid-anagram', difficulty: 'Easy', frequency: 'medium' },
-      { title: 'Longest Substring Without Repeating Characters', slug: 'longest-substring-without-repeating-characters', difficulty: 'Medium', frequency: 'high' },
-      { title: 'String to Integer (atoi)', slug: 'string-to-integer-atoi', difficulty: 'Medium', frequency: 'medium' },
-    ],
-    'Linked Lists': [
-      { title: 'Reverse Linked List', slug: 'reverse-linked-list', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Merge Two Sorted Lists', slug: 'merge-two-sorted-lists', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Linked List Cycle', slug: 'linked-list-cycle', difficulty: 'Easy', frequency: 'medium' },
-      { title: 'Add Two Numbers', slug: 'add-two-numbers', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Remove Nth Node From End of List', slug: 'remove-nth-node-from-end-of-list', difficulty: 'Medium', frequency: 'medium' },
-      { title: 'Intersection of Two Linked Lists', slug: 'intersection-of-two-linked-lists', difficulty: 'Easy', frequency: 'medium' },
+      { title: 'Valid Palindrome', slug: 'valid-palindrome', difficulty: 'Easy', frequency: 'high' },
+      { title: 'Longest Palindromic Substring', slug: 'longest-palindromic-substring', difficulty: 'Medium', frequency: 'medium' },
     ],
     Trees: [
-      { title: 'Maximum Depth of Binary Tree', slug: 'maximum-depth-of-binary-tree', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Invert Binary Tree', slug: 'invert-binary-tree', difficulty: 'Easy', frequency: 'medium' },
       { title: 'Validate Binary Search Tree', slug: 'validate-binary-search-tree', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Binary Tree Level Order Traversal', slug: 'binary-tree-level-order-traversal', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Symmetric Tree', slug: 'symmetric-tree', difficulty: 'Easy', frequency: 'medium' },
-      { title: 'Kth Smallest Element in a BST', slug: 'kth-smallest-element-in-a-bst', difficulty: 'Medium', frequency: 'medium' },
-    ],
-    'Dynamic Programming': [
-      { title: 'Climbing Stairs', slug: 'climbing-stairs', difficulty: 'Easy', frequency: 'high' },
-      { title: 'House Robber', slug: 'house-robber', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Longest Increasing Subsequence', slug: 'longest-increasing-subsequence', difficulty: 'Medium', frequency: 'medium' },
-      { title: 'Coin Change', slug: 'coin-change', difficulty: 'Medium', frequency: 'medium' },
-      { title: 'Unique Paths', slug: 'unique-paths', difficulty: 'Medium', frequency: 'medium' },
-    ],
-    'Stacks & Queues': [
-      { title: 'Valid Parentheses', slug: 'valid-parentheses', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Min Stack', slug: 'min-stack', difficulty: 'Medium', frequency: 'medium' },
-      { title: 'Implement Queue using Stacks', slug: 'implement-queue-using-stacks', difficulty: 'Easy', frequency: 'medium' },
-    ],
-    Design: [
-      { title: 'LRU Cache', slug: 'lru-cache', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Design Underground System', slug: 'design-underground-system', difficulty: 'Medium', frequency: 'low' },
     ],
   },
   Meta: {
     Arrays: [
-      { title: 'Two Sum', slug: 'two-sum', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Best Time to Buy and Sell Stock', slug: 'best-time-to-buy-and-sell-stock', difficulty: 'Easy', frequency: 'high' },
-      { title: '3Sum', slug: '3sum', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Container With Most Water', slug: 'container-with-most-water', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Maximum Subarray', slug: 'maximum-subarray', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Merge Intervals', slug: 'merge-intervals', difficulty: 'Medium', frequency: 'high' },
       { title: 'Product of Array Except Self', slug: 'product-of-array-except-self', difficulty: 'Medium', frequency: 'high' },
-    ],
-    Strings: [
-      { title: 'Valid Parentheses', slug: 'valid-parentheses', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Longest Palindromic Substring', slug: 'longest-palindromic-substring', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Longest Substring Without Repeating Characters', slug: 'longest-substring-without-repeating-characters', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Minimum Window Substring', slug: 'minimum-window-substring', difficulty: 'Hard', frequency: 'high' },
-    ],
-    Trees: [
-      { title: 'Maximum Depth of Binary Tree', slug: 'maximum-depth-of-binary-tree', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Binary Tree Level Order Traversal', slug: 'binary-tree-level-order-traversal', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Validate Binary Search Tree', slug: 'validate-binary-search-tree', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Binary Tree Maximum Path Sum', slug: 'binary-tree-maximum-path-sum', difficulty: 'Hard', frequency: 'high' },
+      { title: 'Merge Intervals', slug: 'merge-intervals', difficulty: 'Medium', frequency: 'high' },
     ],
     Graphs: [
-      { title: 'Number of Islands', slug: 'number-of-islands', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Course Schedule', slug: 'course-schedule', difficulty: 'Medium', frequency: 'high' },
       { title: 'Clone Graph', slug: 'clone-graph', difficulty: 'Medium', frequency: 'medium' },
     ],
     'Dynamic Programming': [
-      { title: 'Climbing Stairs', slug: 'climbing-stairs', difficulty: 'Easy', frequency: 'high' },
-      { title: 'House Robber', slug: 'house-robber', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Longest Increasing Subsequence', slug: 'longest-increasing-subsequence', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Coin Change', slug: 'coin-change', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Edit Distance', slug: 'edit-distance', difficulty: 'Hard', frequency: 'medium' },
-    ],
-    Design: [
-      { title: 'LRU Cache', slug: 'lru-cache', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Design Twitter', slug: 'design-twitter', difficulty: 'Medium', frequency: 'medium' },
-      { title: 'Insert Delete GetRandom O(1)', slug: 'insert-delete-getrandom-o1', difficulty: 'Medium', frequency: 'medium' },
-      { title: 'Design Add and Search Words Data Structure', slug: 'design-add-and-search-words-data-structure', difficulty: 'Medium', frequency: 'medium' },
+      { title: 'House Robber', slug: 'house-robber', difficulty: 'Medium', frequency: 'medium' },
     ],
   },
   Apple: {
     Arrays: [
-      { title: 'Two Sum', slug: 'two-sum', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Best Time to Buy and Sell Stock', slug: 'best-time-to-buy-and-sell-stock', difficulty: 'Easy', frequency: 'high' },
-      { title: '3Sum', slug: '3sum', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Container With Most Water', slug: 'container-with-most-water', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Maximum Subarray', slug: 'maximum-subarray', difficulty: 'Medium', frequency: 'high' },
-    ],
-    Strings: [
-      { title: 'Valid Parentheses', slug: 'valid-parentheses', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Longest Palindromic Substring', slug: 'longest-palindromic-substring', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Longest Substring Without Repeating Characters', slug: 'longest-substring-without-repeating-characters', difficulty: 'Medium', frequency: 'high' },
+      { title: 'Contains Duplicate', slug: 'contains-duplicate', difficulty: 'Easy', frequency: 'high' },
+      { title: 'Missing Number', slug: 'missing-number', difficulty: 'Easy', frequency: 'high' },
     ],
     Trees: [
-      { title: 'Maximum Depth of Binary Tree', slug: 'maximum-depth-of-binary-tree', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Binary Tree Level Order Traversal', slug: 'binary-tree-level-order-traversal', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Validate Binary Search Tree', slug: 'validate-binary-search-tree', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Binary Tree Maximum Path Sum', slug: 'binary-tree-maximum-path-sum', difficulty: 'Hard', frequency: 'high' },
-    ],
-    Graphs: [
-      { title: 'Number of Islands', slug: 'number-of-islands', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Course Schedule', slug: 'course-schedule', difficulty: 'Medium', frequency: 'high' },
-    ],
-    'Dynamic Programming': [
-      { title: 'Climbing Stairs', slug: 'climbing-stairs', difficulty: 'Easy', frequency: 'high' },
-      { title: 'House Robber', slug: 'house-robber', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Coin Change', slug: 'coin-change', difficulty: 'Medium', frequency: 'high' },
+      { title: 'Same Tree', slug: 'same-tree', difficulty: 'Easy', frequency: 'medium' },
     ],
   },
-  Netflix: {
-    Arrays: [
-      { title: 'Two Sum', slug: 'two-sum', difficulty: 'Easy', frequency: 'high' },
-      { title: '3Sum', slug: '3sum', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Maximum Subarray', slug: 'maximum-subarray', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Merge Intervals', slug: 'merge-intervals', difficulty: 'Medium', frequency: 'high' },
-    ],
-    Strings: [
-      { title: 'Valid Parentheses', slug: 'valid-parentheses', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Longest Substring Without Repeating Characters', slug: 'longest-substring-without-repeating-characters', difficulty: 'Medium', frequency: 'high' },
-    ],
-    Trees: [
-      { title: 'Maximum Depth of Binary Tree', slug: 'maximum-depth-of-binary-tree', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Binary Tree Level Order Traversal', slug: 'binary-tree-level-order-traversal', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Validate Binary Search Tree', slug: 'validate-binary-search-tree', difficulty: 'Medium', frequency: 'high' },
-    ],
-    Graphs: [
-      { title: 'Number of Islands', slug: 'number-of-islands', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Course Schedule', slug: 'course-schedule', difficulty: 'Medium', frequency: 'high' },
-    ],
-    'Dynamic Programming': [
-      { title: 'Climbing Stairs', slug: 'climbing-stairs', difficulty: 'Easy', frequency: 'high' },
-      { title: 'House Robber', slug: 'house-robber', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Coin Change', slug: 'coin-change', difficulty: 'Medium', frequency: 'high' },
-    ],
-    Design: [
-      { title: 'LRU Cache', slug: 'lru-cache', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Insert Delete GetRandom O(1)', slug: 'insert-delete-getrandom-o1', difficulty: 'Medium', frequency: 'medium' },
-    ],
-  },
-  Flipkart: {
-    Arrays: [
-      { title: 'Two Sum', slug: 'two-sum', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Best Time to Buy and Sell Stock', slug: 'best-time-to-buy-and-sell-stock', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Contains Duplicate', slug: 'contains-duplicate', difficulty: 'Easy', frequency: 'medium' },
-      { title: '3Sum', slug: '3sum', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Container With Most Water', slug: 'container-with-most-water', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Maximum Subarray', slug: 'maximum-subarray', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Product of Array Except Self', slug: 'product-of-array-except-self', difficulty: 'Medium', frequency: 'medium' },
-    ],
-    Strings: [
-      { title: 'Valid Parentheses', slug: 'valid-parentheses', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Valid Anagram', slug: 'valid-anagram', difficulty: 'Easy', frequency: 'medium' },
-      { title: 'Longest Common Prefix', slug: 'longest-common-prefix', difficulty: 'Easy', frequency: 'medium' },
-      { title: 'Longest Substring Without Repeating Characters', slug: 'longest-substring-without-repeating-characters', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Longest Palindromic Substring', slug: 'longest-palindromic-substring', difficulty: 'Medium', frequency: 'medium' },
-    ],
-    Trees: [
-      { title: 'Maximum Depth of Binary Tree', slug: 'maximum-depth-of-binary-tree', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Binary Tree Level Order Traversal', slug: 'binary-tree-level-order-traversal', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Validate Binary Search Tree', slug: 'validate-binary-search-tree', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Binary Tree Maximum Path Sum', slug: 'binary-tree-maximum-path-sum', difficulty: 'Hard', frequency: 'medium' },
-    ],
-    Graphs: [
-      { title: 'Number of Islands', slug: 'number-of-islands', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Course Schedule', slug: 'course-schedule', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Clone Graph', slug: 'clone-graph', difficulty: 'Medium', frequency: 'medium' },
-    ],
-    'Dynamic Programming': [
-      { title: 'Climbing Stairs', slug: 'climbing-stairs', difficulty: 'Easy', frequency: 'high' },
-      { title: 'House Robber', slug: 'house-robber', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Coin Change', slug: 'coin-change', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Longest Palindromic Substring', slug: 'longest-palindromic-substring', difficulty: 'Medium', frequency: 'medium' },
-    ],
-    'Linked Lists': [
-      { title: 'Reverse Linked List', slug: 'reverse-linked-list', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Merge Two Sorted Lists', slug: 'merge-two-sorted-lists', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Add Two Numbers', slug: 'add-two-numbers', difficulty: 'Medium', frequency: 'medium' },
-    ],
-  },
-  Adobe: {
-    Arrays: [
-      { title: 'Two Sum', slug: 'two-sum', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Best Time to Buy and Sell Stock', slug: 'best-time-to-buy-and-sell-stock', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Contains Duplicate', slug: 'contains-duplicate', difficulty: 'Easy', frequency: 'medium' },
-      { title: 'Product of Array Except Self', slug: 'product-of-array-except-self', difficulty: 'Medium', frequency: 'high' },
-      { title: '3Sum', slug: '3sum', difficulty: 'Medium', frequency: 'medium' },
-    ],
-    Strings: [
-      { title: 'Valid Parentheses', slug: 'valid-parentheses', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Valid Palindrome', slug: 'valid-palindrome', difficulty: 'Easy', frequency: 'medium' },
-      { title: 'Valid Anagram', slug: 'valid-anagram', difficulty: 'Easy', frequency: 'medium' },
-      { title: 'Longest Substring Without Repeating Characters', slug: 'longest-substring-without-repeating-characters', difficulty: 'Medium', frequency: 'high' },
-    ],
-    Trees: [
-      { title: 'Maximum Depth of Binary Tree', slug: 'maximum-depth-of-binary-tree', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Invert Binary Tree', slug: 'invert-binary-tree', difficulty: 'Easy', frequency: 'medium' },
-      { title: 'Binary Tree Level Order Traversal', slug: 'binary-tree-level-order-traversal', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Lowest Common Ancestor of a Binary Tree', slug: 'lowest-common-ancestor-of-a-binary-tree', difficulty: 'Medium', frequency: 'medium' },
-    ],
-    'Dynamic Programming': [
-      { title: 'Climbing Stairs', slug: 'climbing-stairs', difficulty: 'Easy', frequency: 'high' },
-      { title: 'House Robber', slug: 'house-robber', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Coin Change', slug: 'coin-change', difficulty: 'Medium', frequency: 'medium' },
-    ],
-  },
-  Uber: {
-    Arrays: [
-      { title: 'Two Sum', slug: 'two-sum', difficulty: 'Easy', frequency: 'high' },
-      { title: '3Sum', slug: '3sum', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Maximum Subarray', slug: 'maximum-subarray', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Merge Intervals', slug: 'merge-intervals', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Product of Array Except Self', slug: 'product-of-array-except-self', difficulty: 'Medium', frequency: 'high' },
-    ],
-    Strings: [
-      { title: 'Valid Parentheses', slug: 'valid-parentheses', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Longest Substring Without Repeating Characters', slug: 'longest-substring-without-repeating-characters', difficulty: 'Medium', frequency: 'high' },
-    ],
-    Trees: [
-      { title: 'Maximum Depth of Binary Tree', slug: 'maximum-depth-of-binary-tree', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Binary Tree Level Order Traversal', slug: 'binary-tree-level-order-traversal', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Validate Binary Search Tree', slug: 'validate-binary-search-tree', difficulty: 'Medium', frequency: 'high' },
-    ],
-    Graphs: [
-      { title: 'Number of Islands', slug: 'number-of-islands', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Course Schedule', slug: 'course-schedule', difficulty: 'Medium', frequency: 'high' },
-    ],
-    'Dynamic Programming': [
-      { title: 'Climbing Stairs', slug: 'climbing-stairs', difficulty: 'Easy', frequency: 'high' },
-      { title: 'House Robber', slug: 'house-robber', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Coin Change', slug: 'coin-change', difficulty: 'Medium', frequency: 'high' },
-    ],
-    Design: [
-      { title: 'LRU Cache', slug: 'lru-cache', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Design Twitter', slug: 'design-twitter', difficulty: 'Medium', frequency: 'medium' },
-    ],
-  },
-  LinkedIn: {
-    Arrays: [
-      { title: 'Two Sum', slug: 'two-sum', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Best Time to Buy and Sell Stock', slug: 'best-time-to-buy-and-sell-stock', difficulty: 'Easy', frequency: 'high' },
-      { title: '3Sum', slug: '3sum', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Maximum Subarray', slug: 'maximum-subarray', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Merge Intervals', slug: 'merge-intervals', difficulty: 'Medium', frequency: 'high' },
-    ],
-    Strings: [
-      { title: 'Valid Parentheses', slug: 'valid-parentheses', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Longest Substring Without Repeating Characters', slug: 'longest-substring-without-repeating-characters', difficulty: 'Medium', frequency: 'high' },
-    ],
-    Trees: [
-      { title: 'Maximum Depth of Binary Tree', slug: 'maximum-depth-of-binary-tree', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Binary Tree Level Order Traversal', slug: 'binary-tree-level-order-traversal', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Validate Binary Search Tree', slug: 'validate-binary-search-tree', difficulty: 'Medium', frequency: 'high' },
-    ],
-    Graphs: [
-      { title: 'Number of Islands', slug: 'number-of-islands', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Course Schedule', slug: 'course-schedule', difficulty: 'Medium', frequency: 'high' },
-    ],
-    'Dynamic Programming': [
-      { title: 'Climbing Stairs', slug: 'climbing-stairs', difficulty: 'Easy', frequency: 'high' },
-      { title: 'House Robber', slug: 'house-robber', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Coin Change', slug: 'coin-change', difficulty: 'Medium', frequency: 'high' },
-    ],
-  },
-  Salesforce: {
-    Arrays: [
-      { title: 'Two Sum', slug: 'two-sum', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Best Time to Buy and Sell Stock', slug: 'best-time-to-buy-and-sell-stock', difficulty: 'Easy', frequency: 'high' },
-      { title: '3Sum', slug: '3sum', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Maximum Subarray', slug: 'maximum-subarray', difficulty: 'Medium', frequency: 'high' },
-    ],
-    Strings: [
-      { title: 'Valid Parentheses', slug: 'valid-parentheses', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Longest Substring Without Repeating Characters', slug: 'longest-substring-without-repeating-characters', difficulty: 'Medium', frequency: 'high' },
-    ],
-    Trees: [
-      { title: 'Maximum Depth of Binary Tree', slug: 'maximum-depth-of-binary-tree', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Binary Tree Level Order Traversal', slug: 'binary-tree-level-order-traversal', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Validate Binary Search Tree', slug: 'validate-binary-search-tree', difficulty: 'Medium', frequency: 'high' },
-    ],
-    Graphs: [
-      { title: 'Number of Islands', slug: 'number-of-islands', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Course Schedule', slug: 'course-schedule', difficulty: 'Medium', frequency: 'high' },
-    ],
-    'Dynamic Programming': [
-      { title: 'Climbing Stairs', slug: 'climbing-stairs', difficulty: 'Easy', frequency: 'high' },
-      { title: 'House Robber', slug: 'house-robber', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Coin Change', slug: 'coin-change', difficulty: 'Medium', frequency: 'high' },
-    ],
-  },
-  Oracle: {
-    Arrays: [
-      { title: 'Two Sum', slug: 'two-sum', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Best Time to Buy and Sell Stock', slug: 'best-time-to-buy-and-sell-stock', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Contains Duplicate', slug: 'contains-duplicate', difficulty: 'Easy', frequency: 'medium' },
-      { title: '3Sum', slug: '3sum', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Maximum Subarray', slug: 'maximum-subarray', difficulty: 'Medium', frequency: 'high' },
-    ],
-    Strings: [
-      { title: 'Valid Parentheses', slug: 'valid-parentheses', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Valid Anagram', slug: 'valid-anagram', difficulty: 'Easy', frequency: 'medium' },
-      { title: 'Longest Substring Without Repeating Characters', slug: 'longest-substring-without-repeating-characters', difficulty: 'Medium', frequency: 'high' },
-    ],
-    Trees: [
-      { title: 'Maximum Depth of Binary Tree', slug: 'maximum-depth-of-binary-tree', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Binary Tree Level Order Traversal', slug: 'binary-tree-level-order-traversal', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Validate Binary Search Tree', slug: 'validate-binary-search-tree', difficulty: 'Medium', frequency: 'high' },
-    ],
-    Graphs: [
-      { title: 'Number of Islands', slug: 'number-of-islands', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Course Schedule', slug: 'course-schedule', difficulty: 'Medium', frequency: 'high' },
-    ],
-    'Dynamic Programming': [
-      { title: 'Climbing Stairs', slug: 'climbing-stairs', difficulty: 'Easy', frequency: 'high' },
-      { title: 'House Robber', slug: 'house-robber', difficulty: 'Medium', frequency: 'high' },
-      { title: 'Coin Change', slug: 'coin-change', difficulty: 'Medium', frequency: 'high' },
-    ],
-  },
-  Infosys: {
+  Other: {
     Arrays: [
       { title: 'Two Sum', slug: 'two-sum', difficulty: 'Easy', frequency: 'high' },
       { title: 'Contains Duplicate', slug: 'contains-duplicate', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Best Time to Buy and Sell Stock', slug: 'best-time-to-buy-and-sell-stock', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Maximum Subarray', slug: 'maximum-subarray', difficulty: 'Medium', frequency: 'medium' },
-      { title: '3Sum', slug: '3sum', difficulty: 'Medium', frequency: 'medium' },
     ],
     Strings: [
       { title: 'Valid Anagram', slug: 'valid-anagram', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Valid Parentheses', slug: 'valid-parentheses', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Reverse String', slug: 'reverse-string', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Longest Substring Without Repeating Characters', slug: 'longest-substring-without-repeating-characters', difficulty: 'Medium', frequency: 'medium' },
-    ],
-    'Linked Lists': [
-      { title: 'Reverse Linked List', slug: 'reverse-linked-list', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Merge Two Sorted Lists', slug: 'merge-two-sorted-lists', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Linked List Cycle', slug: 'linked-list-cycle', difficulty: 'Easy', frequency: 'medium' },
-      { title: 'Add Two Numbers', slug: 'add-two-numbers', difficulty: 'Medium', frequency: 'medium' },
-    ],
-    Trees: [
-      { title: 'Maximum Depth of Binary Tree', slug: 'maximum-depth-of-binary-tree', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Binary Tree Level Order Traversal', slug: 'binary-tree-level-order-traversal', difficulty: 'Medium', frequency: 'medium' },
-      { title: 'Validate Binary Search Tree', slug: 'validate-binary-search-tree', difficulty: 'Medium', frequency: 'medium' },
-    ],
-    'Dynamic Programming': [
-      { title: 'Climbing Stairs', slug: 'climbing-stairs', difficulty: 'Easy', frequency: 'high' },
-      { title: 'House Robber', slug: 'house-robber', difficulty: 'Medium', frequency: 'medium' },
-      { title: 'Coin Change', slug: 'coin-change', difficulty: 'Medium', frequency: 'medium' },
-    ],
-  },
-  TCS: {
-    Arrays: [
-      { title: 'Two Sum', slug: 'two-sum', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Contains Duplicate', slug: 'contains-duplicate', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Best Time to Buy and Sell Stock', slug: 'best-time-to-buy-and-sell-stock', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Maximum Subarray', slug: 'maximum-subarray', difficulty: 'Medium', frequency: 'medium' },
-    ],
-    Strings: [
-      { title: 'Valid Anagram', slug: 'valid-anagram', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Valid Parentheses', slug: 'valid-parentheses', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Reverse String', slug: 'reverse-string', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Longest Substring Without Repeating Characters', slug: 'longest-substring-without-repeating-characters', difficulty: 'Medium', frequency: 'medium' },
-    ],
-    'Linked Lists': [
-      { title: 'Reverse Linked List', slug: 'reverse-linked-list', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Merge Two Sorted Lists', slug: 'merge-two-sorted-lists', difficulty: 'Easy', frequency: 'high' },
-    ],
-    Trees: [
-      { title: 'Maximum Depth of Binary Tree', slug: 'maximum-depth-of-binary-tree', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Binary Tree Level Order Traversal', slug: 'binary-tree-level-order-traversal', difficulty: 'Medium', frequency: 'medium' },
-    ],
-    'Dynamic Programming': [
-      { title: 'Climbing Stairs', slug: 'climbing-stairs', difficulty: 'Easy', frequency: 'high' },
-      { title: 'House Robber', slug: 'house-robber', difficulty: 'Medium', frequency: 'medium' },
-    ],
-  },
-  Wipro: {
-    Arrays: [
-      { title: 'Two Sum', slug: 'two-sum', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Contains Duplicate', slug: 'contains-duplicate', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Best Time to Buy and Sell Stock', slug: 'best-time-to-buy-and-sell-stock', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Maximum Subarray', slug: 'maximum-subarray', difficulty: 'Medium', frequency: 'medium' },
-    ],
-    Strings: [
-      { title: 'Valid Anagram', slug: 'valid-anagram', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Valid Parentheses', slug: 'valid-parentheses', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Reverse String', slug: 'reverse-string', difficulty: 'Easy', frequency: 'high' },
-    ],
-    'Linked Lists': [
-      { title: 'Reverse Linked List', slug: 'reverse-linked-list', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Merge Two Sorted Lists', slug: 'merge-two-sorted-lists', difficulty: 'Easy', frequency: 'high' },
-    ],
-    Trees: [
-      { title: 'Maximum Depth of Binary Tree', slug: 'maximum-depth-of-binary-tree', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Binary Tree Level Order Traversal', slug: 'binary-tree-level-order-traversal', difficulty: 'Medium', frequency: 'medium' },
-    ],
-  },
-  'HCL Technologies': {
-    Arrays: [
-      { title: 'Two Sum', slug: 'two-sum', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Contains Duplicate', slug: 'contains-duplicate', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Best Time to Buy and Sell Stock', slug: 'best-time-to-buy-and-sell-stock', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Maximum Subarray', slug: 'maximum-subarray', difficulty: 'Medium', frequency: 'medium' },
-    ],
-    Strings: [
-      { title: 'Valid Anagram', slug: 'valid-anagram', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Valid Parentheses', slug: 'valid-parentheses', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Reverse String', slug: 'reverse-string', difficulty: 'Easy', frequency: 'high' },
-    ],
-    'Linked Lists': [
-      { title: 'Reverse Linked List', slug: 'reverse-linked-list', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Merge Two Sorted Lists', slug: 'merge-two-sorted-lists', difficulty: 'Easy', frequency: 'high' },
-    ],
-    Trees: [
-      { title: 'Maximum Depth of Binary Tree', slug: 'maximum-depth-of-binary-tree', difficulty: 'Easy', frequency: 'high' },
-      { title: 'Binary Tree Level Order Traversal', slug: 'binary-tree-level-order-traversal', difficulty: 'Medium', frequency: 'medium' },
     ],
   },
 };
-
-// Populate 'Other' dynamically with general problem pools
-COMPANY_PROBLEMS.Other = {};
-for (const [topic, problems] of Object.entries(TOPIC_STARTERS || {})) {
-  COMPANY_PROBLEMS.Other[topic] = COMPANY_PROBLEMS.Other[topic] || [];
-  COMPANY_PROBLEMS.Other[topic].push(...problems.map(p => ({ ...p, frequency: 'medium' })));
-}
-for (const [topic, problems] of Object.entries(TOPIC_MEDIUM_PICKS || {})) {
-  COMPANY_PROBLEMS.Other[topic] = COMPANY_PROBLEMS.Other[topic] || [];
-  for (const p of problems) {
-    if (!COMPANY_PROBLEMS.Other[topic].some(existing => existing.slug === p.slug)) {
-      COMPANY_PROBLEMS.Other[topic].push({ ...p, frequency: 'medium' });
-    }
-  }
-}
-for (const [topic, problems] of Object.entries(TOPIC_HARD_PICKS || {})) {
-  COMPANY_PROBLEMS.Other[topic] = COMPANY_PROBLEMS.Other[topic] || [];
-  for (const p of problems) {
-    if (!COMPANY_PROBLEMS.Other[topic].some(existing => existing.slug === p.slug)) {
-      COMPANY_PROBLEMS.Other[topic].push({ ...p, frequency: 'medium' });
-    }
-  }
-}
 
 function topicStatusFromCounts(lcCount, target, totalSolved) {
   const solved = lcCount;
@@ -1164,7 +686,7 @@ function leetcodeUrl(slug) {
 }
 
 /** Rule-based problem picks — only problems not in solvedSlugs */
-function buildLeetcodeProblemPicks(lc, profile, targetCompany) {
+function buildLeetcodeProblemPicks(lc, profile) {
   if (!lc) return [];
   const solvedSlugs = new Set(lc.solvedSlugs || []);
   const picks = [];
@@ -1179,65 +701,8 @@ function buildLeetcodeProblemPicks(lc, profile, targetCompany) {
 
   const usedSlugs = new Set();
 
-  // First try company-specific problems with frequency-based prioritization
-  const companyProblems = COMPANY_PROBLEMS[targetCompany];
-  if (companyProblems) {
-    for (const topicName of order) {
-      if (picks.length >= 8) break;
-      const topicProblems = companyProblems[topicName];
-      if (!topicProblems) continue;
-
-      const road = lc.topicRoadmap.find((r) => r.topic === topicName);
-      const lcCount = road?.lcCount ?? 0;
-      if (road?.status === 'strong') continue;
-
-      const experienced = lc.totalSolved >= 120 || lcCount >= 25;
-      const prefer = experienced
-        ? ['Hard', 'Medium', 'Easy']
-        : lcCount < UNCOVERED_LC_COUNT
-        ? ['Easy', 'Medium']
-        : ['Medium', 'Easy', 'Hard'];
-
-      // Sort problems by frequency (high first) within preferred difficulty
-      const frequencyOrder = { high: 0, medium: 1, low: 2 };
-      const sortedTopicProblems = [...topicProblems].sort((a, b) => {
-        const freqA = (a.frequency || 'medium');
-        const freqB = (b.frequency || 'medium');
-        return frequencyOrder[freqA] - frequencyOrder[freqB];
-      });
-
-      for (const diff of prefer) {
-        const problem = sortedTopicProblems.find(p => 
-          p.difficulty === diff && 
-          !solvedSlugs.has(p.slug) && 
-          !usedSlugs.has(p.slug)
-        );
-        if (problem) {
-          usedSlugs.add(problem.slug);
-          const count = road?.toSolveThisWeek || 2;
-          const freqLabel = problem.frequency === 'high' ? '🔥' : problem.frequency === 'medium' ? '⚡' : '💡';
-          picks.push({
-            title: problem.title,
-            slug: problem.slug,
-            topic: topicName,
-            difficulty: problem.difficulty,
-            frequency: problem.frequency || 'medium',
-            pattern: `${targetCompany} ${freqLabel} frequently asked`,
-            why: `This is a ${problem.frequency || 'medium'}-frequency problem at ${targetCompany}. You haven't solved it on LeetCode yet (${lcCount} on ${topicName} tag).`,
-            companyRelevance: targetCompany,
-            leetcodeUrl: leetcodeUrl(problem.slug),
-            problemsToSolve: count,
-            isCompanySpecific: true,
-          });
-          break;
-        }
-      }
-    }
-  }
-
-  // Then fall back to default topic problems for remaining slots
   for (const topicName of order) {
-    if (picks.length >= 8) break;
+    if (picks.length >= 6) break;
 
     const road = lc.topicRoadmap.find((r) => r.topic === topicName);
     const lcCount = road?.lcCount ?? 0;
@@ -1260,11 +725,10 @@ function buildLeetcodeProblemPicks(lc, profile, targetCompany) {
       topic: topicName,
       difficulty: starter.difficulty,
       pattern: 'Not in your LeetCode AC list yet',
-      why: `You haven't solved this on LeetCode (${lcCount} on ${topicName} tag). ${starter.difficulty} pick for ${profile.targetCompany || 'placement'}.`,
+      why: `You haven't solved this on LeetCode (${lcCount} on ${topicName} tag). ${starter.difficulty} pick for ${profile.targetCompany}.`,
       companyRelevance: profile.targetCompany,
       leetcodeUrl: leetcodeUrl(starter.slug),
       problemsToSolve: count,
-      isCompanySpecific: false,
     });
   }
   return filterUnsolvedRecommendations(picks, solvedSlugs);

@@ -187,3 +187,26 @@ export const predictionService = {
 export const aiCommandService = {
   send: (payload) => apiRequest('post', '/ai-command', typeof payload === 'string' ? { message: payload } : payload),
 };
+
+// ─── Opportunities / Hackathons ─────────────────────────────────────────────
+export const opportunityService = {
+  getAll: (params = {}) => apiRequest('get', '/opportunities', null, { params }),
+  getLatest: () => apiRequest('get', '/opportunities/latest'),
+  getTrending: () => apiRequest('get', '/opportunities/trending'),
+  getClosingSoon: () => apiRequest('get', '/opportunities/closing-soon'),
+  getRecommended: () => apiRequest('get', '/opportunities/recommended'),
+  search: (q) => apiRequest('get', '/opportunities/search', null, { params: { q } }),
+  getOne: (id) => apiRequest('get', `/opportunities/${id}`),
+  save: (id, data = {}) => apiRequest('post', `/opportunities/${id}/save`, data),
+  unsave: (id) => apiRequest('delete', `/opportunities/${id}/save`),
+  getSaved: () => apiRequest('get', '/opportunities/saved'),
+};
+
+// ─── Admin ───────────────────────────────────────────────────────────────────
+export const adminService = {
+  getDashboard: () => apiRequest('get', '/admin/dashboard'),
+  getUsers: () => apiRequest('get', '/admin/users'),
+  updateUserRole: (userId, role) => apiRequest('patch', `/admin/users/${userId}/role`, { role }),
+  triggerCollectors: () => apiRequest('post', '/admin/collectors/run'),
+  triggerReminders: () => apiRequest('post', '/admin/reminders/run'),
+};

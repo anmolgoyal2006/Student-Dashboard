@@ -11,9 +11,13 @@ const userSchema = new mongoose.Schema({
   branch:   { type: String, default: '' },
   resetPasswordToken:   { type: String, default: undefined },
   resetPasswordExpires: { type: Date,   default: undefined },
-   googleId: { type: String, default: null },   // ← ADD
-  avatar:   { type: String, default: '' },      // ← ADD
-  fcmToken: { type: String, default: null },  
+  googleId: { type: String, default: null },
+  avatar:   { type: String, default: '' },
+  fcmToken: { type: String, default: null },
+  // New fields for matching engine
+  skills: { type: [String], default: [] },
+  interests: { type: [String], default: [] },
+  cgpa: { type: Number, default: 0, min: 0, max: 10 }
 }, { timestamps: true });
 
 userSchema.pre('save', function (next) {

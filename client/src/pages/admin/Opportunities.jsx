@@ -1,0 +1,291 @@
+
+import { useEffect, useState } from 'react';
+import { useAuth } from '../../context/AuthContext';
+import { useNavigate, useLocation } from 'react-router-dom';
+import toast from '../../context/ToastContext';
+import EmptyState from '../../components/EmptyState';
+import { Lock, Trophy, TrendingUp, Clock, RefreshCw, AlertCircle, Activity, Users } from 'lucide-react';
+import { adminService } from '../../services/apiServices';
+
+export default function AdminOpportunities() {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  
+  const [dashboardStats, setDashboardStats] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [sendingReminders, setSendingReminders] = useState(false);
+
+  const fetchDashboard = async () => {
+    try {
+      const { data } = await adminService.getDashboard();
+      setDashboardStats(data.stats);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to load dashboard.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const triggerCollectors = async () => {
+    try {
+      setRefreshing(true);
+      const { data } = await adminService.triggerCollectors();
+      toast.success(data.message);
+      // Refetch dashboard after a delay to show new logs
+      setTimeout(fetchDashboard, 5000);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to trigger collectors.');
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const triggerReminders = async () => {
+    try {
+      setSendingReminders(true);
+      const { data } = await adminService.triggerReminders();
+      toast.success(data.message);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to trigger reminders.');
+    } finally {
+      setSendingReminders(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDashboard();
+  }, []);
+
+  if (user?.role !== 'teacher') {
+    return (
+      <div className="card" style={{ textAlign: 'center', padding: 40, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+        <Lock size={32} style={{ color: 'var(--color-accent)' }} />
+        <p style={{ fontWeight: 600 }}>Access denied — teachers only.</p>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return <div className="spinner" />;
+  }
+
+  return (
+    <div>
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">Admin Panel</h1>
+          <p className="page-subtitle">Monitor collectors and event stats</p>
+        </div>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button
+            onClick={triggerReminders}
+            disabled={sendingReminders}
+            className="btn btn-primary"
+            style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--color-accent)' }}
+          >
+            <AlertCircle size={16} className={sendingReminders ? 'animate-spin' : ''} />
+            {sendingReminders ? 'Sending…' : 'Check Reminders'}
+          </button>
+          <button
+            onClick={triggerCollectors}
+            disabled={refreshing}
+            className="btn btn-primary"
+            style={{ display: 'flex', alignItems: 'center', gap: 8 }}
+          >
+            <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} />
+            {refreshing ? 'Collecting…' : 'Manual Refresh'}
+          </button>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div style={{
+        display: 'flex',
+        borderBottom: '1px solid var(--border)',
+        marginBottom: 24,
+        gap: 24,
+        marginTop: 12
+      }}>
+        <button
+          onClick={() => navigate('/admin')}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: '12px 4px',
+            background: 'transparent',
+            border: 'none',
+            cursor: 'pointer',
+            color: location.pathname === '/admin' ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
+            borderBottom: location.pathname === '/admin' ? '2px solid var(--color-accent)' : '2px solid transparent',
+            fontSize: 13.5,
+            fontWeight: location.pathname === '/admin' ? 500 : 400,
+            transition: 'all 0.15s ease'
+          }}
+        >
+          <Users size={15} />
+          User Management
+        </button>
+        <button
+          onClick={() => navigate('/admin/opportunities')}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: '12px 4px',
+            background: 'transparent',
+            border: 'none',
+            cursor: 'pointer',
+            color: location.pathname === '/admin/opportunities' ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
+            borderBottom: location.pathname === '/admin/opportunities' ? '2px solid var(--color-accent)' : '2px solid transparent',
+            fontSize: 13.5,
+            fontWeight: location.pathname === '/admin/opportunities' ? 500 : 400,
+            transition: 'all 0.15s ease'
+          }}
+        >
+          <Trophy size={15} />
+          Opportunities
+        </button>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid-4 mb-4">
+        <StatCard 
+          icon={<Trophy size={16} />} 
+          value={dashboardStats?.totalEvents || 0} 
+          label="Total Events" 
+          color="var(--color-accent)" 
+        />
+        {Object.entries(dashboardStats?.eventsBySource || {}).map(([source, count]) => (
+          <StatCard 
+            key={source}
+            icon={<Activity size={16} />} 
+            value={count} 
+            label={`${source.charAt(0).toUpperCase() + source.slice(1)} Events`} 
+            color={source === 'unstop' ? 'var(--color-success)' : 'var(--color-warning)'} 
+          />
+        ))}
+      </div>
+
+      <div className="grid-2 mb-4">
+        {/* Last Run Info */}
+        <div className="card">
+          <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Clock size={16} style={{ color: 'var(--color-accent)' }} />
+            Last Collector Run
+          </div>
+          {dashboardStats?.lastRunTime ? (
+            <div style={{ fontSize: 14, color: 'var(--color-text-secondary)' }}>
+              {new Date(dashboardStats.lastRunTime).toLocaleString()}
+            </div>
+          ) : (
+            <div style={{ fontSize: 14, color: 'var(--color-text-secondary)' }}>No runs yet</div>
+          )}
+        </div>
+
+        {/* Failed Collectors */}
+        <div className="card">
+          <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <AlertCircle size={16} style={{ color: 'var(--color-danger)' }} />
+            Failed Collectors
+          </div>
+          {(dashboardStats?.failedCollectors?.length || 0) === 0 ? (
+            <div style={{ fontSize: 14, color: 'var(--color-text-secondary)' }}>All collectors healthy!</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {dashboardStats.failedCollectors.map(log => (
+                <div key={log._id} style={{ fontSize: 13, color: 'var(--color-danger)' }}>
+                  {log.lastRun.collectorName}: {log.lastRun.errorMessage}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Recent Runs */}
+      <div className="card">
+        <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <TrendingUp size={16} style={{ color: 'var(--color-accent)' }} />
+          Recent Collector Runs
+        </div>
+        {(dashboardStats?.lastRuns?.length || 0) === 0 ? (
+          <EmptyState 
+            title="No runs found"
+            subtitle="No collector runs have been logged yet."
+          />
+        ) : (
+          <div className="table-wrap">
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <thead>
+                <tr style={{ background: 'rgba(255,255,255,0.04)' }}>
+                  {['Collector', 'Status', 'Events', 'Duration', 'Started'].map(h => (
+                    <th key={h} style={thStyle}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {dashboardStats.lastRuns.map(run => (
+                  <tr key={run._id} style={{ borderBottom: '1px solid var(--card-border)' }}>
+                    <td style={tdStyle}>
+                      <div style={{ fontWeight: 600, textTransform: 'capitalize' }}>
+                        {run.collectorName}
+                      </div>
+                    </td>
+                    <td style={tdStyle}>
+                      <span style={{
+                        padding: '3px 10px',
+                        borderRadius: 20,
+                        fontSize: 12,
+                        fontWeight: 600,
+                        background: run.status === 'success'
+                          ? 'rgba(34,197,94,0.15)' : run.status === 'failed'
+                          ? 'rgba(239,68,68,0.15)' : 'rgba(251,191,36,0.15)',
+                        color: run.status === 'success'
+                          ? 'var(--color-success)' : run.status === 'failed'
+                          ? 'var(--color-danger)' : 'var(--color-warning)',
+                        textTransform: 'capitalize'
+                      }}>
+                        {run.status}
+                      </span>
+                    </td>
+                    <td style={tdStyle}>
+                      {run.eventCount}
+                    </td>
+                    <td style={tdStyle}>
+                      {run.duration ? `${Math.round(run.duration / 1000)}s` : '—'}
+                    </td>
+                    <td style={tdStyle}>
+                      {new Date(run.startedAt).toLocaleString()}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function StatCard({ icon, value, label, color }) {
+  return (
+    <div className="card stat-card">
+      <span className="stat-icon" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color }}>{icon}</span>
+      <div className="stat-value" style={{ color }}>{value}</div>
+      <div className="stat-label">{label}</div>
+    </div>
+  );
+}
+
+const thStyle = {
+  padding: '10px 12px', textAlign: 'left',
+  color: 'var(--muted)', fontWeight: 600, whiteSpace: 'nowrap',
+};
+const tdStyle = {
+  padding: '10px 12px', verticalAlign: 'middle',
+};

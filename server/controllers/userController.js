@@ -58,9 +58,9 @@ const sendEmail = async (toEmail, toName, resetURL) => {
 
 // PUT /api/user/update-profile  ← THIS WAS MISSING
 exports.updateProfile = async (req, res) => {
-  const { name, email } = req.body;
-  if (!name?.trim() && !email?.trim())
-    return res.status(400).json({ message: 'Provide at least a name or email to update.' });
+  const { name, email, skills, interests, cgpa, college, semester } = req.body;
+  if (!name?.trim() && !email?.trim() && !skills && !interests && !cgpa && !college && !semester)
+    return res.status(400).json({ message: 'Provide at least one field to update.' });
   try {
     if (email && email.toLowerCase() !== req.user.email.toLowerCase()) {
       const exists = await User.findOne({ email: email.toLowerCase() });
@@ -70,6 +70,21 @@ exports.updateProfile = async (req, res) => {
     const updateFields = {};
     if (name?.trim())  updateFields.name  = name.trim();
     if (email?.trim()) updateFields.email = email.trim().toLowerCase();
+    if (skills) updateFields.skills = Array.isArray(skills) ? skills : [];
+    if (interests) updateFields.interests = Array.isArray(interests) ? interests : [];
+    if (cgpa !== undefined) {
+      const parsedCgpa = parseFloat(cgpa);
+      if (!isNaN(parsedCgpa) && parsedCgpa >= 0 && parsedCgpa <= 10) {
+        updateFields.cgpa = parsedCgpa;
+      }
+    }
+    if (college?.trim()) updateFields.college = college.trim();
+    if (semester !== undefined) {
+      const parsedSemester = parseInt(semester);
+      if (!isNaN(parsedSemester) && parsedSemester >= 1 && parsedSemester <= 8) {
+        updateFields.semester = parsedSemester;
+      }
+    }
     const updated = await User.findByIdAndUpdate(
       req.user.id, { $set: updateFields }, { new: true, runValidators: true }
     ).select('-password');
@@ -77,7 +92,17 @@ exports.updateProfile = async (req, res) => {
     const newToken = generateToken(updated);
     res.json({
       message: 'Profile updated successfully.',
-      user:  { id: updated._id, name: updated.name, email: updated.email, college: updated.college, semester: updated.semester, role: updated.role },
+      user:  { 
+        id: updated._id, 
+        name: updated.name, 
+        email: updated.email, 
+        college: updated.college, 
+        semester: updated.semester, 
+        role: updated.role,
+        skills: updated.skills,
+        interests: updated.interests,
+        cgpa: updated.cgpa
+      },
       token: newToken,
     });
   } catch (err) { res.status(500).json({ message: err.message }); }

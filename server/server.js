@@ -6,6 +6,7 @@ const { startDailyNotificationJob } = require('./jobs/dailyNotificationJob');
 const { startClassroomSyncJob } = require('./jobs/classroomSyncJob');
 const { startNotificationJobs } = require('./jobs/notificationSyncJob');
 const { startDigestJobs } = require('./jobs/digestJobs');
+const { startCollectorScheduler } = require('./jobs/collectorScheduler');
 
 const app = express();
 
@@ -91,6 +92,8 @@ app.use('/api/admin',           require('./routes/adminRoutes'));
 app.use('/api/classroom',       require('./routes/classroomRoutes'));
 app.use('/api/analytics',       require('./routes/analyticsRoutes'));
 app.use('/api',                 require('./routes/riskRoutes'));
+app.use('/api/events',          require('./routes/eventRoutes'));
+app.use('/api/opportunities',   require('./routes/opportunitiesRoutes'));
 
 
 // 🔥 ADD HERE
@@ -156,6 +159,7 @@ mongoose.connect(process.env.MONGO_URI, {
     startClassroomSyncJob();
     startNotificationJobs();
     startDigestJobs();
+    startCollectorScheduler();
     startServer();
   })
   .catch((err) => {

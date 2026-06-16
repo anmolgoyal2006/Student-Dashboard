@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
-import { careerService }   from '../services/apiServices';
+import { careerService, opportunityService } from '../services/apiServices';
+import OpportunityCard from '../components/OpportunityCard';
 import FocusMode           from '../components/FocusMode';
 import CareerProgressBar   from '../components/CareerProgressBar';
 import DsaCoachPanel       from '../components/DsaCoachPanel';
@@ -9,7 +10,7 @@ import {
   Briefcase, CheckCircle, Brain, BarChart2, Sprout, Flame, Award, 
   Target, Settings, Calendar, FileText, ClipboardList, RefreshCw, 
   ChevronDown, ChevronRight, Activity, Lightbulb, Bot, Mic, Loader2,
-  Gamepad, ExternalLink, Trash2, ShieldAlert, Clock, Upload
+  Gamepad, ExternalLink, Trash2, ShieldAlert, Clock, Upload, Trophy, Search, Filter
 } from 'lucide-react';
 import EmptyState from '../components/EmptyState';
 
@@ -34,6 +35,24 @@ export default function Career() {
 
   // Tab switching
   const [activeTab, setActiveTab] = useState('dsa');
+
+  // Hackathons state
+  const [hackathons, setHackathons] = useState([]);
+  const [hackathonLoading, setHackathonLoading] = useState(true);
+  const [savedEventIds, setSavedEventIds] = useState(new Set());
+  const [hackathonView, setHackathonView] = useState('all'); // 'all' | 'recommended' | 'saved' | 'closing'
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Function to load saved event IDs
+  const loadSavedEventIds = async () => {
+    try {
+      const { data } = await opportunityService.getSaved();
+      const ids = new Set((data.data || []).map(e => e._id.toString()));
+      setSavedEventIds(ids);
+    } catch (err) {
+      console.error('Failed to load saved events:', err);
+    }
+  };
 
   // Resume Scanner State
   const [scanMethod, setScanMethod] = useState('pdf'); // 'pdf' | 'text'
@@ -277,6 +296,75 @@ export default function Career() {
     finally { setPlanLoad(false); }
   };
 
+  const loadHackathons = async (view) => {
+    setHackathonLoading(true);
+    try {
+      let data;
+      switch (view) {
+        case 'recommended':
+          data = (await opportunityService.getRecommended()).data;
+          break;
+        case 'saved':
+          data = (await opportunityService.getSaved()).data;
+          break;
+        case 'closing':
+          data = (await opportunityService.getClosingSoon()).data;
+          break;
+        default:
+          data = (await opportunityService.getAll()).data;
+      }
+      setHackathons(data.data || data.events || []);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to load hackathons');
+    } finally {
+      setHackathonLoading(false);
+    }
+  };
+
+  const handleSaveEvent = async (eventId) => {
+    try {
+      await opportunityService.save(eventId);
+      toast.success('Event saved!');
+      // Update local state
+      setSavedEventIds(prev => new Set([...prev, eventId.toString()]));
+      // If on saved view, refresh
+      if (hackathonView === 'saved') {
+        const { data } = await opportunityService.getSaved();
+        setHackathons(data.data || []);
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to save event');
+    }
+  };
+
+  const handleUnsaveEvent = async (eventId) => {
+    try {
+      await opportunityService.unsave(eventId);
+      toast.success('Event removed from saved!');
+      // Update local state
+      setSavedEventIds(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(eventId.toString());
+        return newSet;
+      });
+      // If on saved view, refresh
+      if (hackathonView === 'saved') {
+        const { data } = await opportunityService.getSaved();
+        setHackathons(data.data || []);
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to unsave event');
+    }
+  };
+
+  // Reload hackathons when view changes
+  useEffect(() => {
+    if (activeTab === 'hackathons') {
+      loadHackathons(hackathonView);
+      loadSavedEventIds();
+    }
+  }, [activeTab, hackathonView]);
+
   useEffect(() => { load(); loadPlan(); }, []);
 
   // Bind active question details reactively when navigating
@@ -375,6 +463,7 @@ export default function Career() {
   const TABS = [
     { id: 'dsa',    label: 'DSA tracker', icon: BarChart2 },
     { id: 'prep',   label: 'AI career prep', icon: Brain },
+    { id: 'hackathons', label: 'Hackathons', icon: Trophy },
   ];
 
   const totalSolved = career.leetcodeUsername ? (career.leetcodeSync?.totalOnLeetcode ?? 0) : (career.problemsSolved ?? 0);
@@ -881,6 +970,85 @@ export default function Career() {
                 );
               })()}
             </div>
+          )}
+        </>
+      ) : activeTab === 'hackathons' ? (
+        <>
+          {/* Hackathons View */}
+          <div style={{ marginBottom: 16, display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {[
+                { id: 'all', label: 'All Events' },
+                { id: 'recommended', label: 'Recommended' },
+                { id: 'closing', label: 'Closing Soon' },
+                { id: 'saved', label: 'Saved' }
+              ].map(view => (
+                <button
+                  key={view.id}
+                  onClick={() => setHackathonView(view.id)}
+                  className={`btn btn-sm ${hackathonView === view.id ? 'btn-primary' : 'btn-outline'}`}
+                  style={{ minHeight: 'auto', height: 30, background: hackathonView === view.id ? 'var(--color-accent)' : 'transparent' }}
+                >
+                  {view.label}
+                </button>
+              ))}
+            </div>
+            <div style={{ flex: 1, minWidth: 200, maxWidth: 400 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', borderRadius: 8 }}>
+                <Search size={16} color="var(--color-text-secondary)" />
+                <input
+                  type="text"
+                  placeholder="Search hackathons..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  style={{
+                    flex: 1,
+                    background: 'transparent',
+                    border: 'none',
+                    outline: 'none',
+                    color: 'var(--color-text-primary)',
+                    fontSize: 13
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {hackathonLoading ? (
+            <div style={{ display: 'flex', justifyContent: 'center', padding: '40px' }}>
+              <Loader2 size={32} className="animate-spin" style={{ animation: 'spin 1s linear infinite', color: 'var(--color-accent)' }} />
+            </div>
+          ) : (
+            <>
+              {hackathons.length === 0 ? (
+                <EmptyState
+                  illustration="marks"
+                  title="No hackathons found"
+                  subtitle={`No events in ${hackathonView === 'all' ? 'all events' : hackathonView} category.`}
+                />
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
+              {hackathons
+                .filter(event => 
+                  !searchQuery || 
+                  event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  event.description?.toLowerCase().includes(searchQuery.toLowerCase())
+                )
+                .map(event => (
+                  <OpportunityCard
+                    key={event._id}
+                    opportunity={event}
+                    showMatchScore={hackathonView === 'recommended'}
+                    matchScore={event.matchScore}
+                    matchReasons={event.matchReasons}
+                    isSaved={savedEventIds.has(event._id.toString())}
+                    onSave={() => handleSaveEvent(event._id)}
+                    onUnsave={() => handleUnsaveEvent(event._id)}
+                  />
+                ))}
+            </div>
+              )}
+            </>
           )}
         </>
       ) : (

@@ -22,7 +22,8 @@ const notificationSchema = new mongoose.Schema(
       default: null,
     },
   type: {
-    type:    String,
+    type: String,
+    enum: ['ATTENDANCE_MARK', 'EVENT_REMINDER'],
     default: 'ATTENDANCE_MARK',
   },
   courseName: {
