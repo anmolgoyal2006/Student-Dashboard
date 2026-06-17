@@ -27,52 +27,92 @@ class DevfolioCollector {
     
     // Placeholder events - these are for demonstration only
     return [
-      {
-        title: "Global Tech Hackathon 2025",
-        description: "Build innovative solutions for real-world problems. Open to all developers worldwide.",
-        registrationUrl: "https://devfolio.co/hackathons",
-        registrationDeadline: this.getFutureDate(30),
-        category: "Technology",
-        prizePool: 10000,
-        currency: "USD",
-        registeredCount: 250,
-        source: "devfolio",
-        sourceEventId: "global-tech-2025",
-        requiredSkills: ["Web Development", "Mobile Development", "AI/ML"],
-        difficulty: "intermediate",
-        banner: "https://images.unsplash.com/photo-1504384308090-c894fdcc538d?w=600&q=80"
-      },
-      {
-        title: "Student Innovation Challenge",
-        description: "Exclusive hackathon for students to showcase their creativity and technical skills.",
-        registrationUrl: "https://devfolio.co/hackathons",
-        registrationDeadline: this.getFutureDate(45),
-        category: "Student",
-        prizePool: 5000,
-        currency: "USD",
-        registeredCount: 180,
-        source: "devfolio",
-        sourceEventId: "student-innovation-2025",
-        requiredSkills: ["Python", "JavaScript", "UI/UX Design"],
-        difficulty: "beginner",
-        banner: "https://images.unsplash.com/photo-1531482615713-2afd69097998?w=600&q=80"
-      },
-      {
-        title: "AI & ML Summit Hack",
-        description: "Dive deep into artificial intelligence and machine learning with this specialized hackathon.",
-        registrationUrl: "https://devfolio.co/hackathons",
-        registrationDeadline: this.getFutureDate(60),
-        category: "AI/ML",
-        prizePool: 15000,
-        currency: "USD",
-        registeredCount: 320,
-        source: "devfolio",
-        sourceEventId: "ai-ml-summit-2025",
-        requiredSkills: ["Python", "TensorFlow", "PyTorch", "Data Science"],
-        difficulty: "advanced",
-        banner: "https://images.unsplash.com/photo-1677442135703-1787eea5ce01?w=600&q=80"
-      }
-    ];
+        {
+          title: "Global Tech Hackathon 2025",
+          description: "Build innovative solutions for real-world problems. Open to all developers worldwide.",
+          registrationUrl: "https://devfolio.co/hackathons",
+          registrationDeadline: this.getFutureDate(30),
+          category: "Technology",
+          prizePool: 10000,
+          currency: "USD",
+          registeredCount: 250,
+          source: "devfolio",
+          sourceEventId: "global-tech-2025",
+          requiredSkills: ["Web Development", "Mobile Development", "AI/ML"],
+          difficulty: "intermediate",
+          banner: "https://images.unsplash.com/photo-1504384308090-c894fdcc538d?w=600&q=80",
+          location: "Remote",
+          state: ""
+        },
+        {
+          title: "Student Innovation Challenge",
+          description: "Exclusive hackathon for students to showcase their creativity and technical skills.",
+          registrationUrl: "https://devfolio.co/hackathons",
+          registrationDeadline: this.getFutureDate(45),
+          category: "Student",
+          prizePool: 5000,
+          currency: "USD",
+          registeredCount: 180,
+          source: "devfolio",
+          sourceEventId: "student-innovation-2025",
+          requiredSkills: ["Python", "JavaScript", "UI/UX Design"],
+          difficulty: "beginner",
+          banner: "https://images.unsplash.com/photo-1531482615713-2afd69097998?w=600&q=80",
+          location: "Bangalore, Karnataka",
+          state: "karnataka"
+        },
+        {
+          title: "AI & ML Summit Hack",
+          description: "Dive deep into artificial intelligence and machine learning with this specialized hackathon.",
+          registrationUrl: "https://devfolio.co/hackathons",
+          registrationDeadline: this.getFutureDate(60),
+          category: "AI/ML",
+          prizePool: 15000,
+          currency: "USD",
+          registeredCount: 320,
+          source: "devfolio",
+          sourceEventId: "ai-ml-summit-2025",
+          requiredSkills: ["Python", "TensorFlow", "PyTorch", "Data Science"],
+          difficulty: "advanced",
+          banner: "https://images.unsplash.com/photo-1677442135703-1787eea5ce01?w=600&q=80",
+          location: "San Francisco, California",
+          state: "california"
+        },
+        {
+          title: "Chandigarh Tech Fest Hackathon",
+          description: "A regional hackathon for students in Chandigarh and nearby areas.",
+          registrationUrl: "https://devfolio.co/hackathons",
+          registrationDeadline: this.getFutureDate(20),
+          category: "Regional",
+          prizePool: 5000,
+          currency: "INR",
+          registeredCount: 100,
+          source: "devfolio",
+          sourceEventId: "chandigarh-tech-fest-2025",
+          requiredSkills: ["Web Development", "Python"],
+          difficulty: "intermediate",
+          banner: "https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=600&q=80",
+          location: "Chandigarh",
+          state: "chandigarh"
+        },
+        {
+          title: "Punjab Innovation Challenge",
+          description: "A hackathon for innovators in Punjab, with finals in Chandigarh.",
+          registrationUrl: "https://devfolio.co/hackathons",
+          registrationDeadline: this.getFutureDate(35),
+          category: "Innovation",
+          prizePool: 8000,
+          currency: "INR",
+          registeredCount: 150,
+          source: "devfolio",
+          sourceEventId: "punjab-innovation-challenge-2025",
+          requiredSkills: ["Innovation", "Problem Solving"],
+          difficulty: "intermediate",
+          banner: "https://images.unsplash.com/photo-1559136555-9303baea8ebd?w=600&q=80",
+          location: "",
+          state: ""
+        }
+      ];
   }
 
   /**

@@ -62,7 +62,7 @@ function PasswordInput({ label, name, value, onChange, placeholder }) {
 export default function ProfileSettings() {
   const { user, updateUser,logout} = useAuth();
 
-  const [profile,        setProfile]   = useState({ name: user?.name || '', email: user?.email || '' });
+  const [profile,        setProfile]   = useState({ name: user?.name || '', email: user?.email || '', state: user?.state || '' });
   const [profileStatus,  setPS]        = useState({ type: '', message: '' });
   const [profileLoading, setPL]        = useState(false);
 
@@ -81,17 +81,18 @@ export default function ProfileSettings() {
 
     const name  = profile.name.trim();
     const email = profile.email.trim().toLowerCase();
+    const state = profile.state.trim();
 
-    if (name.length < 2)
+    if (name && name.length < 2)
       return setPS({ type: 'error', message: 'Name must be at least 2 characters.' });
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
       return setPS({ type: 'error', message: 'Please enter a valid email address.' });
-    if (name === user?.name && email === user?.email?.toLowerCase())
+    if (name === user?.name && email === user?.email?.toLowerCase() && state === user?.state)
       return setPS({ type: 'error', message: 'No changes detected.' });
 
     setPL(true);
     try {
-      const { data } = await userService.updateProfile({ name, email });
+      const { data } = await userService.updateProfile({ name, email, state });
       updateUser(data.user, data.token);
       setPS({ type: 'success', message: data.message });
       toast.success('Profile updated!');
@@ -249,6 +250,20 @@ export default function ProfileSettings() {
                 <Zap size={12} style={{ color: 'var(--color-accent)' }} />
                 A new login token is issued when email changes.
               </p>
+            </div>
+
+            <div className="ps-field">
+              <label className="ps-label">State/Region</label>
+              <div className="ps-input-wrap">
+                <span className="ps-icon" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Info size={16} /></span>
+                <input
+                  className="ps-input"
+                  type="text"
+                  value={profile.state}
+                  onChange={e => setProfile(p => ({ ...p, state: e.target.value }))}
+                  placeholder="e.g., California, Maharashtra"
+                />
+              </div>
             </div>
 
             <button type="submit" className="ps-btn ps-btn--indigo" disabled={profileLoading} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>

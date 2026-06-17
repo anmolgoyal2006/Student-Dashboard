@@ -2,6 +2,8 @@
 const express = require('express');
 const router = express.Router();
 const { protect } = require('../middleware/authMiddleware');
+const User = require('../models/User');
+const jwt = require('jsonwebtoken');
 const {
   getAllEvents,
   getLatestEvents,
@@ -15,6 +17,19 @@ const {
   getRecommendedEvents
 } = require('../services/eventService');
 
+// Helper function to get user state from request
+const getUserState = async (req) => {
+  if (!req.headers.authorization) return '';
+  try {
+    const token = req.headers.authorization.split(' ')[1];
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await User.findById(decoded.id).select('state');
+    return user?.state || '';
+  } catch (err) {
+    return '';
+  }
+};
+
 // GET /api/opportunities - All events (paginated)
 router.get('/', async (req, res) => {
   try {
@@ -27,11 +42,14 @@ router.get('/', async (req, res) => {
       startDate,
       endDate,
       minPrize,
-      maxPrize
+      maxPrize,
+      state
     } = req.query;
     
+    const userState = await getUserState(req);
+    
     const result = await getAllEvents(
-      { source, category, difficulty, startDate, endDate, minPrize, maxPrize }, 
+      { source, category, difficulty, startDate, endDate, minPrize, maxPrize, userState, state }, 
       parseInt(page), 
       parseInt(limit)
     );
@@ -52,7 +70,8 @@ router.get('/', async (req, res) => {
 // GET /api/opportunities/latest - Latest 50 events
 router.get('/latest', async (req, res) => {
   try {
-    const events = await getLatestEvents();
+    const userState = await getUserState(req);
+    const events = await getLatestEvents(50, userState);
     res.status(200).json({
       success: true,
       data: events,
@@ -70,7 +89,8 @@ router.get('/latest', async (req, res) => {
 // GET /api/opportunities/trending - Most saved events
 router.get('/trending', async (req, res) => {
   try {
-    const events = await getTrendingEvents();
+    const userState = await getUserState(req);
+    const events = await getTrendingEvents(20, userState);
     res.status(200).json({
       success: true,
       data: events,
@@ -88,7 +108,8 @@ router.get('/trending', async (req, res) => {
 // GET /api/opportunities/closing-soon - Deadline &lt; 7 days
 router.get('/closing-soon', async (req, res) => {
   try {
-    const events = await getClosingSoonEvents();
+    const userState = await getUserState(req);
+    const events = await getClosingSoonEvents(7, userState);
     res.status(200).json({
       success: true,
       data: events,

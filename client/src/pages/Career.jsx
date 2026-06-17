@@ -54,7 +54,8 @@ export default function Career() {
     startDate: '',
     endDate: '',
     minPrize: '',
-    maxPrize: ''
+    maxPrize: '',
+    state: ''
   });
 
   // Filter options always derived from the full unfiltered list so options never disappear
@@ -1343,6 +1344,46 @@ export default function Career() {
                     </div>
                   </div>
                 </div>
+
+                {/* Row 4: Location/State */}
+                <div>
+                  <div style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: 8, 
+                    marginBottom: 10,
+                    paddingBottom: 8,
+                    borderBottom: '1px solid rgba(255,255,255,0.04)'
+                  }}>
+                    <div style={{ width: 2, height: 14, borderRadius: 2, background: 'var(--color-accent)' }} />
+                    <span style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: 0.4 }}>
+                      Location
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                    <div style={{ flex: '1 1 180px', minWidth: 0 }}>
+                      <input
+                        type="text"
+                        placeholder="e.g., California, Karnataka"
+                        value={filters.state}
+                        onChange={(e) => setFilters(f => ({ ...f, state: e.target.value }))}
+                        style={{
+                          width: '100%',
+                          padding: '8px 12px',
+                          background: 'rgba(255,255,255,0.03)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 8,
+                          color: 'var(--color-text-primary)',
+                          fontSize: 13,
+                          outline: 'none',
+                          boxSizing: 'border-box'
+                        }}
+                        onFocus={e => e.currentTarget.style.borderColor = 'var(--color-accent)'}
+                        onBlur={e => e.currentTarget.style.borderColor = 'var(--border)'}
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
               
               {/* Reset Filters Button - Bottom */}
@@ -1370,7 +1411,8 @@ export default function Career() {
                 <button
                   onClick={() => setFilters({
                     source: '', category: '', difficulty: '',
-                    startDate: '', endDate: '', minPrize: '', maxPrize: ''
+                    startDate: '', endDate: '', minPrize: '', maxPrize: '',
+                    state: ''
                   })}
                   className="btn btn-outline btn-sm"
                   style={{ 
@@ -1410,11 +1452,21 @@ export default function Career() {
                   paddingBottom: 12
                 }}>
                   {hackathons
-                    .filter(event => 
-                      !searchQuery || 
-                      event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                      event.description?.toLowerCase().includes(searchQuery.toLowerCase())
-                    )
+                    .filter(event => {
+                      // Search filter
+                      const matchesSearch = !searchQuery || 
+                        event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                        event.description?.toLowerCase().includes(searchQuery.toLowerCase());
+                      
+                      // State filter (check state, location, description, OR no explicit location info)
+                      const matchesState = !filters.state || 
+                        (event.state && event.state.toLowerCase().includes(filters.state.toLowerCase())) ||
+                        (event.location && event.location.toLowerCase().includes(filters.state.toLowerCase())) ||
+                        (event.description && event.description.toLowerCase().includes(filters.state.toLowerCase())) ||
+                        (!event.state && !event.location);
+                      
+                      return matchesSearch && matchesState;
+                    })
                     .map(event => (
                       <OpportunityCard
                         key={event._id}

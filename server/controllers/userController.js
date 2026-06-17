@@ -58,8 +58,8 @@ const sendEmail = async (toEmail, toName, resetURL) => {
 
 // PUT /api/user/update-profile  ← THIS WAS MISSING
 exports.updateProfile = async (req, res) => {
-  const { name, email, skills, interests, cgpa, college, semester } = req.body;
-  if (!name?.trim() && !email?.trim() && !skills && !interests && !cgpa && !college && !semester)
+  const { name, email, skills, interests, cgpa, college, semester, state } = req.body;
+  if (!name?.trim() && !email?.trim() && !skills && !interests && !cgpa && !college && !semester && !state)
     return res.status(400).json({ message: 'Provide at least one field to update.' });
   try {
     if (email && email.toLowerCase() !== req.user.email.toLowerCase()) {
@@ -85,6 +85,7 @@ exports.updateProfile = async (req, res) => {
         updateFields.semester = parsedSemester;
       }
     }
+    if (state !== undefined) updateFields.state = state.trim();
     const updated = await User.findByIdAndUpdate(
       req.user.id, { $set: updateFields }, { new: true, runValidators: true }
     ).select('-password');
@@ -101,7 +102,8 @@ exports.updateProfile = async (req, res) => {
         role: updated.role,
         skills: updated.skills,
         interests: updated.interests,
-        cgpa: updated.cgpa
+        cgpa: updated.cgpa,
+        state: updated.state
       },
       token: newToken,
     });

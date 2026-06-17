@@ -62,6 +62,35 @@ async function getAllEvents(filters = {}, page = 1, limit = 20) {
   if (filters.category) query.category = filters.category;
   if (filters.difficulty) query.difficulty = filters.difficulty;
   
+  // Handle state-related filters
+  if (filters.state) {
+    // Manual state filter: check state, location, description, OR no explicit location info (empty state and location)
+    query.$or = [
+      { state: { $regex: new RegExp(filters.state, 'i') } },
+      { location: { $regex: new RegExp(filters.state, 'i') } },
+      { description: { $regex: new RegExp(filters.state, 'i') } },
+      { 
+        $and: [
+          { $or: [{ state: '' }, { state: { $exists: false } }] },
+          { $or: [{ location: '' }, { location: { $exists: false } }] }
+        ]
+      }
+    ];
+  } else if (filters.userState) {
+    // User profile state filter: check state/location/description, or allow events with no explicit location info
+    query.$or = [
+      { state: { $regex: new RegExp(filters.userState, 'i') } },
+      { location: { $regex: new RegExp(filters.userState, 'i') } },
+      { description: { $regex: new RegExp(filters.userState, 'i') } },
+      { 
+        $and: [
+          { $or: [{ state: '' }, { state: { $exists: false } }] },
+          { $or: [{ location: '' }, { location: { $exists: false } }] }
+        ]
+      }
+    ];
+  }
+  
   // Date range filter
   if (filters.startDate || filters.endDate) {
     query.registrationDeadline = {};
@@ -101,20 +130,67 @@ async function getAllEvents(filters = {}, page = 1, limit = 20) {
   };
 }
 
-async function getLatestEvents(limit = 50) {
-  return await Event.find().sort({ createdAt: -1 }).limit(limit);
+async function getLatestEvents(limit = 50, userState = '') {
+  let query = {};
+  if (userState) {
+    query.$or = [
+      { state: { $regex: new RegExp(userState, 'i') } },
+      { location: { $regex: new RegExp(userState, 'i') } },
+      { description: { $regex: new RegExp(userState, 'i') } },
+      { 
+        $and: [
+          { $or: [{ state: '' }, { state: { $exists: false } }] },
+          { $or: [{ location: '' }, { location: { $exists: false } }] }
+        ]
+      }
+    ];
+  }
+  return await Event.find(query).sort({ createdAt: -1 }).limit(limit);
 }
 
-async function getTrendingEvents(limit = 20) {
-  return await Event.find().sort({ saveCount: -1, registrationDeadline: 1 }).limit(limit);
+async function getTrendingEvents(limit = 20, userState = '') {
+  let query = {};
+  if (userState) {
+    query.$or = [
+      { state: { $regex: new RegExp(userState, 'i') } },
+      { location: { $regex: new RegExp(userState, 'i') } },
+      { description: { $regex: new RegExp(userState, 'i') } },
+      { 
+        $and: [
+          { $or: [{ state: '' }, { state: { $exists: false } }] },
+          { $or: [{ location: '' }, { location: { $exists: false } }] }
+        ]
+      }
+    ];
+  }
+  return await Event.find(query).sort({ saveCount: -1, registrationDeadline: 1 }).limit(limit);
 }
 
-async function getClosingSoonEvents(days = 7) {
+async function getClosingSoonEvents(days = 7, userState = '') {
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() + days);
-  return await Event.find({ 
+  let query = { 
     registrationDeadline: { $gte: new Date(), $lte: cutoff } 
-  }).sort({ registrationDeadline: 1 });
+  };
+  if (userState) {
+    query.$and = [
+      query,
+      {
+        $or: [
+          { state: { $regex: new RegExp(userState, 'i') } },
+          { location: { $regex: new RegExp(userState, 'i') } },
+          { description: { $regex: new RegExp(userState, 'i') } },
+          { 
+            $and: [
+              { $or: [{ state: '' }, { state: { $exists: false } }] },
+              { $or: [{ location: '' }, { location: { $exists: false } }] }
+            ]
+          }
+        ]
+      }
+    ];
+  }
+  return await Event.find(query).sort({ registrationDeadline: 1 });
 }
 
 async function getEventById(id) {
@@ -168,26 +244,77 @@ async function unsaveEventForUser(userId, eventId) {
 }
 
 async function getSavedEventsForUser(userId) {
+  const User = require('../models/User');
+  const user = await User.findById(userId).select('state');
+  const userState = user?.state || '';
+  
   const savedEvents = await SavedEvent.find({ userId }).populate('eventId').sort({ createdAt: -1 });
-  // Return just the populated events
-  return savedEvents.map(se => se.eventId).filter(Boolean);
+  
+  // Return just the populated events, filtered by user's state
+  return savedEvents.map(se => se.eventId).filter(Boolean).filter(event => {
+    if (!userState) return true;
+    const eventState = event.state || '';
+    const eventLocation = event.location || '';
+    const eventDesc = event.description || '';
+    return (
+      eventState.toLowerCase().includes(userState.toLowerCase()) ||
+      eventLocation.toLowerCase().includes(userState.toLowerCase()) ||
+      eventDesc.toLowerCase().includes(userState.toLowerCase()) ||
+      (!eventState && !eventLocation)
+    );
+  });
 }
 
 async function getRecommendedEvents(userId, limit = 20) {
   try {
+    // Get user to check their state
+    const User = require('../models/User');
+    const user = await User.findById(userId).select('state');
+    const userState = user?.state || '';
+
     // First try to get cached recommendations
     const cached = await getCachedRecommendations(userId);
     if (cached && cached.length > 0) {
-      return cached.slice(0, limit);
+      // Filter cached events by user's state
+      const filtered = cached.filter(event => {
+        if (!userState) return true;
+        const eventState = event.state || '';
+        const eventLocation = event.location || '';
+        const eventDesc = event.description || '';
+        return (
+          eventState.toLowerCase().includes(userState.toLowerCase()) ||
+          eventLocation.toLowerCase().includes(userState.toLowerCase()) ||
+          eventDesc.toLowerCase().includes(userState.toLowerCase()) ||
+          (!eventState && !eventLocation)
+        );
+      });
+      return filtered.slice(0, limit);
     }
 
     // If no cache, generate new ones
-    return await generateAndCacheRecommendations(userId);
+    const recommendations = await generateAndCacheRecommendations(userId);
+    // Filter recommendations by user's state
+    const filtered = recommendations.filter(event => {
+      if (!userState) return true;
+      const eventState = event.state || '';
+      const eventLocation = event.location || '';
+      const eventDesc = event.description || '';
+      return (
+        eventState.toLowerCase().includes(userState.toLowerCase()) ||
+        eventLocation.toLowerCase().includes(userState.toLowerCase()) ||
+        eventDesc.toLowerCase().includes(userState.toLowerCase()) ||
+        (!eventState && !eventLocation)
+      );
+    });
+    return filtered.slice(0, limit);
   } catch (error) {
     console.error('[Event Service] Error getting recommended events:', error);
     // Fallback to trending events
-    const trending = await getTrendingEvents(limit);
-    return trending.map(event => ({ ...event._doc, matchScore: 50, matchReasons: ['Trending in your area'] }));
+    const User = require('../models/User');
+    const user = await User.findById(userId).select('state');
+    const userState = user?.state || '';
+    let trending = await getTrendingEvents(limit * 2); // Get more to filter
+    return trending.slice(0, limit).map(event => ({ ...event._doc, matchScore: 50, matchReasons: ['Trending in your area'] }));
   }
 }
 

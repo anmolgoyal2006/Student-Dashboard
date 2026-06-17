@@ -40,6 +40,7 @@ export const AuthProvider = ({ children }) => {
             sid     : data.user.sid,
             college : data.user.college,
             semester: data.user.semester,
+            state   : data.user.state,
           };
           setUser(fresh);
           localStorage.setItem('user', JSON.stringify(fresh));

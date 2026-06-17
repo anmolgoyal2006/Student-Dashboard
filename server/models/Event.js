@@ -14,6 +14,7 @@ const eventSchema = new mongoose.Schema({
   source: { type: String, required: true, trim: true, enum: ['unstop', 'devfolio'] },
   sourceEventId: { type: String, required: true, trim: true },
   location: { type: String, trim: true },
+  state: { type: String, trim: true, default: '' },
   startDate: { type: Date },
   endDate: { type: Date },
   eligibility: { type: String, trim: true },

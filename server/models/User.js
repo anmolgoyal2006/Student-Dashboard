@@ -17,7 +17,8 @@ const userSchema = new mongoose.Schema({
   // New fields for matching engine
   skills: { type: [String], default: [] },
   interests: { type: [String], default: [] },
-  cgpa: { type: Number, default: 0, min: 0, max: 10 }
+  cgpa: { type: Number, default: 0, min: 0, max: 10 },
+  state: { type: String, default: '' }
 }, { timestamps: true });
 
 userSchema.pre('save', function (next) {

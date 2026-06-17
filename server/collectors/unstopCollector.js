@@ -68,6 +68,32 @@ class UnstopCollector {
         // Get category
         const category = opp.type || opp.subtype || 'Hackathon';
 
+        // Extract location and state
+        let location = '';
+        let state = '';
+        if (opp.location) {
+          location = opp.location;
+          // Try to extract state from location (simple heuristic)
+          const stateKeywords = [
+            'andhra pradesh', 'arunachal pradesh', 'assam', 'bihar', 'chhattisgarh',
+            'goa', 'gujarat', 'haryana', 'himachal pradesh', 'jharkhand', 'karnataka',
+            'kerala', 'madhya pradesh', 'maharashtra', 'manipur', 'meghalaya', 'mizoram',
+            'nagaland', 'odisha', 'punjab', 'rajasthan', 'sikkim', 'tamil nadu',
+            'telangana', 'tripura', 'uttar pradesh', 'uttarakhand', 'west bengal',
+            'andaman and nicobar islands', 'chandigarh', 'dadra and nagar haveli',
+            'daman and diu', 'delhi', 'jammu and kashmir', 'ladakh', 'lakshadweep',
+            'puducherry', 'california', 'texas', 'new york', 'florida', 'illinois',
+            'pennsylvania', 'ohio', 'georgia', 'north carolina', 'michigan', 'new jersey'
+          ];
+          const locationLower = location.toLowerCase();
+          for (const s of stateKeywords) {
+            if (locationLower.includes(s)) {
+              state = s;
+              break;
+            }
+          }
+        }
+
         // Extract required skills
         const requiredSkills = [];
         const skillKeywords = ['python', 'java', 'javascript', 'react', 'node', 'nodejs', 'ai', 'ml', 'machine learning', 'deep learning', 'data science', 'web development', 'flutter', 'android', 'ios', 'blockchain', 'iot', 'cloud', 'aws', 'azure', 'gcp', 'sql', 'mongodb', 'docker', 'kubernetes', 'git', 'github', 'typescript', 'nextjs', 'vue', 'angular', 'css', 'html', 'c++', 'c#', 'go', 'rust', 'ruby', 'php', 'swift', 'kotlin', 'r', 'scala', 'matlab'];
@@ -135,7 +161,9 @@ class UnstopCollector {
           sourceEventId: opp.id?.toString(),
           requiredSkills: requiredSkills,
           difficulty: difficulty,
-          banner: banner
+          banner: banner,
+          location: location,
+          state: state
         };
       });
     } catch (error) {
