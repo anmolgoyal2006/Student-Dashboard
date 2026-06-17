@@ -1,6 +1,7 @@
 
 const Reminder = require('../models/Reminder');
 const Notification = require('../models/Notification');
+const NotificationToken = require('../models/NotificationToken');
 const admin = require('../config/firebaseAdmin');
 
 /**
@@ -60,11 +61,10 @@ async function scheduleReminders(userId, event) {
  */
 async function sendReminder(reminder) {
   try {
-    // Get user's FCM token (we'll need to add fcmToken to User schema)
     const User = require('../models/User');
-    const user = await User.findById(reminder.userId);
+    const userId = reminder.userId;
     
-    // Create notification in DB
+    // Create notification in DB first
     await Notification.create({
       userId: reminder.userId,
       title: `Reminder: ${reminder.eventTitle}`,
@@ -72,21 +72,46 @@ async function sendReminder(reminder) {
       type: 'EVENT_REMINDER'
     });
 
-    // Send FCM notification if token exists
-    if (user && user.fcmToken) {
-      const message = {
-        notification: {
-          title: `Reminder: ${reminder.eventTitle}`,
-          body: `Registration deadline is approaching! Don't miss out!`
-        },
-        token: user.fcmToken
-      };
-
-      await admin.messaging().send(message);
-      console.log(`FCM reminder sent to ${user.email} for event ${reminder.eventTitle}`);
+    // Get tokens
+    let tokens = await NotificationToken.find({ userId }).lean();
+    
+    // Fallback to user.fcmToken if no NotificationToken docs exist
+    if (!tokens.length) {
+      const user = await User.findById(userId).select('fcmToken email');
+      if (user && user.fcmToken) {
+        tokens.push({ token: user.fcmToken, platform: 'web', userId, isLegacyToken: true });
+      }
     }
 
-    // Mark reminder as sent
+    const message = {
+      notification: {
+        title: `Reminder: ${reminder.eventTitle}`,
+        body: `Registration deadline is approaching! Don't miss out!`
+      }
+    };
+
+    for (const t of tokens) {
+      try {
+        await admin.messaging().send({ ...message, token: t.token });
+        console.log(`FCM reminder sent to token ${t.token.substring(0, 10)}... for event ${reminder.eventTitle}`);
+      } catch (err) {
+        if (err.code === 'messaging/invalid-registration-token' ||
+            err.code === 'messaging/registration-token-not-registered') {
+          if (t.isLegacyToken) {
+            // Clear legacy fcmToken from User doc
+            await User.findByIdAndUpdate(userId, { fcmToken: null });
+          } else {
+            // Delete from NotificationToken collection
+            await NotificationToken.deleteOne({ userId: t.userId, token: t.token });
+          }
+          console.log(`Removed invalid token ${t.token.substring(0, 10)}...`);
+        } else {
+          console.error(`Error sending reminder to token ${t.token.substring(0, 10)}...:`, err);
+        }
+      }
+    }
+
+    // Mark reminder as sent regardless of FCM success (we still created the Notification doc)
     reminder.sent = true;
     reminder.sentAt = new Date();
     await reminder.save();

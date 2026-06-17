@@ -23,8 +23,25 @@ const notificationSchema = new mongoose.Schema(
     },
   type: {
     type: String,
-    enum: ['ATTENDANCE_MARK', 'EVENT_REMINDER'],
-    default: 'ATTENDANCE_MARK',
+    enum: [
+      'ATTENDANCE_MARK',
+      'EVENT_REMINDER',
+      // Assignment / classroom
+      'CLASSROOM',
+      'NEW_ASSIGNMENT',
+      'OVERDUE',
+      'URGENT',
+      'DUE_SOON',
+      // Study session
+      'SESSION_SOON',
+      'SESSION_START',
+      // Digest / general
+      'DIGEST',
+      'INFO',
+      'WARNING',
+      'DANGER',
+    ],
+    default: 'INFO',
   },
   courseName: {
     type:    String,
@@ -37,5 +54,7 @@ const notificationSchema = new mongoose.Schema(
   },
   { timestamps: true }   // createdAt + updatedAt added automatically
 );
+
+notificationSchema.index({ userId: 1, type: 1, title: 1, createdAt: -1 });
 
 module.exports = mongoose.model('Notification', notificationSchema);

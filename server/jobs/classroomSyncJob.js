@@ -7,6 +7,12 @@ async function syncAllUsers() {
     const integrations = await GoogleIntegration.find({});
     console.log(`[ClassroomSync] Syncing ${integrations.length} users...`);
 
+    let sent = 0;
+    let deduped = 0;
+    let noTokens = 0;
+    let errors = 0;
+    const errorReasons = new Set();
+
     for (const integration of integrations) {
       try {
         const userId = integration.userId;
@@ -98,7 +104,19 @@ async function syncAllUsers() {
               assignment.priority = await calculatePriority(assignment, userId);
               await assignment.save();
 
-              await sendAssignmentNotification(assignment, userId);
+              const result = await sendAssignmentNotification(assignment, userId);
+              if (result.success) {
+                sent++;
+              } else if (result.skipped) {
+                // Skip (assignment already submitted or completed) — don't count in any bucket
+              } else if (result.reason === 'Duplicate within 24h') {
+                deduped++;
+              } else if (result.reason === 'No tokens') {
+                noTokens++;
+              } else {
+                errors++;
+                errorReasons.add(result.error || result.reason);
+              }
             }
           } catch (courseErr) {
             console.error(`[ClassroomSync] Error syncing ${c.name}:`, courseErr.message);
@@ -113,7 +131,8 @@ async function syncAllUsers() {
       }
     }
 
-    console.log('[ClassroomSync] All users synced.');
+    const total = sent + deduped + noTokens + errors;
+    console.log(`[ClassroomSync] All users synced. ${sent} sent, ${deduped} deduped, ${noTokens} no-tokens, ${errors} error${errors !== 1 ? 's' : ''}. Error reasons: ${[...errorReasons].join(', ') || 'none'}`);
   } catch (err) {
     console.error('[ClassroomSync]', err.message);
   }

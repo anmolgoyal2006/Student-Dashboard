@@ -1018,39 +1018,67 @@ export default function Career() {
         </>
       ) : activeTab === 'hackathons' ? (
         <>
-          {/* Hackathons View */}
-          <div style={{ marginBottom: 16, display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {[
-                { id: 'all', label: 'All Events' },
-                { id: 'recommended', label: 'Recommended' },
-                { id: 'closing', label: 'Closing Soon' },
-                { id: 'saved', label: 'Saved' }
-              ].map(view => (
-                <button
-                  key={view.id}
-                  onClick={() => setHackathonView(view.id)}
-                  className={`btn btn-sm ${hackathonView === view.id ? 'btn-primary' : 'btn-outline'}`}
-                  style={{ minHeight: 'auto', height: 30, background: hackathonView === view.id ? 'var(--color-accent)' : 'transparent' }}
-                >
-                  {view.label}
-                </button>
-              ))}
+          {/* Control Bar - Views + Search + Filters */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginBottom: 20 }}>
+            {/* Top row: Views + Filter count badge */}
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                {[
+                  { id: 'all', label: 'All Events' },
+                  { id: 'recommended', label: '✨ Recommended' },
+                  { id: 'closing', label: '⏰ Closing Soon' },
+                  { id: 'saved', label: '💾 Saved' }
+                ].map(view => (
+                  <button
+                    key={view.id}
+                    onClick={() => setHackathonView(view.id)}
+                    className={`btn btn-sm ${hackathonView === view.id ? 'btn-primary' : 'btn-outline'}`}
+                    style={{ 
+                      minHeight: 'auto', 
+                      height: 32, 
+                      background: hackathonView === view.id ? 'var(--color-accent)' : 'transparent',
+                      fontSize: 13,
+                      fontWeight: hackathonView === view.id ? 600 : 500,
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    {view.label}
+                  </button>
+                ))}
+              </div>
+              {Object.values(filters).some(v => v !== '') && (
+                <span style={{
+                  fontSize: 11,
+                  padding: '4px 10px',
+                  background: 'rgba(99,102,241,0.15)',
+                  color: 'var(--color-accent)',
+                  borderRadius: 'var(--radius-pill)',
+                  fontWeight: 600,
+                  whiteSpace: 'nowrap'
+                }}>
+                  {Object.values(filters).filter(v => v !== '').length} active filter(s)
+                </span>
+              )}
             </div>
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className="btn btn-sm btn-outline"
-              style={{ minHeight: 'auto', height: 30, display: 'flex', alignItems: 'center', gap: 6, background: 'transparent' }}
-            >
-              <Filter size={14} />
-              Filters
-            </button>
-            <div style={{ flex: 1, minWidth: 200, maxWidth: 400 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', borderRadius: 8 }}>
-                <Search size={16} color="var(--color-text-secondary)" />
+
+            {/* Search & Filter controls */}
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+              <div style={{ 
+                flex: 1, 
+                minWidth: 240,
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: 8, 
+                padding: '10px 14px', 
+                background: 'rgba(255,255,255,0.03)', 
+                border: '1px solid var(--border)', 
+                borderRadius: 10,
+                transition: 'all 0.2s ease'
+              }}>
+                <Search size={16} color="var(--color-accent)" />
                 <input
                   type="text"
-                  placeholder="Search hackathons..."
+                  placeholder="Search hackathons by name..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   style={{
@@ -1059,174 +1087,309 @@ export default function Career() {
                     border: 'none',
                     outline: 'none',
                     color: 'var(--color-text-primary)',
-                    fontSize: 13
+                    fontSize: 13.5
                   }}
                 />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: 'var(--color-text-secondary)',
+                      fontSize: 18,
+                      padding: 0,
+                      display: 'flex',
+                      alignItems: 'center'
+                    }}
+                  >
+                    ✕
+                  </button>
+                )}
               </div>
+              
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className="btn btn-sm"
+                style={{ 
+                  minHeight: 'auto', 
+                  height: 40,
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: 6,
+                  background: showFilters ? 'rgba(99,102,241,0.1)' : 'transparent',
+                  borderColor: showFilters ? 'var(--color-accent)' : 'var(--border)',
+                  color: showFilters ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+                  transition: 'all 0.2s ease',
+                  fontWeight: 500,
+                  fontSize: 13
+                }}
+              >
+                <Filter size={15} />
+                Filters
+                {Object.values(filters).some(v => v !== '') && (
+                  <span style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: 18,
+                    height: 18,
+                    borderRadius: '50%',
+                    background: 'var(--color-accent)',
+                    color: 'white',
+                    fontSize: 10,
+                    fontWeight: 700
+                  }}>
+                    {Object.values(filters).filter(v => v !== '').length}
+                  </span>
+                )}
+              </button>
             </div>
           </div>
           
-          {/* Filters Section */}
+          {/* Filters Section - Grouped & Organized */}
           {showFilters && (
             <div style={{ 
-              background: 'var(--color-surface-2)', 
-              border: '1px solid var(--border)', 
+              background: 'linear-gradient(135deg, var(--color-surface-2) 0%, rgba(99,102,241,0.02) 100%)',
+              border: '1px solid rgba(99,102,241,0.2)', 
               borderRadius: 12, 
-              padding: 16, 
-              marginBottom: 16 
+              padding: 20, 
+              marginBottom: 20,
+              animation: 'slideDown 0.25s ease'
             }}>
-              <div style={{ 
-                display: 'grid', 
-                gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', 
-                gap: 12 
-              }}>
-                {/* Source Filter */}
-                <div>
-                  <label style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-secondary)', display: 'block', marginBottom: 4 }}>
-                    Source
-                  </label>
-                  <CustomSelect
-                    value={filters.source}
-                    onChange={(v) => setFilters(f => ({ ...f, source: v }))}
-                    placeholder="All Sources"
-                    options={filterOptions.sources}
-                  />
-                </div>
+              <style>{`
+                @keyframes slideDown {
+                  from { 
+                    opacity: 0; 
+                    transform: translateY(-8px);
+                  }
+                  to { 
+                    opacity: 1; 
+                    transform: translateY(0);
+                  }
+                }
+              `}</style>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
                 
-                {/* Category Filter */}
+                {/* Row 1: Category & Type */}
                 <div>
-                  <label style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-secondary)', display: 'block', marginBottom: 4 }}>
-                    Category
-                  </label>
-                  <CustomSelect
-                    value={filters.category}
-                    onChange={(v) => setFilters(f => ({ ...f, category: v }))}
-                    placeholder="All Categories"
-                    options={filterOptions.categories}
-                  />
+                  <div style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: 8, 
+                    marginBottom: 10,
+                    paddingBottom: 8,
+                    borderBottom: '1px solid rgba(255,255,255,0.04)'
+                  }}>
+                    <div style={{ width: 2, height: 14, borderRadius: 2, background: 'var(--color-accent)' }} />
+                    <span style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: 0.4 }}>
+                      Category & Difficulty
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                    <div style={{ flex: '1 1 180px', minWidth: 0 }}>
+                      <CustomSelect
+                        value={filters.source}
+                        onChange={(v) => setFilters(f => ({ ...f, source: v }))}
+                        placeholder="All Sources"
+                        options={filterOptions.sources}
+                      />
+                    </div>
+                    <div style={{ flex: '1 1 180px', minWidth: 0 }}>
+                      <CustomSelect
+                        value={filters.category}
+                        onChange={(v) => setFilters(f => ({ ...f, category: v }))}
+                        placeholder="All Categories"
+                        options={filterOptions.categories}
+                      />
+                    </div>
+                    <div style={{ flex: '1 1 180px', minWidth: 0 }}>
+                      <CustomSelect
+                        value={filters.difficulty}
+                        onChange={(v) => setFilters(f => ({ ...f, difficulty: v }))}
+                        placeholder="All Difficulties"
+                        options={filterOptions.difficulties}
+                      />
+                    </div>
+                  </div>
                 </div>
-                
-                {/* Difficulty Filter */}
+
+                {/* Row 2: Timeline */}
                 <div>
-                  <label style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-secondary)', display: 'block', marginBottom: 4 }}>
-                    Difficulty
-                  </label>
-                  <CustomSelect
-                    value={filters.difficulty}
-                    onChange={(v) => setFilters(f => ({ ...f, difficulty: v }))}
-                    placeholder="All Difficulties"
-                    options={filterOptions.difficulties}
-                  />
+                  <div style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: 8, 
+                    marginBottom: 10,
+                    paddingBottom: 8,
+                    borderBottom: '1px solid rgba(255,255,255,0.04)'
+                  }}>
+                    <div style={{ width: 2, height: 14, borderRadius: 2, background: 'var(--color-accent)' }} />
+                    <span style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: 0.4 }}>
+                      Timeline
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                    <div style={{ flex: '1 1 180px', minWidth: 0, position: 'relative' }}>
+                      <div style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', zIndex: 1, fontSize: 11, color: 'var(--color-text-tertiary)', pointerEvents: 'none' }}>From</div>
+                      <input
+                        type="date"
+                        value={filters.startDate}
+                        onChange={(e) => setFilters(f => ({ ...f, startDate: e.target.value }))}
+                        style={{
+                          width: '100%',
+                          padding: '8px 12px 8px 42px',
+                          background: 'rgba(255,255,255,0.03)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 8,
+                          color: 'var(--color-text-primary)',
+                          fontSize: 13,
+                          colorScheme: 'dark',
+                          outline: 'none',
+                          boxSizing: 'border-box'
+                        }}
+                        onFocus={e => e.currentTarget.style.borderColor = 'var(--color-accent)'}
+                        onBlur={e => e.currentTarget.style.borderColor = 'var(--border)'}
+                      />
+                    </div>
+                    <div style={{ flex: '1 1 180px', minWidth: 0, position: 'relative' }}>
+                      <div style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', zIndex: 1, fontSize: 11, color: 'var(--color-text-tertiary)', pointerEvents: 'none' }}>To</div>
+                      <input
+                        type="date"
+                        value={filters.endDate}
+                        onChange={(e) => setFilters(f => ({ ...f, endDate: e.target.value }))}
+                        style={{
+                          width: '100%',
+                          padding: '8px 12px 8px 42px',
+                          background: 'rgba(255,255,255,0.03)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 8,
+                          color: 'var(--color-text-primary)',
+                          fontSize: 13,
+                          colorScheme: 'dark',
+                          outline: 'none',
+                          boxSizing: 'border-box'
+                        }}
+                        onFocus={e => e.currentTarget.style.borderColor = 'var(--color-accent)'}
+                        onBlur={e => e.currentTarget.style.borderColor = 'var(--border)'}
+                      />
+                    </div>
+                  </div>
                 </div>
-                
-                {/* Start Date Filter */}
+
+                {/* Row 3: Prize Pool */}
                 <div>
-                  <label style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-secondary)', display: 'block', marginBottom: 4 }}>
-                    Deadline From
-                  </label>
-                  <input
-                    type="date"
-                    value={filters.startDate}
-                    onChange={(e) => setFilters(f => ({ ...f, startDate: e.target.value }))}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      background: 'rgba(255,255,255,0.02)',
-                      border: '1px solid var(--border)',
-                      borderRadius: 8,
-                      color: 'var(--color-text-primary)',
-                      fontSize: 13
-                    }}
-                  />
-                </div>
-                
-                {/* End Date Filter */}
-                <div>
-                  <label style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-secondary)', display: 'block', marginBottom: 4 }}>
-                    Deadline To
-                  </label>
-                  <input
-                    type="date"
-                    value={filters.endDate}
-                    onChange={(e) => setFilters(f => ({ ...f, endDate: e.target.value }))}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      background: 'rgba(255,255,255,0.02)',
-                      border: '1px solid var(--border)',
-                      borderRadius: 8,
-                      color: 'var(--color-text-primary)',
-                      fontSize: 13
-                    }}
-                  />
-                </div>
-                
-                {/* Min Prize Filter */}
-                <div>
-                  <label style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-secondary)', display: 'block', marginBottom: 4 }}>
-                    Min Prize
-                  </label>
-                  <input
-                    type="number"
-                    placeholder="0"
-                    value={filters.minPrize}
-                    onChange={(e) => setFilters(f => ({ ...f, minPrize: e.target.value }))}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      background: 'rgba(255,255,255,0.02)',
-                      border: '1px solid var(--border)',
-                      borderRadius: 8,
-                      color: 'var(--color-text-primary)',
-                      fontSize: 13
-                    }}
-                  />
-                </div>
-                
-                {/* Max Prize Filter */}
-                <div>
-                  <label style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-secondary)', display: 'block', marginBottom: 4 }}>
-                    Max Prize
-                  </label>
-                  <input
-                    type="number"
-                    placeholder="100000"
-                    value={filters.maxPrize}
-                    onChange={(e) => setFilters(f => ({ ...f, maxPrize: e.target.value }))}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      background: 'rgba(255,255,255,0.02)',
-                      border: '1px solid var(--border)',
-                      borderRadius: 8,
-                      color: 'var(--color-text-primary)',
-                      fontSize: 13
-                    }}
-                  />
+                  <div style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: 8, 
+                    marginBottom: 10,
+                    paddingBottom: 8,
+                    borderBottom: '1px solid rgba(255,255,255,0.04)'
+                  }}>
+                    <div style={{ width: 2, height: 14, borderRadius: 2, background: 'var(--color-accent)' }} />
+                    <span style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: 0.4 }}>
+                      Prize Pool
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                    <div style={{ flex: '1 1 180px', minWidth: 0, position: 'relative' }}>
+                      <div style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', zIndex: 1, fontSize: 12, color: 'var(--color-text-tertiary)', pointerEvents: 'none', fontWeight: 500 }}>₹</div>
+                      <input
+                        type="number"
+                        placeholder="Min"
+                        value={filters.minPrize}
+                        onChange={(e) => setFilters(f => ({ ...f, minPrize: e.target.value }))}
+                        style={{
+                          width: '100%',
+                          padding: '8px 12px 8px 28px',
+                          background: 'rgba(255,255,255,0.03)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 8,
+                          color: 'var(--color-text-primary)',
+                          fontSize: 13,
+                          colorScheme: 'dark',
+                          outline: 'none',
+                          boxSizing: 'border-box'
+                        }}
+                        onFocus={e => e.currentTarget.style.borderColor = 'var(--color-accent)'}
+                        onBlur={e => e.currentTarget.style.borderColor = 'var(--border)'}
+                      />
+                    </div>
+                    <div style={{ flex: '1 1 180px', minWidth: 0, position: 'relative' }}>
+                      <div style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', zIndex: 1, fontSize: 12, color: 'var(--color-text-tertiary)', pointerEvents: 'none', fontWeight: 500 }}>₹</div>
+                      <input
+                        type="number"
+                        placeholder="Max"
+                        value={filters.maxPrize}
+                        onChange={(e) => setFilters(f => ({ ...f, maxPrize: e.target.value }))}
+                        style={{
+                          width: '100%',
+                          padding: '8px 12px 8px 28px',
+                          background: 'rgba(255,255,255,0.03)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 8,
+                          color: 'var(--color-text-primary)',
+                          fontSize: 13,
+                          colorScheme: 'dark',
+                          outline: 'none',
+                          boxSizing: 'border-box'
+                        }}
+                        onFocus={e => e.currentTarget.style.borderColor = 'var(--color-accent)'}
+                        onBlur={e => e.currentTarget.style.borderColor = 'var(--border)'}
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
               
-              {/* Reset Filters Button */}
-              <div style={{ marginTop: 12, display: 'flex', justifyContent: 'flex-end' }}>
+              {/* Reset Filters Button - Bottom */}
+              <div style={{ marginTop: 18, paddingTop: 16, borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ 
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: 24,
+                    height: 24,
+                    borderRadius: 6,
+                    background: Object.values(filters).filter(v => v !== '').length > 0 ? 'rgba(99,102,241,0.12)' : 'rgba(255,255,255,0.03)',
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: Object.values(filters).filter(v => v !== '').length > 0 ? 'var(--color-accent)' : 'var(--color-text-tertiary)'
+                  }}>
+                    {Object.values(filters).filter(v => v !== '').length}
+                  </span>
+                  <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>
+                    {Object.values(filters).filter(v => v !== '').length === 1 ? 'filter active' : 
+                     Object.values(filters).filter(v => v !== '').length > 1 ? 'filters active' : 'No filters'}
+                  </span>
+                </div>
                 <button
                   onClick={() => setFilters({
-                    source: '',
-                    category: '',
-                    difficulty: '',
-                    startDate: '',
-                    endDate: '',
-                    minPrize: '',
-                    maxPrize: ''
+                    source: '', category: '', difficulty: '',
+                    startDate: '', endDate: '', minPrize: '', maxPrize: ''
                   })}
-                  className="btn btn-sm btn-outline"
-                  style={{ minHeight: 'auto', height: 28, padding: '4px 12px', background: 'transparent' }}
+                  className="btn btn-outline btn-sm"
+                  style={{ 
+                    minHeight: 'auto', 
+                    height: 28, 
+                    padding: '4px 12px', 
+                    background: 'transparent', 
+                    fontSize: 12,
+                    opacity: Object.values(filters).some(v => v !== '') ? 1 : 0.4,
+                    pointerEvents: Object.values(filters).some(v => v !== '') ? 'auto' : 'none'
+                  }}
                 >
-                  Reset Filters
+                  Reset All
                 </button>
               </div>
             </div>
           )}
 
+          {/* Hackathons Grid */}
           {hackathonLoading ? (
             <div style={{ display: 'flex', justifyContent: 'center', padding: '40px' }}>
               <Loader2 size={32} className="animate-spin" style={{ animation: 'spin 1s linear infinite', color: 'var(--color-accent)' }} />
@@ -1240,26 +1403,31 @@ export default function Career() {
                   subtitle={`No events in ${hackathonView === 'all' ? 'all events' : hackathonView} category.`}
                 />
               ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
-              {hackathons
-                .filter(event => 
-                  !searchQuery || 
-                  event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                  event.description?.toLowerCase().includes(searchQuery.toLowerCase())
-                )
-                .map(event => (
-                  <OpportunityCard
-                    key={event._id}
-                    opportunity={event}
-                    showMatchScore={hackathonView === 'recommended'}
-                    matchScore={event.matchScore}
-                    matchReasons={event.matchReasons}
-                    isSaved={savedEventIds.has(event._id.toString())}
-                    onSave={() => handleSaveEvent(event._id)}
-                    onUnsave={() => handleUnsaveEvent(event._id)}
-                  />
-                ))}
-            </div>
+                <div style={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', 
+                  gap: 18,
+                  paddingBottom: 12
+                }}>
+                  {hackathons
+                    .filter(event => 
+                      !searchQuery || 
+                      event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                      event.description?.toLowerCase().includes(searchQuery.toLowerCase())
+                    )
+                    .map(event => (
+                      <OpportunityCard
+                        key={event._id}
+                        opportunity={event}
+                        showMatchScore={hackathonView === 'recommended'}
+                        matchScore={event.matchScore}
+                        matchReasons={event.matchReasons}
+                        isSaved={savedEventIds.has(event._id.toString())}
+                        onSave={() => handleSaveEvent(event._id)}
+                        onUnsave={() => handleUnsaveEvent(event._id)}
+                      />
+                    ))}
+                </div>
               )}
             </>
           )}

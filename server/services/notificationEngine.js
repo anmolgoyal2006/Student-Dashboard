@@ -4,12 +4,25 @@ const Notification = require('../models/Notification');
 
 async function sendNotification(userId, title, body, data = {}) {
   try {
+    // ── Deduplication: skip if same title+type was sent to this user in the last 24h ──
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const recentDupe = await Notification.findOne({
+      userId,
+      title,
+      type: data.type || 'INFO',
+      createdAt: { $gte: since },
+    }).lean();
+    if (recentDupe) {
+      console.log(`[FCM] Skipping duplicate notification "${title}" for user ${userId}`);
+      return { success: false, reason: 'Duplicate within 24h' };
+    }
+
     const tokens = await NotificationToken.find({ userId }).lean();
     if (!tokens.length) {
       const User = require('../models/User');
       const user = await User.findById(userId).select('fcmToken');
       if (user?.fcmToken) {
-        tokens.push({ token: user.fcmToken, platform: 'web' });
+        tokens.push({ token: user.fcmToken, platform: 'web', userId });
       } else {
         console.log(`[FCM] No tokens found for user ${userId}`);
       }
@@ -17,7 +30,7 @@ async function sendNotification(userId, title, body, data = {}) {
     if (!tokens.length) {
       console.log(`[FCM] Skipping push — no tokens for user ${userId}`);
       // Still save the notification to DB
-      await Notification.create({ userId, title, body, type: data.type || 'CLASSROOM', courseName: data.courseName || null });
+      await Notification.create({ userId, title, body, type: data.type || 'INFO', courseName: data.courseName || null });
       return { success: false, reason: 'No tokens' };
     }
 
@@ -34,13 +47,13 @@ async function sendNotification(userId, title, body, data = {}) {
       } catch (err) {
         if (err.code === 'messaging/invalid-registration-token' ||
             err.code === 'messaging/registration-token-not-registered') {
-          await NotificationToken.deleteOne({ token: t.token });
+          await NotificationToken.deleteOne({ userId: t.userId, token: t.token });
         }
         results.push({ token: t.token, success: false, error: err.code });
       }
     }
 
-    await Notification.create({ userId, title, body, type: data.type || 'CLASSROOM', courseName: data.courseName || null });
+    await Notification.create({ userId, title, body, type: data.type || 'INFO', courseName: data.courseName || null });
 
     return { success: true, results };
   } catch (err) {

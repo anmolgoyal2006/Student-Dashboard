@@ -9,6 +9,12 @@ async function sendDailyDigest() {
   try {
     const users = await User.find({ role: 'student' }).select('_id').lean();
 
+    let sent = 0;
+    let deduped = 0;
+    let noTokens = 0;
+    let errors = 0;
+    const errorReasons = new Set();
+
     for (const u of users) {
       const userId = u._id;
 
@@ -46,10 +52,21 @@ async function sendDailyDigest() {
         highestPriority ? `Highest Priority: ${highestPriority.title}` : '',
       ].filter(Boolean).join('\n');
 
-      await sendDigestNotification(userId, title, body);
+      const result = await sendDigestNotification(userId, title, body);
+      if (result.success) {
+        sent++;
+      } else if (result.reason === 'Duplicate within 24h') {
+        deduped++;
+      } else if (result.reason === 'No tokens') {
+        noTokens++;
+      } else {
+        errors++;
+        errorReasons.add(result.error || result.reason);
+      }
     }
 
-    console.log('[Digest] Daily digest sent.');
+    const total = sent + deduped + noTokens + errors;
+    console.log(`[Digest] Daily digest sent. ${sent} sent, ${deduped} deduped, ${noTokens} no-tokens, ${errors} error${errors !== 1 ? 's' : ''}. Error reasons: ${[...errorReasons].join(', ') || 'none'}`);
   } catch (err) {
     console.error('[DailyDigest]', err.message);
   }
@@ -58,6 +75,12 @@ async function sendDailyDigest() {
 async function sendWeeklyDigest() {
   try {
     const users = await User.find({ role: 'student' }).select('_id').lean();
+
+    let sent = 0;
+    let deduped = 0;
+    let noTokens = 0;
+    let errors = 0;
+    const errorReasons = new Set();
 
     for (const u of users) {
       const userId = u._id;
@@ -94,10 +117,21 @@ async function sendWeeklyDigest() {
         'Tap to view your full roadmap.',
       ].join('\n');
 
-      await sendDigestNotification(userId, title, body);
+      const result = await sendDigestNotification(userId, title, body);
+      if (result.success) {
+        sent++;
+      } else if (result.reason === 'Duplicate within 24h') {
+        deduped++;
+      } else if (result.reason === 'No tokens') {
+        noTokens++;
+      } else {
+        errors++;
+        errorReasons.add(result.error || result.reason);
+      }
     }
 
-    console.log('[Digest] Weekly digest sent.');
+    const total = sent + deduped + noTokens + errors;
+    console.log(`[Digest] Weekly digest sent. ${sent} sent, ${deduped} deduped, ${noTokens} no-tokens, ${errors} error${errors !== 1 ? 's' : ''}. Error reasons: ${[...errorReasons].join(', ') || 'none'}`);
   } catch (err) {
     console.error('[WeeklyDigest]', err.message);
   }

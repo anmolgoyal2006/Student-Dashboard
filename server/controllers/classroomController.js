@@ -350,9 +350,29 @@ exports.sync = async (req, res) => {
     await integration.save();
 
     // Send notifications for new assignments
+    let sent = 0;
+    let deduped = 0;
+    let noTokens = 0;
+    let errors = 0;
+    const errorReasons = new Set();
     for (const a of allAssignments) {
-      await sendAssignmentNotification(a, userId);
+      const result = await sendAssignmentNotification(a, userId);
+      if (result.success) {
+        sent++;
+      } else if (result.skipped) {
+        // Skip (assignment already submitted or completed) — don't count in any bucket
+      } else if (result.reason === 'Duplicate within 24h') {
+        deduped++;
+      } else if (result.reason === 'No tokens') {
+        noTokens++;
+      } else {
+        errors++;
+        errorReasons.add(result.error || result.reason);
+      }
     }
+
+    const total = sent + deduped + noTokens + errors;
+    console.log(`[Classroom Controller Sync] ${sent} sent, ${deduped} deduped, ${noTokens} no-tokens, ${errors} error${errors !== 1 ? 's' : ''}. Error reasons: ${[...errorReasons].join(', ') || 'none'}`);
 
     res.json({ message: 'Sync completed', courses: courses.length, assignments: allAssignments.length });
   } catch (err) {

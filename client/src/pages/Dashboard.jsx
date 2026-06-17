@@ -610,9 +610,57 @@ export default function Dashboard() {
         <div style={{ ...card }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 14, fontWeight: 600, color: '#e2e8f0' }}>
-              <Bell size={16} color="#6366f1" /> Notifications
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                <Bell size={16} color="#6366f1" />
+                {notifs.filter(n => !n.read).length > 0 && (
+                  <span style={{
+                    position: 'absolute', top: -5, right: -6,
+                    background: '#ef4444', color: '#fff',
+                    fontSize: 9, fontWeight: 700,
+                    width: 14, height: 14, borderRadius: '50%',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    lineHeight: 1
+                  }}>
+                    {notifs.filter(n => !n.read).length > 9 ? '9+' : notifs.filter(n => !n.read).length}
+                  </span>
+                )}
+              </div>
+              Notifications
             </div>
+            {notifs.filter(n => !n.read).length > 0 && (
+              <button
+                onClick={async () => {
+                  try {
+                    await notificationService.markAllRead?.();
+                    setNotifs(prev => prev.map(n => ({ ...n, read: true })));
+                  } catch (_) {}
+                }}
+                style={{ fontSize: 11, color: '#6366f1', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 500 }}
+              >
+                Mark all read
+              </button>
+            )}
           </div>
+
+          {notifs.length === 0 && (
+            <button
+              onClick={async () => {
+                try {
+                  await notificationService.sendTest();
+                  const { data } = await notificationService.getAll();
+                  setNotifs(data.notifications || []);
+                } catch (_) {}
+              }}
+              style={{
+                width: '100%', padding: '9px 0', borderRadius: 8,
+                background: 'rgba(99,102,241,0.10)', border: '1px dashed rgba(99,102,241,0.35)',
+                color: '#818cf8', fontSize: 12.5, fontWeight: 500, cursor: 'pointer',
+                marginBottom: 12,
+              }}
+            >
+              🔔 Send test notification
+            </button>
+          )}
 
           {notifs.length > 0
             ? notifs.map((n, i) => {

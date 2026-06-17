@@ -16,19 +16,48 @@ async function checkDeadlines() {
       dueDate: { $ne: null },
     }).lean();
 
+    let sent = 0;
+    let deduped = 0;
+    let noTokens = 0;
+    let errors = 0;
+    const errorReasons = new Set();
+
     for (const a of assignments) {
       if (!a.userId || !a.dueDate) continue;
       const dueTime = new Date(a.dueDate).getTime();
 
       // Due in ~6 hours
       if (dueTime > now.getTime() && dueTime < in6h.getTime() && dueTime > now.getTime() - 5 * 60 * 1000) {
-        await sendAssignmentNotification(a, a.userId);
+        const result = await sendAssignmentNotification(a, a.userId);
+        if (result.success) {
+          sent++;
+        } else if (result.reason === 'Duplicate within 24h') {
+          deduped++;
+        } else if (result.reason === 'No tokens') {
+          noTokens++;
+        } else {
+          errors++;
+          errorReasons.add(result.error || result.reason);
+        }
       }
-      // Due in ~24 hours
-      if (dueTime > now.getTime() && dueTime < in24h.getTime() && dueTime > now.getTime() - 5 * 60 * 1000) {
-        await sendAssignmentNotification(a, a.userId);
+      // Due in ~24 hours (mutually exclusive with 6h window)
+      if (dueTime >= in6h.getTime() && dueTime < in24h.getTime() && dueTime > now.getTime() - 5 * 60 * 1000) {
+        const result = await sendAssignmentNotification(a, a.userId);
+        if (result.success) {
+          sent++;
+        } else if (result.reason === 'Duplicate within 24h') {
+          deduped++;
+        } else if (result.reason === 'No tokens') {
+          noTokens++;
+        } else {
+          errors++;
+          errorReasons.add(result.error || result.reason);
+        }
       }
     }
+
+    const total = sent + deduped + noTokens + errors;
+    console.log(`[CheckDeadlines] ${sent} sent, ${deduped} deduped, ${noTokens} no-tokens, ${errors} error${errors !== 1 ? 's' : ''}. Error reasons: ${[...errorReasons].join(', ') || 'none'}`);
   } catch (err) {
     console.error('[CheckDeadlines]', err.message);
   }
@@ -48,14 +77,33 @@ async function checkSessions() {
       },
     }).lean();
 
+    let sent = 0;
+    let deduped = 0;
+    let noTokens = 0;
+    let errors = 0;
+    const errorReasons = new Set();
+
     for (const t of tasks) {
       if (!t.user) continue;
       const taskTime = new Date(t.dueDate).getTime();
 
       if (taskTime > now.getTime() && taskTime < in15min.getTime()) {
-        await sendSessionNotification(t, t.user, 0);
+        const result = await sendSessionNotification(t, t.user, 0);
+        if (result.success) {
+          sent++;
+        } else if (result.reason === 'Duplicate within 24h') {
+          deduped++;
+        } else if (result.reason === 'No tokens') {
+          noTokens++;
+        } else {
+          errors++;
+          errorReasons.add(result.error || result.reason);
+        }
       }
     }
+
+    const total = sent + deduped + noTokens + errors;
+    console.log(`[CheckSessions] ${sent} sent, ${deduped} deduped, ${noTokens} no-tokens, ${errors} error${errors !== 1 ? 's' : ''}. Error reasons: ${[...errorReasons].join(', ') || 'none'}`);
   } catch (err) {
     console.error('[CheckSessions]', err.message);
   }

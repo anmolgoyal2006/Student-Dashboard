@@ -123,6 +123,8 @@ export const aiService = {
 export const notificationService = {
   getAll: () => apiRequest('get', '/notifications'),
   sendTest: () => apiRequest('post', '/notifications/test'),
+  markRead: (id) => apiRequest('patch', `/notifications/${id}/read`),
+  markAllRead: () => apiRequest('patch', '/notifications/read-all'),
 };
 
 // ─── Tasks / Scheduler ───────────────────────────────────────────────────

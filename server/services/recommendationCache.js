@@ -2,6 +2,7 @@
 const StudentRecommendation = require('../models/StudentRecommendation');
 const Event = require('../models/Event');
 const User = require('../models/User');
+const CareerProgress = require('../models/CareerProgress');
 const { getTopMatches } = require('./matchingEngine');
 
 // TTL in milliseconds (6 hours)
@@ -60,8 +61,9 @@ async function cacheRecommendations(userId, recommendations) {
 
 async function generateAndCacheRecommendations(userId) {
   try {
-    const [user, events] = await Promise.all([
+    const [user, career, events] = await Promise.all([
       User.findById(userId),
+      CareerProgress.findOne({ userId }),
       Event.find({ registrationDeadline: { $gt: new Date() } })
     ]);
 
@@ -69,9 +71,26 @@ async function generateAndCacheRecommendations(userId) {
       throw new Error('User not found');
     }
 
-    const topMatches = getTopMatches(user, events);
+    // Merge User + CareerProgress into a single student profile for the matching engine
+    const studentProfile = {
+      // From User model
+      skills: [
+        ...(user.skills || []),
+        ...(career?.skills || [])   // CareerProgress.skills often has more detail
+      ].filter((v, i, arr) => arr.findIndex(s => s.toLowerCase() === v.toLowerCase()) === i), // dedupe
+      interests: user.interests || [],
+      cgpa: user.cgpa || 0,
+      // From CareerProgress
+      readiness: career?.readiness || 'Beginner',
+      targetCompany: career?.targetCompany || 'Other',
+      problemsSolved: career?.problemsSolved || 0,
+      dsaTopics: career?.dsaTopics || [],
+    };
+
+    const topMatches = getTopMatches(studentProfile, events);
     await cacheRecommendations(userId, topMatches);
-    // Normalize matchScore from {score, reasons} to flat fields, matching the cached response shape
+
+    // Normalize matchScore from {score, reasons} to flat fields
     return topMatches.map(match => ({
       ...match,
       matchScore: match.matchScore.score,
