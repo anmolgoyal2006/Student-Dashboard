@@ -58,26 +58,48 @@ export default function OpportunityCard({
     return tmp.textContent || tmp.innerText || '';
   };
 
-  const getBannerImage = () => {
-    if (opportunity.banner) {
-      // For banners, if it's a URL, use as background image, otherwise use as color
-      if (opportunity.banner.startsWith('http')) {
-        return `url(${opportunity.banner})`;
-      } else {
-        return opportunity.banner;
-      }
+  const CATEGORY_BANNERS = {
+    'Technology':     'https://images.unsplash.com/photo-1504384308090-c894fdcc538d?w=600&q=80',
+    'AI/ML':          'https://images.unsplash.com/photo-1677442135703-1787eea5ce01?w=600&q=80',
+    'Student':        'https://images.unsplash.com/photo-1531482615713-2afd69097998?w=600&q=80',
+    'Student Life':   'https://images.unsplash.com/photo-1531482615713-2afd69097998?w=600&q=80',
+    'Web Development':'https://images.unsplash.com/photo-1593720213428-28a5b9e94613?w=600&q=80',
+    'Mobile':         'https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?w=600&q=80',
+    'Design':         'https://images.unsplash.com/photo-1561070791-2526d30994b5?w=600&q=80',
+    'Blockchain':     'https://images.unsplash.com/photo-1639762681057-408e52192e55?w=600&q=80',
+    'Gaming':         'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=600&q=80',
+    'Women in Tech':  'https://images.unsplash.com/photo-1573164713988-8665fc963095?w=600&q=80',
+    'Social Impact':  'https://images.unsplash.com/photo-1559027615-cd4628902d4a?w=600&q=80',
+    'FinTech':        'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=600&q=80',
+    'HealthTech':     'https://images.unsplash.com/photo-1576091160550-2173dba999ef?w=600&q=80',
+    'Open Innovation':'https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=600&q=80',
+  };
+
+  const getBannerUrl = () => {
+    // Use the stored banner if valid
+    if (opportunity.banner && opportunity.banner.startsWith('http')) {
+      return opportunity.banner;
     }
-    // Fallbacks
+    // For any event with no banner, fall back to category-based image
+    if (opportunity.category && CATEGORY_BANNERS[opportunity.category]) {
+      return CATEGORY_BANNERS[opportunity.category];
+    }
+    // Last resort: generic hackathon photo
+    return 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=600&q=80';
+  };
+
+  const getBannerBackground = () => {
     if (opportunity.source === 'unstop') {
-      return `linear-gradient(135deg, #6366f155, #8b5cf655)`;
+      return `linear-gradient(135deg, #6366f122, #8b5cf622)`;
     }
     if (opportunity.source === 'devfolio') {
-      return `linear-gradient(135deg, #00d9ff55, #7c3aed55)`;
+      return `linear-gradient(135deg, #00d9ff22, #7c3aed22)`;
     }
-    return `linear-gradient(135deg, 
-      ${opportunity.source === 'devfolio' ? '#00d9ff' : '#6366f1'}33, 
-      ${opportunity.source === 'devfolio' ? '#7c3aed' : '#8b5cf6'}22)`;
+    return `linear-gradient(135deg, #6366f133, #8b5cf622)`;
   };
+
+  const bannerUrl = getBannerUrl();
+  const isUnstopLogo = opportunity.source === 'unstop';
 
   const diffStyle = difficultyColors[opportunity.difficulty] || difficultyColors.intermediate;
 
@@ -112,10 +134,7 @@ export default function OpportunityCard({
         {/* Banner */}
         <div style={{
           height: 130,
-          background: getBannerImage(),
-          backgroundSize: 'contain',
-          backgroundPosition: '50% 50%',
-          backgroundRepeat: 'no-repeat',
+          background: getBannerBackground(),
           position: 'relative',
           overflow: 'hidden',
           width: '100%',
@@ -123,17 +142,28 @@ export default function OpportunityCard({
           alignItems: 'center',
           justifyContent: 'center'
         }}>
-          {opportunity.banner && opportunity.banner.startsWith('http') && !opportunity.banner.endsWith('_') && (
+          {bannerUrl && (
             <img
-              src={opportunity.banner}
-              onError={e => { e.target.style.display = 'none' }}
+              src={bannerUrl}
+              onError={e => {
+                // If the primary banner fails (e.g. blocked CORS), fall back to category banner
+                const fallback = CATEGORY_BANNERS[opportunity.category]
+                  || 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=600&q=80';
+                if (e.target.src !== fallback) {
+                  e.target.src = fallback;
+                } else {
+                  e.target.style.display = 'none';
+                }
+              }}
               alt=""
               style={{
                 position: 'absolute',
                 inset: 0,
                 width: '100%',
                 height: '100%',
-                objectFit: 'contain',
+                objectFit: isUnstopLogo ? 'contain' : 'cover',
+                objectPosition: 'center',
+                padding: isUnstopLogo ? '12px' : 0,
                 pointerEvents: 'none'
               }}
             />

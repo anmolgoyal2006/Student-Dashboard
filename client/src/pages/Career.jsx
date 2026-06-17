@@ -39,6 +39,7 @@ export default function Career() {
 
   // Hackathons state
   const [hackathons, setHackathons] = useState([]);
+  const [baseHackathons, setBaseHackathons] = useState([]); // unfiltered full list for filter options
   const [hackathonLoading, setHackathonLoading] = useState(true);
   const [savedEventIds, setSavedEventIds] = useState(new Set());
   const [hackathonView, setHackathonView] = useState('all'); // 'all' | 'recommended' | 'saved' | 'closing'
@@ -56,17 +57,17 @@ export default function Career() {
     maxPrize: ''
   });
 
-  // Dynamic filter options derived from loaded events
+  // Filter options always derived from the full unfiltered list so options never disappear
   const filterOptions = useMemo(() => {
-    const sources = [...new Set(hackathons.map(e => e.source).filter(Boolean))];
-    const categories = [...new Set(hackathons.map(e => e.category).filter(Boolean))];
-    const difficulties = [...new Set(hackathons.map(e => e.difficulty).filter(Boolean))];
+    const sources = [...new Set(baseHackathons.map(e => e.source).filter(Boolean))];
+    const categories = [...new Set(baseHackathons.map(e => e.category).filter(Boolean))];
+    const difficulties = [...new Set(baseHackathons.map(e => e.difficulty).filter(Boolean))];
     return {
       sources: sources.map(v => ({ value: v, label: v.charAt(0).toUpperCase() + v.slice(1) })),
       categories: categories.map(v => ({ value: v, label: v })),
       difficulties: difficulties.map(v => ({ value: v, label: v.charAt(0).toUpperCase() + v.slice(1) }))
     };
-  }, [hackathons]);
+  }, [baseHackathons]);
 
   // Function to load saved event IDs
   const loadSavedEventIds = async () => {
@@ -321,27 +322,40 @@ export default function Career() {
     finally { setPlanLoad(false); }
   };
 
-  const loadHackathons = async (view) => {
+  const loadHackathons = async (view, currentFilters) => {
     setHackathonLoading(true);
     try {
       let data;
-      switch (view) {
-        case 'recommended':
-          data = (await opportunityService.getRecommended()).data;
-          break;
-        case 'saved':
-          data = (await opportunityService.getSaved()).data;
-          break;
-        case 'closing':
-          data = (await opportunityService.getClosingSoon()).data;
-          break;
-        default:
-          // Build query params from filters
-          const params = { limit: 100 };
-          Object.entries(filters).forEach(([key, value]) => {
-            if (value) params[key] = value;
-          });
-          data = (await opportunityService.getAll(params)).data;
+      const activeFilters = currentFilters || filters;
+      const hasActiveFilter = Object.values(activeFilters).some(v => v !== '');
+
+      // If any filter is active, always use the 'all' endpoint with filter params
+      if (hasActiveFilter) {
+        const params = { limit: 100 };
+        Object.entries(activeFilters).forEach(([key, value]) => {
+          if (value) params[key] = value;
+        });
+        data = (await opportunityService.getAll(params)).data;
+      } else {
+        switch (view) {
+          case 'recommended':
+            data = (await opportunityService.getRecommended()).data;
+            break;
+          case 'saved':
+            data = (await opportunityService.getSaved()).data;
+            break;
+          case 'closing':
+            data = (await opportunityService.getClosingSoon()).data;
+            break;
+          default: {
+            const params = { limit: 100 };
+            data = (await opportunityService.getAll(params)).data;
+          }
+        }
+        // On unfiltered 'all' fetch, update the base list so filter options stay complete
+        if (view === 'all') {
+          setBaseHackathons(data.data || data.events || []);
+        }
       }
       setHackathons(data.data || data.events || []);
     } catch (err) {
@@ -390,7 +404,7 @@ export default function Career() {
   // Reload hackathons when view or filters change
   useEffect(() => {
     if (activeTab === 'hackathons') {
-      loadHackathons(hackathonView);
+      loadHackathons(hackathonView, filters);
       loadSavedEventIds();
     }
   }, [activeTab, hackathonView, filters]);

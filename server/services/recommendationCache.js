@@ -71,7 +71,12 @@ async function generateAndCacheRecommendations(userId) {
 
     const topMatches = getTopMatches(user, events);
     await cacheRecommendations(userId, topMatches);
-    return topMatches;
+    // Normalize matchScore from {score, reasons} to flat fields, matching the cached response shape
+    return topMatches.map(match => ({
+      ...match,
+      matchScore: match.matchScore.score,
+      matchReasons: match.matchScore.reasons
+    }));
   } catch (err) {
     console.error('[Recommendation Cache] Error generating recommendations:', err);
     throw err;
