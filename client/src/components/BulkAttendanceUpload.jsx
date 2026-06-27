@@ -2,7 +2,7 @@
 import React, { useState, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import axios from 'axios';
-import { FileSpreadsheet, Download, Upload, Link2, AlertCircle } from 'lucide-react';
+import { FileSpreadsheet, Download, Upload, Link2, AlertCircle, CheckCircle } from 'lucide-react';
 import toast from '../context/ToastContext';
 
 export default function BulkAttendanceUpload({ onUploadSuccess }) {
