@@ -4,9 +4,7 @@ const Marks = require('../models/Marks');
 const CareerProgress = require('../models/CareerProgress');
 const Subject = require('../models/Subject');
 const Task = require('../models/Task');
-const Groq = require('groq-sdk');
-
-const groq = new Groq({ apiKey: process.env.GROQ_CHAT_KEY || process.env.GROQ_API_KEY });
+const { chatCompletionsCreate } = require('../services/aiService');
 
 const round2 = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
 
@@ -539,11 +537,10 @@ Instructions:
    - Tailor specifically to the student's company target (e.g., Amazon leadership principles, LeetCode progress) and pending tasks.
 `;
 
-    console.log('[AI Predictor Analysis] Requesting Groq Llama 3.1...');
+    console.log('[AI Predictor Analysis] Requesting Gemini...');
     let parsedResult = null;
     try {
-      const completion = await groq.chat.completions.create({
-        model: 'llama-3.1-8b-instant',
+      const completion = await chatCompletionsCreate({
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: JSON.stringify(analysisPayload) }
@@ -565,8 +562,8 @@ Instructions:
 
       parsedResult = JSON.parse(cleaned);
       console.log('[AI Predictor Analysis] Successfully parsed response.');
-    } catch (groqErr) {
-      console.error('[AI Predictor Analysis] Groq API call or JSON parsing failed:', groqErr.message);
+    } catch (aiErr) {
+      console.error('[AI Predictor Analysis] Gemini API call or JSON parsing failed:', aiErr.message);
     }
 
     if (parsedResult && parsedResult.feasibility) {

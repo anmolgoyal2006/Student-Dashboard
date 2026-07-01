@@ -1,8 +1,8 @@
 /**
- * AI DSA Coach — Groq-powered placement prep assistant.
+ * AI DSA Coach — Gemini-powered placement prep assistant.
  */
 
-const Groq = require('groq-sdk');
+const { chatCompletionsCreate } = require('./aiService');
 const {
   buildLeetcodeInsights,
   buildLeetcodeProblemPicks,
@@ -13,8 +13,7 @@ const {
   UNCOVERED_LC_COUNT,
 } = require('./leetcodeService');
 
-const groq = new Groq({ apiKey: process.env.GROQ_CHAT_KEY || process.env.GROQ_API_KEY });
-const MODEL = 'llama-3.1-8b-instant';
+const { GEMINI_MODEL } = require('./aiService');
 
 const TOPIC_TARGETS = {
   Arrays: 50, Strings: 40, 'Linked Lists': 30, 'Stacks & Queues': 25,
@@ -66,8 +65,7 @@ function extractJSON(raw) {
 }
 
 async function callGroq(system, user, maxTokens = 1800) {
-  const completion = await groq.chat.completions.create({
-    model: MODEL,
+  const completion = await chatCompletionsCreate({
     temperature: 0.35,
     max_tokens: maxTokens,
     messages: [

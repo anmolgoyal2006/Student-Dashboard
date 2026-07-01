@@ -4,6 +4,8 @@ import { aiChatService, aiCommandService } from '../services/apiServices';
 import { useGlobalData } from '../context/GlobalDataContext';
 import toast from '../context/ToastContext';
 import { Bot, BookOpen, Send, Upload, FileText, HelpCircle, Paperclip, Check, Calendar, BarChart2, CheckSquare, Layers, ChevronRight, Mic, Trash2, Copy, Brain, Paperclip as Attachment } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function cleanTextForSpeech(text) {
@@ -115,32 +117,45 @@ function renderMessageText(text) {
         return <CodeBlock key={index} code={code} language={language} />;
       }
       return <pre key={index} style={{ whiteSpace: 'pre-wrap', margin: '4px 0' }}>{part}</pre>;
-    } else {
-      const inlineParts = part.split(/(`[^`\n]+`)/g);
-      return inlineParts.map((subPart, subIndex) => {
-        if (subIndex % 2 === 1) {
-          const cleanCode = subPart.slice(1, -1);
-          return (
-            <code
-              key={subIndex}
-              style={{
-                background: 'rgba(255,255,255,0.06)',
-                border: '1px solid var(--border)',
-                fontFamily: 'SFMono-Regular, Consolas, monospace',
-                padding: '2px 6px',
-                borderRadius: '4px',
-                fontSize: '0.85em',
-                color: 'var(--color-danger)',
-                wordBreak: 'break-all'
-              }}
-            >
-              {cleanCode}
-            </code>
-          );
-        }
-        return subPart;
-      });
     }
+    return (
+      <ReactMarkdown
+        key={index}
+        remarkPlugins={[remarkGfm]}
+        components={{
+          p: ({ children }) => <span style={{ display: 'block', marginBottom: 6 }}>{children}</span>,
+          h1: ({ children }) => <h3 style={{ margin: '10px 0 6px', fontSize: 15, fontWeight: 600 }}>{children}</h3>,
+          h2: ({ children }) => <h4 style={{ margin: '10px 0 6px', fontSize: 14, fontWeight: 600 }}>{children}</h4>,
+          h3: ({ children }) => <h5 style={{ margin: '8px 0 4px', fontSize: 13.5, fontWeight: 600 }}>{children}</h5>,
+          ul: ({ children }) => <ul style={{ margin: '4px 0', paddingLeft: 20 }}>{children}</ul>,
+          ol: ({ children }) => <ol style={{ margin: '4px 0', paddingLeft: 20 }}>{children}</ol>,
+          li: ({ children }) => <li style={{ marginBottom: 2 }}>{children}</li>,
+          strong: ({ children }) => <strong style={{ fontWeight: 600 }}>{children}</strong>,
+          code: ({ children }) => (
+            <code style={{
+              background: 'rgba(255,255,255,0.06)',
+              border: '1px solid var(--border)',
+              fontFamily: 'SFMono-Regular, Consolas, monospace',
+              padding: '2px 6px',
+              borderRadius: 4,
+              fontSize: '0.85em',
+              color: 'var(--color-danger)',
+              wordBreak: 'break-all',
+            }}>
+              {children}
+            </code>
+          ),
+          a: ({ href, children }) => (
+            <a href={href} target="_blank" rel="noopener noreferrer"
+              style={{ color: 'var(--color-accent)', textDecoration: 'underline' }}>
+              {children}
+            </a>
+          ),
+        }}
+      >
+        {part}
+      </ReactMarkdown>
+    );
   });
 }
 
@@ -553,7 +568,7 @@ export default function AIAssistant() {
 
   const assistantIntro = [{
     role: 'ai',
-    text: "Hey! I'm your Dashboard Assistant powered by Groq AI.\n\nI understand natural language — just tell me what you want:\n- Add subjects, attendance, marks, tasks\n- Ask questions about your data\n- Add multiple subjects at once\n- Query today's schedule, CGPA predictions, attendance status\n\nNo rigid commands needed — just talk naturally!",
+    text: "Hey! I'm your Dashboard Assistant powered by Gemini AI.\n\nI understand natural language — just tell me what you want:\n- Add subjects, attendance, marks, tasks\n- Ask questions about your data\n- Add multiple subjects at once\n- Query today's schedule, CGPA predictions, attendance status\n\nNo rigid commands needed — just talk naturally!",
     id  : 0,
   }];
 
@@ -609,7 +624,7 @@ export default function AIAssistant() {
           <p className="page-subtitle">
             {mode === 'notes'
               ? 'Ask questions, summarize notes, generate quizzes'
-              : 'Natural language dashboard control — powered by Groq'}
+              : 'Natural language dashboard control — powered by Gemini'}
           </p>
         </div>
         <button
@@ -949,7 +964,7 @@ export default function AIAssistant() {
           <p style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 8, textAlign: 'center' }}>
             {mode === 'notes'
               ? 'Notes AI · Shift+Enter for new line'
-              : 'Groq AI · Understands natural language · Updates dashboard in real-time'}
+              : 'Gemini AI · Understands natural language · Updates dashboard in real-time'}
           </p>
         </div>
       </div>

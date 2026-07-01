@@ -1,10 +1,8 @@
-const Groq = require('groq-sdk');
 const Task = require('../models/Task');
 const ClassroomAssignment = require('../models/ClassroomAssignment');
 const Subject = require('../models/Subject');
 const Attendance = require('../models/Attendance');
-
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+const { chatCompletionsCreate } = require('../services/aiService');
 
 const SYSTEM_PROMPT = `You are an academic productivity coach for an engineering student.
 
@@ -87,12 +85,11 @@ exports.generatePlan = async (req, res) => {
       availableHoursPerDay: availableHoursPerDay || 4,
     };
 
-    const completion = await groq.chat.completions.create({
+    const completion = await chatCompletionsCreate({
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
         { role: 'user', content: JSON.stringify(input) },
       ],
-      model: 'llama-3.3-70b-versatile',
       temperature: 0.3,
       response_format: { type: 'json_object' },
     });

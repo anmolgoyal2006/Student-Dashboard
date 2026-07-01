@@ -4,9 +4,7 @@ const CareerProgress      = require('../models/CareerProgress');
 const Subject             = require('../models/Subject');
 const Task                = require('../models/Task');
 const ClassroomAssignment = require('../models/ClassroomAssignment');
-const Groq                = require('groq-sdk');
-
-const groq = new Groq({ apiKey: process.env.GROQ_CHAT_KEY || process.env.GROQ_API_KEY });
+const { chatCompletionsCreate } = require('./aiService');
 
 const COMPANY_ROADMAPS = {
   Amazon:   ['Master Arrays, Trees, DP (LeetCode top 100)', 'Study all 16 Amazon Leadership Principles — prepare 2 stories each', 'Practice System Design: URL shortener, Parking Lot, Amazon Cart', 'Do 5+ mock interviews on Pramp or Interviewing.io'],
@@ -382,15 +380,15 @@ GENERAL:
 - Return between 4 and 6 items total
 `;
 
-    console.log('[AI Recommendation] Requesting Groq...');
-    const completion = await groq.chat.completions.create({
-      model:       'llama-3.1-8b-instant',
+    console.log('[AI Recommendation] Requesting Gemini...');
+    const completion = await chatCompletionsCreate({
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user',   content: JSON.stringify(studentData, null, 2) },
       ],
       temperature: 0.15,
-      max_tokens:  800,
+      max_tokens:  2048,
+      response_format: { type: 'json_object' },
     });
 
     const raw = completion.choices[0]?.message?.content?.trim() ?? '';
@@ -398,7 +396,7 @@ GENERAL:
 
     const parsed = extractJSONArray(raw);
     if (parsed && Array.isArray(parsed) && parsed.length > 0) {
-      console.log('[AI Recommendation] Groq parsed successfully:', parsed.length, 'items');
+      console.log('[AI Recommendation] Gemini parsed successfully:', parsed.length, 'items');
 
       const lcLinked = career && !!career.leetcodeUsername;
 
@@ -427,7 +425,7 @@ GENERAL:
     console.warn('[AI Recommendation] Unparseable output — falling back to rule-based.');
 
   } catch (err) {
-    console.error('[AI Recommendation] Groq error:', err.message);
+    console.error('[AI Recommendation] Gemini error:', err.message);
   }
 
   console.log('[AI Recommendation] Using rule-based fallback.');

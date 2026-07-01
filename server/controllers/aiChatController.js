@@ -1,10 +1,7 @@
 const mongoose  = require('mongoose');
 const NoteChunk = require('../models/NoteChunk');
 const { storeNoteEmbeddings, chatWithRAG } = require('../services/ragService');
-const Groq = require('groq-sdk');
-const { toFile } = require('groq-sdk');
-
-const groq = new Groq({ apiKey: process.env.GROQ_CHAT_KEY || process.env.GROQ_API_KEY });
+const { transcribeAudio } = require('../services/aiService');
 
 
 async function extractImageText(buffer, mimetype) {
@@ -19,22 +16,11 @@ exports.transcribeVoice = async (req, res) => {
       return res.status(400).json({ message: 'No audio file uploaded.' });
     }
 
-    if (!process.env.GROQ_CHAT_KEY && !process.env.GROQ_API_KEY) {
+    if (!process.env.GEMINI_API_KEY) {
       return res.status(500).json({ message: 'Voice transcription is not configured.' });
     }
 
-    const filename = req.file.originalname || 'voice.webm';
-    const audioFile = await toFile(req.file.buffer, filename, { type: req.file.mimetype || 'audio/webm' });
-
-    const transcription = await groq.audio.transcriptions.create({
-      file: audioFile,
-      model: 'whisper-large-v3-turbo',
-      language: 'en',
-      response_format: 'json',
-      prompt: 'Student dashboard voice command. Transcribe concise academic commands exactly.',
-    });
-
-    const text = (transcription?.text || '').trim();
+    const text = await transcribeAudio(req.file.buffer, req.file.mimetype || 'audio/webm');
     if (!text) {
       return res.status(400).json({ message: 'No speech detected in the recording.' });
     }

@@ -1,4 +1,3 @@
-const Groq      = require('groq-sdk');
 const Subject    = require('../models/Subject');
 const Attendance = require('../models/Attendance');
 const Marks      = require('../models/Marks');
@@ -6,9 +5,7 @@ const Task       = require('../models/Task');
 const Semester   = require('../models/Semester.model');
 const { sendNotification } = require('../utils/sendNotification');
 const User = require('../models/User');
-
-const groq = new Groq({ apiKey: process.env.GROQ_CHAT_KEY || process.env.GROQ_API_KEY });
-console.log('[AI] GROQ_API_KEY loaded:', process.env.GROQ_API_KEY ? process.env.GROQ_API_KEY.substring(0, 15) + '...' : 'UNDEFINED');
+const { chatCompletionsCreate } = require('../services/aiService');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SYSTEM_PROMPT — Groq handles ALL routing: commands, queries, conversation
@@ -357,9 +354,9 @@ exports.handleCommand = async (req, res) => {
   }
 
   try {
-    // ── Step 1: Call Groq ──────────────────────────────────────────────────
-    console.log('[AI] Calling Groq with model: llama-3.1-8b-instant, key prefix:', process.env.GROQ_API_KEY ? process.env.GROQ_API_KEY.substring(0, 10) : 'NONE');
-    
+    // ── Step 1: Call Gemini ──────────────────────────────────────────────────
+    console.log('[AI] Calling Gemini...');
+
     const historyMessages = [];
     if (req.body.history && Array.isArray(req.body.history)) {
       const recentHistory = req.body.history.slice(-6);
@@ -369,8 +366,7 @@ exports.handleCommand = async (req, res) => {
       }
     }
 
-    const completion = await groq.chat.completions.create({
-      model     : 'llama-3.1-8b-instant',
+    const completion = await chatCompletionsCreate({
       messages   : [
         { role: 'system', content: buildPrompt() },
         ...historyMessages,
@@ -381,7 +377,7 @@ exports.handleCommand = async (req, res) => {
     });
 
     const raw = completion.choices[0]?.message?.content?.trim() ?? '';
-    console.log('[Groq Raw]', raw);
+    console.log('[Gemini Raw]', raw);
 
     // ── Step 2: Extract + validate ────────────────────────────────────────
     const parsed = extractJSON(raw);

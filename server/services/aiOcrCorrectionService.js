@@ -1,8 +1,6 @@
-const Groq = require('groq-sdk');
 const fs = require('fs');
 const { normalizeGrade, VALID_GRADES } = require('./ocrGradePdfParser');
-
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+const { generateContentWithInlineData, generateContent } = require('./aiService');
 
 // ── Vision: read a single grade cell image directly ──────────────────────────
 async function readGradeCellImage(imagePath) {
@@ -10,23 +8,11 @@ async function readGradeCellImage(imagePath) {
 
   try {
     const imageData = fs.readFileSync(imagePath).toString('base64');
-    const ext = imagePath.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
+    const mimeType = imagePath.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
 
-    const completion = await groq.chat.completions.create({
-      model: 'meta-llama/llama-4-scout-17b-16e-instruct',
-      messages: [
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'image_url',
-              image_url: {
-                url: `data:${ext};base64,${imageData}`,
-              },
-            },
-            {
-              type: 'text',
-              text: `This is a cropped cell from a handwritten university grade sheet.
+    const raw = await generateContentWithInlineData([
+      { inlineData: { mimeType, data: imageData } },
+      { text: `This is a cropped cell from a handwritten university grade sheet.
 The cell contains exactly ONE handwritten letter grade.
 Valid grades are ONLY: A+, A, B+, B, C+, C, D, F
 
@@ -34,16 +20,9 @@ Rules:
 - "+" is often written as "t" or "f" in cursive (e.g. "Bt" = B+, "Ct" = C+, "At" = A+, "Cf" = C+)  
 - Ignore any annotations in parentheses like (UMC), (I), (W) — just extract the base grade
 - If the cell looks empty or unreadable, output: ?
-- Output ONLY the grade, nothing else. Examples: A+ or B or C+ or F`,
-            },
-          ],
-        },
-      ],
-      temperature: 0,
-      max_tokens: 10,
-    });
+- Output ONLY the grade, nothing else. Examples: A+ or B or C+ or F` },
+    ], { temperature: 0, maxOutputTokens: 10 });
 
-    const raw = completion.choices?.[0]?.message?.content?.trim() || '';
     return raw;
   } catch (err) {
     console.error('[Vision] readGradeCellImage error:', err.message);
@@ -183,18 +162,12 @@ async function aiCorrectGradesFromText(students) {
     const chunk = students.slice(i, i + CHUNK_SIZE);
 
     try {
-      const completion = await groq.chat.completions.create({
-        model: 'llama-3.1-8b-instant',
-        messages: [
-          { role: 'system', content: 'You are a precise grade correction AI. Output only JSON.' },
-          { role: 'user', content: buildCorrectionPrompt(chunk) },
-        ],
-        temperature: 0.1,
-        max_tokens: 800,
-      });
+      const raw = await generateContent([
+        { role: 'user', parts: [{ text: 'You are a precise grade correction AI. Output only JSON.' }] },
+        { role: 'user', parts: [{ text: buildCorrectionPrompt(chunk) }] },
+      ], { temperature: 0.1, maxOutputTokens: 800 });
 
-      const raw = completion.choices?.[0]?.message?.content || '[]';
-      const cleaned = raw.replace(/```json\s*/gi, '').replace(/```\s*/gi, '').trim();
+      const cleaned = (raw || '[]').replace(/```json\s*/gi, '').replace(/```\s*/gi, '').trim();
       const result = JSON.parse(cleaned);
       if (!Array.isArray(result)) continue;
 

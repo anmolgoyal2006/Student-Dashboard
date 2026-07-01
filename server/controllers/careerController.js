@@ -69,8 +69,7 @@ exports.updateTopic = async (req, res) => {
   }
 };
 
-const Groq = require('groq-sdk');
-const groq = new Groq({ apiKey: process.env.GROQ_CHAT_KEY || process.env.GROQ_API_KEY });
+const { chatCompletionsCreate } = require('../services/aiService');
 
 function extractJSON(raw) {
   if (!raw) return null;
@@ -121,8 +120,7 @@ For Target Role: ${targetRole}
 Target Company: ${targetCompany}
 Current Skills Listed: ${skills}`;
 
-    const completion = await groq.chat.completions.create({
-      model: 'llama-3.1-8b-instant',
+    const completion = await chatCompletionsCreate({
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
@@ -134,7 +132,7 @@ Current Skills Listed: ${skills}`;
     const content = completion.choices[0]?.message?.content?.trim();
     let parsed = extractJSON(content);
     if (!parsed || typeof parsed.score !== 'number') {
-      console.warn('[AnalyzeResume] Llama returned invalid JSON, using regex fallback:', content);
+      console.warn('[AnalyzeResume] Gemini returned invalid JSON, using regex fallback:', content);
       const scoreMatch = content.match(/"score"\s*:\s*(\d+)/);
       const score = scoreMatch ? parseInt(scoreMatch[1]) : 70;
       const feedbackMatch = content.match(/"feedback"\s*:\s*\[([\s\S]*?)\]/);
@@ -185,8 +183,7 @@ No markdown, no fences.`;
     const userPrompt = `Generate 3 interview questions for role: ${targetRole} at company: ${targetCompany} on topic: ${topic}.
 DSA topics completed: ${completedTopics || 'None'}`;
 
-    const completion = await groq.chat.completions.create({
-      model: 'llama-3.1-8b-instant',
+    const completion = await chatCompletionsCreate({
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
@@ -198,7 +195,7 @@ DSA topics completed: ${completedTopics || 'None'}`;
     const content = completion.choices[0]?.message?.content?.trim();
     const parsed = extractJSON(content);
     if (!parsed || !Array.isArray(parsed.questions)) {
-      console.error('[GenerateQuestions] Llama returned invalid JSON:', content);
+      console.error('[GenerateQuestions] Gemini returned invalid JSON:', content);
       return res.status(500).json({ message: 'Failed to generate interview questions.' });
     }
 
@@ -257,8 +254,7 @@ User Answer: ${userAnswer}
 Target Role: ${targetRole}
 Target Company: ${targetCompany}`;
 
-    const completion = await groq.chat.completions.create({
-      model: 'llama-3.1-8b-instant',
+    const completion = await chatCompletionsCreate({
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
@@ -270,7 +266,7 @@ Target Company: ${targetCompany}`;
     const content = completion.choices[0]?.message?.content?.trim();
     const parsed = extractJSON(content);
     if (!parsed || typeof parsed.score !== 'number') {
-      console.error('[EvaluateAnswer] Llama returned invalid JSON:', content);
+      console.error('[EvaluateAnswer] Gemini returned invalid JSON:', content);
       return res.status(500).json({ message: 'Failed to evaluate your answer.' });
     }
 
@@ -427,8 +423,7 @@ For Target Role: ${targetRole}
 Target Company: ${targetCompany}
 Current Skills Listed: ${skills}`;
 
-    const completion = await groq.chat.completions.create({
-      model: 'llama-3.1-8b-instant',
+    const completion = await chatCompletionsCreate({
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
@@ -440,7 +435,7 @@ Current Skills Listed: ${skills}`;
     const content = completion.choices[0]?.message?.content?.trim();
     let parsed = extractJSON(content);
     if (!parsed || typeof parsed.score !== 'number') {
-      console.warn('[UploadResume] Llama returned invalid JSON, using regex fallback:', content);
+      console.warn('[UploadResume] Gemini returned invalid JSON, using regex fallback:', content);
       const scoreMatch = content.match(/"score"\s*:\s*(\d+)/);
       const score = scoreMatch ? parseInt(scoreMatch[1]) : 70;
       const feedbackMatch = content.match(/"feedback"\s*:\s*\[([\s\S]*?)\]/);
