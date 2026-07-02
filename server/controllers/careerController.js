@@ -69,7 +69,7 @@ exports.updateTopic = async (req, res) => {
   }
 };
 
-const { chatCompletionsCreate } = require('../services/aiService');
+const { chatCompletionsCreate, HEAVY_MODEL, NANO_MODEL } = require('../services/aiService');
 
 function extractJSON(raw) {
   if (!raw) return null;
@@ -122,6 +122,14 @@ exports.analyzeResume = async (req, res) => {
 
     const systemPrompt = `You are an expert technical recruiter and resume analyzer for Software Engineering roles. Analyze the resume against the target role and target company, then return STRICT JSON only — no markdown, no code fences, no commentary before or after.
 
+PROJECT ANALYSIS (do this before assigning a score):
+For each project listed on the resume, evaluate:
+- Technical depth: does it show real engineering decisions (architecture, algorithms, tradeoffs) or just a list of technologies used?
+- Relevance: how closely does the tech stack and problem domain match the target role and company?
+- Evidence of scale/impact: are there concrete numbers, user counts, performance figures, or system constraints handled?
+- Originality: does it solve a non-trivial problem, or is it a common tutorial-style clone?
+Weigh the STRONGEST 1-2 projects more heavily than weaker ones — a resume with one excellent, deep project should score higher than one with three shallow ones. Do not treat project count as a substitute for project depth.
+
 OUTPUT SCHEMA (return fields in this exact order):
 {
   "score": <integer 0-100>,
@@ -132,10 +140,11 @@ OUTPUT SCHEMA (return fields in this exact order):
 }
 
 RULES:
-- score: weigh relevance of skills/projects to target role and company, resume clarity, and quantified impact (metrics, scale, outcomes).
+- score: weigh relevance of skills/projects to target role and company, resume clarity, and quantified impact. Base a meaningful portion of the score on the depth and quality of the strongest project, not just presence of relevant keywords across all projects.
 - atsRisk: "high" if resume uses tables/columns/graphics/unusual fonts that ATS parsers commonly fail on, non-standard section headers, or missing a skills section. "medium" if partially structured. "low" if clean, standard, parseable format.
-- strengths: concrete, specific things this candidate does well — reference actual project names, technologies, or metrics from the resume, not generic praise.
-- feedback: each item must reference something specific from THIS resume (a project name, a missing metric, a specific section) — never a generic tip that could apply to any resume. Each item must be actionable.
+- strengths: concrete, specific things this candidate does well — reference actual project names, technologies, or metrics from the resume, not generic praise. Prefer citing the single most technically impressive detail in each project over broad statements.
+- feedback: each item must reference something specific from THIS resume (a project name, a missing metric, a specific technical gap). If a project's description doesn't explain why a technical choice was made (e.g. why a specific database, algorithm, or architecture pattern was used), that is valid, high-value feedback — call it out by project name. Before suggesting the candidate add something (metrics, a summary, specific contributions, scale details), verify it is not already present in the resume text. Do not suggest adding a metric if quantified numbers already appear in that project's description. Each item must be actionable.
+- Do not suggest adding a "Summary" or "About Me" section as filler advice unless it is the single most valuable improvement for this specific resume — prefer feedback about project depth, technical decisions, or specific gaps over generic structural suggestions.
 - missingKeywords: BEFORE listing a keyword, verify it does not already appear anywhere in the resume text, including the Technical Skills, Projects, or Coursework sections. Do not list a skill as missing if it is present anywhere in the resume, even if not emphasized. Double-check this list against the full resume text before finalizing.
 - Do not restate strengths as feedback.
 - Every string must be a single JSON string with no unescaped quotes or line breaks.
@@ -158,6 +167,7 @@ Evaluate this resume specifically for how a recruiter at ${targetCompany} would 
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
       ],
+      model: HEAVY_MODEL,
       temperature: 0.1,
       max_tokens: 900,
       thinkingBudget: 256,
@@ -227,6 +237,7 @@ DSA topics completed: ${completedTopics || 'None'}`;
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
       ],
+      model: NANO_MODEL,
       temperature: 0.3,
       max_tokens: 600,
     });
@@ -298,6 +309,7 @@ Target Company: ${targetCompany}`;
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
       ],
+      model: NANO_MODEL,
       temperature: 0.1,
       max_tokens: 600,
     });
@@ -448,6 +460,14 @@ exports.uploadResume = async (req, res) => {
 
     const systemPrompt = `You are an expert technical recruiter and resume analyzer for Software Engineering roles. Analyze the resume against the target role and target company, then return STRICT JSON only — no markdown, no code fences, no commentary before or after.
 
+PROJECT ANALYSIS (do this before assigning a score):
+For each project listed on the resume, evaluate:
+- Technical depth: does it show real engineering decisions (architecture, algorithms, tradeoffs) or just a list of technologies used?
+- Relevance: how closely does the tech stack and problem domain match the target role and company?
+- Evidence of scale/impact: are there concrete numbers, user counts, performance figures, or system constraints handled?
+- Originality: does it solve a non-trivial problem, or is it a common tutorial-style clone?
+Weigh the STRONGEST 1-2 projects more heavily than weaker ones — a resume with one excellent, deep project should score higher than one with three shallow ones. Do not treat project count as a substitute for project depth.
+
 OUTPUT SCHEMA (return fields in this exact order):
 {
   "score": <integer 0-100>,
@@ -458,10 +478,11 @@ OUTPUT SCHEMA (return fields in this exact order):
 }
 
 RULES:
-- score: weigh relevance of skills/projects to target role and company, resume clarity, and quantified impact (metrics, scale, outcomes).
+- score: weigh relevance of skills/projects to target role and company, resume clarity, and quantified impact. Base a meaningful portion of the score on the depth and quality of the strongest project, not just presence of relevant keywords across all projects.
 - atsRisk: "high" if resume uses tables/columns/graphics/unusual fonts that ATS parsers commonly fail on, non-standard section headers, or missing a skills section. "medium" if partially structured. "low" if clean, standard, parseable format.
-- strengths: concrete, specific things this candidate does well — reference actual project names, technologies, or metrics from the resume, not generic praise.
-- feedback: each item must reference something specific from THIS resume (a project name, a missing metric, a specific section) — never a generic tip that could apply to any resume. Each item must be actionable.
+- strengths: concrete, specific things this candidate does well — reference actual project names, technologies, or metrics from the resume, not generic praise. Prefer citing the single most technically impressive detail in each project over broad statements.
+- feedback: each item must reference something specific from THIS resume (a project name, a missing metric, a specific technical gap). If a project's description doesn't explain why a technical choice was made (e.g. why a specific database, algorithm, or architecture pattern was used), that is valid, high-value feedback — call it out by project name. Before suggesting the candidate add something (metrics, a summary, specific contributions, scale details), verify it is not already present in the resume text. Do not suggest adding a metric if quantified numbers already appear in that project's description. Each item must be actionable.
+- Do not suggest adding a "Summary" or "About Me" section as filler advice unless it is the single most valuable improvement for this specific resume — prefer feedback about project depth, technical decisions, or specific gaps over generic structural suggestions.
 - missingKeywords: BEFORE listing a keyword, verify it does not already appear anywhere in the resume text, including the Technical Skills, Projects, or Coursework sections. Do not list a skill as missing if it is present anywhere in the resume, even if not emphasized. Double-check this list against the full resume text before finalizing.
 - Do not restate strengths as feedback.
 - Every string must be a single JSON string with no unescaped quotes or line breaks.
@@ -484,6 +505,7 @@ Evaluate this resume specifically for how a recruiter at ${targetCompany} would 
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
       ],
+      model: HEAVY_MODEL,
       temperature: 0.1,
       max_tokens: 900,
       thinkingBudget: 256,

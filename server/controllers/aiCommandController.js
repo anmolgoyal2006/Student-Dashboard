@@ -5,7 +5,7 @@ const Task       = require('../models/Task');
 const Semester   = require('../models/Semester.model');
 const { sendNotification } = require('../utils/sendNotification');
 const User = require('../models/User');
-const { chatCompletionsCreate } = require('../services/aiService');
+const { chatCompletionsCreate, LIGHT_MODEL } = require('../services/aiService');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SYSTEM_PROMPT — Groq handles ALL routing: commands, queries, conversation
@@ -367,6 +367,7 @@ exports.handleCommand = async (req, res) => {
     }
 
     const completion = await chatCompletionsCreate({
+      model: LIGHT_MODEL,
       messages   : [
         { role: 'system', content: buildPrompt() },
         ...historyMessages,

@@ -2,7 +2,7 @@
  * AI DSA Coach — Gemini-powered placement prep assistant.
  */
 
-const { chatCompletionsCreate } = require('./aiService');
+const { chatCompletionsCreate, LIGHT_MODEL } = require('./aiService');
 const {
   buildLeetcodeInsights,
   buildLeetcodeProblemPicks,
@@ -12,8 +12,6 @@ const {
   COMPANY_PROBLEMS,
   UNCOVERED_LC_COUNT,
 } = require('./leetcodeService');
-
-const { GEMINI_MODEL } = require('./aiService');
 
 const TOPIC_TARGETS = {
   Arrays: 50, Strings: 40, 'Linked Lists': 30, 'Stacks & Queues': 25,
@@ -66,6 +64,7 @@ function extractJSON(raw) {
 
 async function callGroq(system, user, maxTokens = 1800) {
   const completion = await chatCompletionsCreate({
+    model: LIGHT_MODEL,
     temperature: 0.35,
     max_tokens: maxTokens,
     messages: [

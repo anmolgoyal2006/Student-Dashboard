@@ -1,6 +1,6 @@
 const fs = require('fs');
 const { normalizeGrade, VALID_GRADES } = require('./ocrGradePdfParser');
-const { generateContentWithInlineData, generateContent } = require('./aiService');
+const { generateContentWithInlineData, generateContent, NANO_MODEL } = require('./aiService');
 
 // ── Vision: read a single grade cell image directly ──────────────────────────
 async function readGradeCellImage(imagePath) {
@@ -21,7 +21,7 @@ Rules:
 - Ignore any annotations in parentheses like (UMC), (I), (W) — just extract the base grade
 - If the cell looks empty or unreadable, output: ?
 - Output ONLY the grade, nothing else. Examples: A+ or B or C+ or F` },
-    ], { temperature: 0, maxOutputTokens: 10 });
+    ], { model: NANO_MODEL, temperature: 0, maxOutputTokens: 10 });
 
     return raw;
   } catch (err) {
@@ -165,7 +165,7 @@ async function aiCorrectGradesFromText(students) {
       const raw = await generateContent([
         { role: 'user', parts: [{ text: 'You are a precise grade correction AI. Output only JSON.' }] },
         { role: 'user', parts: [{ text: buildCorrectionPrompt(chunk) }] },
-      ], { temperature: 0.1, maxOutputTokens: 800 });
+      ], { model: NANO_MODEL, temperature: 0.1, maxOutputTokens: 800 });
 
       const cleaned = (raw || '[]').replace(/```json\s*/gi, '').replace(/```\s*/gi, '').trim();
       const result = JSON.parse(cleaned);

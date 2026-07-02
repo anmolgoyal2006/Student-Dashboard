@@ -4,7 +4,7 @@ const CareerProgress      = require('../models/CareerProgress');
 const Subject             = require('../models/Subject');
 const Task                = require('../models/Task');
 const ClassroomAssignment = require('../models/ClassroomAssignment');
-const { chatCompletionsCreate } = require('./aiService');
+const { chatCompletionsCreate, LIGHT_MODEL } = require('./aiService');
 
 const COMPANY_ROADMAPS = {
   Amazon:   ['Master Arrays, Trees, DP (LeetCode top 100)', 'Study all 16 Amazon Leadership Principles — prepare 2 stories each', 'Practice System Design: URL shortener, Parking Lot, Amazon Cart', 'Do 5+ mock interviews on Pramp or Interviewing.io'],
@@ -382,6 +382,7 @@ GENERAL:
 
     console.log('[AI Recommendation] Requesting Gemini...');
     const completion = await chatCompletionsCreate({
+      model: LIGHT_MODEL,
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user',   content: JSON.stringify(studentData, null, 2) },

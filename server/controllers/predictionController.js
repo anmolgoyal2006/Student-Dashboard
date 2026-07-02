@@ -4,7 +4,7 @@ const Marks = require('../models/Marks');
 const CareerProgress = require('../models/CareerProgress');
 const Subject = require('../models/Subject');
 const Task = require('../models/Task');
-const { chatCompletionsCreate } = require('../services/aiService');
+const { chatCompletionsCreate, HEAVY_MODEL } = require('../services/aiService');
 
 const round2 = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
 
@@ -545,6 +545,7 @@ Instructions:
           { role: 'system', content: systemPrompt },
           { role: 'user', content: JSON.stringify(analysisPayload) }
         ],
+        model: HEAVY_MODEL,
         temperature: 0.3,
         max_tokens: 1000,
       });

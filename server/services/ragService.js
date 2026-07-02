@@ -1,6 +1,6 @@
 const mongoose  = require('mongoose');
 const NoteChunk = require('../models/NoteChunk');
-const { chatCompletionsCreate } = require('./aiService');
+const { chatCompletionsCreate, LIGHT_MODEL } = require('./aiService');
 
 function chunkText(text, size = 500, overlap = 50) {
   const words  = text.split(/\s+/);
@@ -91,6 +91,7 @@ ${context ? `Notes:\n\n${context}` : 'No notes found.'}`,
   }
 
   const completion = await chatCompletionsCreate({
+    model: LIGHT_MODEL,
     messages: [
       { role: 'system', content: systemPrompts[mode] || systemPrompts.chat },
       ...historyMessages,

@@ -713,9 +713,8 @@ export default function Career() {
             )}
           </div>
 
-          {/* Manual tracker trigger */}
-          {!career.leetcodeUsername && (
-            <div className="card mb-4" style={{ padding: 0, overflow: 'hidden' }}>
+          {/* Manual tracker trigger — always visible; LeetCode sync handles problem counts but target/skills still need to be editable */}
+          <div className="card mb-4" style={{ padding: 0, overflow: 'hidden' }}>
               <button
                 type="button"
                 data-manual-tracker-btn
@@ -729,12 +728,14 @@ export default function Career() {
                 <div>
                   <div style={{ fontSize: 15, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 6 }}>
                     <Settings size={16} color="var(--color-accent)" />
-                    Manual tracker & settings
+                    {career.leetcodeUsername ? 'Target settings & skills' : 'Manual tracker & settings'}
                   </div>
                   <div className="text-muted" style={{ fontSize: 12, marginTop: 4 }}>
                     {hasAiCoach
                       ? 'AI coach handles plans — expand to edit targets or topics'
-                      : 'Target company, problem counts, and topic checklist'}
+                      : career.leetcodeUsername
+                        ? 'LeetCode syncs problem counts — set target company, role, and skills here'
+                        : 'Target company, problem counts, and topic checklist'}
                   </div>
                 </div>
                 <span style={{ color: 'var(--color-text-secondary)', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
@@ -833,7 +834,6 @@ export default function Career() {
                 </div>
               )}
             </div>
-          )}
 
           {/* Today's Action Plan */}
           {plan && !hasAiCoach && (

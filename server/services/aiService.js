@@ -1,19 +1,26 @@
 const https = require('https');
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+// Heavy model: used for resume analysis and grade prediction (quality-critical)
+const HEAVY_MODEL = process.env.GEMINI_HEAVY_MODEL || 'gemini-2.5-flash';
+// Light model: used for mid-complexity tasks (DSA coach, chat, AI commands, etc.)
+const LIGHT_MODEL = process.env.GEMINI_LIGHT_MODEL || 'gemini-2.0-flash';
+// Nano model: used for small, fast tasks (transcription, OCR cells, study planner, interview Qs)
+const NANO_MODEL = process.env.GEMINI_NANO_MODEL || 'gemini-1.5-flash';
+// GEMINI_MODEL kept for backward compat — any code importing it gets the light model
+const GEMINI_MODEL = LIGHT_MODEL;
 const BASE_URL = 'generativelanguage.googleapis.com';
 
 if (!GEMINI_API_KEY) {
   console.warn('[AI Service] GEMINI_API_KEY is not set. AI features will fail.');
 }
 
-function geminiFetch(path, body) {
+function geminiFetch(path, body, model = LIGHT_MODEL) {
   return new Promise((resolve, reject) => {
     const data = JSON.stringify(body);
     const options = {
       hostname: BASE_URL,
-      path: `/v1beta/models/${GEMINI_MODEL}:${path}?key=${GEMINI_API_KEY}`,
+      path: `/v1beta/models/${model}:${path}?key=${GEMINI_API_KEY}`,
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -29,7 +36,7 @@ function geminiFetch(path, body) {
         const raw = Buffer.concat(chunks).toString();
         if (res.statusCode < 200 || res.statusCode >= 300) {
           const errBody = raw.slice(0, 500);
-          console.error(`[Gemini] HTTP ${res.statusCode} response:`, errBody);
+          console.error(`[Gemini/${model}] HTTP ${res.statusCode} response:`, errBody);
           const err = new Error(`Gemini API error (${res.statusCode}): ${errBody}`);
           err.statusCode = res.statusCode;
           return reject(err);
@@ -92,6 +99,7 @@ function buildGeminiContents(messages) {
 }
 
 async function generateContent(contents, options = {}) {
+  const model = options.model || LIGHT_MODEL;
   return withRetry(async () => {
     const body = { contents };
 
@@ -107,17 +115,18 @@ async function generateContent(contents, options = {}) {
       body.generationConfig.thinkingConfig = { thinkingBudget: options.thinkingBudget };
     }
 
-    const json = await geminiFetch('generateContent', body);
+    const json = await geminiFetch('generateContent', body, model);
     return extractTextFromResponse(json);
   });
 }
 
-async function chatCompletionsCreate({ messages, temperature, max_tokens, response_format, thinkingBudget }) {
+async function chatCompletionsCreate({ messages, temperature, max_tokens, response_format, thinkingBudget, model }) {
   const systemMsg = messages.find(m => m.role === 'system');
   const otherMessages = messages.filter(m => m.role !== 'system');
   const responseMimeType = response_format?.type === 'json_object' ? 'application/json' : null;
 
   const text = await generateContent(buildGeminiContents(otherMessages), {
+    model: model || LIGHT_MODEL,
     systemInstruction: systemMsg?.content,
     temperature: temperature ?? 0.7,
     maxOutputTokens: max_tokens ?? 1000,
@@ -141,12 +150,13 @@ async function transcribeAudio(audioBuffer, mimetype) {
         ],
       }],
       generationConfig: { temperature: 0, maxOutputTokens: 500, thinkingConfig: { thinkingBudget: 0 } },
-    });
+    }, NANO_MODEL);
     return (extractTextFromResponse(json) || '').trim();
   });
 }
 
 async function generateContentWithInlineData(parts, options = {}) {
+  const model = options.model || LIGHT_MODEL;
   return withRetry(async () => {
     const body = {
       contents: [{ role: 'user', parts }],
@@ -157,13 +167,16 @@ async function generateContentWithInlineData(parts, options = {}) {
     if (options.maxOutputTokens !== undefined) body.generationConfig.maxOutputTokens = options.maxOutputTokens;
     body.generationConfig.thinkingConfig = { thinkingBudget: options.thinkingBudget ?? 0 };
 
-    const json = await geminiFetch('generateContent', body);
+    const json = await geminiFetch('generateContent', body, model);
     return extractTextFromResponse(json);
   });
 }
 
 module.exports = {
   GEMINI_MODEL,
+  HEAVY_MODEL,
+  LIGHT_MODEL,
+  NANO_MODEL,
   GEMINI_API_KEY,
   generateText: generateContent,
   generateContent,
