@@ -4,9 +4,9 @@ const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 // Heavy model: used for resume analysis and grade prediction (quality-critical)
 const HEAVY_MODEL = process.env.GEMINI_HEAVY_MODEL || 'gemini-2.5-flash';
 // Light model: used for mid-complexity tasks (DSA coach, chat, AI commands, etc.)
-const LIGHT_MODEL = process.env.GEMINI_LIGHT_MODEL || 'gemini-2.0-flash';
+const LIGHT_MODEL = process.env.GEMINI_LIGHT_MODEL || 'gemini-3.1-flash-lite';
 // Nano model: used for small, fast tasks (transcription, OCR cells, study planner, interview Qs)
-const NANO_MODEL = process.env.GEMINI_NANO_MODEL || 'gemini-1.5-flash';
+const NANO_MODEL = process.env.GEMINI_NANO_MODEL || 'gemini-3.1-flash-lite';
 // GEMINI_MODEL kept for backward compat — any code importing it gets the light model
 const GEMINI_MODEL = LIGHT_MODEL;
 const BASE_URL = 'generativelanguage.googleapis.com';
