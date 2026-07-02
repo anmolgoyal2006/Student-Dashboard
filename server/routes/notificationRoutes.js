@@ -44,6 +44,36 @@ router.post('/test', protect, async (req, res) => {
   }
 });
 
+// ── POST /api/notifications/test-push ────────────────────────────────────────
+// Sends a real FCM push to the logged-in user's registered tokens.
+// Use this to verify the full Firebase Admin → device pipeline.
+router.post('/test-push', protect, async (req, res) => {
+  try {
+    const { sendNotification } = require('../services/notificationEngine');
+
+    // Bypass 24h dedup by using a unique title each time
+    const title = `🔔 Push Test ${new Date().toLocaleTimeString('en-IN')}`;
+    const result = await sendNotification(
+      req.user._id,
+      title,
+      'If you see this as a browser/phone notification, FCM is working.',
+      { type: 'INFO' }
+    );
+
+    res.json({
+      success: result.success,
+      reason: result.reason || null,
+      results: result.results || [],
+      message: result.success
+        ? `Push sent to ${result.results.length} token(s)`
+        : `Not sent — reason: ${result.reason || result.error}`,
+    });
+  } catch (err) {
+    console.error('[Notifications] POST test-push error:', err.message);
+    res.status(500).json({ message: err.message });
+  }
+});
+
 // ── PATCH /notifications/read-all ────────────────────────────────────────────
 // Must be BEFORE /:id route to avoid Express treating 'read-all' as an id param
 router.patch('/read-all', protect, async (req, res) => {
