@@ -15,6 +15,18 @@
       "dest": "/static/$1"
     },
     {
+      "src": "/firebase-messaging-sw.js",
+      "dest": "/firebase-messaging-sw.js",
+      "headers": {
+        "Content-Type": "application/javascript",
+        "Service-Worker-Allowed": "/"
+      }
+    },
+    {
+      "src": "/(.*\\.js)",
+      "dest": "/$1"
+    },
+    {
       "src": "/(.*)",
       "dest": "/index.html"
     }
