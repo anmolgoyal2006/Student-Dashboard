@@ -109,7 +109,7 @@ export default function Career() {
       const { data } = await careerService.analyzeResume(resumeText);
       setResumeAnalysis(data);
       toast.success('Resume analyzed successfully!');
-      setCareer(prev => ({ ...prev, resumeScore: data.score, resumeFeedback: data.feedback, resumeKeywords: data.missingKeywords }));
+      setCareer(prev => ({ ...prev, resumeScore: data.score, resumeAtsRisk: data.atsRisk, resumeStrengths: data.strengths, resumeFeedback: data.feedback, resumeKeywords: data.missingKeywords }));
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to analyze resume');
     } finally {
@@ -127,7 +127,7 @@ export default function Career() {
       const { data } = await careerService.uploadResume(formData);
       setResumeAnalysis(data);
       toast.success('Resume file scanned and analyzed successfully!');
-      setCareer(prev => ({ ...prev, resumeScore: data.score, resumeFeedback: data.feedback, resumeKeywords: data.missingKeywords }));
+      setCareer(prev => ({ ...prev, resumeScore: data.score, resumeAtsRisk: data.atsRisk, resumeStrengths: data.strengths, resumeFeedback: data.feedback, resumeKeywords: data.missingKeywords }));
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to analyze resume file');
     } finally {
@@ -301,8 +301,10 @@ export default function Career() {
       if (data.career.resumeScore > 0) {
         setResumeAnalysis({
           score: data.career.resumeScore,
+          atsRisk: data.career.resumeAtsRisk || 'low',
+          strengths: data.career.resumeStrengths || [],
           feedback: data.career.resumeFeedback || [],
-          missingKeywords: data.career.resumeKeywords || []
+          missingKeywords: data.career.resumeKeywords || [],
         });
       }
 
@@ -1607,6 +1609,7 @@ export default function Career() {
               </div>
               {resumeAnalysis ? (
                 <div style={{ marginTop: 14 }}>
+                  {/* Score + ATS Risk row */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16 }}>
                     <div style={{
                       width: 64,
@@ -1623,11 +1626,60 @@ export default function Career() {
                     }}>
                       {resumeAnalysis.score}
                     </div>
-                    <div>
+                    <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 14.5, fontWeight: 600, color: 'var(--color-text-primary)' }}>Resume match score</div>
                       <div className="text-muted" style={{ marginTop: 2, fontSize: 12.5 }}>Targeting {career.targetCompany} · {career.targetRole}</div>
                     </div>
+                    {/* ATS Risk badge */}
+                    {resumeAnalysis.atsRisk && (
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 5,
+                        padding: '4px 10px',
+                        borderRadius: 'var(--radius-pill)',
+                        fontSize: 12,
+                        fontWeight: 500,
+                        background: resumeAnalysis.atsRisk === 'high'
+                          ? 'rgba(239,68,68,0.1)'
+                          : resumeAnalysis.atsRisk === 'medium'
+                            ? 'rgba(245,158,11,0.1)'
+                            : 'rgba(34,197,94,0.1)',
+                        color: resumeAnalysis.atsRisk === 'high'
+                          ? 'var(--color-danger)'
+                          : resumeAnalysis.atsRisk === 'medium'
+                            ? 'var(--color-warning)'
+                            : 'var(--color-success)',
+                        border: `1px solid ${resumeAnalysis.atsRisk === 'high'
+                          ? 'rgba(239,68,68,0.25)'
+                          : resumeAnalysis.atsRisk === 'medium'
+                            ? 'rgba(245,158,11,0.25)'
+                            : 'rgba(34,197,94,0.25)'}`,
+                        whiteSpace: 'nowrap',
+                      }}>
+                        <ShieldAlert size={12} />
+                        ATS risk: {resumeAnalysis.atsRisk}
+                        {resumeAnalysis.atsRiskEstimated && (
+                          <span style={{ opacity: 0.65, fontWeight: 400 }}> · estimated</span>
+                        )}
+                      </div>
+                    )}
                   </div>
+
+                  {/* Strengths */}
+                  {resumeAnalysis.strengths?.length > 0 && (
+                    <div style={{ marginBottom: 14 }}>
+                      <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <CheckCircle size={14} color="var(--color-success)" />
+                        Strengths
+                      </div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                        {resumeAnalysis.strengths.map((s, i) => (
+                          <span key={i} className="badge badge-success">{s}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Missing Keywords */}
                   <div style={{ marginBottom: 14 }}>

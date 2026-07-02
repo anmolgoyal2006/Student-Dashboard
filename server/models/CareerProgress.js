@@ -30,6 +30,8 @@ const careerSchema = new mongoose.Schema({
   resumeScore:     { type: Number, default: 0, min: 0, max: 100 },
   resumeFeedback:  [{ type: String }],
   resumeKeywords:  [{ type: String }],
+  resumeStrengths: [{ type: String }],
+  resumeAtsRisk:   { type: String, enum: ['low', 'medium', 'high'], default: 'low' },
   activeInterview: {
     topic:       { type: String, default: '' },
     activeIndex: { type: Number, default: 0 },

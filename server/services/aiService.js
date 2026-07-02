@@ -1,7 +1,7 @@
 const https = require('https');
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_MODEL = 'gemini-2.5-flash';
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
 const BASE_URL = 'generativelanguage.googleapis.com';
 
 if (!GEMINI_API_KEY) {
@@ -27,6 +27,13 @@ function geminiFetch(path, body) {
       res.on('data', (c) => chunks.push(c));
       res.on('end', () => {
         const raw = Buffer.concat(chunks).toString();
+        if (res.statusCode < 200 || res.statusCode >= 300) {
+          const errBody = raw.slice(0, 500);
+          console.error(`[Gemini] HTTP ${res.statusCode} response:`, errBody);
+          const err = new Error(`Gemini API error (${res.statusCode}): ${errBody}`);
+          err.statusCode = res.statusCode;
+          return reject(err);
+        }
         try {
           resolve(JSON.parse(raw));
         } catch {
@@ -44,7 +51,11 @@ function geminiFetch(path, body) {
 
 function extractTextFromResponse(json) {
   try {
-    return json.candidates[0].content.parts[0].text || '';
+    const candidate = json.candidates[0];
+    if (candidate.finishReason === 'MAX_TOKENS') {
+      console.warn('[Gemini] Response truncated due to MAX_TOKENS');
+    }
+    return candidate.content.parts[0].text || '';
   } catch {
     throw new Error('Gemini response missing text: ' + JSON.stringify(json).slice(0, 200));
   }
@@ -57,11 +68,11 @@ async function withRetry(fn, maxRetries = 3, baseDelay = 1000) {
       return await fn();
     } catch (err) {
       lastError = err;
-      if (attempt < maxRetries - 1) {
-        const delay = baseDelay * Math.pow(2, attempt);
-        console.warn(`[AI Service] Attempt ${attempt + 1} failed, retrying in ${delay}ms:`, err.message);
-        await new Promise(resolve => setTimeout(resolve, delay));
-      }
+      const nonRetryable = err.statusCode >= 400 && err.statusCode < 500 && err.statusCode !== 429;
+      if (nonRetryable || attempt === maxRetries - 1) break;
+      const delay = baseDelay * Math.pow(2, attempt);
+      console.warn(`[AI Service] Attempt ${attempt + 1} failed, retrying in ${delay}ms:`, err.message);
+      await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
   throw lastError;

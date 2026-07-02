@@ -1,4 +1,4 @@
-const CareerProgress = require('../models/CareerProgress');
+﻿const CareerProgress = require('../models/CareerProgress');
 
 const DSA_TOPICS = [
   'Arrays', 'Strings', 'Linked Lists', 'Stacks & Queues',
@@ -91,6 +91,22 @@ function extractJSON(raw) {
   return null;
 }
 
+// Extracts an array of strings from a raw JSON array fragment like:
+// "item one", "item, with comma", "item three"
+// Splits on `","` boundaries to avoid shredding sentences that contain commas.
+function extractStringArray(raw) {
+  if (!raw) return [];
+  const items = [];
+  // Match each quoted JSON string value (handles escaped quotes inside)
+  const re = /"((?:[^"\\]|\\.)*)"/g;
+  let m;
+  while ((m = re.exec(raw)) !== null) {
+    const val = m[1].replace(/\\"/g, '"').trim();
+    if (val) items.push(val);
+  }
+  return items;
+}
+
 // POST /api/career/analyze-resume
 exports.analyzeResume = async (req, res) => {
   try {
@@ -104,21 +120,38 @@ exports.analyzeResume = async (req, res) => {
     const targetRole = career.targetRole || 'Software Engineer';
     const skills = (career.skills || []).join(', ');
 
-    const systemPrompt = `You are an expert technical recruiter and resume analyzer. Return a JSON object with:
-- score (integer, 0 to 100) based on target company, target role, and resume text
-- feedback (array of strings, max 4 items, constructive feedback)
-- missingKeywords (array of strings, key technical skills/technologies missing for target role/company)
+    const systemPrompt = `You are an expert technical recruiter and resume analyzer for Software Engineering roles. Analyze the resume against the target role and target company, then return STRICT JSON only — no markdown, no code fences, no commentary before or after.
 
-Strictly return RAW JSON matching:
-{ "score": 85, "feedback": ["Improve DSA examples"], "missingKeywords": ["Redis"] }
-No markdown, no fences.`;
+OUTPUT SCHEMA (return fields in this exact order):
+{
+  "score": <integer 0-100>,
+  "atsRisk": "<low|medium|high>",
+  "strengths": [<1-3 short strings, max 12 words each>],
+  "feedback": [<2-4 short strings, max 18 words each, one clear idea per item, avoid compound sentences with multiple commas>],
+  "missingKeywords": [<0-6 short strings, single skill/tech names only, e.g. "Kubernetes" not "experience with Kubernetes">]
+}
 
-    const userPrompt = `Analyze this resume:
+RULES:
+- score: weigh relevance of skills/projects to target role and company, resume clarity, and quantified impact (metrics, scale, outcomes).
+- atsRisk: "high" if resume uses tables/columns/graphics/unusual fonts that ATS parsers commonly fail on, non-standard section headers, or missing a skills section. "medium" if partially structured. "low" if clean, standard, parseable format.
+- strengths: concrete, specific things this candidate does well — reference actual project names, technologies, or metrics from the resume, not generic praise.
+- feedback: each item must reference something specific from THIS resume (a project name, a missing metric, a specific section) — never a generic tip that could apply to any resume. Each item must be actionable.
+- missingKeywords: BEFORE listing a keyword, verify it does not already appear anywhere in the resume text, including the Technical Skills, Projects, or Coursework sections. Do not list a skill as missing if it is present anywhere in the resume, even if not emphasized. Double-check this list against the full resume text before finalizing.
+- Do not restate strengths as feedback.
+- Every string must be a single JSON string with no unescaped quotes or line breaks.
+- Do not exceed the array length limits above under any circumstances, even if you think more detail would help — brevity is required for reliable parsing.
+- Output nothing except the JSON object. No leading or trailing text.`;
+
+    const userPrompt = `Resume:
+"""
 ${resumeText}
+"""
 
-For Target Role: ${targetRole}
+Target Role: ${targetRole}
 Target Company: ${targetCompany}
-Current Skills Listed: ${skills}`;
+Candidate's Self-Reported Skills: ${skills || 'None listed'}
+
+Evaluate this resume specifically for how a recruiter at ${targetCompany} would screen it for a ${targetRole} position. Be honest about experience-level mismatches (e.g. student/early-career resumes evaluated against senior-level bars) rather than inflating the score.`;
 
     const completion = await chatCompletionsCreate({
       messages: [
@@ -126,7 +159,8 @@ Current Skills Listed: ${skills}`;
         { role: 'user', content: userPrompt },
       ],
       temperature: 0.1,
-      max_tokens: 600,
+      max_tokens: 900,
+      thinkingBudget: 256,
     });
 
     const content = completion.choices[0]?.message?.content?.trim();
@@ -136,22 +170,27 @@ Current Skills Listed: ${skills}`;
       const scoreMatch = content.match(/"score"\s*:\s*(\d+)/);
       const score = scoreMatch ? parseInt(scoreMatch[1]) : 70;
       const feedbackMatch = content.match(/"feedback"\s*:\s*\[([\s\S]*?)\]/);
-      const feedback = feedbackMatch ? feedbackMatch[1].split(',').map(s => s.replace(/"/g, '').trim()).filter(Boolean) : ["Review DSA examples and formatting."];
+      const feedback = feedbackMatch ? extractStringArray(feedbackMatch[1]) : ["Review DSA examples and formatting."];
       const kwMatch = content.match(/"missingKeywords"\s*:\s*\[([\s\S]*?)\]/);
-      const missingKeywords = kwMatch ? kwMatch[1].split(',').map(s => s.replace(/"/g, '').trim()).filter(Boolean) : [];
-      parsed = { score, feedback, missingKeywords };
+      const missingKeywords = kwMatch ? extractStringArray(kwMatch[1]) : [];
+      parsed = { score, feedback, missingKeywords, strengths: [], atsRisk: 'medium', isFallback: true };
     }
 
-    // Save score, feedback and keywords in DB
+    // Save score, feedback, keywords, strengths and atsRisk in DB
     career.resumeScore = parsed.score;
     career.resumeFeedback = parsed.feedback || [];
     career.resumeKeywords = parsed.missingKeywords || [];
+    career.resumeStrengths = parsed.strengths || [];
+    career.resumeAtsRisk = ['low', 'medium', 'high'].includes(parsed.atsRisk) ? parsed.atsRisk : 'low';
     await career.save();
 
     res.json({
       score: parsed.score,
+      atsRisk: career.resumeAtsRisk,
+      atsRiskEstimated: Boolean(parsed.isFallback),
+      strengths: career.resumeStrengths,
       feedback: parsed.feedback || [],
-      missingKeywords: parsed.missingKeywords || []
+      missingKeywords: parsed.missingKeywords || [],
     });
 
   } catch (err) {
@@ -407,21 +446,38 @@ exports.uploadResume = async (req, res) => {
     const targetRole = career.targetRole || 'Software Engineer';
     const skills = (career.skills || []).join(', ');
 
-    const systemPrompt = `You are an expert technical recruiter and resume analyzer. Return a JSON object with:
-- score (integer, 0 to 100) based on target company, target role, and resume text
-- feedback (array of strings, max 4 items, constructive feedback)
-- missingKeywords (array of strings, key technical skills/technologies missing for target role/company)
+    const systemPrompt = `You are an expert technical recruiter and resume analyzer for Software Engineering roles. Analyze the resume against the target role and target company, then return STRICT JSON only — no markdown, no code fences, no commentary before or after.
 
-Strictly return RAW JSON matching:
-{ "score": 85, "feedback": ["Improve DSA examples"], "missingKeywords": ["Redis"] }
-No markdown, no fences.`;
+OUTPUT SCHEMA (return fields in this exact order):
+{
+  "score": <integer 0-100>,
+  "atsRisk": "<low|medium|high>",
+  "strengths": [<1-3 short strings, max 12 words each>],
+  "feedback": [<2-4 short strings, max 18 words each, one clear idea per item, avoid compound sentences with multiple commas>],
+  "missingKeywords": [<0-6 short strings, single skill/tech names only, e.g. "Kubernetes" not "experience with Kubernetes">]
+}
 
-    const userPrompt = `Analyze this resume:
+RULES:
+- score: weigh relevance of skills/projects to target role and company, resume clarity, and quantified impact (metrics, scale, outcomes).
+- atsRisk: "high" if resume uses tables/columns/graphics/unusual fonts that ATS parsers commonly fail on, non-standard section headers, or missing a skills section. "medium" if partially structured. "low" if clean, standard, parseable format.
+- strengths: concrete, specific things this candidate does well — reference actual project names, technologies, or metrics from the resume, not generic praise.
+- feedback: each item must reference something specific from THIS resume (a project name, a missing metric, a specific section) — never a generic tip that could apply to any resume. Each item must be actionable.
+- missingKeywords: BEFORE listing a keyword, verify it does not already appear anywhere in the resume text, including the Technical Skills, Projects, or Coursework sections. Do not list a skill as missing if it is present anywhere in the resume, even if not emphasized. Double-check this list against the full resume text before finalizing.
+- Do not restate strengths as feedback.
+- Every string must be a single JSON string with no unescaped quotes or line breaks.
+- Do not exceed the array length limits above under any circumstances, even if you think more detail would help — brevity is required for reliable parsing.
+- Output nothing except the JSON object. No leading or trailing text.`;
+
+    const userPrompt = `Resume:
+"""
 ${resumeText}
+"""
 
-For Target Role: ${targetRole}
+Target Role: ${targetRole}
 Target Company: ${targetCompany}
-Current Skills Listed: ${skills}`;
+Candidate's Self-Reported Skills: ${skills || 'None listed'}
+
+Evaluate this resume specifically for how a recruiter at ${targetCompany} would screen it for a ${targetRole} position. Be honest about experience-level mismatches (e.g. student/early-career resumes evaluated against senior-level bars) rather than inflating the score.`;
 
     const completion = await chatCompletionsCreate({
       messages: [
@@ -429,7 +485,8 @@ Current Skills Listed: ${skills}`;
         { role: 'user', content: userPrompt },
       ],
       temperature: 0.1,
-      max_tokens: 600,
+      max_tokens: 900,
+      thinkingBudget: 256,
     });
 
     const content = completion.choices[0]?.message?.content?.trim();
@@ -439,22 +496,27 @@ Current Skills Listed: ${skills}`;
       const scoreMatch = content.match(/"score"\s*:\s*(\d+)/);
       const score = scoreMatch ? parseInt(scoreMatch[1]) : 70;
       const feedbackMatch = content.match(/"feedback"\s*:\s*\[([\s\S]*?)\]/);
-      const feedback = feedbackMatch ? feedbackMatch[1].split(',').map(s => s.replace(/"/g, '').trim()).filter(Boolean) : ["Review DSA examples and formatting."];
+      const feedback = feedbackMatch ? extractStringArray(feedbackMatch[1]) : ["Review DSA examples and formatting."];
       const kwMatch = content.match(/"missingKeywords"\s*:\s*\[([\s\S]*?)\]/);
-      const missingKeywords = kwMatch ? kwMatch[1].split(',').map(s => s.replace(/"/g, '').trim()).filter(Boolean) : [];
-      parsed = { score, feedback, missingKeywords };
+      const missingKeywords = kwMatch ? extractStringArray(kwMatch[1]) : [];
+      parsed = { score, feedback, missingKeywords, strengths: [], atsRisk: 'medium', isFallback: true };
     }
 
-    // Save score, feedback and keywords in DB
+    // Save score, feedback, keywords, strengths and atsRisk in DB
     career.resumeScore = parsed.score;
     career.resumeFeedback = parsed.feedback || [];
     career.resumeKeywords = parsed.missingKeywords || [];
+    career.resumeStrengths = parsed.strengths || [];
+    career.resumeAtsRisk = ['low', 'medium', 'high'].includes(parsed.atsRisk) ? parsed.atsRisk : 'low';
     await career.save();
 
     res.json({
       score: parsed.score,
+      atsRisk: career.resumeAtsRisk,
+      atsRiskEstimated: Boolean(parsed.isFallback),
+      strengths: career.resumeStrengths,
       feedback: parsed.feedback || [],
-      missingKeywords: parsed.missingKeywords || []
+      missingKeywords: parsed.missingKeywords || [],
     });
 
   } catch (err) {
