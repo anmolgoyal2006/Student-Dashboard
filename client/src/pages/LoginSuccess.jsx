@@ -27,7 +27,7 @@ export default function LoginSuccess() {
       };
 
       login(user, token);   // uses your existing AuthContext login function
-      navigate('/');
+      navigate('/dashboard');
     } catch {
       navigate('/login?error=invalid_token');
     }

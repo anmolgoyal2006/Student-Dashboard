@@ -37,7 +37,7 @@ export default function Login() {
       const { data } = await authService.login(form);
       login(data.user, data.token);
       toast.success(`Welcome back, ${data.user.name}!`);
-      navigate('/');
+      navigate('/dashboard');
     } catch (err) {
       toast.error(err.response?.data?.message || 'Login failed');
     } finally {

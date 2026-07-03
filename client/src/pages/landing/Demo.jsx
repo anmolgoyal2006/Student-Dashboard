@@ -1,4 +1,3 @@
-import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { GitBranch, ExternalLink } from 'lucide-react';
 
@@ -29,9 +28,14 @@ export default function Demo() {
           </p>
 
           <div className="demo-ctas">
-            <Link to="/login" className="btn-primary">
+            <a
+              href="https://student-dashboard-ashy-rho.vercel.app"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn-primary"
+            >
               <ExternalLink size={16} /> Live Demo
-            </Link>
+            </a>
             <a
               href="https://github.com/anmolgoyal2006/Student-Dashboard"
               target="_blank"

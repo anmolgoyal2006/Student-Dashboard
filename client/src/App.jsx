@@ -132,8 +132,9 @@ export default function App() {
           <Route path="/signup" element={<Signup />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password/:token" element={<ResetPassword />} />
-          <Route path="/" element={
-            isLoggedIn ? <AppLayout><Dashboard /></AppLayout> : <LandingPage />
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/dashboard" element={
+            <ProtectedRoute><AppLayout><Dashboard /></AppLayout></ProtectedRoute>
           } />
           <Route path="/login-success" element={<LoginSuccess />} />
           <Route path="/prediction" element={
@@ -172,7 +173,7 @@ export default function App() {
           <Route path="/analytics" element={
             <ProtectedRoute><AppLayout><Analytics /></AppLayout></ProtectedRoute>
           } />
-          <Route path="*" element={<Navigate to="/" replace />} />
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </BrowserRouter>
     </ToastProvider>

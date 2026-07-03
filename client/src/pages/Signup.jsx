@@ -24,7 +24,7 @@ export default function Signup() {
       const { data } = await authService.signup(form);
       login(data.user, data.token);
       toast.success('Account created! Welcome');
-      navigate('/');
+      navigate('/dashboard');
     } catch (err) {
       toast.error(err.response?.data?.message || 'Signup failed');
     } finally {

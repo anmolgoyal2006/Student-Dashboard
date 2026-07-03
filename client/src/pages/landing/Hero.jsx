@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { GraduationCap, ArrowRight, GitBranch, Play } from 'lucide-react';
+import { GraduationCap, ArrowRight, GitBranch } from 'lucide-react';
 
 const techChips = [
   'React', 'Node.js', 'MongoDB', 'Gemini AI',
@@ -133,9 +133,6 @@ export default function Hero() {
                 <Link to="/login" className="btn-primary">
                   Get Started <ArrowRight size={16} />
                 </Link>
-                <a href="#modules" className="btn-outline">
-                  <Play size={15} /> View Demo
-                </a>
                 <a
                   href="https://github.com/anmolgoyal2006/Student-Dashboard"
                   target="_blank"
