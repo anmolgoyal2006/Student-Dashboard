@@ -3,6 +3,7 @@ import { ToastProvider, toast } from './context/ToastContext';
 import { useEffect } from 'react';
 import { useAuth } from './context/AuthContext';
 import Sidebar    from './components/Sidebar';
+import LandingPage from './pages/landing/LandingPage';
 import { motion } from 'framer-motion';
 import Login      from './pages/Login';
 import Signup     from './pages/Signup';
@@ -132,7 +133,7 @@ export default function App() {
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password/:token" element={<ResetPassword />} />
           <Route path="/" element={
-            <ProtectedRoute><AppLayout><Dashboard /></AppLayout></ProtectedRoute>
+            isLoggedIn ? <AppLayout><Dashboard /></AppLayout> : <LandingPage />
           } />
           <Route path="/login-success" element={<LoginSuccess />} />
           <Route path="/prediction" element={
