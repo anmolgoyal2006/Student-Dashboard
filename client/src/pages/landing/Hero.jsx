@@ -1,6 +1,7 @@
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { GraduationCap, ArrowRight, GitBranch } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
 const techChips = [
   'React', 'Node.js', 'MongoDB', 'Gemini AI',
@@ -77,6 +78,9 @@ function DashboardMockup() {
 }
 
 export default function Hero() {
+  const { isLoggedIn } = useAuth();
+  const ctaTarget = isLoggedIn ? '/dashboard' : '/login';
+
   return (
     <section className="hero-section">
       {/* Ambient orbs */}
@@ -101,7 +105,9 @@ export default function Hero() {
             <li><a href="#modules">Modules</a></li>
             <li><a href="#tech-stack">Tech Stack</a></li>
           </ul>
-          <Link to="/login" className="navbar-signin">Sign In</Link>
+          <Link to={ctaTarget} className="navbar-signin">
+            {isLoggedIn ? 'Dashboard' : 'Sign In'}
+          </Link>
         </div>
         <div className="navbar-divider" />
       </nav>
@@ -130,8 +136,8 @@ export default function Hero() {
                 Powered by Gemini AI and Google Classroom.
               </p>
               <div className="hero-ctas">
-                <Link to="/login" className="btn-primary">
-                  Get Started <ArrowRight size={16} />
+                <Link to={ctaTarget} className="btn-primary">
+                  {isLoggedIn ? 'Go to Dashboard' : 'Get Started'} <ArrowRight size={16} />
                 </Link>
                 <a
                   href="https://github.com/anmolgoyal2006/Student-Dashboard"

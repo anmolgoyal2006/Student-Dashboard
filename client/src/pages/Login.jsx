@@ -17,8 +17,14 @@ export default function Login() {
   const [form, setForm]       = useState({ email: '', password: '' });
   const [loading, setLoading] = useState(false);
   const [focused, setFocused] = useState('');
-  const { login } = useAuth();
+  const { login, isLoggedIn } = useAuth();
   const navigate  = useNavigate();
+
+  // Already logged in — skip the login page entirely
+  if (isLoggedIn) {
+    navigate('/dashboard', { replace: true });
+    return null;
+  }
 
   // Show toast if redirected back with an OAuth error
   useState(() => {
