@@ -76,16 +76,10 @@ async function sendAssignmentNotification(assignment, userId) {
     return sendNotification(userId, '❌ Overdue', `[${courseName}] ${assignment.title} — submit immediately`, { type: 'OVERDUE', assignmentId: assignment.assignmentId, courseName });
   }
   if (diffHrs < 6) {
-    return sendNotification(userId, '🚨 Due in 6 hours', `[${courseName}] ${assignment.title} — submit now`, { type: 'URGENT', assignmentId: assignment.assignmentId, courseName });
+    return sendNotification(userId, '🚨 Urgent Deadline', `[${courseName}] ${assignment.title} due in 6 hours`, { type: 'URGENT', assignmentId: assignment.assignmentId, courseName });
   }
   if (diffHrs < 24) {
     return sendNotification(userId, '⚠️ Due Tomorrow', `[${courseName}] ${assignment.title} · Est. ${assignment.estimatedHours} hrs`, { type: 'DUE_SOON', assignmentId: assignment.assignmentId, courseName });
-  }
-  if (diffHrs < 72) {
-    return sendNotification(userId, '📅 Due in 3 days', `[${courseName}] ${assignment.title} · Est. ${assignment.estimatedHours} hrs`, { type: 'DUE_SOON', assignmentId: assignment.assignmentId, courseName });
-  }
-  if (diffHrs < 168) {
-    return sendNotification(userId, '📌 Due in 7 days', `[${courseName}] ${assignment.title} · Due ${dueDate.toLocaleDateString()}`, { type: 'NEW_ASSIGNMENT', assignmentId: assignment.assignmentId, courseName });
   }
   return sendNotification(userId, '📚 New Assignment', `[${courseName}] ${assignment.title} · Due ${dueDate.toLocaleDateString()}`, { type: 'NEW_ASSIGNMENT', assignmentId: assignment.assignmentId, courseName });
 }
