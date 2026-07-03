@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { authService } from '../services/apiServices';
@@ -20,11 +20,10 @@ export default function Login() {
   const { login, isLoggedIn } = useAuth();
   const navigate  = useNavigate();
 
-  // Already logged in — skip the login page entirely
-  if (isLoggedIn) {
-    navigate('/dashboard', { replace: true });
-    return null;
-  }
+  // Already logged in — redirect to dashboard
+  useEffect(() => {
+    if (isLoggedIn) navigate('/dashboard', { replace: true });
+  }, [isLoggedIn, navigate]);
 
   // Show toast if redirected back with an OAuth error
   useState(() => {
