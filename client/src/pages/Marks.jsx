@@ -14,6 +14,8 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend);
 
 const EMPTY = { subjectId: '', examType: 'midterm', marksObtained: '', maxMarks: 100, examDate: '' };
 
+const DEFAULT_SEM_CREDITS = [22, 21, 22, 24, 20, 12, 19, 21];
+
 export default function Marks() {
   const [activeTab,    setActiveTab]    = useState('marks'); // Student sees Marks & CGPA by default
 
@@ -130,7 +132,7 @@ export default function Marks() {
       setManualLoading(true);
       await marksService.addManualSGPA({ semesterNumber, semesterName, sgpa: Number(sgpa), semCredits: manualForm.semCredits ? Number(manualForm.semCredits) : undefined });
       toast.success('Past SGPA added!');
-      setManualForm({ semesterNumber: '', semesterName: '', sgpa: '', semCredits: '' });
+      setManualForm({ semesterNumber: '', semesterName: '', sgpa: '', semCredits: '', _creditsManuallyEdited: false });
       load();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed');
@@ -552,7 +554,19 @@ export default function Marks() {
                     <label className="form-label">Semester No. *</label>
                     <input className="form-input" type="number" min="1" placeholder="e.g. 1"
                        value={manualForm.semesterNumber}
-                       onChange={e => setManualForm(p => ({ ...p, semesterNumber: e.target.value }))} />
+                       onChange={e => {
+                         const val = e.target.value;
+                         const idx = parseInt(val, 10) - 1;
+                         const defaultCredit = idx >= 0 && idx < DEFAULT_SEM_CREDITS.length
+                           ? String(DEFAULT_SEM_CREDITS[idx])
+                           : '';
+                         setManualForm(p => ({
+                           ...p,
+                           semesterNumber: val,
+                           // Only auto-fill if user hasn't manually changed credits yet
+                           semCredits: p._creditsManuallyEdited ? p.semCredits : defaultCredit,
+                         }));
+                       }} />
                   </div>
                   <div className="form-group">
                     <label className="form-label">Label (optional)</label>
@@ -570,7 +584,7 @@ export default function Marks() {
                     <label className="form-label">Total Credits (for accurate CGPA)</label>
                     <input className="form-input" type="number" min="1" step="1" placeholder="e.g. 24"
                        value={manualForm.semCredits}
-                       onChange={e => setManualForm(p => ({ ...p, semCredits: e.target.value }))} />
+                       onChange={e => setManualForm(p => ({ ...p, semCredits: e.target.value, _creditsManuallyEdited: true }))} />
                   </div>
                   <button className="btn btn-primary" onClick={handleAddManualSGPA} disabled={manualLoading}>
                     {manualLoading ? 'Saving…' : 'Add Past SGPA'}

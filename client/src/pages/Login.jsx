@@ -1,6 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';import { useAuth } from '../context/AuthContext';
 import { authService } from '../services/apiServices';
 import toast from '../context/ToastContext';
 import { GraduationCap, Mail, Lock, ArrowRight, Check } from 'lucide-react';
@@ -17,13 +16,8 @@ export default function Login() {
   const [form, setForm]       = useState({ email: '', password: '' });
   const [loading, setLoading] = useState(false);
   const [focused, setFocused] = useState('');
-  const { login, isLoggedIn } = useAuth();
+  const { login } = useAuth();
   const navigate  = useNavigate();
-
-  // Already logged in — redirect to dashboard
-  useEffect(() => {
-    if (isLoggedIn) navigate('/dashboard', { replace: true });
-  }, [isLoggedIn, navigate]);
 
   // Show toast if redirected back with an OAuth error
   useState(() => {

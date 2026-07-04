@@ -32,6 +32,12 @@ const ProtectedRoute = ({ children }) => {
   return isLoggedIn ? children : <Navigate to="/login" replace />;
 };
 
+// Redirects logged-in users away from public-only pages
+const PublicRoute = ({ children }) => {
+  const { isLoggedIn } = useAuth();
+  return isLoggedIn ? <Navigate to="/dashboard" replace /> : children;
+};
+
 const AppLayout = ({ children }) => {
   const isProduction = process.env.REACT_APP_ENV === 'production' || process.env.VITE_APP_ENV === 'production';
   return (
@@ -128,11 +134,11 @@ export default function App() {
     <ToastProvider>
       <BrowserRouter>
         <Routes>
-          <Route path="/login"  element={<Login />} />
-          <Route path="/signup" element={<Signup />} />
+          <Route path="/login"  element={<PublicRoute><Login /></PublicRoute>} />
+          <Route path="/signup" element={<PublicRoute><Signup /></PublicRoute>} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password/:token" element={<ResetPassword />} />
-          <Route path="/" element={<LandingPage />} />
+          <Route path="/" element={<PublicRoute><LandingPage /></PublicRoute>} />
           <Route path="/dashboard" element={
             <ProtectedRoute><AppLayout><Dashboard /></AppLayout></ProtectedRoute>
           } />
