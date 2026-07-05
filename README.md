@@ -182,52 +182,52 @@ StudentAI uses a **service-oriented architecture** with specialized controllers 
 ### 🏠 Dashboard — Live Academic Snapshot
 At-a-glance CGPA, today's classes, low-attendance alerts, and per-subject attendance trends the moment you log in.
 
-![Dashboard Overview](../../Screenshots/dashboard.png)
+![Dashboard Overview](Screenshots/dashboard.png)
 
 ### 🗓️ Smart Scheduler — Weekly Timetable Grid
 Color-coded weekly grid with room numbers and time slots, auto-populated and editable in seconds.
 
-![Weekly Timetable Grid](../../Screenshots/timetable.png)
+![Weekly Timetable Grid](Screenshots/timetable.png)
 
 ### ✅ Attendance Intelligence — Records & Subject Breakdown
 Subject-wise attendance percentage with shortage warnings ("Attend next 2 consecutive classes to reach 75%") plus a full present/absent log.
 
-![Attendance Records](../../Screenshots/attendance.png)
+![Attendance Records](Screenshots/attendance.png)
 
 ### 📊 Marks & CGPA — Multi-PDF Ranking + OCR
 Upload marksheet PDFs directly, auto-merge results, weight scoring, and generate ranked leaderboards — no manual data entry.
 
-![Marks, CGPA & OCR Upload](../../Screenshots/marks-ocr.png)
+![Marks, CGPA & OCR Upload](Screenshots/marks-ocr.png)
 
 ### 🧮 Trajectory Analysis — Predictive CGPA Forecasting
 The Predictor agent projects your CGPA semesters in advance, flags risk-area subjects, and outputs a concrete improvement plan.
 
-![Trajectory Analysis](../../Screenshots/trajectory.png)
+![Trajectory Analysis](Screenshots/trajectory.png)
 
 ### 💻 AI DSA Coach — Placement Readiness
 Live LeetCode sync (solved counts by difficulty), a personalized AI-generated practice plan, and a 0–100 placement readiness score.
 
-![AI DSA Coach](../../Screenshots/dsa-coach.png)
+![AI DSA Coach](Screenshots/dsa-coach.png)
 
 ### 🎤 Resume Scanner & AI Mock Interview
 Upload a resume for keyword-gap analysis against your target role, then jump straight into an AI-generated mock interview.
 
-![Resume Scanner & Mock Interview](../../Screenshots/mock-interview.png)
+![Resume Scanner & Mock Interview](Screenshots/mock-interview.png)
 
 ### 🚀 Opportunity Intelligence — Hackathon Discovery
 Auto-aggregated hackathons, workshops, and competitions with difficulty tags and deadlines — filterable by Recommended, Closing Soon, and Saved.
 
-![Hackathon Discovery](../../Screenshots/hackathons.png)
+![Hackathon Discovery](Screenshots/hackathons.png)
 
 ### 🧠 AI Study Assistant — Natural Language Dashboard Control
 A Groq-powered chat interface that updates your dashboard from plain English — add a subject, mark attendance, or ask about your CGPA, conversationally.
 
-![AI Study Assistant](../../Screenshots/notes-ai.png)
+![AI Study Assistant](Screenshots/notes-ai.png)
 
 ### 📈 Analytics — Productivity & Workload Insights
 Assignment completion trends, subject-wise workload distribution, and deadline timelines that surface where effort is actually going.
 
-![Analytics Dashboard](../../Screenshots/analytics.png)
+![Analytics Dashboard](Screenshots/analytics.png)
 
 ---
 
