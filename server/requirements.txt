@@ -1,1 +1,5 @@
 pdfplumber
+opencv-python-headless
+numpy
+pytesseract
+pdf2image

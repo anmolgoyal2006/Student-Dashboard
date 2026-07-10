@@ -2,6 +2,8 @@ const express  = require('express');
 const router   = express.Router();
 const multer   = require('multer');
 const upload   = multer();
+const { body, param } = require('express-validator');
+const { validate } = require('../middleware/validate');
 
 const {
   getCareer,
@@ -28,27 +30,69 @@ const {
   getCompanyQuestions,
 } = require('../controllers/leetcodeController');
 const { protect }                              = require('../middleware/authMiddleware');
+const { aiLimiter }                            = require('../middleware/rateLimitMiddleware');
 
 router.use(protect);
 
 router.get('/plan',               getCareerPlan);   // ← MUST be first
-router.post('/dsa/coach',         getDsaCoach);
-router.post('/dsa/topic-guide',   getTopicGuide);
-router.post('/dsa/log-practice',  logPractice);
-router.post('/dsa/hint',          getHint);
-router.put('/leetcode',           linkLeetcode);
+router.post('/dsa/coach',         aiLimiter, validate([body('refresh').optional().isBoolean()]), getDsaCoach);
+router.post('/dsa/topic-guide',   aiLimiter, validate([body('topic').notEmpty().isString()]), getTopicGuide);
+router.post('/dsa/log-practice',  aiLimiter, validate([body('text').notEmpty().isString()]), logPractice);
+router.post('/dsa/hint',          aiLimiter, validate([
+  body('topic').notEmpty().isString(),
+  body('problemTitle').notEmpty().isString(),
+  body('attempt').optional().isString(),
+]), getHint);
+
+router.put('/leetcode', validate([
+  body('username').trim().notEmpty().withMessage('LeetCode username is required.'),
+]), linkLeetcode);
 router.delete('/leetcode',        unlinkLeetcode);
-router.post('/leetcode/sync',     syncLeetcode);
+router.post('/leetcode/sync', validate([
+  body('username').optional().isString().trim(),
+]), syncLeetcode);
 router.get('/leetcode/company-questions', getCompanyQuestions);
 router.get('/',                   getCareer);
-router.put('/',                   updateCareer);
-router.patch('/topic/:topicName', updateTopic);
 
-router.post('/analyze-resume',   analyzeResume);
-router.post('/mock-questions',   generateMockQuestions);
-router.post('/evaluate-answer',  evaluateInterviewAnswer);
+router.put('/', validate([
+  body('targetCompany').optional().isIn([
+    'Amazon', 'Microsoft', 'Google', 'Meta', 'Apple', 'Netflix', 'Flipkart',
+    'Adobe', 'Uber', 'LinkedIn', 'Salesforce', 'Oracle', 'Infosys', 'TCS',
+    'Wipro', 'HCL Technologies', 'Other',
+  ]),
+  body('targetRole').optional().isString(),
+  body('skills').optional().isArray(),
+  body('problemsSolved').optional().isInt({ min: 0 }),
+  body('leetcodeUsername').optional().isString(),
+  body('dsaTopics').optional().isArray(),
+  body('dsaTopics.*.name').optional().isString(),
+  body('dsaTopics.*.problems').optional().isInt({ min: 0 }),
+  body('dsaTopics.*.completed').optional().isBoolean(),
+]), updateCareer);
+
+router.patch('/topic/:topicName', validate([
+  body('completed').optional().isBoolean(),
+  body('problems').optional().isInt({ min: 0 }),
+]), updateTopic);
+
+router.post('/analyze-resume', aiLimiter, validate([
+  body('resumeText').notEmpty().isString().withMessage('Resume text is required.'),
+]), analyzeResume);
+router.post('/mock-questions', aiLimiter, validate([
+  body('topic').notEmpty().isString().withMessage('Topic is required.'),
+]), generateMockQuestions);
+router.post('/evaluate-answer', aiLimiter, validate([
+  body('question').notEmpty().isString(),
+  body('userAnswer').notEmpty().isString(),
+  body('topic').optional().isString(),
+]), evaluateInterviewAnswer);
 router.post('/upload-resume',    upload.single('file'), uploadResume);
-router.patch('/active-interview/index', updateActiveIndex);
+router.patch('/active-interview/index', validate([
+  // Preserves existing semantics exactly (controller currently checks
+  // typeof index !== 'number') — isNumeric() rather than isInt() so this
+  // doesn't introduce a new, stricter constraint.
+  body('index').isNumeric().withMessage('Index must be a number.'),
+]), updateActiveIndex);
 router.delete('/active-interview',      resetActiveInterview);
 
 module.exports = router;

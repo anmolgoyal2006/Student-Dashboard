@@ -1,0 +1,10 @@
+node_modules/
+.env
+.env.local
+.git/
+*.log
+config/serviceAccountKey.json
+public/debug/
+scripts/__pycache__/
+tests/
+collectors/tests/

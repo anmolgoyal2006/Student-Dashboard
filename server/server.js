@@ -1,7 +1,22 @@
 const express  = require('express');
 const cors     = require('cors');
 const mongoose = require('mongoose');
+const helmet   = require('helmet');
 require('dotenv').config({ path: require('path').join(__dirname, '.env') });
+
+// ─── Error tracking (Sentry) ────────────────────────────────────────────────
+// With no SENTRY_DSN set, the SDK safely no-ops — nothing is sent anywhere.
+// Set a real DSN (from sentry.io's free tier) in .env to start receiving
+// error reports; see .env.example.
+const Sentry = require('@sentry/node');
+if (!process.env.SENTRY_DSN) {
+  console.warn('[Sentry] SENTRY_DSN is not set. Error tracking is disabled.');
+}
+Sentry.init({
+  dsn: process.env.SENTRY_DSN,
+  environment: process.env.NODE_ENV || 'development',
+});
+
 const { startDailyNotificationJob } = require('./jobs/dailyNotificationJob');
 const { startClassroomSyncJob } = require('./jobs/classroomSyncJob');
 const { startNotificationJobs } = require('./jobs/notificationSyncJob');
@@ -9,6 +24,9 @@ const { startDigestJobs } = require('./jobs/digestJobs');
 const { startCollectorScheduler } = require('./jobs/collectorScheduler');
 
 const app = express();
+
+// ─── Security headers (as early in the chain as possible) ─────────────────
+app.use(helmet());
 
 // ─── Health check (before all other middleware/routes) ─────────────────
 app.get('/health', (_req, res) => res.status(200).send('OK'));
@@ -111,6 +129,11 @@ app.get('/api/test-notification', async (req, res) => {
 app.use((_req, res) => {
   res.status(404).json({ message: 'Route not found' });
 });
+
+// ─── Sentry error capture (reports to Sentry, then falls through to our
+// own error-formatting handler below — this augments the existing
+// console.error logging, it doesn't replace it) ────────────────────────────
+Sentry.setupExpressErrorHandler(app);
 
 // ─── Global error handler ─────────────────────────────────────────────────
 app.use((err, _req, res, _next) => {

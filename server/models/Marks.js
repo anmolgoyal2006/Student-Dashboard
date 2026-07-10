@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
 const marksSchema = new mongoose.Schema({
-  userId:        { type: mongoose.Schema.Types.ObjectId, ref: 'User',    required: true },
+  userId:        { type: mongoose.Schema.Types.ObjectId, ref: 'User',    required: true, index: true },
   subjectId:     { type: mongoose.Schema.Types.ObjectId, ref: 'Subject', required: true },
   examType:      { type: String, enum: ['midterm', 'final', 'quiz', 'assignment', 'practical'], required: true },
   marksObtained: { type: Number, required: true, min: 0 },

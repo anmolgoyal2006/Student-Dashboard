@@ -127,8 +127,11 @@ async function aiCorrectGrades(students) {
 
 // ── Text-only fallback (original Groq text approach) ────────────────────────
 function buildCorrectionPrompt(students) {
+  // Matched back to students purely by array index (see aiCorrectGradesFromText below) —
+  // name/roll are never needed by the model for a grade-symbol classification task,
+  // so they're deliberately omitted to avoid sending student PII to a third-party API.
   const entries = students.map((s, i) =>
-    `  ${i + 1}. Name: "${s.name}", Roll: "${s.roll}", OCR Raw: "${s.ocrGradeRaw || ''}", Current: "${s.grade || '?'}", Confidence: ${s.ocrConfidence || 0}%`
+    `  ${i + 1}. OCR Raw: "${s.ocrGradeRaw || ''}", Current: "${s.grade || '?'}", Confidence: ${s.ocrConfidence || 0}%`
   ).join('\n');
 
   return `You are a grade correction AI for a university grade sheet.

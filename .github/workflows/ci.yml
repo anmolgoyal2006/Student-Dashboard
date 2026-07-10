@@ -1,0 +1,76 @@
+name: CI
+
+# Quality gate only — Render and Vercel already auto-deploy from GitHub on
+# their own, so this workflow does not build/push a deploy artifact. It just
+# verifies the backend and frontend still install and parse/build cleanly
+# before a change merges.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: server/package-lock.json
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install system OCR/PDF deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends tesseract-ocr poppler-utils
+
+      - name: Install Node deps
+        run: npm ci
+
+      - name: Install Python deps
+        run: pip install -r requirements.txt
+
+      # No real unit test suite exists yet — server/tests/ and
+      # server/collectors/tests/ hit live third-party APIs (Unstop, Devfolio)
+      # and are deliberately NOT run here, since a change on those external
+      # sites would flakily fail unrelated PRs. This is a syntax/parse gate:
+      # every .js file must at least be valid JavaScript.
+      - name: Syntax-check all backend source files
+        run: |
+          find . -name '*.js' -not -path './node_modules/*' -print0 \
+            | xargs -0 -n1 node -c
+
+      - name: Build backend Docker image
+        run: docker build -t student-dashboard-server .
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: client
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: client/package-lock.json
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+        env:
+          CI: true

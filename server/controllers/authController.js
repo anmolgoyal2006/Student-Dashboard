@@ -59,30 +59,3 @@ exports.getMe = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
-
-// PUT /api/auth/profile
-exports.updateProfile = async (req, res) => {
-  try {
-    const updated = await User.findByIdAndUpdate(
-      req.user.id,
-      { $set: req.body },
-      { new: true, runValidators: true }
-    ).select('-password');
-    res.json({ user: updated });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-};
-
-
-exports.changePassword = async (req, res) => {
-  res.json({ message: "changePassword working" });
-};
-
-exports.forgotPassword = async (req, res) => {
-  res.json({ message: "forgotPassword working" });
-};
-
-exports.resetPassword = async (req, res) => {
-  res.json({ message: "resetPassword working" });
-};

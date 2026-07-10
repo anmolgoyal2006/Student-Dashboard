@@ -86,6 +86,12 @@ self.addEventListener('notificationclick', (event) => {
     const token = await getTokenFromCache();
     if (!token) {
       console.error('[SW] No JWT token found');
+      await self.registration.showNotification('Please log in again', {
+        body: 'Open the app and sign in to mark attendance from notifications.',
+        icon: '/logo192.png',
+        badge: '/logo192.png',
+        data: { url: '/login' },
+      });
       return;
     }
 
@@ -104,6 +110,14 @@ self.addEventListener('notificationclick', (event) => {
         body: `Marked as "${action.replace(/_/g, ' ')}"`,
         icon: '/logo192.png',
         badge: '/logo192.png',
+      });
+    } else if (res.status === 401) {
+      console.error('[SW] Failed: 401 — token expired or invalid');
+      await self.registration.showNotification('Please log in again', {
+        body: 'Your session has ended. Open the app and sign in to mark attendance from notifications.',
+        icon: '/logo192.png',
+        badge: '/logo192.png',
+        data: { url: '/login' },
       });
     } else {
       console.error('[SW] Failed:', res.status);

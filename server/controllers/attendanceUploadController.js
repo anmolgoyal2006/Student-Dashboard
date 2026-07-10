@@ -2,8 +2,57 @@
 const XLSX      = require('xlsx');
 const mongoose  = require('mongoose');
 const axios     = require('axios');
+const dns       = require('dns').promises;
+const net       = require('net');
 const User      = require('../models/User');
 const Attendance = require('../models/Attendance');
+
+// ─── SSRF guard: only allow fetching public http(s) hosts ────────────────────
+// Prevents a teacher-supplied "import from URL" link from being used to reach
+// internal services, cloud metadata endpoints (e.g. 169.254.169.254), or
+// loopback addresses from the server.
+function isPrivateOrReservedIp(ip) {
+  if (net.isIPv4(ip)) {
+    const [a, b] = ip.split('.').map(Number);
+    if (a === 127) return true;                       // loopback
+    if (a === 10) return true;                         // 10.0.0.0/8
+    if (a === 172 && b >= 16 && b <= 31) return true;   // 172.16.0.0/12
+    if (a === 192 && b === 168) return true;            // 192.168.0.0/16
+    if (a === 169 && b === 254) return true;            // link-local / cloud metadata
+    if (a === 0) return true;                           // 0.0.0.0/8
+    return false;
+  }
+  const lower = ip.toLowerCase();
+  if (lower === '::1') return true;                     // loopback
+  if (lower.startsWith('fe80:')) return true;           // link-local
+  if (lower.startsWith('fc') || lower.startsWith('fd')) return true; // unique local fc00::/7
+  if (lower.startsWith('::ffff:')) return isPrivateOrReservedIp(lower.slice(7));
+  return false;
+}
+
+async function assertPublicHttpUrl(rawUrl) {
+  let parsed;
+  try {
+    parsed = new URL(rawUrl);
+  } catch {
+    throw new Error('Invalid URL.');
+  }
+  if (!['http:', 'https:'].includes(parsed.protocol)) {
+    throw new Error('Only http:// and https:// URLs are allowed.');
+  }
+  const hostname = parsed.hostname;
+  if (!hostname || hostname === 'localhost') {
+    throw new Error('This URL is not allowed.');
+  }
+
+  const ips = net.isIP(hostname)
+    ? [hostname]
+    : (await dns.lookup(hostname, { all: true })).map(r => r.address);
+
+  if (!ips.length || ips.some(isPrivateOrReservedIp)) {
+    throw new Error('This URL points to a private or internal address and is not allowed.');
+  }
+}
 
 // ─── Helper: parse & validate date string ────────────────────────────────────
 function parseDate(raw) {
@@ -174,6 +223,8 @@ async function resolveOneDriveLink(shareUrl) {
   let cookieMap = {};
 
   for (let i = 0; i < 5; i++) {
+    await assertPublicHttpUrl(currentUrl);
+
     const headers = {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     };
@@ -216,10 +267,14 @@ async function resolveOneDriveLink(shareUrl) {
 }
 
 async function downloadExcelFromUrl(url) {
+  await assertPublicHttpUrl(url);
+
   let downloadUrl = url;
   if (/1drv\.ms/i.test(url) || /onedrive\.live\.com/i.test(url)) {
     downloadUrl = await resolveOneDriveLink(url);
   }
+
+  await assertPublicHttpUrl(downloadUrl);
 
   const res = await axios.get(downloadUrl, {
     responseType: 'arraybuffer',
@@ -297,6 +352,13 @@ const getAttendanceBySid = async (req, res) => {
     const user = await User.findOne({ sid }).select('_id name email');
     if (!user) {
       return res.status(404).json({ message: `No user found with SID "${sid}"` });
+    }
+
+    // Only the student themselves or a teacher may view this attendance record
+    const requesterId = String(req.user.id || req.user._id || '');
+    const isSelf = String(user._id) === requesterId;
+    if (!isSelf && req.user.role !== 'teacher') {
+      return res.status(403).json({ message: 'You are not authorized to view this student\'s attendance.' });
     }
 
     // Fetch attendance records

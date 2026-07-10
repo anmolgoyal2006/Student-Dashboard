@@ -1,6 +1,8 @@
 const express      = require('express');
 const router       = express.Router();
+const { param }    = require('express-validator');
 const {protect}      = require('../middleware/authMiddleware');
+const { validate }  = require('../middleware/validate');
 const Notification = require('../models/Notification');
 
 // ── GET /api/notifications ────────────────────────────────────────────────────
@@ -90,7 +92,7 @@ router.patch('/read-all', protect, async (req, res) => {
 });
 
 // ── PATCH /notifications/:id/read ────────────────────────────────────────────
-router.patch('/:id/read', protect, async (req, res) => {
+router.patch('/:id/read', protect, validate([param('id').isMongoId()]), async (req, res) => {
   try {
     const notification = await Notification.findOneAndUpdate(
       { _id: req.params.id, userId: req.user._id },

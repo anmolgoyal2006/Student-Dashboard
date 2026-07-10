@@ -406,6 +406,13 @@ exports.getStudentBySid = async (req, res) => {
     if (!student)
       return res.status(404).json({ message: `No student found with SID: ${req.params.sid}` });
 
+    // Only the student themselves or a teacher may view this attendance record
+    const requesterId = String(req.user.id || req.user._id || '');
+    const isSelf = String(student._id) === requesterId;
+    if (!isSelf && req.user.role !== 'teacher') {
+      return res.status(403).json({ message: 'You are not authorized to view this student\'s attendance.' });
+    }
+
     const rawRecords = await Attendance.find({ userId: student._id })
       .populate('subjectId', 'name code')
       .sort({ date: -1, createdAt: -1 });

@@ -39,8 +39,11 @@ export default function Marks() {
   const [semMode,      setSemMode]      = useState('full'); // 'full' | 'manual'
   const [manualForm,   setManualForm]   = useState({ semesterNumber: '', semesterName: '', sgpa: '', semCredits: '' });
   const [manualLoading, setManualLoading] = useState(false);
+  const [loadError,    setLoadError]    = useState(null);
 
   const load = async () => {
+    setLoading(true);
+    setLoadError(null);
     try {
       const m      = await marksService.getAll();
       const s      = await subjectService.getAll();
@@ -57,9 +60,11 @@ export default function Marks() {
       setGradeOptions(grades.data.gradeOptions || []);
       setCgpaSem(cgpas.data);
       setSavedPdfs(pdfs.data.pdfs || []);
-      setLoading(false);
     } catch (err) {
       console.error('FAILED API:', err.config?.url, err);
+      setLoadError(err.response?.data?.message || 'Failed to load your marks. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -189,6 +194,19 @@ export default function Marks() {
   };
 
   if (loading) return <div className="spinner" />;
+
+  if (loadError) {
+    return (
+      <div style={{ padding: 32, textAlign: 'center' }}>
+        <AlertCircle size={32} style={{ marginBottom: 12, opacity: 0.7 }} />
+        <p style={{ marginBottom: 16 }}>{loadError}</p>
+        <button className="btn-primary" onClick={load}>
+          <RefreshCw size={16} style={{ marginRight: 6 }} />
+          Retry
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div>

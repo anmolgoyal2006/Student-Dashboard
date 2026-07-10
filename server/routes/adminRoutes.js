@@ -1,10 +1,12 @@
 // routes/adminRoutes.js
 const express = require('express');
 const router  = express.Router();
+const { body, param } = require('express-validator');
 const User    = require('../models/User');
 const Event   = require('../models/Event');
 const EventFetchLog = require('../models/EventFetchLog');
 const { protect } = require('../middleware/authMiddleware');
+const { validate } = require('../middleware/validate');
 const { runCollectors } = require('../jobs/collectorScheduler');
 const { sendDueReminders } = require('../services/reminderService');
 const { detectDuplicates } = require('../services/eventService');
@@ -30,7 +32,10 @@ router.get('/users', protect, teacherOnly, async (req, res) => {
 });
 
 // PATCH /api/admin/users/:id/role — change a user's role
-router.patch('/users/:id/role', protect, teacherOnly, async (req, res) => {
+router.patch('/users/:id/role', protect, teacherOnly, validate([
+  param('id').isMongoId(),
+  body('role').isIn(['student', 'teacher']).withMessage('Role must be student or teacher.'),
+]), async (req, res) => {
   try {
     const { role } = req.body;
     if (!['student', 'teacher'].includes(role)) {

@@ -1,19 +1,29 @@
 const express    = require('express');
 const router     = express.Router();
+const { body }   = require('express-validator');
 const passport   = require('../config/passport');          // ← ADD
 const jwt        = require('jsonwebtoken');                // ← ADD
-const { signup, login, getMe, updateProfile,
-        changePassword, forgotPassword,
-        resetPassword } = require('../controllers/authController');
+const { signup, login, getMe } = require('../controllers/authController');
 const { protect } = require('../middleware/authMiddleware');
+const { authLimiter } = require('../middleware/rateLimitMiddleware');
+const { validate } = require('../middleware/validate');
 
-router.post('/signup',  signup);
-router.post('/login',   login);
+router.post('/signup', authLimiter, validate([
+  body('name').trim().notEmpty().withMessage('Name is required.'),
+  body('email').isEmail().withMessage('A valid email is required.').normalizeEmail(),
+  body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters.'),
+  body('college').optional().isString(),
+  body('branch').optional().isString(),
+  body('sid').optional().isString(),
+  body('semester').optional().isInt({ min: 1, max: 8 }).withMessage('Semester must be between 1 and 8.'),
+]), signup);
+
+router.post('/login', authLimiter, validate([
+  body('email').isEmail().withMessage('A valid email is required.'),
+  body('password').notEmpty().withMessage('Password is required.'),
+]), login);
+
 router.get ('/me',      protect, getMe);
-router.put ('/profile', protect, updateProfile);
-router.put ('/change-password',     protect, changePassword);
-router.post('/forgot-password',     forgotPassword);
-router.post('/reset-password/:token', resetPassword);
 
 // ── Google OAuth ──────────────────────────────────────────────────────────
 router.get('/google',

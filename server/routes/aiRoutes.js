@@ -1,7 +1,10 @@
 const express     = require('express');
 const router      = express.Router();
 const multer      = require('multer');
+const { body }    = require('express-validator');
 const { protect } = require('../middleware/authMiddleware');
+const { aiLimiter } = require('../middleware/rateLimitMiddleware');
+const { validate } = require('../middleware/validate');
 const {
   chat, uploadNotes, getNotes, deleteNote, transcribeVoice
 } = require('../controllers/aiChatController');
@@ -48,11 +51,17 @@ const handleUpload = (req, res, next) => {
 
 router.use(protect);
 
-router.post('/chat',              chat);
-router.post('/upload',            handleUpload, uploadNotes);
-router.post('/transcribe',        handleUpload, transcribeVoice);
+router.post('/chat', aiLimiter, validate([
+  body('message').notEmpty().isString().withMessage('Message is required.'),
+  body('mode').optional().isString(),
+  body('history').optional().isArray(),
+]), chat);
+router.post('/upload',            aiLimiter, handleUpload, uploadNotes);
+router.post('/transcribe',        aiLimiter, handleUpload, transcribeVoice);
 router.get ('/notes',             getNotes);
 router.delete('/notes/:filename', deleteNote);
-router.post('/generate-study-plan', generatePlan);
+router.post('/generate-study-plan', aiLimiter, validate([
+  body('availableHoursPerDay').optional().isFloat({ min: 0 }).withMessage('availableHoursPerDay must be a positive number.'),
+]), generatePlan);
 
 module.exports = router;

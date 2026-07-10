@@ -1,7 +1,9 @@
 
 const express = require('express');
 const router = express.Router();
+const { body, param } = require('express-validator');
 const { protect } = require('../middleware/authMiddleware');
+const { validate } = require('../middleware/validate');
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 const {
@@ -186,7 +188,11 @@ router.get('/saved', protect, async (req, res) => {
 });
 
 // POST /api/opportunities/:id/save - Save event (protected)
-router.post('/:id/save', protect, async (req, res) => {
+router.post('/:id/save', protect, validate([
+  param('id').isMongoId(),
+  body('notes').optional().isString(),
+  body('reminderDate').optional().isISO8601(),
+]), async (req, res) => {
   try {
     const { notes, reminderDate } = req.body;
     const result = await saveEventForUser(req.user._id, req.params.id, notes, reminderDate);
@@ -204,7 +210,7 @@ router.post('/:id/save', protect, async (req, res) => {
 });
 
 // DELETE /api/opportunities/:id/save - Unsave event (protected)
-router.delete('/:id/save', protect, async (req, res) => {
+router.delete('/:id/save', protect, validate([param('id').isMongoId()]), async (req, res) => {
   try {
     const deleted = await unsaveEventForUser(req.user._id, req.params.id);
     if (!deleted) {
@@ -227,7 +233,7 @@ router.delete('/:id/save', protect, async (req, res) => {
 });
 
 // GET /api/opportunities/:id - Single event details
-router.get('/:id', async (req, res) => {
+router.get('/:id', validate([param('id').isMongoId()]), async (req, res) => {
   try {
     const event = await getEventById(req.params.id);
     if (!event) {

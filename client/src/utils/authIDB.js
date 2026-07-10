@@ -33,6 +33,19 @@ export async function saveTokenToCache(token) {
     console.error('[authIDB] Cache save error:', err);
   }
 }
+
+/**
+ * Clear JWT from the Cache API on logout — without this, a valid token
+ * remains readable (e.g. by the service worker) after the user logs out.
+ */
+export async function clearTokenFromCache() {
+  try {
+    const cache = await caches.open('auth-cache');
+    await cache.delete('auth-token');
+  } catch (err) {
+    console.error('[authIDB] Cache clear error:', err);
+  }
+}
 export async function saveTokenToIDB(token) {
   const db = await openDB();
   const tx = db.transaction(STORE_NAME, 'readwrite');

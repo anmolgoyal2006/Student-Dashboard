@@ -217,7 +217,8 @@ async function parseScannedGradePdf(pdfBuffer) {
     for (const raw of rawRows) {
       const sid   = String(raw.sid  || '').trim();
       const name  = String(raw.name || '').trim() || 'Unknown Student';
-      const grade = normalizeGrade(raw.grade) || raw.grade || '';
+      const { grade: normalized, confidence } = normalizeGradeWithConfidence(raw.grade);
+      const grade = normalized || raw.grade || '';
 
       // FIX: relaxed SID length threshold from 7 to 5 to match Python change.
       if (!sid || sid.length < 5) continue;
@@ -226,6 +227,7 @@ async function parseScannedGradePdf(pdfBuffer) {
       seen.add(sid);
 
       const gp = GRADE_POINTS[grade] ?? 0;
+      const ocrConfidence = grade ? confidence : 0;
 
       rows.push({
         name,
@@ -236,6 +238,9 @@ async function parseScannedGradePdf(pdfBuffer) {
           'Grade Points': gp,
         },
         source:     'ocr',
+        ocrGradeRaw: raw.grade || '',
+        ocrConfidence,
+        ocrConfidenceLevel: ocrConfidence >= 90 ? 'high' : ocrConfidence >= 60 ? 'medium' : 'low',
         ocrWarning: grade ? '' : 'Grade could not be read from scanned PDF.',
       });
     }

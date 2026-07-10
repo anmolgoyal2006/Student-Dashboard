@@ -1,7 +1,7 @@
 // src/context/AuthContext.js
 
 import { createContext, useContext, useState, useCallback, useEffect } from 'react';
-import { saveTokenToIDB, clearTokenFromIDB, saveTokenToCache } from '../utils/authIDB';
+import { saveTokenToIDB, clearTokenFromIDB, saveTokenToCache, clearTokenFromCache } from '../utils/authIDB';
 import { authService } from '../services/apiServices';
 
 const AuthContext = createContext();
@@ -18,6 +18,7 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     clearTokenFromIDB();
+    clearTokenFromCache();
     setUser(null);
   }, []);
 

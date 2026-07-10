@@ -9,6 +9,8 @@ const LIGHT_MODEL = process.env.GEMINI_LIGHT_MODEL || 'gemini-3.1-flash-lite';
 const NANO_MODEL = process.env.GEMINI_NANO_MODEL || 'gemini-3.1-flash-lite';
 // GEMINI_MODEL kept for backward compat — any code importing it gets the light model
 const GEMINI_MODEL = LIGHT_MODEL;
+// Embedding model: used for RAG (semantic search over uploaded notes)
+const EMBEDDING_MODEL = process.env.GEMINI_EMBEDDING_MODEL || 'gemini-embedding-001';
 const BASE_URL = 'generativelanguage.googleapis.com';
 
 if (!GEMINI_API_KEY) {
@@ -120,6 +122,25 @@ async function generateContent(contents, options = {}) {
   });
 }
 
+/**
+ * Returns a numeric embedding vector for the given text via Gemini's
+ * embedContent endpoint. Used for semantic (vector) search over uploaded
+ * notes — see server/services/ragService.js.
+ */
+async function embedText(text) {
+  return withRetry(async () => {
+    const json = await geminiFetch('embedContent', {
+      content: { parts: [{ text }] },
+    }, EMBEDDING_MODEL);
+
+    const values = json?.embedding?.values;
+    if (!Array.isArray(values) || !values.length) {
+      throw new Error('Gemini embedding response missing values: ' + JSON.stringify(json).slice(0, 200));
+    }
+    return values;
+  });
+}
+
 async function chatCompletionsCreate({ messages, temperature, max_tokens, response_format, thinkingBudget, model }) {
   const systemMsg = messages.find(m => m.role === 'system');
   const otherMessages = messages.filter(m => m.role !== 'system');
@@ -177,11 +198,13 @@ module.exports = {
   HEAVY_MODEL,
   LIGHT_MODEL,
   NANO_MODEL,
+  EMBEDDING_MODEL,
   GEMINI_API_KEY,
   generateText: generateContent,
   generateContent,
   chatCompletionsCreate,
   transcribeAudio,
   generateContentWithInlineData,
+  embedText,
   withRetry,
 };

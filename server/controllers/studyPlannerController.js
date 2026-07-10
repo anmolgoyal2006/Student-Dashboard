@@ -142,24 +142,32 @@ exports.generatePlan = async (req, res) => {
           const priorityMap = { CRITICAL: 'high', HIGH: 'high', MEDIUM: 'medium', LOW: 'low' };
           const taskPriority = priorityMap[session.priority] || 'medium';
 
+          // Match an existing task for this session by user+title+same calendar day
+          // (Task schema's date field is `dueDate`, not `date`) so regenerating the
+          // plan updates today's session in place instead of creating a duplicate.
+          const dayStart = new Date(startDate);
+          dayStart.setHours(0, 0, 0, 0);
+          const dayEnd = new Date(dayStart);
+          dayEnd.setDate(dayEnd.getDate() + 1);
+
           await Task.findOneAndUpdate(
             {
               user: userId,
               title: session.task,
-              date: { $gte: new Date(startDate.toISOString().slice(0, 10)) },
+              dueDate: { $gte: dayStart, $lt: dayEnd },
             },
             {
-              user: userId,
-              title: session.task,
-              subject: session.category === 'Assignment' ? session.task.split(' ')[0] : session.category,
-              description: `${session.category} · ${session.priority} priority`,
-              dueDate: startDate,
-              dueTime: `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`,
-              priority: taskPriority,
-              type: session.category?.toLowerCase() || 'other',
-              status: 'pending',
+              $set: {
+                subject: session.category === 'Assignment' ? session.task.split(' ')[0] : session.category,
+                description: `${session.category} · ${session.priority} priority`,
+                dueDate: startDate,
+                dueTime: `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`,
+                priority: taskPriority,
+                type: session.category?.toLowerCase() || 'other',
+                status: 'pending',
+              },
             },
-            { upsert: true, new: true }
+            { upsert: true, new: true, setDefaultsOnInsert: true }
           );
         }
       }
