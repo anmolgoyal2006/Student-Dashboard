@@ -1,21 +1,11 @@
+// MUST be the very first require — initializes Sentry (and loads .env)
+// before anything else in the app is imported.
+const Sentry = require('./instrument');
+
 const express  = require('express');
 const cors     = require('cors');
 const mongoose = require('mongoose');
 const helmet   = require('helmet');
-require('dotenv').config({ path: require('path').join(__dirname, '.env') });
-
-// ─── Error tracking (Sentry) ────────────────────────────────────────────────
-// With no SENTRY_DSN set, the SDK safely no-ops — nothing is sent anywhere.
-// Set a real DSN (from sentry.io's free tier) in .env to start receiving
-// error reports; see .env.example.
-const Sentry = require('@sentry/node');
-if (!process.env.SENTRY_DSN) {
-  console.warn('[Sentry] SENTRY_DSN is not set. Error tracking is disabled.');
-}
-Sentry.init({
-  dsn: process.env.SENTRY_DSN,
-  environment: process.env.NODE_ENV || 'development',
-});
 
 const { startDailyNotificationJob } = require('./jobs/dailyNotificationJob');
 const { startClassroomSyncJob } = require('./jobs/classroomSyncJob');
@@ -113,6 +103,15 @@ app.use('/api',                 require('./routes/riskRoutes'));
 app.use('/api/events',          require('./routes/eventRoutes'));
 app.use('/api/opportunities',   require('./routes/opportunitiesRoutes'));
 
+
+// ─── Sentry verification route (non-production only — this deliberately
+// throws, so it must not be a permanent public attack surface in prod) ─────
+if (process.env.NODE_ENV !== 'production') {
+  app.get('/debug-sentry', (_req, res) => {
+    Sentry.logger.info('User triggered test error', { action: 'test_error_endpoint' });
+    throw new Error('My first Sentry error!');
+  });
+}
 
 // 🔥 ADD HERE
 app.get('/api/test-notification', async (req, res) => {
