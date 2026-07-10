@@ -21,14 +21,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# Install Node deps first so this layer is cached unless package.json changes
+# Copy dependency manifests first (both Node and Python)
 COPY package*.json ./
-RUN npm ci --omit=dev
-
-# Install Python deps (Debian 12 marks the system Python as "externally managed" —
-# --break-system-packages is safe here since this container has no other Python use)
 COPY requirements.txt ./
-RUN pip3 install --no-cache-dir --break-system-packages -r requirements.txt
+
+# Install Node deps (postinstall will run pip install via the script above)
+RUN npm ci --omit=dev
 
 # Now the rest of the source
 COPY . .
