@@ -2,11 +2,11 @@
 
 # 🎓 StudentAI
 
-### Autonomous AI-Powered Academic Success Agent
+### AI-Powered Academic Success Platform
 
-**StudentAI doesn't just track your grades — it thinks, predicts, and acts on your behalf.**
+**StudentAI doesn't just show you your CGPA — it predicts where you're headed and helps you course-correct before it's a problem.**
 
-A multi-agent platform that perceives your academic life, predicts risk before it happens, and autonomously plans your path to placement readiness.
+A service-oriented platform that centralizes attendance, grades, coursework, coding practice, and opportunities — then layers Gemini-powered reasoning and predictive scoring on top of your own data.
 
 [![Live Demo](https://img.shields.io/badge/Live-Demo-7C3AED?style=for-the-badge&logo=vercel&logoColor=white)](https://student-dashboard-ashy-rho.vercel.app/)
 [![GitHub](https://img.shields.io/badge/GitHub-Repository-1E3A8A?style=for-the-badge&logo=github&logoColor=white)](https://github.com/anmolgoyal2006/Student-Dashboard)
@@ -16,8 +16,8 @@ A multi-agent platform that perceives your academic life, predicts risk before i
 ![Node.js](https://img.shields.io/badge/Node.js-339933?style=flat-square&logo=node.js&logoColor=white)
 ![MongoDB](https://img.shields.io/badge/MongoDB-47A248?style=flat-square&logo=mongodb&logoColor=white)
 ![Express](https://img.shields.io/badge/Express-000000?style=flat-square&logo=express&logoColor=white)
-![Groq](https://img.shields.io/badge/Groq-LLM-F55036?style=flat-square)
-![OpenAI](https://img.shields.io/badge/OpenAI-412991?style=flat-square&logo=openai&logoColor=white)
+![Google Gemini](https://img.shields.io/badge/Google_Gemini-8E75B2?style=flat-square&logo=googlegemini&logoColor=white)
+![Firebase](https://img.shields.io/badge/Firebase-FFCA28?style=flat-square&logo=firebase&logoColor=black)
 
 [Live Demo](https://student-dashboard-ashy-rho.vercel.app/) · [Report Bug](https://github.com/anmolgoyal2006/Student-Dashboard/issues) · [Request Feature](https://github.com/anmolgoyal2006/Student-Dashboard/issues)
 
@@ -25,13 +25,21 @@ A multi-agent platform that perceives your academic life, predicts risk before i
 
 ---
 
+### 📚 Table of Contents
+
+[Overview](#-project-overview) · [Why StudentAI](#-why-studentai) · [Core Features](#-core-features) · [How the Intelligence Works](#-how-the-intelligence-works) · [Architecture](#️-system-architecture) · [Tech Stack](#️-technology-stack) · [Screenshots](#-screenshots) · [Installation](#️-installation-guide) · [Environment Variables](#-environment-variables) · [API Overview](#-api-overview) · [Folder Structure](#-folder-structure) · [Known Limitations](#-known-limitations) · [Roadmap](#️-future-roadmap) · [Highlights](#-resume-worthy-highlights) · [License](#-license)
+
+---
+
 ## 📖 Project Overview
 
 Most "student dashboards" stop at showing you a CGPA number and a pie chart. **StudentAI is built differently.**
 
-It's architected as a **multi-agent autonomous system** — six specialized AI agents coordinated by a central orchestrator — that continuously collects signals from your academic life (attendance, marks, classroom activity, coding practice, opportunities) and acts on them: predicting risk, generating study plans, digitizing handwritten records, simulating interviews, and surfacing hackathons before deadlines pass.
+It's a **service-oriented academic platform** — a Node/Express API with 27 specialized services behind six feature domains (academics, learning, OCR, placements, interviews, opportunities) — that continuously collects signals from your academic life (attendance, marks, classroom activity, coding practice, opportunities) and turns them into forward-looking output: shortage predictions, CGPA trajectories, digitized records, mock interview feedback, and surfaced hackathons before their deadlines pass.
 
-It's not a tracker. It's an **agent that works while you study.**
+It's not a static tracker. Every core feature answers a "so what happens next" question, not just a "what happened" question.
+
+> **A note on how the "intelligence" works:** the predictive and generative features in this project are built from deterministic formulas (attendance/CGPA projection) and LLM calls to **Google Gemini**, grounded in your own stored data (study plans, mock interview feedback, chat commands) — not autonomous multi-agent orchestration. See [How the Intelligence Works](#-how-the-intelligence-works) for the exact mechanism behind each feature.
 
 ---
 
@@ -39,12 +47,15 @@ It's not a tracker. It's an **agent that works while you study.**
 
 | Typical Student Dashboard | StudentAI |
 |---|---|
-| Shows your CGPA after the fact | **Predicts** attendance shortage before it happens |
+| Shows your CGPA after the fact | **Projects** your CGPA forward and flags at-risk subjects before finals |
 | Manual data entry for every mark | **OCR pipeline** digitizes handwritten marksheets automatically |
-| Static analytics | **Multi-agent loop** continuously re-plans as new data arrives |
-| One feature, one purpose | **Six coordinated agents** spanning academics, placements, and opportunities |
-| You search for hackathons yourself | **Opportunity Intelligence** agent discovers and tracks deadlines for you |
-| Generic "study harder" advice | Personalized, explainable recommendations grounded in your actual data |
+| Static analytics | Predictions **re-run** whenever new attendance/marks data comes in |
+| One feature, one purpose | **Six coordinated intelligence domains** spanning academics, placements, and opportunities |
+| You search for hackathons yourself | **Opportunity collectors** pull from Unstop & Devfolio and track deadlines for you |
+| Generic "study harder" advice | Recommendations generated by an LLM prompted with your actual attendance/marks/DSA data |
+| A teacher enters attendance for 60 students one by one | A teacher **uploads an Excel sheet or pastes a link to one** (even a OneDrive share link) and the whole class is marked in one request |
+| You tap through menus to log something | You **type or speak a sentence** ("mark me present for DBMS today") and Gemini executes it as a real, validated write |
+| Attendance registers live on paper until someone re-types them | A phone photo of the register is OCR'd client-side and parsed straight into structured present/absent rows |
 
 ---
 
@@ -52,55 +63,95 @@ It's not a tracker. It's an **agent that works while you study.**
 
 ### 📊 Academic Intelligence
 - Real-time attendance monitoring with subject-wise breakdowns
-- **Predictive shortage detection** — know how many classes you can miss before it's a problem
+- **Predictive shortage detection** — a deterministic formula projects how many more classes you can miss before dropping below your target percentage
+- **Bulk attendance import for teachers** — upload an Excel sheet or paste a URL to one (OneDrive share links included) and mark an entire class in one request, with an SSRF-guarded server-side fetch and a downloadable template
+- **OCR attendance register scanner** — photograph a paper register and a client-side Tesseract.js pipeline parses SID + present/absent rows automatically
+- Dedicated **risk alerts** surface (`/api/risks`) separate from the trajectory/prediction pages
 - SGPA/CGPA analytics with semester-over-semester trends
 - Exam readiness scoring based on syllabus coverage and performance history
 - Centralized marks management across midterms, finals, quizzes, and assignments
 
+### 🗣️ Voice & Natural-Language Control
+- **AI Command Bar** — type a plain-English instruction ("mark me present for DBMS", "add a subject called OS") and Gemini parses it into a structured, validated action executed against your real data
+- **Voice commands** — record instead of typing; audio is transcribed by Gemini and run through the same command pipeline, no separate voice-specific logic
+- Same natural-language interface doubles as a conversational Q&A assistant ("what's my CGPA?", "how many classes can I miss?")
+
 ### 🧠 AI Learning Assistant
-- Upload lecture notes (PDF, image, or text) for instant processing
-- AI-generated concept summaries and key-point extraction
+- Upload lecture notes (PDF, image, or text) for LLM-based processing
+- RAG-based semantic search over your uploaded notes (Gemini embeddings)
 - Automatic quiz generation from your own study material
-- Personalized study suggestions based on weak areas
+- Personalized study plans, generated by prompting Gemini with your weak-area data
 
 ### 🔍 OCR Intelligence
 - Upload photos or PDFs of handwritten marksheets or grade lists
-- Tesseract.js + AI correction pipeline extracts marks automatically
+- Tesseract.js extracts raw text; a Gemini correction pass cleans up OCR errors and structures the output
 - Auto-digitizes records into your academic profile — no manual typing
 - Multi-PDF merge and ranking for bulk uploads
 
 ### 💼 Placement Intelligence
 - LeetCode progress sync with topic-wise DSA strength analysis
-- Placement readiness scoring across companies and roles
-- Company-focused preparation roadmaps
+- AI-generated DSA coaching, topic guides, and hints tied to your practice log
+- **Focus Mode** — a 25-minute Pomodoro-style session scoped to a DSA topic and difficulty (Easy/Medium/Hard), so coaching turns into scheduled practice, not just advice
+- Company-focused preparation roadmaps and company-specific question banks
 - Coding consistency tracking over time
 
 ### 🎤 AI Mock Interview System
-- Realistic interview simulations with AI-generated, role-specific questions
-- Structured feedback on answers, communication, and technical depth
+- Resume analysis with keyword-gap scoring against a target role
+- Interview simulations with Gemini-generated, role-specific questions
+- Structured feedback on typed answers, communication, and technical depth
 - Iterative practice loop tied into placement readiness scoring
 
 ### 🚀 Opportunity Intelligence
-- Autonomous **Hackathon Discovery Agent** that scans and surfaces relevant competitions
-- Workshop and event discovery
+- Scheduled **collectors** (`unstopCollector.js`, `devfolioCollector.js`) scrape and normalize hackathons/events on a cron schedule
+- Workshop and event discovery with full-text search
 - Deadline monitoring with proactive reminders
-- Career opportunity recommendations matched to your skill profile
+- Recommendations matched to your stored skill profile
 
 ### ⏰ Productivity System
+- **"Today's Plan"** — a single aggregated daily action plan pulled across attendance, tasks, and DSA state, so you get one answer to "what should I actually do today"
 - Smart timetable and task scheduling
 - Cron-based reminders for deadlines, classes, and assignments
 - Push notifications via Firebase Cloud Messaging
 
+### 🧑‍🏫 Teacher/Admin Console
+- Role-gated admin routes (`teacher` role only) — a student never sees these
+- Full student roster with role management
+- Manual triggers for the opportunity collectors, due reminders, and duplicate-event cleanup, without waiting for the next cron cycle
+
 ### 🔗 Smart Integrations
 - **Google Classroom sync** — assignments and announcements flow in automatically
-- Google OAuth for frictionless login
-- Email notifications for critical academic events
+- Google OAuth for frictionless login (separate OAuth client from Classroom access)
+- Brevo-powered transactional email for password resets and critical academic events
+- Sentry error tracking in production
 
 ---
 
-## 🧠 Intelligence Architecture
+## 🔬 How the Intelligence Works
 
-StudentAI uses a **service-oriented architecture** with specialized controllers and services, coordinated through a central Express API. Rather than monolithic AI calls, the system routes requests through domain-specific handlers.
+Every "smart" feature here is one of three things: a **deterministic formula**, a **scheduled scraper/sync job**, or an **LLM call grounded in your stored data**. No feature is a black box — here's the actual mechanism behind each one.
+
+| Feature | Mechanism | Real-time / Live? |
+|---|---|---|
+| Attendance shortage prediction | Deterministic formula: classes needed to hit target % given current present/absent counts | Computed live from your stored records |
+| CGPA trajectory forecasting | Weighted projection from historical SGPA trend across stored semesters | Computed live from your stored records |
+| Placement readiness score | Formula combining LeetCode solve counts by difficulty, topic coverage, and coding consistency | Computed live from synced LeetCode data |
+| OCR marksheet digitization | Tesseract.js text extraction → Gemini pass to correct errors and structure into JSON | Real OCR + real LLM call |
+| AI study plan / recommendations | Gemini prompted with your stored attendance, marks, and weak-area data | Real LLM call, grounded in your data |
+| AI chat assistant (natural language dashboard control) | Gemini parses your message into a structured command, executed against your data via the API | Real LLM call + real write |
+| Mock interview questions & feedback | Gemini generates role-specific questions and scores your typed answers | Real LLM call |
+| Notes RAG search | Gemini embedding model indexes uploaded notes; queries are matched by semantic similarity | Real embedding-based search |
+| Voice commands | Audio recorded in-browser → Gemini transcription → same AI-command parsing pipeline as typed text | Real LLM call (transcription + parsing) |
+| Bulk attendance import (Excel/URL) | Deterministic parsing: `xlsx` reads the sheet (uploaded or fetched from a URL through an SSRF-guarded resolver), rows matched to students by SID | Real parsing, no LLM involved |
+| OCR attendance register scan | Client-side Tesseract.js OCR + a regex-based row parser (SID / date / present-absent detection) | Real OCR, no LLM involved |
+| "Today's Plan" daily aggregation | Deterministic aggregation across stored attendance, tasks, and DSA practice state | Computed live from your stored records |
+| Hackathon/opportunity discovery | Cron-scheduled collectors scrape Unstop and Devfolio, normalize into MongoDB | Real scheduled scrape, not live-polled per request |
+| Google Classroom sync | Real Google Classroom API call, pulls assignments/announcements on demand or via scheduled job | Real live API |
+
+**What this is not:** an autonomous multi-agent system with agent-to-agent communication or a planner that dynamically selects which "agent" to invoke. It's an LLM-augmented service-oriented API — every AI call is triggered by a specific route handler for a specific feature, not by an orchestrator making its own decisions.
+
+---
+
+## 🏛️ System Architecture
 
 ```
                      ┌───────────────────────┐
@@ -111,25 +162,31 @@ StudentAI uses a **service-oriented architecture** with specialized controllers 
                                   ▼
                      ┌───────────────────────┐
                      │  Node.js + Express API  │
-                     │   (JWT + Google OAuth) │
+                     │  (JWT + dual Google     │
+                     │   OAuth + rate limiting)│
                      └───────────┬────────────┘
                                   │
               ┌───────────────────┼───────────────────┐
               ▼                   ▼                    ▼
      ┌────────────────┐ ┌─────────────────┐ ┌──────────────────┐
-     │  MongoDB Atlas  │ │  Service Layer   │ │   Node Cron Jobs  │
-     │   (persistence) │ │  (26 services)  │ │ (scheduled tasks) │
+     │    MongoDB      │ │  Service Layer   │ │   Node Cron Jobs  │
+     │  19 schemas /   │ │  27 services —   │ │  5 scheduled       │
+     │  persistence    │ │  routes call     │ │  tasks: reminders, │
+     │                 │ │  services, which │ │  opportunity        │
+     │                 │ │  call SDKs/DB    │ │  collectors, sync   │
      └────────────────┘ └────────┬────────┘ └──────────────────┘
                                   │
-            ┌─────────────┬──────┼──────┬──────────────┬───────────────┐
-            ▼             ▼      ▼      ▼              ▼               ▼
-      ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌────────────┐ ┌───────────────┐
-      │   Groq   │ │  OpenAI  │ │  Google  │ │  Firebase  │ │   LeetCode /   │
-      │   SDK    │ │   SDK    │ │Classroom │ │     FCM    │ │  Hackathon Eng │
-      └──────────┘ └──────────┘ └──────────┘ └────────────┘ └───────────────┘
+          ┌─────────────┬────────┼────────┬──────────────┬───────────────┐
+          ▼             ▼        ▼        ▼              ▼               ▼
+    ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌────────────┐ ┌───────────────┐ ┌─────────┐
+    │  Google  │ │  Google  │ │ Firebase │ │ Tesseract.js│ │    Brevo      │ │ Sentry  │
+    │  Gemini  │ │Classroom │ │    FCM   │ │     OCR     │ │  Email API    │ │  errors │
+    └──────────┘ └──────────┘ └──────────┘ └────────────┘ └───────────────┘ └─────────┘
 ```
 
-**Connected Services:** Groq (LLM reasoning) · OpenAI (LLM fallback) · Google Classroom API · Firebase Cloud Messaging · LeetCode tracking · Hackathon Discovery Engine · Tesseract.js OCR
+**Request flow example (AI chat command):** UI sends plain-English message → route handler → `ai-command` service builds a prompt with the user's stored context → Gemini returns a structured action → service validates and executes the action against MongoDB (e.g. mark attendance) → response returned to UI.
+
+**Connected services:** Google Gemini (LLM reasoning + embeddings) · Google Classroom API · Google OAuth (login) · Firebase Cloud Messaging · LeetCode public API (sync) · Unstop/Devfolio (scheduled scrape) · Tesseract.js (OCR) · Brevo (transactional email) · Sentry (error tracking)
 
 ---
 
@@ -151,29 +208,28 @@ StudentAI uses a **service-oriented architecture** with specialized controllers 
 <td valign="top" width="33%">
 
 **Backend**
-- Node.js
-- Express.js
-- MongoDB Atlas + Mongoose
+- Node.js + Express.js
+- MongoDB + Mongoose
 - JWT Authentication
-- Google OAuth (Passport)
+- Dual Google OAuth (Passport) — login & Classroom
 - Node Cron
+- Helmet + express-rate-limit
+- Sentry error tracking
 
 </td>
 <td valign="top" width="33%">
 
 **AI / Intelligence**
-- Groq SDK (LLM)
-- OpenAI SDK
+- Google Gemini API (`gemini-2.5-flash` for quality-critical tasks, `gemini-3.1-flash-lite` for chat/coaching/OCR)
+- Gemini embeddings (RAG over uploaded notes)
 - Tesseract.js OCR
-- AI Correction Pipeline
-- AI Notes Processing
-- Quiz Generation
+- LLM-based OCR correction, notes processing & quiz generation
 
 </td>
 </tr>
 </table>
 
-**Integrations:** Google Classroom API · Firebase Cloud Messaging · Email Notifications · LeetCode Tracking · Unstop & Devfolio Collectors
+**Integrations:** Google Classroom API · Firebase Cloud Messaging · Brevo Transactional Email · LeetCode Tracking · Unstop & Devfolio Collectors · Sentry
 
 ---
 
@@ -200,12 +256,12 @@ Upload marksheet PDFs directly, auto-merge results, weight scoring, and generate
 ![Marks, CGPA & OCR Upload](Screenshots/marks-ocr.png)
 
 ### 🧮 Trajectory Analysis — Predictive CGPA Forecasting
-The Predictor agent projects your CGPA semesters in advance, flags risk-area subjects, and outputs a concrete improvement plan.
+Projects your CGPA semesters in advance from your stored SGPA trend, flags risk-area subjects, and outputs a concrete improvement plan.
 
 ![Trajectory Analysis](Screenshots/trajectory.png)
 
 ### 💻 AI DSA Coach — Placement Readiness
-Live LeetCode sync (solved counts by difficulty), a personalized AI-generated practice plan, and a 0–100 placement readiness score.
+Live LeetCode sync (solved counts by difficulty), a personalized AI-generated practice plan, and topic-wise strength scoring.
 
 ![AI DSA Coach](Screenshots/dsa-coach.png)
 
@@ -220,7 +276,7 @@ Auto-aggregated hackathons, workshops, and competitions with difficulty tags and
 ![Hackathon Discovery](Screenshots/hackathons.png)
 
 ### 🧠 AI Study Assistant — Natural Language Dashboard Control
-A Groq-powered chat interface that updates your dashboard from plain English — add a subject, mark attendance, or ask about your CGPA, conversationally.
+A Gemini-powered chat interface that updates your dashboard from plain English — add a subject, mark attendance, or ask about your CGPA, conversationally.
 
 ![AI Study Assistant](Screenshots/notes-ai.png)
 
@@ -233,13 +289,15 @@ Assignment completion trends, subject-wise workload distribution, and deadline t
 
 ## ⚙️ Installation Guide
 
+> 💡 **Just want to try it?** Skip the setup — the live deployment is at **[student-dashboard-ashy-rho.vercel.app](https://student-dashboard-ashy-rho.vercel.app/)**.
+
 ### Prerequisites
 - Node.js v18+
-- MongoDB Atlas account (or local MongoDB instance)
-- Groq API key
+- MongoDB (Atlas or local instance)
 - Google Gemini API key
-- Google Cloud OAuth credentials
-- Firebase project (for FCM)
+- Google OAuth credentials (two separate OAuth clients: one for login, one for Classroom access)
+- Firebase project (for FCM push notifications)
+- Brevo account (for transactional email, optional in dev)
 
 ### 1. Clone the Repository
 
@@ -270,35 +328,48 @@ The app will be available at `http://localhost:3000` (frontend) and `http://loca
 
 ## 🔑 Environment Variables
 
-Create a `.env` file inside `/server`:
+Create a `.env` file inside `/server` (see `server/.env.example` for the authoritative list):
 
 ```env
-# Server
+# ── Core ─────────────────────────────────────────────────────────────────
 PORT=5000
+NODE_ENV=development
+MONGO_URI=your-mongodb-connection-string
+JWT_SECRET=replace-with-a-long-random-string
+FRONTEND_URL=http://localhost:3000
+CLIENT_URL=http://localhost:3000
+BACKEND_URL=http://localhost:5000
 
-# Database
-MONGO_URI=your_mongodb_atlas_uri
+# ── Email (Brevo transactional email, used for password reset) ─────────────
+BREVO_API_KEY=your-brevo-api-key
 
-# Auth
-JWT_SECRET=your_jwt_secret
-GOOGLE_CLIENT_ID=your_google_oauth_client_id
-GOOGLE_CLIENT_SECRET=your_google_oauth_client_secret
+# ── Google Gemini (AI features: chat, RAG, OCR correction, recommendations) ─
+GEMINI_API_KEY=your-gemini-api-key
+# Optional overrides — sensible defaults are used if left unset
+GEMINI_HEAVY_MODEL=
+GEMINI_LIGHT_MODEL=
+GEMINI_NANO_MODEL=
+GEMINI_EMBEDDING_MODEL=
 
-# AI Services
-GROQ_API_KEY=your_groq_api_key
-GEMINI_API_KEY=your_gemini_vision_api_key
+# ── Firebase Admin (push notifications) ─────────────────────────────────────
+FIREBASE_PROJECT_ID=your-firebase-project-id
+FIREBASE_CLIENT_EMAIL=your-firebase-service-account-email
+FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
 
-# Google Classroom
-GOOGLE_CLASSROOM_API_KEY=your_classroom_api_key
+# ── Google OAuth (user login via "Continue with Google") ───────────────────
+GOOGLE_AUTH_CLIENT_ID=your-google-oauth-client-id
+GOOGLE_AUTH_CLIENT_SECRET=your-google-oauth-client-secret
 
-# Firebase
-FIREBASE_SERVER_KEY=your_firebase_server_key
-FIREBASE_PROJECT_ID=your_firebase_project_id
+# ── Google Classroom integration (separate OAuth client from login above) ──
+GOOGLE_CLIENT_ID=your-google-classroom-client-id
+GOOGLE_CLIENT_SECRET=your-google-classroom-client-secret
+GOOGLE_CLASSROOM_REDIRECT=http://localhost:5000/api/classroom/oauth/callback
 
-# Email
-EMAIL_HOST=smtp.example.com
-EMAIL_USER=your_email
-EMAIL_PASS=your_email_app_password
+# ── Error tracking (optional — leave blank to disable) ──────────────────────
+SENTRY_DSN=
+
+# ── Optional: override which Python executable spawns the OCR/PDF scripts ──
+PYTHON_PATH=
 ```
 
 ---
@@ -310,8 +381,8 @@ EMAIL_PASS=your_email_app_password
 | `POST` | `/api/auth/signup` | Register a new user |
 | `POST` | `/api/auth/login` | Login (JWT) |
 | `GET` | `/api/auth/google` | Google OAuth login |
-| `POST` | `/api/auth/forgot-password` | Send password reset email |
-| `POST` | `/api/auth/reset-password/:token` | Reset password with token |
+| `POST` | `/api/user/forgot-password` | Send password reset email |
+| `POST` | `/api/user/reset-password/:token` | Reset password with token |
 | `GET` | `/api/marks` | Fetch marks records |
 | `POST` | `/api/marks` | Add marks |
 | `GET` | `/api/marks/cgpa` | Get CGPA |
@@ -321,31 +392,44 @@ EMAIL_PASS=your_email_app_password
 | `POST` | `/api/marks/upload-pdf` | Upload marksheet PDF |
 | `POST` | `/api/marks/parse-pdfs` | Parse multiple PDFs at once |
 | `POST` | `/api/marks/generate-leaderboard` | Generate marks leaderboard |
-| `POST` | `/api/marks/ocr-ai-correct` | AI correction for OCR output |
+| `POST` | `/api/marks/ocr-ai-correct` | Gemini correction pass for OCR output |
 | `GET` | `/api/attendance/summary` | Attendance breakdown + shortage prediction |
 | `POST` | `/api/attendance` | Mark attendance |
 | `GET` | `/api/attendance/trends` | Monthly attendance trends |
 | `POST` | `/api/attendance/mark-from-notification` | Mark attendance via notification |
+| `POST` | `/api/attendance/upload` | Teacher bulk-uploads an Excel attendance sheet |
+| `POST` | `/api/attendance/upload-url` | Teacher imports an Excel sheet from a URL (SSRF-guarded) |
+| `GET` | `/api/attendance/template` | Download the sample Excel template |
 | `GET` | `/api/tasks` | Get all tasks |
 | `GET` | `/api/timetable` | Get timetable |
 | `GET` | `/api/subjects` | Get subjects |
 | `GET` | `/api/career` | Career progress data |
+| `POST` | `/api/career/dsa/coach` | AI DSA coaching plan |
+| `POST` | `/api/career/analyze-resume` | Resume keyword-gap analysis |
+| `POST` | `/api/career/mock-questions` | Generate mock interview questions |
+| `POST` | `/api/career/evaluate-answer` | Score a typed interview answer |
 | `POST` | `/api/ai/chat` | AI chat assistant |
 | `POST` | `/api/ai/upload` | Upload notes for AI processing |
+| `POST` | `/api/ai/transcribe` | Transcribe a voice command (Gemini) |
 | `POST` | `/api/ai/generate-study-plan` | Generate study plan |
-| `POST` | `/api/ai-command/process` | Process natural language commands |
-| `GET` | `/api/predict/attendance` | Predict attendance shortage risk |
-| `GET` | `/api/predict/cgpa` | Predict CGPA trajectory |
+| `POST` | `/api/ai-command` | Process natural language (or transcribed voice) commands |
+| `GET` | `/api/predict` | Attendance + CGPA projections |
+| `GET` | `/api/predict/ai-analysis` | Gemini-generated risk analysis |
+| `GET` | `/api/decision/today-plan` | Aggregated daily action plan |
 | `GET` | `/api/opportunities` | Discovered hackathons & events |
 | `GET` | `/api/opportunities/recommended` | Personalized recommendations |
 | `GET` | `/api/opportunities/closing-soon` | Events closing soon |
 | `GET` | `/api/opportunities/trending` | Trending opportunities |
 | `POST` | `/api/opportunities/:id/save` | Save an opportunity |
-| `GET` | `/api/recommendations` | AI-generated personalized recommendations |
+| `GET` | `/api/recommendations` | LLM-generated personalized recommendations |
 | `GET` | `/api/analytics` | Productivity & workload analytics |
 | `POST` | `/api/classroom/sync` | Sync Google Classroom assignments |
 | `GET` | `/api/notifications` | Get user notifications |
 | `GET` | `/api/events` | Get academic events |
+| `GET` | `/api/risks` | Risk alerts |
+| `GET` | `/api/admin/users` | List all users & roles (teacher-only) |
+| `GET` | `/api/admin/dashboard` | Admin overview (teacher-only) |
+| `POST` | `/api/admin/collectors/run` | Manually trigger opportunity collectors (teacher-only) |
 
 ---
 
@@ -361,33 +445,46 @@ Student-Dashboard/
 │   ├── config/                  # DB + Passport configs
 │   ├── controllers/             # Business logic (18 controllers)
 │   ├── jobs/                    # Node Cron scheduled tasks (5 jobs)
-│   ├── middleware/              # Auth & validation
+│   ├── middleware/               # Auth, rate limiting & validation
 │   ├── models/                  # Mongoose schemas (19 models)
-│   ├── routes/                  # API routes (22 route files)
-│   ├── services/                # AI, OCR, ranking, notification services
-│   ├── utils/                   # SGPA/CGPA, helpers
+│   ├── routes/                  # API routes (21 route files)
+│   ├── services/                # AI, OCR, ranking, notification services (27)
+│   ├── utils/                    # SGPA/CGPA, helpers
 │   └── server.js                # Entry point
 │
 └── client/                       # Frontend (React CRA)
     └── src/
-        ├── components/           # UI components (27 components)
-        ├── context/              # Global state (React Context)
-        ├── pages/                # Route pages (15+ pages)
-        ├── services/             # API service layer
-        └── styles/               # Global CSS
+        ├── components/           # UI components (28 components)
+        ├── context/               # Global state (React Context)
+        ├── pages/                # Route pages (17+ pages, plus admin/ and landing/)
+        ├── services/              # API service layer
+        └── styles/                # Global CSS
 ```
+
+---
+
+## 🧪 Known Limitations
+
+Being upfront about what this project doesn't do yet:
+
+- **No automated test suite** — a handful of manual scripts exist for the opportunity collectors (`server/tests/`, `server/collectors/tests/`), but there's no Jest/CI-wired unit or integration test runner yet
+- **OCR accuracy depends on handwriting legibility** — the Gemini correction pass helps but doesn't guarantee 100% accuracy on messy input
+- **Hackathon collectors run on a fixed schedule**, not live per-request, so listings can lag the source site by up to one cron cycle
+- **Single-institution assumption** — timetable/subject structures aren't yet generalized across different colleges' academic calendars
 
 ---
 
 ## 🗺️ Future Roadmap
 
+- [ ] Automated test coverage (Jest + Supertest for API, RTL for client)
 - [ ] Mobile app (React Native)
 - [ ] Multi-institution support for college-wide deployment
-- [ ] Resume builder agent with ATS optimization
+- [ ] Resume builder with ATS optimization
 - [ ] Peer benchmarking (anonymized cohort comparisons)
 - [ ] Voice-based mock interviews
 - [ ] LinkedIn/GitHub profile intelligence integration
 - [ ] Offline-first PWA support
+- [ ] True agentic orchestration — a planner that dynamically chains the existing intelligence services based on user intent, rather than one route handler per feature
 
 ---
 
@@ -395,14 +492,15 @@ Student-Dashboard/
 
 > Use these as talking points in interviews, resumes, or hackathon pitches.
 
-- Designed and built an **AI-powered student platform** with specialized controllers and services for academics, placements, and opportunities
-- Built an **OCR-based digitization pipeline** using Tesseract.js + AI correction to convert handwritten marksheets into structured academic records
-- Implemented a **predictive attendance engine** that forecasts shortage risk rather than just reporting historical data
+- Designed and built a **service-oriented academic platform** with 27 backend services spanning academics, placements, and opportunities
+- Built an **OCR digitization pipeline** using Tesseract.js + a Gemini correction pass to convert handwritten marksheets into structured academic records
+- Implemented a **deterministic attendance-shortage engine** that projects risk forward instead of only reporting historical percentages
+- Built a **bulk attendance import pipeline** (Excel upload or URL, including OneDrive share-link resolution) with a custom SSRF guard on the server-side fetch
+- Developed a **voice-and-text AI command bar** — Gemini transcribes speech, then parses either input into a structured, validated dashboard action
 - Engineered **Google Classroom synchronization** for automatic assignment and announcement ingestion
-- Built **autonomous hackathon collectors** (Unstop & Devfolio) for proactive opportunity surfacing and deadline tracking
-- Developed an **AI chat assistant** with LLM-powered study planning and command processing
-- Created a **placement readiness system** combining DSA topic analysis and coding consistency metrics
-- Architected a full production stack: **React, Node/Express, MongoDB Atlas**, JWT + Google OAuth, and Firebase Cloud Messaging
+- Built **scheduled opportunity collectors** (Unstop & Devfolio) with cron-based deadline tracking
+- Created a **placement readiness system** combining DSA topic analysis, coding consistency metrics, and a Focus Mode practice timer
+- Architected a full production stack: **React, Node/Express, MongoDB**, JWT + dual Google OAuth, Firebase Cloud Messaging, and Sentry error tracking
 
 ---
 
