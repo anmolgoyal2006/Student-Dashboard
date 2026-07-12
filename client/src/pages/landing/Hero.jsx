@@ -1,7 +1,12 @@
 import { Link, useNavigate } from 'react-router-dom';
+import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { GraduationCap, ArrowRight, GitBranch } from 'lucide-react';
+import { GraduationCap, ArrowRight, GitBranch, PlayCircle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { authService } from '../../services/apiServices';
+import toast from '../../context/ToastContext';
+
+const DEMO_CREDENTIALS = { email: 'demo@studentai.app', password: 'Demo@123' };
 
 const techChips = [
   'React', 'Node.js', 'MongoDB', 'Gemini AI',
@@ -78,8 +83,24 @@ function DashboardMockup() {
 }
 
 export default function Hero() {
-  const { isLoggedIn } = useAuth();
+  const { isLoggedIn, login } = useAuth();
+  const navigate = useNavigate();
   const ctaTarget = isLoggedIn ? '/dashboard' : '/login';
+  const [demoLoading, setDemoLoading] = useState(false);
+
+  const handleViewDemo = async () => {
+    setDemoLoading(true);
+    try {
+      const { data } = await authService.login(DEMO_CREDENTIALS);
+      login(data.user, data.token);
+      toast.success('Welcome to the StudentAI demo!');
+      navigate('/dashboard');
+    } catch (err) {
+      toast.error('Demo login failed — please try again shortly.');
+    } finally {
+      setDemoLoading(false);
+    }
+  };
 
   return (
     <section className="hero-section">
@@ -139,6 +160,14 @@ export default function Hero() {
                 <Link to={ctaTarget} className="btn-primary">
                   {isLoggedIn ? 'Go to Dashboard' : 'Get Started'} <ArrowRight size={16} />
                 </Link>
+                <button
+                  type="button"
+                  onClick={handleViewDemo}
+                  disabled={demoLoading}
+                  className="btn-outline"
+                >
+                  <PlayCircle size={15} /> {demoLoading ? 'Loading demo…' : 'View Demo'}
+                </button>
                 <a
                   href="https://github.com/anmolgoyal2006/Student-Dashboard"
                   target="_blank"

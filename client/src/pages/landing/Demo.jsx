@@ -1,7 +1,32 @@
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { GitBranch, ExternalLink } from 'lucide-react';
+import { GitBranch, PlayCircle } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
+import { authService } from '../../services/apiServices';
+import toast from '../../context/ToastContext';
+
+const DEMO_CREDENTIALS = { email: 'demo@studentai.app', password: 'Demo@123' };
 
 export default function Demo() {
+  const { login } = useAuth();
+  const navigate = useNavigate();
+  const [demoLoading, setDemoLoading] = useState(false);
+
+  const handleViewDemo = async () => {
+    setDemoLoading(true);
+    try {
+      const { data } = await authService.login(DEMO_CREDENTIALS);
+      login(data.user, data.token);
+      toast.success('Welcome to the StudentAI demo!');
+      navigate('/dashboard');
+    } catch (err) {
+      toast.error('Demo login failed — please try again shortly.');
+    } finally {
+      setDemoLoading(false);
+    }
+  };
+
   return (
     <section className="demo-section">
       <div className="demo-glow" />
@@ -23,19 +48,19 @@ export default function Demo() {
             See <span className="gradient-text">StudentAI</span> in action
           </h2>
           <p className="section-subtitle">
-            The platform is live and free to try. Sign up, connect Google Classroom,
-            and get a personalized academic overview in under a minute.
+            The platform is live and free to try. Jump straight into a demo account preloaded
+            with real semesters, attendance history, and DSA progress — no signup required.
           </p>
 
           <div className="demo-ctas">
-            <a
-              href="https://student-dashboard-ashy-rho.vercel.app"
-              target="_blank"
-              rel="noopener noreferrer"
+            <button
+              type="button"
+              onClick={handleViewDemo}
+              disabled={demoLoading}
               className="btn-primary"
             >
-              <ExternalLink size={16} /> Live Demo
-            </a>
+              <PlayCircle size={16} /> {demoLoading ? 'Loading demo…' : 'View Demo'}
+            </button>
             <a
               href="https://github.com/anmolgoyal2006/Student-Dashboard"
               target="_blank"

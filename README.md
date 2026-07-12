@@ -25,9 +25,22 @@ A service-oriented platform that centralizes attendance, grades, coursework, cod
 
 ---
 
+### 🎮 Try It Instantly — No Signup Required
+
+The [live demo](https://student-dashboard-ashy-rho.vercel.app/) comes preloaded with a demo account so you see the real thing in the first 15 seconds, not an empty dashboard.
+
+| | |
+|---|---|
+| **Email** | `demo@studentai.app` |
+| **Password** | `Demo@123` |
+
+Already loaded: 2 completed semesters of grades (SGPA 9.19 → 8.65), ~10 weeks of real attendance history across 5 subjects (including one intentionally below 75% so you see the shortage warning fire), 70 solved LeetCode problems with topic-wise breakdown, past mock interview feedback, and upcoming deadlines.
+
+---
+
 ### 📚 Table of Contents
 
-[Overview](#-project-overview) · [Why StudentAI](#-why-studentai) · [Core Features](#-core-features) · [How the Intelligence Works](#-how-the-intelligence-works) · [Architecture](#️-system-architecture) · [Tech Stack](#️-technology-stack) · [Screenshots](#-screenshots) · [Installation](#️-installation-guide) · [Environment Variables](#-environment-variables) · [API Overview](#-api-overview) · [Folder Structure](#-folder-structure) · [Known Limitations](#-known-limitations) · [Roadmap](#️-future-roadmap) · [Highlights](#-resume-worthy-highlights) · [License](#-license)
+[Try It Instantly](#-try-it-instantly--no-signup-required) · [Overview](#-project-overview) · [Why StudentAI](#-why-studentai) · [Core Features](#-core-features) · [How the Intelligence Works](#-how-the-intelligence-works) · [Architecture](#️-system-architecture) · [Tech Stack](#️-technology-stack) · [Screenshots](#-screenshots) · [Installation](#️-installation-guide) · [Environment Variables](#-environment-variables) · [API Overview](#-api-overview) · [Folder Structure](#-folder-structure) · [Known Limitations](#-known-limitations) · [Roadmap](#️-future-roadmap) · [Highlights](#-resume-worthy-highlights) · [License](#-license)
 
 ---
 
@@ -289,7 +302,7 @@ Assignment completion trends, subject-wise workload distribution, and deadline t
 
 ## ⚙️ Installation Guide
 
-> 💡 **Just want to try it?** Skip the setup — the live deployment is at **[student-dashboard-ashy-rho.vercel.app](https://student-dashboard-ashy-rho.vercel.app/)**.
+> 💡 **Just want to try it?** Skip the setup — use the live deployment at **[student-dashboard-ashy-rho.vercel.app](https://student-dashboard-ashy-rho.vercel.app/)** with the [demo credentials above](#-try-it-instantly--no-signup-required) (`demo@studentai.app` / `Demo@123`).
 
 ### Prerequisites
 - Node.js v18+

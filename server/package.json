@@ -9,7 +9,8 @@
     "postinstall": "pip3 install --break-system-packages -r requirements.txt || pip install --break-system-packages -r requirements.txt",
     "test:unstop": "node collectors/tests/unstopTest.js",
     "test:devfolio": "node collectors/tests/devfolioTest.js",
-    "test:all-collectors": "node tests/runAllTests.js"
+    "test:all-collectors": "node tests/runAllTests.js",
+    "seed:demo": "node scripts/seedDemoAccount.js"
   },
   "dependencies": {
     "@sentry/node": "^9.0.0",
