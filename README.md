@@ -263,8 +263,8 @@ Color-coded weekly grid with room numbers and time slots, auto-populated and edi
 
 ![Weekly Timetable Grid](Screenshots/timetable.png)
 
-### ✅ Attendance Intelligence — Records & Subject Breakdown
-Subject-wise attendance percentage with shortage warnings ("Attend next 2 consecutive classes to reach 75%") plus a full present/absent log.
+### ✅ Attendance Intelligence — Bulk Upload & OCR Scan
+Bulk-import attendance from an Excel sheet or a OneDrive link, or scan a physical register with AI OCR to auto-fill records.
 
 ![Attendance Records](Screenshots/attendance.png)
 
@@ -288,8 +288,8 @@ Live LeetCode sync (solved counts by difficulty), a personalized AI-generated pr
 
 ![AI DSA Coach](Screenshots/dsa-coach.png)
 
-### 🎤 Resume Scanner & AI Mock Interview
-Upload a resume for keyword-gap analysis against your target role, then jump straight into an AI-generated mock interview.
+### 🎤 AI Resume Scanner — Keyword-Gap Analysis
+Upload a resume for keyword-gap analysis against your target role — strengths, missing keywords, ATS risk, and actionable feedback, plus a launch pad into an AI-generated mock interview.
 
 ![Resume Scanner & Mock Interview](Screenshots/mock-interview.png)
 
