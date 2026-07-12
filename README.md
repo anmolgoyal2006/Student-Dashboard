@@ -248,12 +248,17 @@ Every "smart" feature here is one of three things: a **deterministic formula**, 
 
 ## 📸 Screenshots
 
+### 🚀 Landing Page — AI-Powered Academic Success Platform
+The entry point: a unified pitch for grades, attendance, notes, placements, and opportunities, powered by Gemini AI and Google Classroom.
+
+![Landing Page](Screenshots/landing-page.png)
+
 ### 🏠 Dashboard — Live Academic Snapshot
 At-a-glance CGPA, today's classes, low-attendance alerts, and per-subject attendance trends the moment you log in.
 
 ![Dashboard Overview](Screenshots/dashboard.png)
 
-### 🗓️ Smart Scheduler — Weekly Timetable Grid
+### 🗓️ Weekly Timetable — Smart Grid
 Color-coded weekly grid with room numbers and time slots, auto-populated and editable in seconds.
 
 ![Weekly Timetable Grid](Screenshots/timetable.png)
@@ -262,6 +267,11 @@ Color-coded weekly grid with room numbers and time slots, auto-populated and edi
 Subject-wise attendance percentage with shortage warnings ("Attend next 2 consecutive classes to reach 75%") plus a full present/absent log.
 
 ![Attendance Records](Screenshots/attendance.png)
+
+### ⏰ Smart Scheduler — Tasks & Google Classroom Sync
+Import courses and assignments straight from Google Classroom, then track tasks and deadlines in a weekly planner.
+
+![Smart Scheduler](Screenshots/scheduler.png)
 
 ### 📊 Marks & CGPA — Multi-PDF Ranking + OCR
 Upload marksheet PDFs directly, auto-merge results, weight scoring, and generate ranked leaderboards — no manual data entry.
@@ -292,11 +302,6 @@ Auto-aggregated hackathons, workshops, and competitions with difficulty tags and
 A Gemini-powered chat interface that updates your dashboard from plain English — add a subject, mark attendance, or ask about your CGPA, conversationally.
 
 ![AI Study Assistant](Screenshots/notes-ai.png)
-
-### 📈 Analytics — Productivity & Workload Insights
-Assignment completion trends, subject-wise workload distribution, and deadline timelines that surface where effort is actually going.
-
-![Analytics Dashboard](Screenshots/analytics.png)
 
 ---
 
