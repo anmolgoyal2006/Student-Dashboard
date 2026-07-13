@@ -428,41 +428,46 @@
         <animate attributeName="opacity" from="0" to="1" begin="2.0s" dur="0.3s" fill="freeze"/>
         &gt;
       </text>
-      <rect x="0" y="0" width="1" height="1" opacity="0">
-        <animate id="roleCycle-light" attributeName="opacity" values="1;1" begin="2.0s" dur="12.0s" repeatCount="indefinite"/>
-      </rect>
 
     <clipPath id="roleClip-light-0">
       <rect x="534" y="172" width="0" height="26">
-        <animate attributeName="width" from="0" to="234.0" begin="roleCycle-light.begin+0.0s" dur="1.1s" fill="freeze" calcMode="linear"/>
-        <animate attributeName="opacity" values="1;1;0" keyTimes="0;0.817;1" begin="roleCycle-light.begin+0.0s" dur="3.0s" fill="freeze"/>
+        <animate attributeName="width"
+          values="0;234.0;234.0;0;0"
+          keyTimes="0;0.0917;0.2042;0.2333;1"
+          begin="2.0s" dur="12.0s" repeatCount="indefinite"/>
       </rect>
     </clipPath>
-    <text x="534" y="190" clip-path="url(#roleClip-light-0)" font-family="'SFMono-Regular',Consolas,Menlo,monospace" font-size="18" font-weight="600" fill="url(#accentGradient-light)">Full Stack Developer</text>
+    <text x="534" y="190" clip-path="url(#roleClip-light-0)" font-family="'SFMono-Regular',Consolas,Menlo,monospace" font-size="18" font-weight="600" fill="url(#accentGradient-light)" opacity="0"><animate attributeName="opacity" values="1;1;1;0;0" keyTimes="0;0.0917;0.2042;0.2333;1" begin="2.0s" dur="12.0s" repeatCount="indefinite"/>Full Stack Developer</text>
 
     <clipPath id="roleClip-light-1">
       <rect x="534" y="172" width="0" height="26">
-        <animate attributeName="width" from="0" to="279.6" begin="roleCycle-light.begin+3.0s" dur="1.1s" fill="freeze" calcMode="linear"/>
-        <animate attributeName="opacity" values="1;1;0" keyTimes="0;0.817;1" begin="roleCycle-light.begin+3.0s" dur="3.0s" fill="freeze"/>
+        <animate attributeName="width"
+          values="0;279.6;279.6;0;0"
+          keyTimes="0;0.0917;0.2042;0.2333;1"
+          begin="5.0s" dur="12.0s" repeatCount="indefinite"/>
       </rect>
     </clipPath>
-    <text x="534" y="190" clip-path="url(#roleClip-light-1)" font-family="'SFMono-Regular',Consolas,Menlo,monospace" font-size="18" font-weight="600" fill="url(#accentGradient-light)">AI / LLM Systems Builder</text>
+    <text x="534" y="190" clip-path="url(#roleClip-light-1)" font-family="'SFMono-Regular',Consolas,Menlo,monospace" font-size="18" font-weight="600" fill="url(#accentGradient-light)" opacity="0"><animate attributeName="opacity" values="1;1;1;0;0" keyTimes="0;0.0917;0.2042;0.2333;1" begin="5.0s" dur="12.0s" repeatCount="indefinite"/>AI / LLM Systems Builder</text>
 
     <clipPath id="roleClip-light-2">
       <rect x="534" y="172" width="0" height="26">
-        <animate attributeName="width" from="0" to="268.2" begin="roleCycle-light.begin+6.0s" dur="1.1s" fill="freeze" calcMode="linear"/>
-        <animate attributeName="opacity" values="1;1;0" keyTimes="0;0.817;1" begin="roleCycle-light.begin+6.0s" dur="3.0s" fill="freeze"/>
+        <animate attributeName="width"
+          values="0;268.2;268.2;0;0"
+          keyTimes="0;0.0917;0.2042;0.2333;1"
+          begin="8.0s" dur="12.0s" repeatCount="indefinite"/>
       </rect>
     </clipPath>
-    <text x="534" y="190" clip-path="url(#roleClip-light-2)" font-family="'SFMono-Regular',Consolas,Menlo,monospace" font-size="18" font-weight="600" fill="url(#accentGradient-light)">Open Source Contributor</text>
+    <text x="534" y="190" clip-path="url(#roleClip-light-2)" font-family="'SFMono-Regular',Consolas,Menlo,monospace" font-size="18" font-weight="600" fill="url(#accentGradient-light)" opacity="0"><animate attributeName="opacity" values="1;1;1;0;0" keyTimes="0;0.0917;0.2042;0.2333;1" begin="8.0s" dur="12.0s" repeatCount="indefinite"/>Open Source Contributor</text>
 
     <clipPath id="roleClip-light-3">
       <rect x="534" y="172" width="0" height="26">
-        <animate attributeName="width" from="0" to="279.6" begin="roleCycle-light.begin+9.0s" dur="1.1s" fill="freeze" calcMode="linear"/>
-        <animate attributeName="opacity" values="1;1;0" keyTimes="0;0.817;1" begin="roleCycle-light.begin+9.0s" dur="3.0s" fill="freeze"/>
+        <animate attributeName="width"
+          values="0;279.6;279.6;0;0"
+          keyTimes="0;0.0917;0.2042;0.2333;1"
+          begin="11.0s" dur="12.0s" repeatCount="indefinite"/>
       </rect>
     </clipPath>
-    <text x="534" y="190" clip-path="url(#roleClip-light-3)" font-family="'SFMono-Regular',Consolas,Menlo,monospace" font-size="18" font-weight="600" fill="url(#accentGradient-light)">React &amp; Node.js Engineer</text>
+    <text x="534" y="190" clip-path="url(#roleClip-light-3)" font-family="'SFMono-Regular',Consolas,Menlo,monospace" font-size="18" font-weight="600" fill="url(#accentGradient-light)" opacity="0"><animate attributeName="opacity" values="1;1;1;0;0" keyTimes="0;0.0917;0.2042;0.2333;1" begin="11.0s" dur="12.0s" repeatCount="indefinite"/>React &amp; Node.js Engineer</text>
       <rect x="534" y="174" width="2.5" height="20" fill="#06B6D4">
         <animate attributeName="opacity" values="1;0;1" dur="0.9s" begin="2s" repeatCount="indefinite"/>
       </rect>
