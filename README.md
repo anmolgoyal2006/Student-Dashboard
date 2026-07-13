@@ -400,60 +400,19 @@ PYTHON_PATH=
 
 ## 🔌 API Overview
 
-| Method | Endpoint | Description |
-|---|---|---|
-| `POST` | `/api/auth/signup` | Register a new user |
-| `POST` | `/api/auth/login` | Login (JWT) |
-| `GET` | `/api/auth/google` | Google OAuth login |
-| `POST` | `/api/user/forgot-password` | Send password reset email |
-| `POST` | `/api/user/reset-password/:token` | Reset password with token |
-| `GET` | `/api/marks` | Fetch marks records |
-| `POST` | `/api/marks` | Add marks |
-| `GET` | `/api/marks/cgpa` | Get CGPA |
-| `POST` | `/api/marks/semester` | Add a new semester |
-| `GET` | `/api/marks/cgpa-semester` | Compute CGPA from semester SGPAs |
-| `GET` | `/api/marks/semesters` | Get all semesters |
-| `POST` | `/api/marks/upload-pdf` | Upload marksheet PDF |
-| `POST` | `/api/marks/parse-pdfs` | Parse multiple PDFs at once |
-| `POST` | `/api/marks/generate-leaderboard` | Generate marks leaderboard |
-| `POST` | `/api/marks/ocr-ai-correct` | Gemini correction pass for OCR output |
-| `GET` | `/api/attendance/summary` | Attendance breakdown + shortage prediction |
-| `POST` | `/api/attendance` | Mark attendance |
-| `GET` | `/api/attendance/trends` | Monthly attendance trends |
-| `POST` | `/api/attendance/mark-from-notification` | Mark attendance via notification |
-| `POST` | `/api/attendance/upload` | Teacher bulk-uploads an Excel attendance sheet |
-| `POST` | `/api/attendance/upload-url` | Teacher imports an Excel sheet from a URL (SSRF-guarded) |
-| `GET` | `/api/attendance/template` | Download the sample Excel template |
-| `GET` | `/api/tasks` | Get all tasks |
-| `GET` | `/api/timetable` | Get timetable |
-| `GET` | `/api/subjects` | Get subjects |
-| `GET` | `/api/career` | Career progress data |
-| `POST` | `/api/career/dsa/coach` | AI DSA coaching plan |
-| `POST` | `/api/career/analyze-resume` | Resume keyword-gap analysis |
-| `POST` | `/api/career/mock-questions` | Generate mock interview questions |
-| `POST` | `/api/career/evaluate-answer` | Score a typed interview answer |
-| `POST` | `/api/ai/chat` | AI chat assistant |
-| `POST` | `/api/ai/upload` | Upload notes for AI processing |
-| `POST` | `/api/ai/transcribe` | Transcribe a voice command (Gemini) |
-| `POST` | `/api/ai/generate-study-plan` | Generate study plan |
-| `POST` | `/api/ai-command` | Process natural language (or transcribed voice) commands |
-| `GET` | `/api/predict` | Attendance + CGPA projections |
-| `GET` | `/api/predict/ai-analysis` | Gemini-generated risk analysis |
-| `GET` | `/api/decision/today-plan` | Aggregated daily action plan |
-| `GET` | `/api/opportunities` | Discovered hackathons & events |
-| `GET` | `/api/opportunities/recommended` | Personalized recommendations |
-| `GET` | `/api/opportunities/closing-soon` | Events closing soon |
-| `GET` | `/api/opportunities/trending` | Trending opportunities |
-| `POST` | `/api/opportunities/:id/save` | Save an opportunity |
-| `GET` | `/api/recommendations` | LLM-generated personalized recommendations |
-| `GET` | `/api/analytics` | Productivity & workload analytics |
-| `POST` | `/api/classroom/sync` | Sync Google Classroom assignments |
-| `GET` | `/api/notifications` | Get user notifications |
-| `GET` | `/api/events` | Get academic events |
-| `GET` | `/api/risks` | Risk alerts |
-| `GET` | `/api/admin/users` | List all users & roles (teacher-only) |
-| `GET` | `/api/admin/dashboard` | Admin overview (teacher-only) |
-| `POST` | `/api/admin/collectors/run` | Manually trigger opportunity collectors (teacher-only) |
+Representative endpoints per domain — the full list lives in `server/routes/` (21 route files).
+
+| Domain | Example Endpoints |
+|---|---|
+| Auth | `POST /api/auth/signup`, `POST /api/auth/login`, `GET /api/auth/google`, `POST /api/user/forgot-password` |
+| Marks & CGPA | `GET/POST /api/marks`, `GET /api/marks/cgpa`, `POST /api/marks/upload-pdf`, `POST /api/marks/ocr-ai-correct` |
+| Attendance | `GET /api/attendance/summary`, `POST /api/attendance`, `POST /api/attendance/upload(-url)`, `GET /api/attendance/template` |
+| Career / DSA | `GET /api/career`, `POST /api/career/dsa/coach`, `POST /api/career/analyze-resume`, `POST /api/career/mock-questions` |
+| AI Assistant | `POST /api/ai/chat`, `POST /api/ai/transcribe`, `POST /api/ai/generate-study-plan`, `POST /api/ai-command` |
+| Predictions | `GET /api/predict`, `GET /api/predict/ai-analysis`, `GET /api/decision/today-plan`, `GET /api/risks` |
+| Opportunities | `GET /api/opportunities(/recommended, /closing-soon)`, `POST /api/opportunities/:id/save` |
+| Classroom / Notifications | `POST /api/classroom/sync`, `GET /api/notifications`, `GET /api/events` |
+| Admin (teacher-only) | `GET /api/admin/users`, `GET /api/admin/dashboard`, `POST /api/admin/collectors/run` |
 
 ---
 
@@ -509,22 +468,6 @@ Being upfront about what this project doesn't do yet:
 - [ ] LinkedIn/GitHub profile intelligence integration
 - [ ] Offline-first PWA support
 - [ ] True agentic orchestration — a planner that dynamically chains the existing intelligence services based on user intent, rather than one route handler per feature
-
----
-
-## 🏆 Resume-Worthy Highlights
-
-> Use these as talking points in interviews, resumes, or hackathon pitches.
-
-- Designed and built a **service-oriented academic platform** with 27 backend services spanning academics, placements, and opportunities
-- Built an **OCR digitization pipeline** using Tesseract.js + a Gemini correction pass to convert handwritten marksheets into structured academic records
-- Implemented a **deterministic attendance-shortage engine** that projects risk forward instead of only reporting historical percentages
-- Built a **bulk attendance import pipeline** (Excel upload or URL, including OneDrive share-link resolution) with a custom SSRF guard on the server-side fetch
-- Developed a **voice-and-text AI command bar** — Gemini transcribes speech, then parses either input into a structured, validated dashboard action
-- Engineered **Google Classroom synchronization** for automatic assignment and announcement ingestion
-- Built **scheduled opportunity collectors** (Unstop & Devfolio) with cron-based deadline tracking
-- Created a **placement readiness system** combining DSA topic analysis, coding consistency metrics, and a Focus Mode practice timer
-- Architected a full production stack: **React, Node/Express, MongoDB**, JWT + dual Google OAuth, Firebase Cloud Messaging, and Sentry error tracking
 
 ---
 
