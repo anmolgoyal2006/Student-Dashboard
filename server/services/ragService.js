@@ -165,4 +165,4 @@ ${untrustedNotesBlock || 'No notes found.'}`,
   return { answer, sources };
 }
 
-module.exports = { storeNoteEmbeddings, chatWithRAG };
+module.exports = { storeNoteEmbeddings, chatWithRAG, cosineSimilarity };

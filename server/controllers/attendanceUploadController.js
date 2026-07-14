@@ -518,4 +518,7 @@ module.exports = {
   getAttendanceBySid,
   getClassSummary,
   downloadTemplate,
+  // Exported for unit tests:
+  isPrivateOrReservedIp,
+  assertPublicHttpUrl,
 };

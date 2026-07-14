@@ -40,15 +40,17 @@ jobs:
       - name: Install Python deps
         run: pip install -r requirements.txt
 
-      # No real unit test suite exists yet — server/tests/ and
-      # server/collectors/tests/ hit live third-party APIs (Unstop, Devfolio)
-      # and are deliberately NOT run here, since a change on those external
-      # sites would flakily fail unrelated PRs. This is a syntax/parse gate:
-      # every .js file must at least be valid JavaScript.
+      # The live-network collector scripts (server/tests/*.js,
+      # server/collectors/tests/) are NOT run here — they hit third-party
+      # sites (Unstop, Devfolio) and would flakily fail unrelated PRs. The
+      # real Jest suite (server/tests/*.test.js) runs below.
       - name: Syntax-check all backend source files
         run: |
           find . -name '*.js' -not -path './node_modules/*' -print0 \
             | xargs -0 -n1 node -c
+
+      - name: Test
+        run: npm test
 
       - name: Build backend Docker image
         run: docker build -t student-dashboard-server .
@@ -69,6 +71,11 @@ jobs:
 
       - name: Install deps
         run: npm ci
+
+      - name: Test
+        run: npm test
+        env:
+          CI: true
 
       - name: Build
         run: npm run build
