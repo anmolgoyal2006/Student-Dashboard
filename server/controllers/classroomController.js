@@ -1,4 +1,8 @@
 const { google } = require('googleapis');
+// Cap every googleapis HTTP call at 20s so a slow Google Classroom response
+// can't hang the on-demand sync request (which loops over all courses and
+// coursework) with no upper bound.
+google.options({ timeout: 20000 });
 const GoogleIntegration = require('../models/GoogleIntegration');
 const ClassroomCourse = require('../models/ClassroomCourse');
 const ClassroomAssignment = require('../models/ClassroomAssignment');

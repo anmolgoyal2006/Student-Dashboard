@@ -52,6 +52,7 @@ const sendEmail = async (toEmail, toName, resetURL) => {
         'content-type': 'application/json',
         'api-key':      process.env.BREVO_API_KEY,
       },
+      timeout: 15000, // don't let a slow Brevo hold the reset-password request open
     }
   );
 };

@@ -63,7 +63,11 @@ app.use('/api', (_req, res, next) => {
   next();
 });
 
-// ─── Request timeout (180s) ───────────────────────────────────────────────
+// ─── Request timeout (600s) ───────────────────────────────────────────────
+// Deliberately long: marks/attendance uploads run PDF parsing + Python OCR
+// child processes that can legitimately take minutes (the client axios timeout
+// is 600s to match). Per-dependency timeouts + circuit breakers (see
+// utils/circuitBreaker.js) guard the external calls that could otherwise hang.
 app.use((req, res, next) => {
   res.setTimeout(600000, () => {
     res.status(503).json({ message: 'Request timeout — server busy' });

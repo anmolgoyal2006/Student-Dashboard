@@ -1,4 +1,14 @@
 const axios = require('axios');
+const { getBreaker } = require('../utils/circuitBreaker');
+
+// LeetCode's public GraphQL is unauthenticated and throttle-prone; the career
+// page fans out an N+1 of these per submission. A breaker stops a throttled or
+// hung LeetCode from holding the request open across dozens of 15s calls.
+const lcBreaker = getBreaker('leetcode', {
+  failureThreshold: 4,
+  cooldownMs: 30000,
+  timeoutMs: 15000,
+});
 
 const LC_GRAPHQL = 'https://leetcode.com/graphql';
 const LC_HEADERS = {
@@ -38,16 +48,18 @@ const TAG_TO_TOPIC = {
 const DASHBOARD_TOPICS = new Set(Object.values(TAG_TO_TOPIC));
 
 async function lcQuery(query, variables = {}) {
-  const { data } = await axios.post(
-    LC_GRAPHQL,
-    { query, variables },
-    { headers: LC_HEADERS, timeout: 15000 }
-  );
-  if (data.errors?.length) {
-    const msg = data.errors.map((e) => e.message).join('; ');
-    throw new Error(msg || 'LeetCode API error');
-  }
-  return data.data;
+  return lcBreaker.exec(async () => {
+    const { data } = await axios.post(
+      LC_GRAPHQL,
+      { query, variables },
+      { headers: LC_HEADERS, timeout: 15000 }
+    );
+    if (data.errors?.length) {
+      const msg = data.errors.map((e) => e.message).join('; ');
+      throw new Error(msg || 'LeetCode API error');
+    }
+    return data.data;
+  });
 }
 
 /**

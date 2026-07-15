@@ -15,7 +15,9 @@ class UnstopCollector {
   async fetch() {
     try {
       const params = { oppstatus: "open", per_page: 50 };
-      const response = await axios.get(this.baseUrl, { params, headers: this.headers });
+      // 20s timeout so a hung Unstop response can't stall the every-15-min
+      // collector cron indefinitely.
+      const response = await axios.get(this.baseUrl, { params, headers: this.headers, timeout: 20000 });
       
       let opportunities = [];
       if (response.data?.data?.data && Array.isArray(response.data.data.data)) {

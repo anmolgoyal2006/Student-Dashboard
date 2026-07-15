@@ -1,4 +1,15 @@
 const https = require('https');
+const { getBreaker } = require('../utils/circuitBreaker');
+
+// Shared breaker for all Gemini calls. Trips after 5 consecutive failures and
+// fast-fails for 30s so a Gemini brownout can't pile up ~30s-each hung requests
+// on the user-facing AI routes (chat, DSA coach, predictions) and starve the
+// connection pool. The 30s per-call timeout mirrors the socket timeout below.
+const geminiBreaker = getBreaker('gemini', {
+  failureThreshold: 5,
+  cooldownMs: 30000,
+  timeoutMs: 30000,
+});
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 // Heavy model: used for resume analysis and grade prediction (quality-critical)
@@ -17,7 +28,7 @@ if (!GEMINI_API_KEY) {
   console.warn('[AI Service] GEMINI_API_KEY is not set. AI features will fail.');
 }
 
-function geminiFetch(path, body, model = LIGHT_MODEL) {
+function geminiFetchRaw(path, body, model = LIGHT_MODEL) {
   return new Promise((resolve, reject) => {
     const data = JSON.stringify(body);
     const options = {
@@ -58,6 +69,12 @@ function geminiFetch(path, body, model = LIGHT_MODEL) {
   });
 }
 
+// Breaker-gated entry point. All callers go through this; if Gemini is tripped
+// the call fails fast with a CircuitOpenError instead of hanging.
+function geminiFetch(path, body, model = LIGHT_MODEL) {
+  return geminiBreaker.exec(() => geminiFetchRaw(path, body, model));
+}
+
 function extractTextFromResponse(json) {
   try {
     const candidate = json.candidates[0];
@@ -77,6 +94,9 @@ async function withRetry(fn, maxRetries = 3, baseDelay = 1000) {
       return await fn();
     } catch (err) {
       lastError = err;
+      // A tripped breaker means the dependency is known-down — retrying just
+      // burns the request's time budget, so fail fast straight through.
+      if (err.code === 'CIRCUIT_OPEN') break;
       const nonRetryable = err.statusCode >= 400 && err.statusCode < 500 && err.statusCode !== 429;
       if (nonRetryable || attempt === maxRetries - 1) break;
       const delay = baseDelay * Math.pow(2, attempt);
