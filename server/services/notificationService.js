@@ -109,6 +109,18 @@ async function saveNotificationToDB(userId, subjectId, title, body) {
   }
 }
 
+// Batched variant: insert many notification docs in a single round trip.
+// Used by the cron loops, which would otherwise issue one insert per subject.
+async function saveNotificationsToDB(docs) {
+  if (!docs.length) return;
+  try {
+    await Notification.insertMany(docs, { ordered: false });
+    console.log(`✅ Saved ${docs.length} notifications to DB`);
+  } catch (err) {
+    console.error("❌ DB BULK SAVE ERROR:", err.message);
+  }
+}
+
 // ─── Start-of-day reminder ───────────────────────────────────────
 async function sendTodayNotifications() {
   const dayShort = getISTDayShort();
@@ -121,6 +133,7 @@ async function sendTodayNotifications() {
   }
 
   let totalSent = 0;
+  const notifDocs = [];
 
   for (const subject of subjects) {
     const todaySchedule = subject.schedule.find((s) => s.day === dayShort);
@@ -134,13 +147,20 @@ async function sendTodayNotifications() {
     const tokens = [user.fcmToken];
     const payload = buildPayload(subject, subject.userId, startTime, dateStr);
 
-    await saveNotificationToDB(subject.userId, subject._id, payload.notification.title, payload.notification.body);
+    notifDocs.push({
+      userId:    subject.userId,
+      subjectId: subject._id,
+      title:     payload.notification.title,
+      body:      payload.notification.body,
+    });
 
     for (const token of tokens) {
       const sent = await sendNotification(token, payload);
       if (sent) totalSent++;
     }
   }
+
+  await saveNotificationsToDB(notifDocs);
 
   console.log(`[FCM] Total start-of-day notifications sent: ${totalSent}`);
 }
@@ -171,6 +191,8 @@ async function sendEndOfClassNotifications() {
   if (!subjects.length) return;
 
   console.log(`[FCM] ${subjects.length} class(es) ending at ${currentTime} IST on ${dayShort}`);
+
+  const notifDocs = [];
 
   for (const subject of subjects) {
     const user = await User.findById(subject.userId).select('fcmToken').lean();
@@ -215,10 +237,12 @@ async function sendEndOfClassNotifications() {
     };
 
     await sendNotification(user.fcmToken, payload);
-    await saveNotificationToDB(subject.userId, subject._id, title, body);
+    notifDocs.push({ userId: subject.userId, subjectId: subject._id, title, body });
 
     console.log(`[FCM] End-of-class notification sent: ${subject.name} at ${currentTime} IST`);
   }
+
+  await saveNotificationsToDB(notifDocs);
 }
 
 module.exports = { sendTodayNotifications, sendEndOfClassNotifications, sendNotification, buildPayload };

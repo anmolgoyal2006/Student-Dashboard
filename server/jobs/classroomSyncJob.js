@@ -86,6 +86,15 @@ async function syncAllUsers() {
 
               const status = submitted ? 'submitted' : (w.state === 'PUBLISHED' ? 'assigned' : w.state?.toLowerCase() || 'assigned');
 
+              // Compute priority up front from the incoming fields so it can be
+              // folded into the single upsert below — avoids the previous pattern
+              // of findOneAndUpdate followed by a second assignment.save() just
+              // to persist priority (two writes per assignment → one).
+              const priority = await calculatePriority(
+                { dueDate, courseName: c.name, points, status },
+                userId
+              );
+
               const assignment = await ClassroomAssignment.findOneAndUpdate(
                 { userId, courseId: c.id, assignmentId: w.id },
                 {
@@ -96,13 +105,11 @@ async function syncAllUsers() {
                   points, maxPoints: points,
                   assignmentUrl: w.alternateLink || '',
                   estimatedHours: estimated,
+                  priority,
                   updatedAt: new Date(),
                 },
                 { upsert: true, new: true }
               );
-
-              assignment.priority = await calculatePriority(assignment, userId);
-              await assignment.save();
 
               const result = await sendAssignmentNotification(assignment, userId);
               if (result.success) {

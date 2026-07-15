@@ -10,6 +10,7 @@ async function saveEvents(events) {
   let inserted = 0;
   let updated = 0;
   let skipped = 0;
+  const ops = [];
 
   // First, delete expired events from the database
   const today = new Date();
@@ -22,7 +23,7 @@ async function saveEvents(events) {
   for (const event of events) {
     // Strip HTML from description
     event.description = stripHtml(event.description);
-    
+
     // Verify data quality before inserting
     if (!event.title || !event.registrationDeadline || !event.source || !event.sourceEventId) {
       console.warn(`⚠️ Skipping invalid event:`, event);
@@ -30,25 +31,31 @@ async function saveEvents(events) {
       continue;
     }
 
-    try {
-      // Check if duplicate
-      const exists = await Event.findOne({
-        source: event.source,
-        sourceEventId: event.sourceEventId
-      });
+    // Upsert keyed on (source, sourceEventId): update when it already exists,
+    // insert otherwise. Collapses the previous per-event findOne + update/create
+    // (~2 round trips each) into a single batched bulkWrite below.
+    ops.push({
+      updateOne: {
+        filter: { source: event.source, sourceEventId: event.sourceEventId },
+        update: { $set: event },
+        upsert: true,
+      },
+    });
+  }
 
-      if (exists) {
-        // Update existing
-        await Event.updateOne({ _id: exists._id }, event);
-        updated++;
-      } else {
-        // Insert new
-        await Event.create(event);
-        inserted++;
+  if (ops.length > 0) {
+    try {
+      // Chunk to keep individual bulkWrite payloads bounded on large runs.
+      const CHUNK = 500;
+      for (let i = 0; i < ops.length; i += CHUNK) {
+        const result = await Event.bulkWrite(ops.slice(i, i + CHUNK), { ordered: false });
+        inserted += result.upsertedCount || 0;
+        updated  += result.matchedCount || 0;
       }
     } catch (error) {
-      console.error(`❌ Error processing event ${event.title}:`, error.message);
-      skipped++;
+      console.error('❌ Error bulk-writing events:', error.message);
+      // A bulk error may still have written some docs; surface it but don't crash the run.
+      skipped += ops.length;
     }
   }
 

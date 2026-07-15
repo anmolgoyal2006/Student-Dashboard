@@ -166,24 +166,26 @@ const processExcelBuffer = async (buffer) => {
     });
   }
 
-  // ── Upsert valid records ──
-  for (const op of ops) {
-    const filter = {
-      userId:    op.userId,
-      subjectId: op.subjectId,
-      date:      op.date,
-    };
-
-    const result = await Attendance.findOneAndUpdate(
-      filter,
-      { $set: { status: op.status } },
-      { upsert: true, new: true, rawResult: true }
-    );
-
-    if (result.lastErrorObject?.updatedExisting) {
-      updated++;
-    } else {
-      inserted++;
+  // ── Bulk-upsert valid records ──
+  // A roster upload can be hundreds of rows; batching collapses one DB round
+  // trip per row into a single bulkWrite. upsertedCount = new inserts,
+  // matchedCount = existing rows updated. Chunked to bound statement size.
+  if (ops.length > 0) {
+    const CHUNK = 500;
+    for (let i = 0; i < ops.length; i += CHUNK) {
+      const slice = ops.slice(i, i + CHUNK);
+      const result = await Attendance.bulkWrite(
+        slice.map((op) => ({
+          updateOne: {
+            filter: { userId: op.userId, subjectId: op.subjectId, date: op.date },
+            update: { $set: { status: op.status } },
+            upsert: true,
+          },
+        })),
+        { ordered: false }
+      );
+      inserted += result.upsertedCount || 0;
+      updated  += result.matchedCount || 0;
     }
   }
 
