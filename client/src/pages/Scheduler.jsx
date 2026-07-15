@@ -143,20 +143,36 @@ export default function Scheduler() {
 
   const handleDelete = async id => {
     if (!window.confirm('Delete this task?')) return;
+    // Optimistic: remove immediately, restore the row if the server rejects.
+    const prev = tasks;
+    setTasks(curr => curr.filter(t => t._id !== id));
     try {
       await taskService.remove(id);
       toast.success('Task deleted');
-      load();
     } catch {
+      setTasks(prev);
       toast.error('Failed to delete');
     }
   };
 
+  // Mirrors the server's status cycle so the UI can update before the round trip.
+  const STATUS_CYCLE = { pending: 'in-progress', 'in-progress': 'completed', completed: 'pending' };
+
   const handleToggle = async id => {
+    // Optimistic: advance the status locally now, reconcile with the server's
+    // returned task, and roll back to the previous status on failure.
+    const prev = tasks;
+    setTasks(curr => curr.map(t =>
+      t._id === id ? { ...t, status: STATUS_CYCLE[t.status] || t.status } : t
+    ));
     try {
-      await taskService.toggle(id);
-      load();
+      const res = await taskService.toggle(id);
+      const updated = res?.data?.task;
+      if (updated) {
+        setTasks(curr => curr.map(t => (t._id === id ? updated : t)));
+      }
     } catch {
+      setTasks(prev);
       toast.error('Failed to update status');
     }
   };

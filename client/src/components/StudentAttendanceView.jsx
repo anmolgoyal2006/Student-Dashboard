@@ -191,6 +191,19 @@ const StudentAttendanceView = ({ sid }) => {
     } finally { setLoading(false); }
   };
 
+  // Attendance-only refresh: the timetable doesn't change when a class is
+  // marked, so quick-mark reconciliation shouldn't re-pull it or flip the
+  // page into a full loading state (TodayScheduleCard already shows the mark
+  // optimistically).
+  const refreshAttendanceRecords = async () => {
+    try {
+      const ar = await API.get(`/attendance/student/${sid}`);
+      setData(ar.data);
+    } catch {
+      /* keep existing data; TodayScheduleCard rolls back its own optimistic mark on error */
+    }
+  };
+
   useEffect(() => {
     sid
       ? fetchAttendance()
@@ -201,12 +214,16 @@ const StudentAttendanceView = ({ sid }) => {
 
   /* ── quick mark (from TodayScheduleCard) ── */
   const handleQuickMark = async (subjectId, date, status, slot) => {
+    // TodayScheduleCard already reflects the mark optimistically and rolls back
+    // on throw, so surface errors and refresh only the attendance records
+    // (not the timetable) to reconcile.
     try {
       await API.post(`/attendance`, { subjectId, date, status, slot });
       toast.success(`Marked ${status}!`);
-      fetchAttendance();
+      refreshAttendanceRecords();
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to mark attendance.");
+      throw err;
     }
   };
 

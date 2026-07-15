@@ -369,37 +369,46 @@ export default function Career() {
   };
 
   const handleSaveEvent = async (eventId) => {
+    const id = eventId.toString();
+    // Optimistic: fill the bookmark immediately, roll back if the server rejects.
+    setSavedEventIds(prev => new Set([...prev, id]));
     try {
       await opportunityService.save(eventId);
       toast.success('Event saved!');
-      // Update local state
-      setSavedEventIds(prev => new Set([...prev, eventId.toString()]));
-      // If on saved view, refresh
+      // If on saved view, refresh the list to include the newly saved event.
       if (hackathonView === 'saved') {
         const { data } = await opportunityService.getSaved();
         setHackathons(data.data || []);
       }
     } catch (err) {
+      setSavedEventIds(prev => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
       toast.error(err.response?.data?.message || 'Failed to save event');
     }
   };
 
   const handleUnsaveEvent = async (eventId) => {
+    const id = eventId.toString();
+    // Optimistic: empty the bookmark immediately, restore it on failure.
+    const wasSaved = savedEventIds.has(id);
+    setSavedEventIds(prev => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
     try {
       await opportunityService.unsave(eventId);
       toast.success('Event removed from saved!');
-      // Update local state
-      setSavedEventIds(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(eventId.toString());
-        return newSet;
-      });
-      // If on saved view, refresh
+      // If on saved view, refresh the list to drop the removed event.
       if (hackathonView === 'saved') {
         const { data } = await opportunityService.getSaved();
         setHackathons(data.data || []);
       }
     } catch (err) {
+      if (wasSaved) setSavedEventIds(prev => new Set([...prev, id]));
       toast.error(err.response?.data?.message || 'Failed to unsave event');
     }
   };
