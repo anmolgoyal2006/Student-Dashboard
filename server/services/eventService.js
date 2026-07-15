@@ -5,6 +5,12 @@ const { scheduleReminders, cancelReminders } = require('./reminderService');
 const { getCachedRecommendations, generateAndCacheRecommendations } = require('./recommendationCache');
 const { stripHtml } = require('../utils/helpers');
 const stringSimilarity = require('string-similarity');
+const { TTLCache } = require('../utils/ttlCache');
+
+// Shared, read-mostly event listings are identical across users and only change
+// when the collector cron writes new events. Cache them in-process (5 min TTL as
+// a safety net) and invalidate explicitly on every write in saveEvents().
+const listingCache = new TTLCache({ ttlMs: 5 * 60 * 1000, maxEntries: 300 });
 
 async function saveEvents(events) {
   let inserted = 0;
@@ -60,10 +66,18 @@ async function saveEvents(events) {
   }
 
   console.log(`📊 Event processing complete: Inserted ${inserted}, Updated ${updated}, Skipped ${skipped}`);
+  // Event set changed (deletes + upserts) — drop cached listings so the next
+  // read recomputes against fresh data rather than serving up to 5-min-stale.
+  listingCache.clear();
   return { inserted, updated, skipped };
 }
 
 async function getAllEvents(filters = {}, page = 1, limit = 20) {
+  const cacheKey = `all:${JSON.stringify(filters)}:${page}:${limit}`;
+  return listingCache.wrap(cacheKey, () => getAllEventsUncached(filters, page, limit));
+}
+
+async function getAllEventsUncached(filters = {}, page = 1, limit = 20) {
   const query = {};
   if (filters.source) query.source = filters.source;
   if (filters.category) query.category = filters.category;
@@ -138,6 +152,10 @@ async function getAllEvents(filters = {}, page = 1, limit = 20) {
 }
 
 async function getLatestEvents(limit = 50, userState = '') {
+  return listingCache.wrap(`latest:${limit}:${userState}`, () => getLatestEventsUncached(limit, userState));
+}
+
+async function getLatestEventsUncached(limit = 50, userState = '') {
   let query = {};
   if (userState) {
     query.$or = [
@@ -156,6 +174,10 @@ async function getLatestEvents(limit = 50, userState = '') {
 }
 
 async function getTrendingEvents(limit = 20, userState = '') {
+  return listingCache.wrap(`trending:${limit}:${userState}`, () => getTrendingEventsUncached(limit, userState));
+}
+
+async function getTrendingEventsUncached(limit = 20, userState = '') {
   let query = {};
   if (userState) {
     query.$or = [
@@ -174,6 +196,10 @@ async function getTrendingEvents(limit = 20, userState = '') {
 }
 
 async function getClosingSoonEvents(days = 7, userState = '') {
+  return listingCache.wrap(`closing:${days}:${userState}`, () => getClosingSoonEventsUncached(days, userState));
+}
+
+async function getClosingSoonEventsUncached(days = 7, userState = '') {
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() + days);
   let query = { 
