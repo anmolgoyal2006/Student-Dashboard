@@ -3,10 +3,11 @@
 // server.js or from a test) therefore always initializes Sentry first.
 const Sentry = require('./instrument');
 
-const express  = require('express');
-const cors     = require('cors');
-const mongoose = require('mongoose');
-const helmet   = require('helmet');
+const express     = require('express');
+const cors        = require('cors');
+const mongoose    = require('mongoose');
+const helmet      = require('helmet');
+const compression = require('compression');
 
 const app = express();
 
@@ -45,6 +46,13 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions)); // ← same config for preflight
+
+// ─── Response compression (gzip/deflate) ──────────────────────────────────
+// Render runs this as a bare Node container with no proxy in front, so nothing
+// gzips responses unless we do it here. Runs before the routes so all JSON
+// payloads are compressed; the built-in ~1 KB threshold skips tiny responses
+// (e.g. /api/ping), and it honours the client's Accept-Encoding automatically.
+app.use(compression());
 
 // ─── Body parsing ─────────────────────────────────────────────────────────
 app.use(express.json({ limit: '10mb' }));
