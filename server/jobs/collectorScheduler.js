@@ -6,6 +6,7 @@ const { generateAndCacheRecommendations } = require('../services/recommendationC
 const { sendDueReminders } = require('../services/reminderService');
 const EventFetchLog = require('../models/EventFetchLog');
 const User = require('../models/User');
+const { safeJob } = require('../utils/safeJob');
 
 let isRunning = false;
 
@@ -84,19 +85,19 @@ async function refreshAllRecommendations() {
 
 function startCollectorScheduler() {
   // Run every 15 minutes
-  cron.schedule('*/15 * * * *', runCollectors, {
+  cron.schedule('*/15 * * * *', safeJob('runCollectors', runCollectors), {
     scheduled: true,
     timezone: 'Asia/Kolkata',
   });
 
   // Refresh recommendations every 6 hours
-  cron.schedule('0 */6 * * *', refreshAllRecommendations, {
+  cron.schedule('0 */6 * * *', safeJob('refreshAllRecommendations', refreshAllRecommendations), {
     scheduled: true,
     timezone: 'Asia/Kolkata',
   });
 
   // Check for due reminders every hour
-  cron.schedule('0 * * * *', sendDueReminders, {
+  cron.schedule('0 * * * *', safeJob('sendDueReminders', sendDueReminders), {
     scheduled: true,
     timezone: 'Asia/Kolkata',
   });
@@ -105,7 +106,7 @@ function startCollectorScheduler() {
   console.log('[CRON] Collector scheduler started (every 15 minutes).');
   console.log('[CRON] Recommendation refresh started (every 6 hours).');
   console.log('[CRON] Reminder checker started (every hour).');
-  runCollectors();
+  safeJob('runCollectors', runCollectors)();
 }
 
 module.exports = { startCollectorScheduler, runCollectors, refreshAllRecommendations };

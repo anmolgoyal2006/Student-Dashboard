@@ -1,4 +1,5 @@
 const cron = require('node-cron');
+const { safeJob } = require('../utils/safeJob');
 const ClassroomAssignment = require('../models/ClassroomAssignment');
 const Task = require('../models/Task');
 const { sendAssignmentNotification, sendSessionNotification, sendNotification } = require('../services/notificationEngine');
@@ -124,17 +125,17 @@ async function checkRisks() {
 
 function startNotificationJobs() {
   // Every hour
-  cron.schedule('0 * * * *', () => {
+  cron.schedule('0 * * * *', safeJob('checkDeadlines+checkRisks', async () => {
     console.log('[Cron] Checking deadlines...');
-    checkDeadlines();
-    checkRisks();
-  }, { timezone: 'Asia/Kolkata' });
+    await checkDeadlines();
+    await checkRisks();
+  }), { timezone: 'Asia/Kolkata' });
 
   // Every 15 minutes
-  cron.schedule('*/15 * * * *', () => {
+  cron.schedule('*/15 * * * *', safeJob('checkSessions', async () => {
     console.log('[Cron] Checking sessions...');
-    checkSessions();
-  }, { timezone: 'Asia/Kolkata' });
+    await checkSessions();
+  }), { timezone: 'Asia/Kolkata' });
 
   console.log('[Cron] Notification jobs scheduled.');
 }

@@ -8,6 +8,7 @@ const cors        = require('cors');
 const mongoose    = require('mongoose');
 const helmet      = require('helmet');
 const compression = require('compression');
+const cookieParser = require('cookie-parser');
 
 const app = express();
 
@@ -16,6 +17,9 @@ app.use(helmet());
 
 // ─── Health check (before all other middleware/routes) ─────────────────
 app.get('/health', (_req, res) => res.status(200).send('OK'));
+
+// Signed with JWT_SECRET so the OAuth `state` cookie cannot be forged.
+app.use(cookieParser(process.env.JWT_SECRET));
 
 const passport = require('./config/passport');
 app.use(passport.initialize());

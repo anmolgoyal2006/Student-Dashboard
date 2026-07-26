@@ -1,4 +1,5 @@
 const cron = require('node-cron');
+const { safeJob } = require('../utils/safeJob');
 const ClassroomAssignment = require('../models/ClassroomAssignment');
 const Task = require('../models/Task');
 const Attendance = require('../models/Attendance');
@@ -139,16 +140,16 @@ async function sendWeeklyDigest() {
 
 function startDigestJobs() {
   // Daily at 6 PM
-  cron.schedule('0 18 * * *', () => {
+  cron.schedule('0 18 * * *', safeJob('sendDailyDigest', async () => {
     console.log('[Cron] Sending daily digest...');
-    sendDailyDigest();
-  }, { timezone: 'Asia/Kolkata' });
+    await sendDailyDigest();
+  }), { timezone: 'Asia/Kolkata' });
 
   // Every Sunday at 10 AM
-  cron.schedule('0 10 * * 0', () => {
+  cron.schedule('0 10 * * 0', safeJob('sendWeeklyDigest', async () => {
     console.log('[Cron] Sending weekly digest...');
-    sendWeeklyDigest();
-  }, { timezone: 'Asia/Kolkata' });
+    await sendWeeklyDigest();
+  }), { timezone: 'Asia/Kolkata' });
 
   console.log('[Cron] Digest jobs scheduled.');
 }

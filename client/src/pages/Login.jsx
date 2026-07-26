@@ -25,6 +25,7 @@ export default function Login() {
     const error  = params.get('error');
     if (error === 'google_failed') toast.error('Google sign-in failed. Please try again.');
     if (error === 'server_error')  toast.error('Server error during sign-in. Please try again.');
+    if (error === 'invalid_state') toast.error('Sign-in link expired or invalid. Please start again from this page.');
   });
 
   const handleChange = e => setForm(p => ({ ...p, [e.target.name]: e.target.value }));

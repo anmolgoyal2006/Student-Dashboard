@@ -5,6 +5,7 @@
 // connecting to the real database or starting cron jobs.
 const app      = require('./app');
 const mongoose = require('mongoose');
+const Sentry   = require('./instrument');
 
 const { startDailyNotificationJob } = require('./jobs/dailyNotificationJob');
 const { startClassroomSyncJob } = require('./jobs/classroomSyncJob');
@@ -75,4 +76,30 @@ mongoose.connection.on('reconnected', () => {
 
 mongoose.connection.on('error', (err) => {
   console.error('MongoDB connection error:', err.message);
+});
+
+// ── Last-resort process handlers ───────────────────────────────────────
+// These are a safety net, not a substitute for local try/catch: every cron
+// callback is already wrapped in safeJob(). Without them a single unhandled
+// rejection anywhere would terminate the process and take every user's
+// requests down with it.
+const shutdown = (reason, err) => {
+  console.error(`[FATAL] ${reason}:`, err?.stack || err);
+  Sentry.captureException(err);
+  // Give Sentry a moment to flush, then exit so Render restarts us clean.
+  // Continuing after an uncaught exception leaves undefined state.
+  Sentry.close(2000).then(() => process.exit(1));
+};
+
+process.on('unhandledRejection', (reason) => {
+  // A rejected promise has not corrupted process state, so log and keep serving.
+  console.error('[FATAL] Unhandled promise rejection:', reason?.stack || reason);
+  Sentry.captureException(reason);
+});
+
+process.on('uncaughtException', (err) => {
+  // EPIPE on stdout means something closed our output pipe (e.g. `| head`).
+  // It says nothing about application health, so never die for it.
+  if (err?.code === 'EPIPE') return;
+  shutdown('Uncaught exception', err);
 });
