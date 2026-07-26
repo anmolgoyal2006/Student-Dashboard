@@ -6,6 +6,7 @@ export const authService = {
   login:  (data) => apiRequest('post', '/auth/login',  data),
   getMe:  ()     => apiRequest('get',  '/auth/me'),
   update: (data) => apiRequest('put',  '/auth/profile', data),
+  logoutAll: ()  => apiRequest('post', '/auth/logout-all'),
 };
 
 // ─── Subjects (Timetable) ──────────────────────────────────────────────────

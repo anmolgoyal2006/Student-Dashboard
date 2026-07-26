@@ -34,7 +34,14 @@ const reminderSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
-  sentAt: Date
+  sentAt: Date,
+  // A reminder that keeps throwing (deleted user, bad data) would otherwise be
+  // re-fetched by the hourly job forever. Capped by MAX_SEND_ATTEMPTS.
+  attempts: {
+    type: Number,
+    default: 0
+  },
+  lastError: String
 }, { timestamps: true });
 
 module.exports = mongoose.model('Reminder', reminderSchema);

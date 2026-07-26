@@ -12,6 +12,11 @@ describe('CORS origin policy', () => {
     expect(res.headers['access-control-allow-origin']).toBeDefined();
   });
 
+  test('the bare Vercel project alias is allowed', async () => {
+    const res = await check('https://student-dashboard.vercel.app');
+    expect(res.headers['access-control-allow-origin']).toBeDefined();
+  });
+
   test('localhost dev origin is allowed', async () => {
     const res = await check('http://localhost:3000');
     expect(res.headers['access-control-allow-origin']).toBeDefined();
@@ -29,6 +34,11 @@ describe('CORS origin policy', () => {
 
   test('a lookalike domain is blocked', async () => {
     const res = await check('https://student-dashboard-ashy-rho.vercel.app.evil.com');
+    expect(res.headers['access-control-allow-origin']).toBeUndefined();
+  });
+
+  test('a prefix-squatted vercel subdomain is blocked', async () => {
+    const res = await check('https://evil-student-dashboard-x.vercel.app');
     expect(res.headers['access-control-allow-origin']).toBeUndefined();
   });
 

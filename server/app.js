@@ -27,6 +27,9 @@ app.use(passport.initialize());
 
 const allowedOrigins = [
   'https://student-dashboard-ashy-rho.vercel.app',
+  // Vercel also assigns a bare project alias; it does not match the preview
+  // pattern below (no `-suffix`), so it needs its own entry.
+  'https://student-dashboard.vercel.app',
   'http://localhost:3000',
   'http://localhost:3001',
   'http://localhost:3002',

@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { userService } from '../services/apiServices';
+import { userService, authService } from '../services/apiServices';
 import toast from '../context/ToastContext';
-import { Lock, Eye, EyeOff, User, Mail, Zap, ArrowRight, Shield, GraduationCap, Info, LogOut } from 'lucide-react';
+import { Lock, Eye, EyeOff, User, Mail, Zap, ArrowRight, Shield, ShieldOff, GraduationCap, Info, LogOut } from 'lucide-react';
 import './ProfileSettings.css';
 
 function getPasswordStrength(pw) {
@@ -74,6 +74,22 @@ export default function ProfileSettings() {
   const [sid,        setSid]  = useState(user?.sid || '');
   const [sidStatus,  setSidS] = useState({ type: '', message: '' });
   const [sidLoading, setSidL] = useState(false);
+
+  const [logoutAllLoading, setLogoutAllL] = useState(false);
+
+  const handleLogoutAll = async () => {
+    if (!window.confirm('Sign out of every device? You will need to log in again everywhere.')) return;
+
+    setLogoutAllL(true);
+    try {
+      await authService.logoutAll();
+      toast.success('Signed out of all devices.');
+      logout();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to sign out of all devices.');
+      setLogoutAllL(false);
+    }
+  };
 
   const handleProfileSubmit = async e => {
     e.preventDefault();
@@ -421,6 +437,24 @@ export default function ProfileSettings() {
           >
             <LogOut size={14} />
             Logout
+          </button>
+
+          <div className="ps-alert ps-alert--info" style={{ marginTop: '14px' }}>
+            <span className="ps-alert-icon"><Info size={14} /></span>
+            <span>
+              Lost a device, or think someone else has your account? Signing out
+              everywhere immediately invalidates every existing session.
+            </span>
+          </div>
+
+          <button
+            onClick={handleLogoutAll}
+            disabled={logoutAllLoading}
+            className="ps-btn"
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', marginTop: '10px', background: 'transparent', color: 'var(--color-danger)', border: '1px solid var(--color-danger)' }}
+          >
+            <ShieldOff size={14} />
+            {logoutAllLoading ? 'Signing out…' : 'Sign out of all devices'}
           </button>
         </div>
 

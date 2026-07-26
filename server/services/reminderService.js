@@ -4,6 +4,8 @@ const Notification = require('../models/Notification');
 const NotificationToken = require('../models/NotificationToken');
 const admin = require('../config/firebaseAdmin');
 
+const MAX_SEND_ATTEMPTS = 3;
+
 /**
  * Schedule reminders for an event when a user saves it
  */
@@ -119,6 +121,16 @@ async function sendReminder(reminder) {
     return true;
   } catch (error) {
     console.error(`Error sending reminder ${reminder._id}:`, error);
+    // Record the failure so a permanently broken reminder eventually stops
+    // being retried by the hourly job.
+    try {
+      await Reminder.updateOne(
+        { _id: reminder._id },
+        { $inc: { attempts: 1 }, $set: { lastError: error.message } }
+      );
+    } catch (bookkeepingErr) {
+      console.error(`Could not record failure for reminder ${reminder._id}:`, bookkeepingErr.message);
+    }
     return false;
   }
 }
@@ -128,21 +140,29 @@ async function sendReminder(reminder) {
  */
 async function sendDueReminders() {
   console.log('Checking for due reminders...');
-  
+
   const now = new Date();
-  // Get reminders that are due and not sent yet
+  // Get reminders that are due, not sent yet, and not exhausted by repeated failures.
+  // `attempts` is absent on rows created before this field existed, and $lt does
+  // not match a missing field — so those must be matched explicitly.
   const dueReminders = await Reminder.find({
     sendAt: { $lte: now },
-    sent: false
+    sent: false,
+    $or: [
+      { attempts: { $exists: false } },
+      { attempts: { $lt: MAX_SEND_ATTEMPTS } }
+    ]
   });
 
   console.log(`Found ${dueReminders.length} due reminders`);
 
+  let failed = 0;
   for (const reminder of dueReminders) {
-    await sendReminder(reminder);
+    const ok = await sendReminder(reminder);
+    if (!ok) failed++;
   }
 
-  console.log('Reminder check complete');
+  console.log(`Reminder check complete (${dueReminders.length - failed} sent, ${failed} failed)`);
 }
 
 /**
