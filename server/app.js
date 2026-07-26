@@ -9,6 +9,7 @@ const mongoose    = require('mongoose');
 const helmet      = require('helmet');
 const compression = require('compression');
 const cookieParser = require('cookie-parser');
+const multer = require('multer');
 
 const app = express();
 
@@ -144,6 +145,20 @@ Sentry.setupExpressErrorHandler(app);
 // ─── Global error handler ─────────────────────────────────────────────────
 app.use((err, _req, res, _next) => {
   console.error('[Error]', err.message);
+
+  // Multer rejects oversized/too-many/disallowed files. These are client
+  // mistakes, not server faults, so they must not surface as 500s.
+  if (err instanceof multer.MulterError) {
+    const message =
+      err.code === 'LIMIT_FILE_SIZE'  ? 'File is too large.' :
+      err.code === 'LIMIT_FILE_COUNT' ? 'Too many files uploaded.' :
+      `Upload rejected: ${err.message}`;
+    return res.status(413).json({ message });
+  }
+  if (/Only .* (are allowed|supported)/i.test(err.message || '')) {
+    return res.status(400).json({ message: err.message });
+  }
+
   res.status(err.status || 500).json({ message: err.message || 'Internal server error' });
 });
 

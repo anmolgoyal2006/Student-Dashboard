@@ -1,7 +1,19 @@
 const express  = require('express');
 const router   = express.Router();
 const multer   = require('multer');
-const upload   = multer();
+// Bare multer() has no size cap and buffers into RAM. uploadResume also checks
+// size, but only after the full file is already in memory — too late to help.
+const upload   = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024, files: 1 },
+  fileFilter: (_req, file, cb) => {
+    const ok =
+      file.mimetype === 'application/pdf' ||
+      file.mimetype.startsWith('image/') ||
+      /\.(pdf|png|jpe?g)$/i.test(file.originalname);
+    cb(ok ? null : new Error('Only PDF and image files (PNG, JPG) are allowed.'), ok);
+  },
+});
 const { body, param } = require('express-validator');
 const { validate } = require('../middleware/validate');
 

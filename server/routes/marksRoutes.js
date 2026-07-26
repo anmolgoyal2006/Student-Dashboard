@@ -34,7 +34,19 @@ const {
   parseSavedPdfById,
 } = require('../controllers/marksUploadController');
 const multer = require('multer');
-const upload = multer({ storage: multer.memoryStorage() });
+// Files are buffered in RAM, so the size cap must be enforced here — a check
+// inside the controller runs only after the whole upload is already resident.
+// /parse-pdfs accepts 20 files, so the effective ceiling is 20 × 10 MB.
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024, files: 20 },
+  fileFilter: (_req, file, cb) => {
+    const ok =
+      file.mimetype === 'application/pdf' ||
+      /\.pdf$/i.test(file.originalname);
+    cb(ok ? null : new Error('Only PDF files are allowed.'), ok);
+  },
+});
 
 router.use(protect);
 
