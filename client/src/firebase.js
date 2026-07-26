@@ -33,6 +33,16 @@ export async function getFCMToken() {
       return null;
     }
   } catch (err) {
+    // Declining notifications is a normal user choice, not a fault — logging it
+    // as an error buries real failures in the console.
+    if (
+      err?.code === 'messaging/permission-blocked' ||
+      err?.code === 'messaging/permission-default' ||
+      err?.code === 'messaging/notifications-blocked'
+    ) {
+      console.info('[FCM] Notifications not permitted — push disabled.');
+      return null;
+    }
     console.error('[FCM] getToken error:', err);
     return null;
   }

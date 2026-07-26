@@ -127,55 +127,9 @@ async function fetchRecentAcSubmissions(username, limit = 50) {
 async function fetchSolvedSlugs(username) {
   const slugs = new Set();
 
-  const acQuery = `
-    query acSubmissionList($username: String!, $limit: Int!) {
-      matchedUser(username: $username) {
-        acSubmissionList(limit: $limit) {
-          titleSlug
-        }
-      }
-    }
-  `;
-  try {
-    const data = await lcQuery(acQuery, { username, limit: 500 });
-    for (const s of data?.matchedUser?.acSubmissionList || []) {
-      if (s.titleSlug) slugs.add(s.titleSlug);
-    }
-  } catch {
-    /* fall through */
-  }
-
-  const listQuery = `
-    query submissionList($username: String!, $limit: Int!, $offset: Int!) {
-      submissionList(username: $username, limit: $limit, offset: $offset) {
-        hasNext
-        submissions {
-          titleSlug
-          statusDisplay
-        }
-      }
-    }
-  `;
-  try {
-    let offset = 0;
-    const limit = 20;
-    for (let page = 0; page < 40; page++) {
-      const data = await lcQuery(listQuery, { username, limit, offset });
-      const block = data?.submissionList;
-      const subs = block?.submissions || [];
-      for (const s of subs) {
-        if ((s.statusDisplay || '').toLowerCase() === 'accepted' && s.titleSlug) {
-          slugs.add(s.titleSlug);
-        }
-      }
-      offset += limit;
-      if (!block?.hasNext || subs.length < limit) break;
-      await new Promise((r) => setTimeout(r, 80));
-    }
-  } catch {
-    /* fall through */
-  }
-
+  // LeetCode removed `matchedUser.acSubmissionList` and the `username` argument
+  // on `submissionList` (both now hard-400 on every call). `recentAcSubmissionList`
+  // is the only unauthenticated source left, and it caps out around 20 entries.
   const recent = await fetchRecentAcSubmissions(username, 50);
   for (const s of recent) {
     if (s.titleSlug) slugs.add(s.titleSlug);
@@ -613,7 +567,12 @@ async function buildLeetcodeInsights(career, { live = false, topicTargets = {} }
       totalSolved = stats.totalSolved;
       const tagRows = await fetchSkillTagCounts(username);
       lcByTopic = aggregateTagsToDashboardTopics(tagRows);
-      solvedSlugs = await fetchSolvedSlugs(username);
+      // Union rather than replace: fetchSolvedSlugs only sees a ~20-entry
+      // window, and the coach uses this set to avoid re-recommending solved
+      // problems. Replacing it would make solved problems reappear.
+      for (const slug of await fetchSolvedSlugs(username)) {
+        solvedSlugs.add(slug);
+      }
       const recent = await fetchRecentAcSubmissions(username, 25);
       const enriched = await enrichSubmissionsWithTopics(recent.slice(0, 8), 8);
       recentSolves = enriched.map((s) => ({

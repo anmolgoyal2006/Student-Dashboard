@@ -119,6 +119,12 @@ exports.syncLeetcode = async (req, res) => {
     const tagRows = await fetchSkillTagCounts(username);
     const lcByTopic = aggregateTagsToDashboardTopics(tagRows);
     const solvedSlugSet = await fetchSolvedSlugs(username);
+    // LeetCode only exposes the ~20 most recent accepted submissions to
+    // unauthenticated callers, so a sync sees a moving window, not full history.
+    // Union with what we already stored, or company progress would go backwards.
+    for (const slug of career.leetcodeSync?.solvedSlugs || []) {
+      solvedSlugSet.add(slug);
+    }
     const solvedSlugs = [...solvedSlugSet];
     const recent = await fetchRecentAcSubmissions(username, 50);
 
