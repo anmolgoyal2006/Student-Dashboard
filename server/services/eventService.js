@@ -202,23 +202,22 @@ async function getClosingSoonEvents(days = 7, userState = '') {
 async function getClosingSoonEventsUncached(days = 7, userState = '') {
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() + days);
-  let query = { 
-    registrationDeadline: { $gte: new Date(), $lte: cutoff } 
+  let query = {
+    registrationDeadline: { $gte: new Date(), $lte: cutoff }
   };
   if (userState) {
-    query.$and = [
-      query,
+    // Attach the state filter as a sibling $or, matching the other listing
+    // queries. Building `query.$and = [query, ...]` would make the object
+    // contain itself, and serializing it throws "Maximum call stack size
+    // exceeded" before the query ever reaches Mongo.
+    query.$or = [
+      { state: { $regex: new RegExp(userState, 'i') } },
+      { location: { $regex: new RegExp(userState, 'i') } },
+      { description: { $regex: new RegExp(userState, 'i') } },
       {
-        $or: [
-          { state: { $regex: new RegExp(userState, 'i') } },
-          { location: { $regex: new RegExp(userState, 'i') } },
-          { description: { $regex: new RegExp(userState, 'i') } },
-          { 
-            $and: [
-              { $or: [{ state: '' }, { state: { $exists: false } }] },
-              { $or: [{ location: '' }, { location: { $exists: false } }] }
-            ]
-          }
+        $and: [
+          { $or: [{ state: '' }, { state: { $exists: false } }] },
+          { $or: [{ location: '' }, { location: { $exists: false } }] }
         ]
       }
     ];
@@ -440,7 +439,8 @@ async function detectDuplicates() {
   };
 }
 
-module.exports = { 
+module.exports = {
+  listingCache, 
   saveEvents, 
   getAllEvents, 
   getLatestEvents, 

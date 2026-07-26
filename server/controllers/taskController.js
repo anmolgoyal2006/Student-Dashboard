@@ -81,14 +81,27 @@ const createTask = async (req, res) => {
 };
 
 // PUT update task
+const TASK_UPDATABLE_FIELDS = [
+  'title', 'subject', 'description', 'dueDate', 'dueTime',
+  'priority', 'status', 'type',
+];
+
 const updateTask = async (req, res) => {
   try {
+    // Whitelist rather than passing req.body through: the route validates the
+    // shape of known fields but does not reject unknown ones, so an untrusted
+    // body could otherwise reassign `user` and hand the task to someone else.
+    const updates = {};
+    for (const field of TASK_UPDATABLE_FIELDS) {
+      if (req.body[field] !== undefined) updates[field] = req.body[field];
+    }
+
     const task = await Task.findOneAndUpdate(
       {
         _id: req.params.id,
         user: getUserId(req),
       },
-      req.body,
+      { $set: updates },
       { new: true, runValidators: true }
     );
 

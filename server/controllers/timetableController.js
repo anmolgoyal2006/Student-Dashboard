@@ -25,11 +25,20 @@ exports.addSubject = async (req, res) => {
 };
 
 // PUT /api/subjects/:id
+const SUBJECT_UPDATABLE_FIELDS = ['name', 'code', 'instructor', 'credits', 'schedule'];
+
 exports.updateSubject = async (req, res) => {
   try {
+    // Whitelist: $set: req.body would let a client reassign `userId` and move
+    // the subject to another account.
+    const updates = {};
+    for (const field of SUBJECT_UPDATABLE_FIELDS) {
+      if (req.body[field] !== undefined) updates[field] = req.body[field];
+    }
+
     const subject = await Subject.findOneAndUpdate(
       { _id: req.params.id, userId: req.user.id },
-      { $set: req.body },
+      { $set: updates },
       { new: true, runValidators: true }
     );
     if (!subject) return res.status(404).json({ message: 'Subject not found.' });

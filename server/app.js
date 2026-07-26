@@ -33,14 +33,19 @@ const allowedOrigins = [
   'http://localhost:3003',
 ];
 
+// Vercel preview deploys get generated subdomains, so they need a pattern
+// rather than a fixed entry. Scope it to this project's own previews —
+// /\.vercel\.app$/ would match ANY Vercel site, including one an attacker
+// deploys for free, letting it call this API from the browser.
+const VERCEL_PREVIEW = /^https:\/\/student-dashboard-[a-z0-9-]+\.vercel\.app$/;
+
 const corsOptions = {
   origin: (origin, cb) => {
     // allow requests with no origin (mobile apps, curl, Postman)
-    // and any Vercel preview deployments
     if (
       !origin ||
       allowedOrigins.includes(origin) ||
-      /\.vercel\.app$/.test(origin)
+      VERCEL_PREVIEW.test(origin)
     ) return cb(null, true);
     cb(new Error(`CORS blocked for origin: ${origin}`));
   },
