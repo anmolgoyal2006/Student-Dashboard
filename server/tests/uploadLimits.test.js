@@ -1,17 +1,28 @@
 const request = require('supertest');
 const jwt = require('jsonwebtoken');
-const mongoose = require('mongoose');
 const app = require('../app');
+const User = require('../models/User');
 
 // Uploads are buffered into memory, so an unbounded multer config lets one
 // authenticated user OOM the server for everyone. These routes previously had
 // no size cap and no type filter at all.
 describe('Upload limits', () => {
-  const token = jwt.sign(
-    { id: new mongoose.Types.ObjectId().toString(), email: 'u@example.com', role: 'student' },
-    process.env.JWT_SECRET,
-    { expiresIn: '1h' }
-  );
+  let token;
+
+  beforeEach(async () => {
+    // Must be a real user: protect() now verifies tokenVersion against the DB.
+    const user = await User.create({
+      name: 'Uploader',
+      email: 'uploader@example.com',
+      password: 'hashed-not-used-here',
+      role: 'student',
+    });
+    token = jwt.sign(
+      { id: user._id.toString(), email: user.email, role: user.role, tokenVersion: 0 },
+      process.env.JWT_SECRET,
+      { expiresIn: '1h' }
+    );
+  });
 
   const pdf = (mb) => Buffer.alloc(mb * 1024 * 1024, 'a');
 

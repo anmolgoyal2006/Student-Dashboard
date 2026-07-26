@@ -4,7 +4,7 @@ const crypto     = require('crypto');
 const { body }   = require('express-validator');
 const passport   = require('../config/passport');          // ← ADD
 const jwt        = require('jsonwebtoken');                // ← ADD
-const { signup, login, getMe } = require('../controllers/authController');
+const { signup, login, getMe, logoutAll } = require('../controllers/authController');
 const { protect } = require('../middleware/authMiddleware');
 const { authLimiter } = require('../middleware/rateLimitMiddleware');
 const { validate } = require('../middleware/validate');
@@ -25,6 +25,7 @@ router.post('/login', authLimiter, validate([
 ]), login);
 
 router.get ('/me',      protect, getMe);
+router.post('/logout-all', protect, logoutAll);
 
 // ── Google OAuth ──────────────────────────────────────────────────────────
 const CLIENT_URL = 'https://student-dashboard-ashy-rho.vercel.app';
@@ -95,7 +96,13 @@ router.get('/google/callback',
 
       try {
         const token = jwt.sign(
-          { id: user._id, email: user.email, name: user.name, role: user.role },
+          {
+            id: user._id,
+            email: user.email,
+            name: user.name,
+            role: user.role,
+            tokenVersion: user.tokenVersion || 0,
+          },
           process.env.JWT_SECRET,
           { expiresIn: '7d' }
         );

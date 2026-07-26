@@ -3,10 +3,17 @@ const User   = require('../models/User');
 const bcrypt = require('bcryptjs');
 const jwt    = require('jsonwebtoken');
 const axios  = require('axios');
+const { invalidateUserTokens } = require('../middleware/authMiddleware');
 
 const generateToken = (user) =>
   jwt.sign(
-    { id: user._id, email: user.email, name: user.name, role: user.role },
+    {
+      id: user._id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      tokenVersion: user.tokenVersion || 0,
+    },
     process.env.JWT_SECRET,
     { expiresIn: '7d' }
   );
@@ -126,7 +133,11 @@ exports.changePassword = async (req, res) => {
     const isMatch = await bcrypt.compare(oldPassword, user.password);
     if (!isMatch) return res.status(401).json({ message: 'Old password is incorrect.' });
     user.password = await bcrypt.hash(newPassword, 12);
+    // The response already tells the user to log in again; enforce it so old
+    // sessions (including any attacker's) actually stop working.
+    user.tokenVersion = (user.tokenVersion || 0) + 1;
     await user.save();
+    invalidateUserTokens(user._id);
     res.json({ message: 'Password changed successfully. Please log in again.' });
   } catch (err) { res.status(500).json({ message: err.message }); }
 };
@@ -188,7 +199,11 @@ exports.resetPassword = async (req, res) => {
     user.password             = await bcrypt.hash(newPassword, 12);
     user.resetPasswordToken   = undefined;
     user.resetPasswordExpires = undefined;
+    // Resetting a password is the main "I may be compromised" action, so every
+    // session issued before now must stop working.
+    user.tokenVersion         = (user.tokenVersion || 0) + 1;
     await user.save();
+    invalidateUserTokens(user._id);
     res.json({ message: 'Password reset successfully. You can now log in.' });
   } catch (err) { res.status(500).json({ message: err.message }); }
 };

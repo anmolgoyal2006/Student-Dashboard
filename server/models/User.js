@@ -6,6 +6,10 @@ const userSchema = new mongoose.Schema({
   password: { type: String, required: true, minlength: 6 },
   sid:  { type: String, sparse: true },
   role: { type: String, enum: ['student', 'teacher'], default: 'student' },
+  // Stamped into every JWT and re-checked on each request. Bumping it
+  // invalidates every token issued before the bump — this is the only way to
+  // revoke a stolen JWT before its 7-day expiry.
+  tokenVersion: { type: Number, default: 0 },
   college:  { type: String, default: '' },
   semester: { type: Number, default: 1, min: 1, max: 8 },
   branch:   { type: String, default: '' },

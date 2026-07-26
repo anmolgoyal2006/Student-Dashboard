@@ -2,10 +2,17 @@ const mongoose = require('mongoose');
 const User   = require('../models/User');
 const bcrypt = require('bcryptjs');
 const jwt    = require('jsonwebtoken');
+const { invalidateUserTokens } = require('../middleware/authMiddleware');
 
 const generateToken = (user) =>
   jwt.sign(
-    { id: user._id, email: user.email, name: user.name, role: user.role },
+    {
+      id: user._id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      tokenVersion: user.tokenVersion || 0,
+    },
     process.env.JWT_SECRET,
     { expiresIn: '7d' }
   );
@@ -45,6 +52,27 @@ res.json({
       token: generateToken(user),
       user:  { id: user._id, name: user.name, email: user.email, college: user.college, semester: user.semester, role: user.role, sid: user.sid },
     });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// POST /api/auth/logout-all
+// Ordinary logout is client-side only (the token is simply discarded), which
+// does nothing about a copy an attacker already holds. This bumps tokenVersion
+// so every outstanding session for this user is rejected server-side.
+exports.logoutAll = async (req, res) => {
+  try {
+    const user = await User.findByIdAndUpdate(
+      req.user.id,
+      { $inc: { tokenVersion: 1 } },
+      { new: true }
+    ).select('tokenVersion');
+
+    if (!user) return res.status(404).json({ message: 'User not found.' });
+
+    invalidateUserTokens(req.user.id);
+    res.json({ message: 'Signed out of all devices. Please log in again.' });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
