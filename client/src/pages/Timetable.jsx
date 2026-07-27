@@ -1,10 +1,11 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { subjectService } from '../services/apiServices';
 import toast from '../context/ToastContext';
 import WeeklyGrid from '../components/WeeklyGrid';
 import EmptyState from '../components/EmptyState';
 import Skeleton, { CardSkeleton, StatsSkeleton } from '../components/Skeleton';
-import { LayoutGrid, List, Plus, Edit, Trash2, Calendar, Clock, BookOpen, X, ChevronRight } from 'lucide-react';
+import TimetableImportPreview from '../components/TimetableImportPreview';
+import { LayoutGrid, List, Plus, Edit, Trash2, Calendar, Clock, BookOpen, X, ChevronRight, Upload, FileText, Loader2 } from 'lucide-react';
 
 const DAYS      = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 const EMPTY     = { name: '', code: '', instructor: '', credits: 4, schedule: [] };
@@ -69,6 +70,12 @@ export default function Timetable() {
   const [showForm, setShowForm] = useState(false);
   const [tab,      setTab]      = useState('grid');
 
+  /* ── PDF import ───────────────────────────────────────────────────────── */
+  const fileInputRef = useRef(null);
+  const [parsing,   setParsing]   = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [preview,   setPreview]   = useState(null);   // { entries, fileName }
+
   const load = async () => {
     try {
       const { data } = await subjectService.getAll();
@@ -115,8 +122,39 @@ export default function Timetable() {
     } catch (err) { toast.error(err.response?.data?.message || 'Failed'); }
   };
 
-  const handleEdit = s => {
-    setForm({
+  const handlePdfSelected = async e => {
+    const file = e.target.files?.[0];
+    // Reset immediately so picking the same file again still fires onChange.
+    e.target.value = '';
+    if (!file) return;
+
+    setParsing(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const { data } = await subjectService.importPdf(fd);
+      setPreview({ entries: data.entries, fileName: file.name });
+      if (data.flagged) toast.warning(`${data.flagged} subject(s) need review.`);
+    } catch (err) {
+      const res = err.response?.data;
+      toast.error([res?.message, res?.hint].filter(Boolean).join(' ') || 'Could not read that PDF.');
+    } finally { setParsing(false); }
+  };
+
+  const handleConfirmImport = async subjects => {
+    setImporting(true);
+    try {
+      const { data } = await subjectService.confirmImport(subjects);
+      toast.success(data.message);
+      if (data.skipped?.length) toast.info(`Already present: ${data.skipped.join(', ')}`);
+      setPreview(null);
+      load();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Import failed');
+    } finally { setImporting(false); }
+  };
+
+  const handleEdit = s => {    setForm({
       name: s.name, code: s.code, instructor: s.instructor || '',
       credits: String(s.credits || 4),
       schedule: (s.schedule || []).map(sl => ({
@@ -229,6 +267,8 @@ export default function Timetable() {
         .tt-sub-card:hover { border-color: rgba(255,255,255,0.14) !important; transform: translateY(-2px); }
         .tt-action-btn { background: transparent; border: none; cursor: pointer; padding: 6px; border-radius: 7px; transition: background 0.15s; }
         .tt-action-btn:hover { background: rgba(255,255,255,0.07); }
+        @keyframes tt-spin-kf { to { transform: rotate(360deg); } }
+        .tt-spin { animation: tt-spin-kf 0.9s linear infinite; flex-shrink: 0; }
         @media (max-width: 640px) {
           .tt-slot-grid { grid-template-columns: 1fr 1fr; }
           .tt-slot-del  { grid-column: span 2; }
@@ -244,21 +284,70 @@ export default function Timetable() {
           </h1>
           <p style={{ margin: '4px 0 0', fontSize: 13, color: C.textMuted }}>Weekly schedule and subject management</p>
         </div>
-        <button
-          onClick={() => { setShowForm(true); setEditing(null); setForm(EMPTY); }}
-          style={{
-            display: 'inline-flex', alignItems: 'center', gap: 7,
-            padding: '9px 18px', borderRadius: 10, border: 'none', cursor: 'pointer',
-            background: C.accent, color: '#fff', fontWeight: 600, fontSize: 13.5,
-            transition: 'background 0.18s, transform 0.15s',
-            boxShadow: '0 2px 12px rgba(99,102,241,0.3)',
-          }}
-          onMouseEnter={e => { e.currentTarget.style.background = '#4f46e5'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
-          onMouseLeave={e => { e.currentTarget.style.background = C.accent;  e.currentTarget.style.transform = 'translateY(0)'; }}
-        >
-          <Plus size={16} /> Add Subject
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="application/pdf,.pdf"
+            onChange={handlePdfSelected}
+            style={{ display: 'none' }}
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={parsing}
+            title="Upload your college timetable PDF — subjects and class times are read automatically, and you review everything before it's saved."
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 7,
+              padding: '9px 18px', borderRadius: 10, cursor: parsing ? 'wait' : 'pointer',
+              background: 'transparent', color: C.text, fontWeight: 600, fontSize: 13.5,
+              border: `1px solid ${C.border2}`, opacity: parsing ? 0.6 : 1,
+            }}
+          >
+            <Upload size={16} /> {parsing ? 'Reading PDF…' : 'Import from PDF'}
+          </button>
+          <button
+            onClick={() => { setShowForm(true); setEditing(null); setForm(EMPTY); }}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 7,
+              padding: '9px 18px', borderRadius: 10, border: 'none', cursor: 'pointer',
+              background: C.accent, color: '#fff', fontWeight: 600, fontSize: 13.5,
+              transition: 'background 0.18s, transform 0.15s',
+              boxShadow: '0 2px 12px rgba(99,102,241,0.3)',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = '#4f46e5'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = C.accent;  e.currentTarget.style.transform = 'translateY(0)'; }}
+          >
+            <Plus size={16} /> Add Subject
+          </button>
+        </div>
       </div>
+
+      {/* ── PDF import: what the button does, and progress while it runs ───── */}
+      {!preview && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 9,
+          padding: '10px 14px', borderRadius: 10, fontSize: 12.5,
+          background: parsing ? 'rgba(99,102,241,0.08)' : 'rgba(255,255,255,0.02)',
+          border: `1px solid ${parsing ? 'rgba(99,102,241,0.25)' : C.border}`,
+          color: parsing ? C.text : C.textMuted,
+        }}>
+          {parsing ? <Loader2 size={14} className="tt-spin" color={C.accent} /> : <FileText size={14} />}
+          {parsing
+            ? 'Reading your timetable — this can take up to a minute for a full week.'
+            : 'Have a timetable PDF? Use "Import from PDF" to pull in every subject and class time at once — you review and edit everything before it saves.'}
+        </div>
+      )}
+
+      {/* ── PDF import review ─────────────────────────────────────────────── */}
+      {preview && (
+        <TimetableImportPreview
+          entries={preview.entries}
+          fileName={preview.fileName}
+          saving={importing}
+          onConfirm={handleConfirmImport}
+          onCancel={() => setPreview(null)}
+        />
+      )}
 
       {/* ── Live class banner ─────────────────────────────────────────────── */}
       {(currentClass || nextClass) && (() => {

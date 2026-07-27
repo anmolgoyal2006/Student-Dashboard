@@ -6,6 +6,7 @@ const Semester   = require('../models/Semester.model');
 const { sendNotification } = require('../utils/sendNotification');
 const User = require('../models/User');
 const { chatCompletionsCreate, LIGHT_MODEL } = require('../services/aiService');
+const { createSubject, mergeSchedule } = require('../services/subjectService');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SYSTEM_PROMPT — Groq handles ALL routing: commands, queries, conversation
@@ -264,18 +265,6 @@ const FALLBACK = {
   message: "I couldn't understand that. Please try rephrasing.",
   data   : null,
 };
-
-// ─────────────────────────────────────────────────────────────────────────────
-// createSubject helper — used for both single and bulk
-// ─────────────────────────────────────────────────────────────────────────────
-async function createSubject(data, userId) {
-  if (!data.code && data.name) {
-    data.code = data.name.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
-  }
-  const exists = await Subject.findOne({ userId, name: new RegExp(`^${data.name}$`, 'i') });
-  if (exists) return { skipped: true, name: data.name };
-  return Subject.create({ ...data, userId });
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // upsertSemester helper — handles single upsert of a manual semester SGPA
@@ -944,9 +933,7 @@ if (parsed.data.items && Array.isArray(parsed.data.items)) {
     if (r.skipped && item.schedule && Array.isArray(item.schedule)) {
       const existing = await Subject.findOne({ userId, name: new RegExp(item.name, 'i') });
       if (existing) {
-        const newDays   = item.schedule.map(sc => sc.day);
-        const keptSlots = (existing.schedule || []).filter(sc => !newDays.includes(sc.day));
-        existing.schedule = [...keptSlots, ...item.schedule];
+        existing.schedule = mergeSchedule(existing.schedule, item.schedule);
         const saved = await existing.save();
         return { merged: true, name: item.name, doc: saved };
       }
@@ -973,8 +960,7 @@ if (r.skipped) {
       return res.json({ success: false, message: `Subject "${parsed.data.name}" not found.` });
     }
 const newDays    = parsed.data.schedule.map(sc => sc.day);
-const keptSlots  = (existing.schedule || []).filter(sc => !newDays.includes(sc.day));
-        existing.schedule = [...keptSlots, ...parsed.data.schedule];
+        existing.schedule = mergeSchedule(existing.schedule, parsed.data.schedule);
         result = await existing.save();
         return res.json({
           success: true, action: 'add', entity: 'subject',
@@ -995,9 +981,7 @@ const keptSlots  = (existing.schedule || []).filter(sc => !newDays.includes(sc.d
   // If schedule update — replace entire schedule or merge by day
   if (parsed.data.schedule && Array.isArray(parsed.data.schedule)) {
     // Remove old slots for the days being updated, add new ones
-    const updatedDays = parsed.data.schedule.map(sc => sc.day);
-    const keptSlots   = s.schedule.filter(sc => !updatedDays.includes(sc.day));
-    s.schedule        = [...keptSlots, ...parsed.data.schedule];
+    s.schedule = mergeSchedule(s.schedule, parsed.data.schedule);
   }
 
   // Update other fields if provided

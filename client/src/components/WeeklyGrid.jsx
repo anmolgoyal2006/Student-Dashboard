@@ -5,18 +5,23 @@ const DAYS  = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const HOURS = ['08:00','09:00','10:00','11:00','12:00','13:00',
                '14:00','15:00','16:00','17:00','18:00'];
 
-// 10 distinct colors for subjects
+// 10 distinct subject colors. The hue carries identity via the tinted fill and
+// the left border; the label itself stays near-white so every subject reads at
+// the same contrast (13:1+) instead of each hue landing wherever it happens to.
+// Tinting the text with its own hue put some subjects near 4.4:1, and one used
+// a 12%-alpha token as a text colour, which rendered at 1.19:1 — invisible.
+const LABEL = 'var(--color-text-primary)';
 const COLORS = [
-  { bg: 'rgba(99,102,241,0.18)',  border: 'var(--color-accent)', text: 'var(--color-accent)'  },
-  { bg: 'rgba(20,184,166,0.18)',  border: 'var(--color-accent)', text: 'var(--color-accent-muted)'  },
-  { bg: 'rgba(245,158,11,0.18)', border: 'var(--color-warning)', text: 'var(--color-warning)'  },
-  { bg: 'rgba(239,68,68,0.18)',  border: 'var(--color-danger)', text: 'var(--color-danger)'  },
-  { bg: 'rgba(168,85,247,0.18)', border: 'var(--color-accent)', text: 'var(--color-accent)'  },
-  { bg: 'rgba(34,197,94,0.18)',  border: 'var(--color-success)', text: 'var(--color-success)'  },
-  { bg: 'rgba(236,72,153,0.18)', border: 'var(--color-danger)', text: 'var(--color-danger)'  },
-  { bg: 'rgba(59,130,246,0.18)', border: '#3b82f6', text: 'var(--color-accent)'  },
-  { bg: 'rgba(249,115,22,0.18)', border: 'var(--color-warning)', text: 'var(--color-warning)'  },
-  { bg: 'rgba(16,185,129,0.18)', border: 'var(--color-success)', text: 'var(--color-success)'  },
+  { bg: 'rgba(99,102,241,0.18)',  border: '#818cf8', text: LABEL },
+  { bg: 'rgba(20,184,166,0.18)',  border: '#2dd4bf', text: LABEL },
+  { bg: 'rgba(245,158,11,0.18)',  border: '#fbbf24', text: LABEL },
+  { bg: 'rgba(239,68,68,0.18)',   border: '#f87171', text: LABEL },
+  { bg: 'rgba(168,85,247,0.18)',  border: '#c084fc', text: LABEL },
+  { bg: 'rgba(34,197,94,0.18)',   border: '#4ade80', text: LABEL },
+  { bg: 'rgba(236,72,153,0.18)',  border: '#f472b6', text: LABEL },
+  { bg: 'rgba(59,130,246,0.18)',  border: '#60a5fa', text: LABEL },
+  { bg: 'rgba(249,115,22,0.18)',  border: '#fb923c', text: LABEL },
+  { bg: 'rgba(16,185,129,0.18)',  border: '#34d399', text: LABEL },
 ];
 
 const toMinutes = (t) => {

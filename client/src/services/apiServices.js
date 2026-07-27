@@ -15,6 +15,11 @@ export const subjectService = {
   add:    (data)  => apiRequest('post',   '/timetable', data),
   update: (id, d) => apiRequest('put',    `/timetable/${id}`, d),
   remove: (id)    => apiRequest('delete', `/timetable/${id}`),
+  importPdf: (formData) =>
+    API.post('/timetable/import-pdf', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
+  confirmImport: (subjects) => apiRequest('post', '/timetable/import-pdf/confirm', { subjects }),
 };
 
 // ─── Attendance ───────────────────────────────────────────────────────────
