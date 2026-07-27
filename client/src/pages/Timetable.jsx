@@ -39,7 +39,9 @@ const C = {
   danger:    '#ef4444',
   text:      '#f1f5f9',
   textSub:   '#94a3b8',
-  textMuted: '#475569',
+  // #475569 read at 2.53:1 on this canvas — below the 4.5:1 floor — and it is
+  // used as body copy (hints, room names, "No schedule set"), not just chrome.
+  textMuted: '#7c8ba1',
 };
 
 const card = (extra = {}) => ({
@@ -326,15 +328,21 @@ export default function Timetable() {
       {!preview && (
         <div style={{
           display: 'flex', alignItems: 'center', gap: 9,
-          padding: '10px 14px', borderRadius: 10, fontSize: 12.5,
-          background: parsing ? 'rgba(99,102,241,0.08)' : 'rgba(255,255,255,0.02)',
-          border: `1px solid ${parsing ? 'rgba(99,102,241,0.25)' : C.border}`,
-          color: parsing ? C.text : C.textMuted,
+          padding: '11px 14px', borderRadius: 10, fontSize: 12.5, lineHeight: 1.5,
+          background: 'rgba(99,102,241,0.08)',
+          border: '1px solid rgba(99,102,241,0.25)',
+          color: C.textSub,
         }}>
-          {parsing ? <Loader2 size={14} className="tt-spin" color={C.accent} /> : <FileText size={14} />}
           {parsing
-            ? 'Reading your timetable — this can take up to a minute for a full week.'
-            : 'Have a timetable PDF? Use "Import from PDF" to pull in every subject and class time at once — you review and edit everything before it saves.'}
+            ? <Loader2 size={15} className="tt-spin" color="#a5b4fc" style={{ flexShrink: 0 }} />
+            : <FileText size={15} color="#a5b4fc" style={{ flexShrink: 0 }} />}
+          {parsing
+            ? <span style={{ color: C.text }}>Reading your timetable — this can take up to a minute for a full week.</span>
+            : <span>
+                Have a timetable PDF?{' '}
+                <strong style={{ color: C.text, fontWeight: 600 }}>Import from PDF</strong>{' '}
+                pulls in every subject and class time at once — you review and edit everything before it saves.
+              </span>}
         </div>
       )}
 

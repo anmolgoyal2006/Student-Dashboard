@@ -71,7 +71,7 @@ export default function TimetableImportPreview({ entries, fileName, onConfirm, o
         <FileText size={16} />
         <strong style={{ fontSize: 15 }}>Review imported timetable</strong>
       </div>
-      <p style={{ margin: '0 0 16px', fontSize: 13, color: 'var(--muted)' }}>
+      <p style={{ margin: '0 0 16px', fontSize: 13, color: 'var(--color-text-secondary)' }}>
         Found {rows.length} subject(s) in {fileName || 'the PDF'}. Check the details below —
         nothing is saved until you confirm.
       </p>
