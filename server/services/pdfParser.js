@@ -1,7 +1,26 @@
 const pdfParse = require('pdf-parse');
 const { createCanvas, Image } = require('canvas');
 global.Image = Image;
+
+// Suppress PDF.js warning logs (like "Warning: TT: undefined function: 21")
+const originalLog = console.log;
+console.log = function (...args) {
+  if (typeof args[0] === 'string' && (args[0].startsWith('Warning:') || args[0].startsWith('Warning: TT:'))) {
+    return;
+  }
+  originalLog.apply(console, args);
+};
+
+const originalWarn = console.warn;
+console.warn = function (...args) {
+  if (typeof args[0] === 'string' && (args[0].startsWith('Warning:') || args[0].startsWith('Warning: TT:'))) {
+    return;
+  }
+  originalWarn.apply(console, args);
+};
+
 const pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js');
+pdfjsLib.verbosity = pdfjsLib.VerbosityLevel.ERRORS;
 
 async function extractTextFromPDF(buffer) {
   const data = await pdfParse(buffer);
