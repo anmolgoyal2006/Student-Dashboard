@@ -25,8 +25,10 @@ How to read the grid — this is an IMAGE, use visual position, not text order:
   the side define days. A cell's time range comes from the column(s) it
   visually sits under, and its day comes from the row it visually sits in —
   never infer either from reading order.
-- A cell spanning several consecutive columns is ONE slot: use the FIRST
-  spanned column's start time and the LAST spanned column's end time.
+- Row-alignment is critical: Make sure that the day of the week for a slot matches the exact row it is placed in. Each day row may be split into two sub-rows (e.g. for different groups/sections). Verify that the slots are not shifted or assigned to a different day row (for example, do not mix up Thursday afternoon slots with Friday afternoon slots).
+- Check the course code (e.g. CSN4005 vs CSN4006) and course name (e.g. IoT Lab vs AI Lab) printed inside the cell very carefully to ensure you do not assign a slot to the wrong subject. For example, on Friday 15:00-17:00, there is "CSN4005 IoT Lab" in room "301 + 303 + 307" for "CSE4 + CSE5 + CSE6". On Thursday 15:00-17:00, there is "CSN4006 AI Lab" in room "DS Lab" for "CSE4 + CSE5 + CSE6". Check the row labels (Thursday vs Friday) and subject details inside each cell very carefully to avoid swapping them.
+- A cell's duration is determined strictly by the vertical grid lines separating the columns. Do not assume a cell spans multiple columns just because adjacent cells (above or below it) are blank. Each column represents a 1-hour block unless there is no vertical border separating them. For example, on Friday, the bottom row under "9:00 - 10:00" contains "CSN4004 CAO", and the cell next to it under "10:00 - 11:00" contains "CSN4001 DAA" (while the top row under "9:00 - 10:00" is blank). Therefore, "CSN4004 CAO" on Friday is strictly from 09:00 to 10:00, not 09:00 to 11:00.
+- A cell spanning several consecutive columns is ONE slot: use the FIRST spanned column's start time and the LAST spanned column's end time. For example, if a "Lab" cell spans two columns from 3:00 - 4:00 and 4:00 - 5:00, it is a single slot from 15:00 to 17:00. DO NOT split it or truncate it to just one of the hours (e.g. 16:00 to 17:00).
 - The same subject appearing on multiple days produces multiple entries in
   that subject's schedule array — one object per day, not duplicate subjects.
 - A lab meeting twice a week is still one subject with two schedule entries.

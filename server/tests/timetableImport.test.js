@@ -237,6 +237,86 @@ describe('Timetable PDF import', () => {
       expect(await Subject.countDocuments({ userId: user._id })).toBe(2);
     });
 
+    test('resolveAction = replace overwrites existing subject schedule and details', async () => {
+      await Subject.create({
+        userId: user._id,
+        name: 'Physics',
+        code: 'PHYS101',
+        instructor: 'Dr. Old',
+        credits: 3,
+        schedule: [{ day: 'Mon', startTime: '09:00', endTime: '10:00' }],
+      });
+
+      const res = await confirm([
+        {
+          name: 'Physics',
+          code: 'PHYS102',
+          instructor: 'Dr. New',
+          credits: 4,
+          resolveAction: 'replace',
+          schedule: [{ day: 'Tue', startTime: '10:00', endTime: '11:00' }],
+        },
+      ]);
+
+      expect(res.status).toBe(201);
+      const saved = await Subject.findOne({ userId: user._id, name: 'Physics' });
+      expect(saved.code).toBe('PHYS102');
+      expect(saved.instructor).toBe('Dr. New');
+      expect(saved.credits).toBe(4);
+      expect(saved.schedule).toHaveLength(1);
+      expect(saved.schedule[0].day).toBe('Tue');
+    });
+
+    test('resolveAction = merge merges schedules and updates details', async () => {
+      await Subject.create({
+        userId: user._id,
+        name: 'Physics',
+        code: 'PHYS101',
+        instructor: 'Dr. Old',
+        credits: 3,
+        schedule: [{ day: 'Mon', startTime: '09:00', endTime: '10:00' }],
+      });
+
+      const res = await confirm([
+        {
+          name: 'Physics',
+          code: 'PHYS101',
+          instructor: 'Dr. New',
+          credits: 4,
+          resolveAction: 'merge',
+          schedule: [{ day: 'Tue', startTime: '10:00', endTime: '11:00' }],
+        },
+      ]);
+
+      expect(res.status).toBe(201);
+      const saved = await Subject.findOne({ userId: user._id, name: 'Physics' });
+      expect(saved.credits).toBe(4);
+      expect(saved.instructor).toBe('Dr. New');
+      expect(saved.schedule).toHaveLength(2); // Mon slot kept, Tue slot added
+    });
+
+    test('resolveAction = skip does not write or modify the subject', async () => {
+      await Subject.create({
+        userId: user._id,
+        name: 'Physics',
+        schedule: [{ day: 'Mon', startTime: '09:00', endTime: '10:00' }],
+      });
+
+      const res = await confirm([
+        {
+          name: 'Physics',
+          resolveAction: 'skip',
+          schedule: [{ day: 'Tue', startTime: '10:00', endTime: '11:00' }],
+        },
+      ]);
+
+      expect(res.status).toBe(201);
+      expect(res.body.skipped).toContain('Physics');
+      const saved = await Subject.findOne({ userId: user._id, name: 'Physics' });
+      expect(saved.schedule).toHaveLength(1);
+      expect(saved.schedule[0].day).toBe('Mon');
+    });
+
     test('an invalid day is rejected by the route validators', async () => {
       const res = await confirm([
         { name: 'Bad', schedule: [{ day: 'Funday', startTime: '09:00', endTime: '10:00' }] },

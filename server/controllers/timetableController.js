@@ -86,15 +86,59 @@ exports.importSubjectsFromPDF = async (req, res) => {
 exports.confirmImportedSubjects = async (req, res) => {
   try {
     const created = [];
+    const updated = [];
     const skipped = [];
+    const { mergeSchedule } = require('../services/subjectService');
+
     for (const entry of req.body.subjects) {
-      const result = await createSubject(entry, req.user.id);
-      if (result.skipped) skipped.push(result.name);
-      else created.push(result);
+      const action = entry.resolveAction || 'create';
+
+      if (action === 'skip') {
+        skipped.push(entry.name);
+        continue;
+      }
+
+      if (action === 'replace') {
+        const existing = await Subject.findOne({ userId: req.user.id, name: new RegExp(`^${entry.name}$`, 'i') });
+        if (existing) {
+          existing.code = entry.code || existing.code;
+          existing.instructor = entry.instructor || existing.instructor;
+          existing.credits = entry.credits ?? existing.credits;
+          existing.schedule = entry.schedule;
+          await existing.save();
+          updated.push(existing);
+        } else {
+          const result = await Subject.create({ ...entry, userId: req.user.id });
+          created.push(result);
+        }
+      } else if (action === 'merge') {
+        const existing = await Subject.findOne({ userId: req.user.id, name: new RegExp(`^${entry.name}$`, 'i') });
+        if (existing) {
+          existing.schedule = mergeSchedule(existing.schedule, entry.schedule);
+          existing.code = entry.code || existing.code;
+          existing.instructor = entry.instructor || existing.instructor;
+          existing.credits = entry.credits ?? existing.credits;
+          await existing.save();
+          updated.push(existing);
+        } else {
+          const result = await Subject.create({ ...entry, userId: req.user.id });
+          created.push(result);
+        }
+      } else {
+        // Default: 'create'
+        const result = await createSubject(entry, req.user.id);
+        if (result.skipped) skipped.push(result.name);
+        else created.push(result);
+      }
     }
+
+    const message = updated.length > 0
+      ? `Imported ${created.length} new subject(s), updated ${updated.length} subject(s).`
+      : `Imported ${created.length} subject(s).`;
+
     res.status(201).json({
-      message: `Imported ${created.length} subject(s).`,
-      subjects: created,
+      message,
+      subjects: [...created, ...updated],
       skipped,
     });
   } catch (err) {

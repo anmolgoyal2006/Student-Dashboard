@@ -351,6 +351,7 @@ export default function Timetable() {
         <TimetableImportPreview
           entries={preview.entries}
           fileName={preview.fileName}
+          existingSubjects={subjects}
           saving={importing}
           onConfirm={handleConfirmImport}
           onCancel={() => setPreview(null)}

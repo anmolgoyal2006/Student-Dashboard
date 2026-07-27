@@ -59,6 +59,7 @@ router.post('/import-pdf/confirm', validate([
   body('subjects.*.instructor').optional().isString(),
   body('subjects.*.credits').optional({ nullable: true }).isFloat({ min: 1, max: 6 })
     .withMessage('Credits must be between 1 and 6.'),
+  body('subjects.*.resolveAction').optional().isIn(['create', 'replace', 'merge', 'skip']),
   body('subjects.*.schedule').optional().isArray(),
   body('subjects.*.schedule.*.day').isIn(['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']),
   body('subjects.*.schedule.*.startTime').optional().isString(),
