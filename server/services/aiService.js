@@ -206,6 +206,7 @@ async function generateContentWithInlineData(parts, options = {}) {
     body.generationConfig = {};
     if (options.temperature !== undefined) body.generationConfig.temperature = options.temperature;
     if (options.maxOutputTokens !== undefined) body.generationConfig.maxOutputTokens = options.maxOutputTokens;
+    if (options.responseMimeType) body.generationConfig.responseMimeType = options.responseMimeType;
     body.generationConfig.thinkingConfig = { thinkingBudget: options.thinkingBudget ?? 0 };
 
     const json = await geminiFetch('generateContent', body, model);

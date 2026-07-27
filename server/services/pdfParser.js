@@ -1,21 +1,33 @@
 const pdfParse = require('pdf-parse');
+const pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js');
+const { createCanvas } = require('canvas');
 
-/**
- * Extracts text from a PDF buffer.
- * Returns raw string.
- */
 async function extractTextFromPDF(buffer) {
   const data = await pdfParse(buffer);
   return data.text;
 }
 
-/**
- * Parses raw text into array of { name, roll, marks, subject }
- * Handles common formats:
- *   "John Doe  101  85"
- *   "1. John Doe - 85"
- *   "Roll: 101 | Name: John | Marks: 85"
- */
+async function renderPDFPagesToImages(buffer, { maxPages = 5, scale = 2.2 } = {}) {
+  const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(buffer) });
+  const doc = await loadingTask.promise;
+  const pageCount = Math.min(doc.numPages, maxPages);
+  const images = [];
+
+  for (let i = 1; i <= pageCount; i++) {
+    const page = await doc.getPage(i);
+    const viewport = page.getViewport({ scale });
+    const canvas = createCanvas(viewport.width, viewport.height);
+    const context = canvas.getContext('2d');
+    await page.render({ canvasContext: context, viewport }).promise;
+
+    images.push({
+      mimeType: 'image/jpeg',
+      data: canvas.toBuffer('image/jpeg', { quality: 0.92 }).toString('base64'),
+    });
+  }
+  return images;
+}
+
 function parseStudentMarks(rawText) {
   const lines = rawText
     .split('\n')
@@ -26,18 +38,14 @@ function parseStudentMarks(rawText) {
   let currentSubject = null;
 
   for (const line of lines) {
-    // Detect subject header lines like "Subject: Mathematics" or "## Physics"
     const subjectMatch = line.match(/^(?:subject|paper|course)\s*[:\-–]?\s*(.+)/i);
     if (subjectMatch) {
       currentSubject = subjectMatch[1].trim();
       continue;
     }
 
-    // Skip pure header rows
     if (/^(s\.?no|rank|roll|name|marks|total|sr)/i.test(line)) continue;
 
-    // Try to extract: optional rank/sno, name, optional roll, marks
-    // Pattern: anything with a number at the end (marks)
     const pattern = /^(?:\d+[\.\)]\s*)?([A-Za-z][A-Za-z\s\.\-']{2,40?})\s+(\d{2,6})?\s*(\d{1,3}(?:\.\d{1,2})?)$/;
     const match = line.match(pattern);
 
@@ -52,7 +60,6 @@ function parseStudentMarks(rawText) {
       continue;
     }
 
-    // Fallback: pipe or comma separated
     const parts = line.split(/[|,\t]/).map(p => p.trim());
     if (parts.length >= 2) {
       const lastPart = parts[parts.length - 1];
@@ -70,4 +77,4 @@ function parseStudentMarks(rawText) {
   return results;
 }
 
-module.exports = { extractTextFromPDF, parseStudentMarks };
+module.exports = { extractTextFromPDF, renderPDFPagesToImages, parseStudentMarks };

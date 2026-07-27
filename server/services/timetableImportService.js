@@ -1,14 +1,10 @@
-const { chatCompletionsCreate, HEAVY_MODEL } = require('./aiService');
-const { extractTextFromPDF } = require('./pdfParser');
+const { generateContentWithInlineData, HEAVY_MODEL } = require('./aiService');
+const { renderPDFPagesToImages } = require('./pdfParser');
 const { extractJSON } = require('../utils/extractJSON');
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-// pdf-parse returns '' for scanned/image-only PDFs — there is no text layer to
-// send to the model, and doing so would burn a HEAVY_MODEL call on whitespace.
-const MIN_TEXT_LENGTH = 40;
-
-const PROMPT = `You extract class timetables from raw PDF text into JSON.
+const PROMPT = `You extract class timetables from an image of a timetable grid into JSON.
 
 Return ONLY a JSON object of this exact shape:
 {"subjects":[{"name":"","code":"","instructor":"","credits":null,"schedule":[{"day":"","startTime":"","endTime":"","room":""}]}]}
@@ -24,29 +20,28 @@ Field rules — these names are fixed, do not rename or add fields:
   "14:00"). A timetable running 9-5 with a bare "1:00" start means "13:00".
 - room: room/venue as printed. "" if absent.
 
-Real-world layouts you must handle:
-- A cell spanning several consecutive periods is ONE slot: use the first
-  period's start and the last period's end.
+How to read the grid — this is an IMAGE, use visual position, not text order:
+- The column headers across the top define time ranges. The row labels down
+  the side define days. A cell's time range comes from the column(s) it
+  visually sits under, and its day comes from the row it visually sits in —
+  never infer either from reading order.
+- A cell spanning several consecutive columns is ONE slot: use the FIRST
+  spanned column's start time and the LAST spanned column's end time.
 - The same subject appearing on multiple days produces multiple entries in
   that subject's schedule array — one object per day, not duplicate subjects.
 - A lab meeting twice a week is still one subject with two schedule entries.
 - Group/section labels ("G1", "B2", "CSE3,CSE4") are not part of the subject
   name and not a room. Drop them unless they are clearly the venue.
-- Skip non-teaching rows entirely: LUNCH, BREAK, RECESS, free/blank periods,
-  and header rows repeating the day names.
+- Skip non-teaching cells entirely: LUNCH, BREAK, RECESS, free/blank periods,
+  and the header row/column itself.
 - Room codes and course codes can look alike; the room is the one printed
-  inside the timetable cell, the code is the one in a legend/subject list.
+  inside the timetable cell, the code is the one in a legend/subject list
+  elsewhere on the page, if present.
 
-Never invent a value. If something is genuinely not in the text, use "" for
+Never invent a value. If something is genuinely not visible, use "" for
 strings and null for credits. Return every subject you find, even if some of
 its fields are incomplete. Never drop a row because it is partial.`;
 
-/**
- * Validates one model-produced entry against what the Subject schema and the
- * route validators actually accept. Returns the cleaned entry plus a list of
- * per-field problems — nothing is dropped or corrected silently, the user
- * confirms everything in the preview before it reaches the DB.
- */
 function flagEntry(raw) {
   const issues = [];
   const name = typeof raw?.name === 'string' ? raw.name.trim() : '';
@@ -96,13 +91,6 @@ function flagEntry(raw) {
   };
 }
 
-/**
- * Folds rows that are the same course into one, before any flagging. A
- * timetable often lists a course once per teacher or once per session block;
- * createSubject dedupes by name on write, so leaving them split would silently
- * drop every slot after the first. Schedules concatenate, first non-empty
- * scalar wins. Runs on raw model output, so every field is treated as untrusted.
- */
 function mergeDuplicates(subjects) {
   const byKey = new Map();
   for (const raw of subjects) {
@@ -124,46 +112,37 @@ function mergeDuplicates(subjects) {
   return [...byKey.values()];
 }
 
-/**
- * Reads a timetable PDF and returns candidate subjects for user review.
- * Throws an error carrying `.code` so the controller can map it to a status.
- */
 async function parseTimetablePDF(buffer) {
-  let text;
+  let images;
   try {
-    text = await extractTextFromPDF(buffer);
+    images = await renderPDFPagesToImages(buffer);
   } catch (err) {
     const e = new Error('That PDF could not be read. It may be corrupted or password-protected.');
     e.code = 'UNREADABLE_PDF';
     throw e;
   }
 
-  if (!text || text.trim().length < MIN_TEXT_LENGTH) {
-    const e = new Error('No readable text found in that PDF.');
-    e.code = 'NO_TEXT';
-    e.hint = 'Scanned or photographed timetables have no text layer. Export the PDF from your portal, or add the subjects manually.';
+  if (!images || images.length === 0) {
+    const e = new Error('That PDF has no pages to read.');
+    e.code = 'UNREADABLE_PDF';
     throw e;
   }
 
-  const completion = await chatCompletionsCreate({
+  const parts = images.map(img => ({
+    inlineData: { mimeType: img.mimeType, data: img.data },
+  }));
+  parts.push({ text: PROMPT });
+
+  const rawText = await generateContentWithInlineData(parts, {
     model: HEAVY_MODEL,
-    messages: [
-      { role: 'system', content: PROMPT },
-      { role: 'user', content: text },
-    ],
     temperature: 0,
-    // A full week of subjects with every slot runs well past the 1000-token
-    // default; truncated output parses as null and looks like "no timetable".
-    max_tokens: 8000,
-    response_format: { type: 'json_object' },
+    maxOutputTokens: 8000,
+    responseMimeType: 'application/json',
   });
 
-  const parsed = extractJSON(completion.choices[0]?.message?.content?.trim() ?? '');
+  const parsed = extractJSON((rawText || '').trim());
   const subjects = Array.isArray(parsed?.subjects) ? parsed.subjects : null;
 
-  // An empty array means the model read the text fine and found no classes in
-  // it — a marks sheet or syllabus. That is the same dead end for the user as
-  // unparseable output, so it gets the same 422 rather than an empty success.
   if (!subjects || subjects.length === 0) {
     const e = new Error('Could not find any classes in that PDF.');
     e.code = 'NO_TIMETABLE';
