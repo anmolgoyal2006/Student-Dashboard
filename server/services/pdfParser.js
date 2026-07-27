@@ -1,6 +1,7 @@
 const pdfParse = require('pdf-parse');
+const { createCanvas, Image } = require('canvas');
+global.Image = Image;
 const pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js');
-const { createCanvas } = require('canvas');
 
 async function extractTextFromPDF(buffer) {
   const data = await pdfParse(buffer);
