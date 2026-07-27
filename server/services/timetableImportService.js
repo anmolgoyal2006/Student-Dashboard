@@ -58,19 +58,43 @@ function flagEntry(raw) {
   }
 
   const schedule = (Array.isArray(raw?.schedule) ? raw.schedule : []).map((slot, i) => {
-    const day = typeof slot?.day === 'string' ? slot.day.trim() : '';
+    let day = typeof slot?.day === 'string' ? slot.day.trim() : '';
+    const dayLower = day.toLowerCase();
+    const dayMap = {
+      sun: 'Sun', sunday: 'Sun',
+      mon: 'Mon', monday: 'Mon',
+      tue: 'Tue', tuesday: 'Tue',
+      wed: 'Wed', wednesday: 'Wed',
+      thu: 'Thu', thursday: 'Thu',
+      fri: 'Fri', friday: 'Fri',
+      sat: 'Sat', saturday: 'Sat'
+    };
+    if (dayMap[dayLower]) {
+      day = dayMap[dayLower];
+    }
     if (!DAYS.includes(day)) {
       issues.push({ field: `schedule.${i}.day`, reason: `"${day || 'blank'}" is not a valid day.` });
     }
-    for (const key of ['startTime', 'endTime']) {
-      if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(slot?.[key] || '')) {
-        issues.push({ field: `schedule.${i}.${key}`, reason: 'Time must be in 24-hour HH:MM form.' });
-      }
+    let startTime = slot?.startTime || '';
+    if (/^\d:[0-5]\d$/.test(startTime)) {
+      startTime = '0' + startTime;
     }
+    let endTime = slot?.endTime || '';
+    if (/^\d:[0-5]\d$/.test(endTime)) {
+      endTime = '0' + endTime;
+    }
+
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(startTime)) {
+      issues.push({ field: `schedule.${i}.startTime`, reason: 'Time must be in 24-hour HH:MM form.' });
+    }
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(endTime)) {
+      issues.push({ field: `schedule.${i}.endTime`, reason: 'Time must be in 24-hour HH:MM form.' });
+    }
+
     return {
       day,
-      startTime: slot?.startTime || '',
-      endTime: slot?.endTime || '',
+      startTime,
+      endTime,
       room: typeof slot?.room === 'string' ? slot.room.trim() : '',
     };
   });
