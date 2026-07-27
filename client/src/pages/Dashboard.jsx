@@ -58,27 +58,26 @@ export default function Dashboard() {
 
   useEffect(() => {
     const isTeacher = user?.role === 'teacher';
-    const promises = [
+
+    Promise.all([
       attendanceService.getSummary(),
       marksService.getCGPAbySemester(),
-      aiService.getRecommendations(),
       notificationService.getAll(),
       subjectService.getAll(),
-    ];
-    if (isTeacher) promises.push(attendanceService.getClassSummary());
+      ...(isTeacher ? [attendanceService.getClassSummary()] : []),
+    ]).then(([a, m, n, s, cs]) => {
+      setSummary(a.data.summary || []);
+      setCgpa(m.data.cgpa);
+      setNotifs(n.data.notifications || []);
+      setSubjects(s.data.subjects || []);
+      setSubjectCount((s.data.subjects || []).length);
+      if (cs) setClassSummary(cs.data.students || []);
+      setLoading(false);
+    }).catch(() => setLoading(false));
 
-    Promise.all(promises)
-      .then(([a, m, r, n, s, cs]) => {
-        setSummary(a.data.summary || []);
-        setCgpa(m.data.cgpa);
-        setRecs(r.data.suggestions || []);
-        setNotifs(n.data.notifications || []);
-        setSubjects(s.data.subjects || []);
-        setSubjectCount((s.data.subjects || []).length);
-        if (cs) setClassSummary(cs.data.students || []);
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    aiService.getRecommendations()
+      .then(r => setRecs(r.data?.suggestions || []))
+      .catch(() => setRecs([]));
   }, [user]);
 
   /* ── derived values ────────────────────────────────────────────────────── */

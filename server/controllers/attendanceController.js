@@ -8,10 +8,13 @@
 //   5. All routes: consistent error logging, safe error messages to client
 // ============================================================
 
+const { TTLCache } = require('../utils/ttlCache');
 const Attendance = require('../models/Attendance');
 const Subject    = require('../models/Subject');
 const User       = require('../models/User');
 const mongoose   = require('mongoose');
+
+const summaryCache = new TTLCache({ ttlMs: 5 * 60 * 1000, maxEntries: 1000 });
 
 // ── Shared pure helpers ───────────────────────────────────────────────────────
 
@@ -102,6 +105,7 @@ exports.markAttendance = async (req, res) => {
       if (!record) throw upsertErr;
     }
 
+    summaryCache.del(`summary:${userId}`);
     res.status(201).json({ message: 'Attendance marked', attendance: record });
   } catch (err) {
     console.error('[markAttendance]', err);
@@ -115,12 +119,17 @@ exports.markAttendance = async (req, res) => {
 // [CHANGED] Now includes: neededClasses, missNClasses prediction, streak, statusLabel
 exports.getAttendanceSummary = async (req, res) => {
   const userId = req.user.id;
+  const cacheKey = `summary:${userId}`;
 
   try {
+    const cached = summaryCache.get(cacheKey);
+    if (cached) return res.json(cached);
+
     const records = await Attendance
       .find({ userId })
       .populate('subjectId', 'name code credits')
-      .sort({ date: 1 }); // chronological for streak calculation
+      .sort({ date: 1 })
+      .lean(); // chronological for streak calculation
 
     // [CHANGED] Build per-subject map with streak tracking
     const map = {};
@@ -211,7 +220,9 @@ exports.getAttendanceSummary = async (req, res) => {
       total   : summary.length,
     };
 
-    res.json({ summary, overview });
+    const result = { summary, overview };
+    summaryCache.set(cacheKey, result);
+    res.json(result);
 
   } catch (err) {
     console.error('[getAttendanceSummary]', err);
@@ -390,6 +401,7 @@ exports.markFromNotification = async (req, res) => {
     );
 
     console.log(`🔔 Attendance marked via notification: ${mappedStatus}`);
+    summaryCache.del(`summary:${userId}`);
 
     res.json({ success: true, record });
 

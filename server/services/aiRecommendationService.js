@@ -1,3 +1,5 @@
+const { TTLCache } = require('../utils/ttlCache');
+const { getRawAttendance, getRawMarks } = require('../utils/dataFetchers');
 const Attendance          = require('../models/Attendance');
 const Marks               = require('../models/Marks');
 const CareerProgress      = require('../models/CareerProgress');
@@ -5,6 +7,9 @@ const Subject             = require('../models/Subject');
 const Task                = require('../models/Task');
 const ClassroomAssignment = require('../models/ClassroomAssignment');
 const { chatCompletionsCreate, LIGHT_MODEL } = require('./aiService');
+
+const recsCache = new TTLCache({ ttlMs: 30 * 60 * 1000, maxEntries: 500 });
+const RECS_STALE_REFRESH_MS = 5 * 60 * 1000;
 
 const COMPANY_ROADMAPS = {
   Amazon:   ['Master Arrays, Trees, DP (LeetCode top 100)', 'Study all 16 Amazon Leadership Principles — prepare 2 stories each', 'Practice System Design: URL shortener, Parking Lot, Amazon Cart', 'Do 5+ mock interviews on Pramp or Interviewing.io'],
@@ -262,20 +267,43 @@ async function getFallbackRecommendations(userId) {
   return suggestions.slice(0, 6);
 }
 
-// ── Main Export ───────────────────────────────────────────────────────────────
+// ── Stale-while-revalidate ────────────────────────────────────────────────────
 
 exports.getRecommendations = async (userId) => {
+  const cacheKey = `recs:${userId}`;
+  const cached = recsCache.get(cacheKey);
+
+  if (cached) {
+    if (Date.now() - cached.generatedAt > RECS_STALE_REFRESH_MS) {
+      generateAndCacheRecommendations(userId, cacheKey).catch(err =>
+        console.error('[AI Recommendation] Background refresh failed:', err.message)
+      );
+    }
+    return cached.data;
+  }
+
+  return generateAndCacheRecommendations(userId, cacheKey);
+};
+
+async function generateAndCacheRecommendations(userId, cacheKey) {
+  const result = await computeRecommendations(userId);
+  recsCache.set(cacheKey, { data: result, generatedAt: Date.now() });
+  return result;
+}
+
+// ── Core AI computation (extracted from getRecommendations) ─────────────────
+
+async function computeRecommendations(userId) {
   try {
     const [subjects, attendanceRecords, marksRecords, pendingTasks, career, classroomAssignments] = await Promise.all([
       Subject.find({ userId }),
-      Attendance.find({ userId }).populate('subjectId', 'name'),
-      Marks.find({ userId }).populate('subjectId', 'name'),
+      getRawAttendance(userId),
+      getRawMarks(userId),
       Task.find({ user: userId, status: { $ne: 'completed' } }),
       CareerProgress.findOne({ userId }),
       ClassroomAssignment.find({ userId, status: { $ne: 'submitted' } }).sort({ dueDate: 1 }).limit(10),
     ]);
 
-    // Format all data with rich context
     const attData         = formatAttendance(attendanceRecords);
     const marksData       = formatMarks(marksRecords);
     const taskData        = formatTasks(pendingTasks);
@@ -283,7 +311,6 @@ exports.getRecommendations = async (userId) => {
     const classData       = formatClassroomAssignments(classroomAssignments);
     const careerData      = formatCareer(career);
 
-    // Compute CGPA
     let totalWt = 0, totalCr = 0;
     for (const m of marksRecords) {
       const cr = m.subjectId?.credits || 3;
@@ -295,26 +322,16 @@ exports.getRecommendations = async (userId) => {
     const studentData = {
       totalSubjects:   subjects.length,
       cgpa,
-
-      // Rich attendance with at-risk flags
       attendance: attData.map(a => a.summary),
       atRiskSubjects: attData.filter(a => a.atRisk).map(a => `${a.subject} (${a.percentage}%, needs ${a.classesNeeded} more classes)`),
-
-      // Marks with weak subject flags
       examMarks:    marksData.flatMap(m => m.exams.map(e => e.summary)),
       weakSubjects: marksData.filter(m => m.weak).map(m => m.subject),
-
-      // Tasks with urgency context
       pendingTasks: taskData.map(t => t.summary),
       overdueTasks: taskData.filter(t => t.overdue).map(t => t.title),
       dueSoonTasks: taskData.filter(t => t.dueSoon).map(t => `${t.title} (${t.daysUntilDue}d)`),
-
-      // Classroom with urgency
       classroomAssignments: classData.map(a => a.summary),
       overdueAssignments:   classData.filter(a => a.overdue).map(a => `${a.title} (${a.course})`),
       dueSoonAssignments:   classData.filter(a => a.dueSoon).map(a => `${a.title} — ${a.course} in ${a.daysUntilDue}d`),
-
-      // Career & LeetCode
       careerProfile: careerData.summary,
       leetcode:      lcData.summary,
       leetcodeDiagnosis: lcData.diagnosis || '',
@@ -402,16 +419,12 @@ GENERAL:
       const lcLinked = career && !!career.leetcodeUsername;
 
       const filtered = parsed.filter(r => {
-        // Remove "link LeetCode" if already linked
         if (lcLinked && (r.title?.toLowerCase().includes('link leetcode') || r.message?.toLowerCase().includes('link your leetcode'))) return false;
-        // Remove 0% attendance suggestions (no real classes)
         if (r.message?.includes('0%') && r.title?.toLowerCase().startsWith('attend')) return false;
-        // Remove any gradePoint mentions
         if (r.message?.toLowerCase().includes('gradepoint') || r.message?.toLowerCase().includes('grade point')) return false;
         return true;
       });
 
-      // Deduplicate by title
       const seen = new Set();
       const deduped = filtered.filter(r => {
         const key = r.title?.toLowerCase().trim();
@@ -431,4 +444,4 @@ GENERAL:
 
   console.log('[AI Recommendation] Using rule-based fallback.');
   return getFallbackRecommendations(userId);
-};
+}

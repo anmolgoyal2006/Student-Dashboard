@@ -45,6 +45,10 @@ class TTLCache {
     return value;
   }
 
+  del(key) {
+    this.store.delete(key);
+  }
+
   clear() {
     this.store.clear();
   }
