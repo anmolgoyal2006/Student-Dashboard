@@ -2,13 +2,14 @@ const request = require('supertest');
 const jwt = require('jsonwebtoken');
 
 jest.mock('../services/aiService', () => require('./helpers/mockAiService').factory());
+const mockRenderPDF = jest.fn();
 jest.mock('../services/pdfParser', () => ({
   ...jest.requireActual('../services/pdfParser'),
   extractTextFromPDF: jest.fn(),
+  renderPDFPagesToImages: mockRenderPDF,
 }));
 
-const { mockGeminiJSON, mockGeminiRaw, resetGemini } = require('./helpers/mockAiService');
-const { extractTextFromPDF } = require('../services/pdfParser');
+const { mockGeminiVisionJSON, mockGeminiVisionRaw, resetGemini } = require('./helpers/mockAiService');
 const { flagEntry } = require('../services/timetableImportService');
 const app = require('../app');
 const User = require('../models/User');
@@ -26,14 +27,14 @@ describe('Timetable PDF import', () => {
       process.env.JWT_SECRET,
       { expiresIn: '1h' }
     );
-    extractTextFromPDF.mockResolvedValue(
-      'TIME TABLE\nMon 09:00 CS201 Data Structures Room A1\nWed 11:00 CS201 Data Structures Room A1'
-    );
+    mockRenderPDF.mockResolvedValue([
+      { mimeType: 'image/jpeg', data: 'fakebase64data' },
+    ]);
   });
 
   afterEach(() => {
     resetGemini();
-    extractTextFromPDF.mockReset();
+    mockRenderPDF.mockReset();
   });
 
   const upload = () =>
@@ -44,7 +45,7 @@ describe('Timetable PDF import', () => {
 
   describe('parse', () => {
     test('returns entries and a flagged count', async () => {
-      mockGeminiJSON({
+      mockGeminiVisionJSON({
         subjects: [{
           name: 'Data Structures', code: 'CS201', instructor: '', credits: 4,
           schedule: [
@@ -64,7 +65,7 @@ describe('Timetable PDF import', () => {
     });
 
     test('a partial row is flagged per field, not dropped', async () => {
-      mockGeminiJSON({
+      mockGeminiVisionJSON({
         subjects: [
           { name: 'Physics', schedule: [{ day: 'Mon', startTime: '09:00', endTime: '10:00' }] },
           { name: '', credits: 99, schedule: [{ day: 'Funday', startTime: '9am', endTime: '' }] },
@@ -86,7 +87,7 @@ describe('Timetable PDF import', () => {
     });
 
     test('one bad row does not reject the whole import', async () => {
-      mockGeminiJSON({
+      mockGeminiVisionJSON({
         subjects: [
           { name: 'Good', schedule: [{ day: 'Tue', startTime: '10:00', endTime: '11:00' }] },
           { name: 'Bad', schedule: [] },
@@ -102,7 +103,7 @@ describe('Timetable PDF import', () => {
       // Real timetables list a course once per teacher/session block. Leaving
       // them split loses every slot after the first, since createSubject
       // dedupes by name on write.
-      mockGeminiJSON({
+      mockGeminiVisionJSON({
         subjects: [
           {
             name: 'SC', code: 'CSN5002', instructor: 'Dr. Dipika',
@@ -123,7 +124,7 @@ describe('Timetable PDF import', () => {
     });
 
     test('a duplicate row supplies the slots its twin was missing', async () => {
-      mockGeminiJSON({
+      mockGeminiVisionJSON({
         subjects: [
           { name: 'Lab', code: 'CS9', schedule: [] },
           { name: 'Lab', code: 'CS9', schedule: [{ day: 'Fri', startTime: '09:00', endTime: '11:00' }] },
@@ -137,7 +138,7 @@ describe('Timetable PDF import', () => {
     });
 
     test('different courses are not folded together', async () => {
-      mockGeminiJSON({
+      mockGeminiVisionJSON({
         subjects: [
           { name: 'SE', code: 'CSN5003', schedule: [{ day: 'Mon', startTime: '08:00', endTime: '09:00' }] },
           { name: 'SC', code: 'CSN5002', schedule: [{ day: 'Mon', startTime: '14:00', endTime: '15:00' }] },
@@ -148,17 +149,17 @@ describe('Timetable PDF import', () => {
       expect(res.body.entries).toHaveLength(2);
     });
 
-    test('a scanned PDF with no text layer returns 422 with a hint', async () => {
-      extractTextFromPDF.mockResolvedValue('   ');
+    test('a corrupt PDF returns 422', async () => {
+      mockRenderPDF.mockRejectedValueOnce(new Error('corrupt PDF'));
 
       const res = await upload();
 
       expect(res.status).toBe(422);
-      expect(res.body.hint).toMatch(/scanned/i);
+      expect(res.body.message).toMatch(/could not be read/i);
     });
 
     test('a non-timetable PDF returns 422 rather than an empty success', async () => {
-      mockGeminiRaw('I am not able to find a timetable here.');
+      mockGeminiVisionRaw('I am not able to find a timetable here.');
 
       const res = await upload();
 
@@ -169,7 +170,7 @@ describe('Timetable PDF import', () => {
     test('a marks sheet — valid JSON, zero subjects — also returns 422', async () => {
       // The model reads a result sheet or syllabus fine and correctly reports no
       // classes. That is a dead end for the user, not a successful import.
-      mockGeminiJSON({ subjects: [] });
+      mockGeminiVisionJSON({ subjects: [] });
 
       const res = await upload();
 
@@ -178,7 +179,7 @@ describe('Timetable PDF import', () => {
     });
 
     test('fenced JSON from the model is still parsed', async () => {
-      mockGeminiRaw('```json\n{"subjects":[{"name":"Maths","schedule":[{"day":"Fri","startTime":"14:00","endTime":"15:00"}]}]}\n```');
+      mockGeminiVisionRaw('```json\n{"subjects":[{"name":"Maths","schedule":[{"day":"Fri","startTime":"14:00","endTime":"15:00"}]}]}\n```');
 
       const res = await upload();
 

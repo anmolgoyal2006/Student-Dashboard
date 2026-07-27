@@ -11,10 +11,12 @@ function factory() {
   return {
     ...jest.requireActual('../../services/aiService'),
     chatCompletionsCreate: jest.fn(),
+    generateContentWithInlineData: jest.fn(),
   };
 }
 
 const getMock = () => require('../../services/aiService').chatCompletionsCreate;
+const getVisionMock = () => require('../../services/aiService').generateContentWithInlineData;
 
 /** Stub the next Gemini reply with `value` serialized as JSON. */
 function mockGeminiJSON(value) {
@@ -28,6 +30,16 @@ function mockGeminiRaw(text) {
   getMock().mockResolvedValue({ choices: [{ message: { content: text } }] });
 }
 
+/** Stub the vision model (generateContentWithInlineData) with a JSON value. */
+function mockGeminiVisionJSON(value) {
+  getVisionMock().mockResolvedValue(JSON.stringify(value));
+}
+
+/** Stub the vision model with a raw string. */
+function mockGeminiVisionRaw(text) {
+  getVisionMock().mockResolvedValue(text);
+}
+
 /** Make the next Gemini call reject, to exercise error paths. */
 function mockGeminiError(err) {
   getMock().mockRejectedValue(err instanceof Error ? err : new Error(err));
@@ -36,6 +48,10 @@ function mockGeminiError(err) {
 /** Clear call history and queued implementations between tests. */
 function resetGemini() {
   getMock().mockReset();
+  getVisionMock().mockReset();
 }
 
-module.exports = { factory, mockGeminiJSON, mockGeminiRaw, mockGeminiError, resetGemini, getMock };
+module.exports = {
+  factory, mockGeminiJSON, mockGeminiRaw, mockGeminiVisionJSON, mockGeminiVisionRaw,
+  mockGeminiError, resetGemini, getMock, getVisionMock,
+};
