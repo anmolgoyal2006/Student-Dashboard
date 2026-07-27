@@ -83,32 +83,52 @@ async function sendWeeklyDigest() {
     let errors = 0;
     const errorReasons = new Set();
 
-    for (const u of users) {
-      const userId = u._id;
+    const userIds = users.map(u => u._id);
+    const weekEnd = new Date();
+    weekEnd.setDate(weekEnd.getDate() + 7);
+    weekEnd.setHours(23, 59, 59, 999);
 
-      const weekEnd = new Date();
-      weekEnd.setDate(weekEnd.getDate() + 7);
-      weekEnd.setHours(23, 59, 59, 999);
-
-      const dueThisWeek = await ClassroomAssignment.countDocuments({
-        userId, status: { $in: ['assigned', 'missing'] },
-        dueDate: { $lte: weekEnd },
-      });
-
-      const subjectsAtRisk = await Attendance.aggregate([
-        { $match: { userId: userId } },
+    const [atRiskByUser, dueByUser, placementByUser] = await Promise.all([
+      Attendance.aggregate([
+        { $match: { userId: { $in: userIds } } },
         { $lookup: { from: 'subjects', localField: 'subjectId', foreignField: '_id', as: 'subject' } },
         { $unwind: { path: '$subject', preserveNullAndEmptyArrays: true } },
-        { $group: { _id: '$subject.name', total: { $sum: 1 }, present: { $sum: { $cond: [{ $eq: ['$status', 'present'] }, 1, 0] } } } },
+        { $group: { _id: { userId: '$userId', subjectName: '$subject.name' }, total: { $sum: 1 }, present: { $sum: { $cond: [{ $eq: ['$status', 'present'] }, 1, 0] } } } },
         { $addFields: { pct: { $multiply: [{ $divide: ['$present', { $max: ['$total', 1] }] }, 100] } } },
         { $match: { pct: { $lt: 75 } } },
-      ]);
+      ]).then(rows => {
+        const map = new Map();
+        for (const row of rows) {
+          const uid = row._id.userId.toString();
+          if (!map.has(uid)) map.set(uid, []);
+          map.get(uid).push({ subject: row._id.subjectName, pct: row.pct });
+        }
+        return map;
+      }),
+      ClassroomAssignment.aggregate([
+        { $match: { userId: { $in: userIds }, status: { $in: ['assigned', 'missing'] }, dueDate: { $lte: weekEnd } } },
+        { $group: { _id: '$userId', count: { $sum: 1 } } },
+      ]).then(rows => {
+        const map = new Map();
+        for (const row of rows) map.set(row._id.toString(), row.count);
+        return map;
+      }),
+      Task.aggregate([
+        { $match: { user: { $in: userIds }, type: 'placement', dueDate: { $lte: weekEnd } } },
+        { $group: { _id: '$user', count: { $sum: 1 } } },
+      ]).then(rows => {
+        const map = new Map();
+        for (const row of rows) map.set(row._id.toString(), row.count);
+        return map;
+      }),
+    ]);
 
-      const placementSessions = await Task.countDocuments({
-        user: userId,
-        type: 'placement',
-        dueDate: { $lte: weekEnd },
-      });
+    for (const u of users) {
+      const uid = u._id.toString();
+
+      const dueThisWeek = dueByUser.get(uid) || 0;
+      const subjectsAtRisk = atRiskByUser.get(uid) || [];
+      const placementSessions = placementByUser.get(uid) || 0;
 
       const title = '🤖 Weekly Academic Plan Ready';
       const body = [
@@ -118,7 +138,7 @@ async function sendWeeklyDigest() {
         'Tap to view your full roadmap.',
       ].join('\n');
 
-      const result = await sendDigestNotification(userId, title, body);
+      const result = await sendDigestNotification(u._id, title, body);
       if (result.success) {
         sent++;
       } else if (result.reason === 'Duplicate within 24h') {

@@ -45,13 +45,15 @@ export default function Marks() {
     setLoading(true);
     setLoadError(null);
     try {
-      const m      = await marksService.getAll();
-      const s      = await subjectService.getAll();
-      const c      = await marksService.getCGPA();
-      const sems   = await marksService.getSemesters();
-      const grades = await marksService.getGradeOptions();
-      const cgpas  = await marksService.getCGPAbySemester();
-      const pdfs   = await marksService.getSavedPdfs();
+      const [m, s, c, sems, grades, cgpas, pdfs] = await Promise.all([
+        marksService.getAll(),
+        subjectService.getAll(),
+        marksService.getCGPA(),
+        marksService.getSemesters(),
+        marksService.getGradeOptions(),
+        marksService.getCGPAbySemester(),
+        marksService.getSavedPdfs(),
+      ]);
 
       setMarks(m.data.marks || []);
       setSubjects(s.data.subjects || []);

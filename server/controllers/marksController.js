@@ -1,5 +1,8 @@
+const { TTLCache } = require('../utils/ttlCache');
 const Marks   = require('../models/Marks');
 const Subject = require('../models/Subject');
+
+const cgpaCache = new TTLCache({ ttlMs: 5 * 60 * 1000, maxEntries: 500 });
 
 // POST /api/marks
 exports.addMarks = async (req, res) => {
@@ -94,36 +97,34 @@ exports.getSemesters = async (req, res) => {
 // GET /api/marks/cgpa-semester
 exports.getCGPAbySemester = async (req, res) => {
   try {
-    const semesters = await Semester.find({ student: req.user.id }).sort({ semesterNumber: 1 });
+    const userId = req.user.id;
+    const cacheKey = `cgpa-semester:${userId}`;
 
-    // Recalculate SGPAs from raw subject data (fixes old toFixed bugs in stored values)
+    const cached = cgpaCache.get(cacheKey);
+    if (cached) return res.json(cached);
+
+    const semesters = await Semester.find({ student: userId }).sort({ semesterNumber: 1 });
+
     const { calculateSGPA } = require('../utils/gradeUtils');
-    const sgpaList = semesters.map((s) =>
-      s.isManual && s.directSGPA !== null ? s.directSGPA : calculateSGPA(s.subjects)
-    );
 
-    // Credit-weighted CGPA: Σ(SGPA × credits) / Σ(credits)
-    // Only applies when every semester has credit data available
-    const allHaveCredits = semesters.every((s) =>
-      s.isManual ? (s.totalCredits != null && s.totalCredits > 0) : s.subjects?.length > 0
-    );
+    let weightedSum = 0;
+    let totalCreditsAll = 0;
+    const sgpaList = semesters.map((s) => {
+      const sgpa = s.isManual && s.directSGPA !== null ? s.directSGPA : calculateSGPA(s.subjects);
+      const cr = s.isManual ? (s.totalCredits || 0) : s.subjects.reduce((a, b) => a + (b.credits || 0), 0);
+      weightedSum += sgpa * cr;
+      totalCreditsAll += cr;
+      return { semester: s.semesterName || `Semester ${s.semesterNumber}`, sgpa };
+    });
 
-    let cgpa;
-    if (allHaveCredits) {
-      let weightedSum = 0;
-      let totalCreditsAll = 0;
-      for (const s of semesters) {
-        const sgpa = s.isManual && s.directSGPA !== null ? s.directSGPA : calculateSGPA(s.subjects);
-        const cr = s.isManual ? s.totalCredits : s.subjects.reduce((a, b) => a + (b.credits || 0), 0);
-        weightedSum += sgpa * cr;
-        totalCreditsAll += cr;
-      }
-      cgpa = calculateCGPA.withWeightedTotal(weightedSum, totalCreditsAll);
-    } else {
-      cgpa = calculateCGPA(sgpaList);
-    }
+    const allHaveCredits = totalCreditsAll > 0;
+    const cgpa = allHaveCredits
+      ? calculateCGPA.withWeightedTotal(weightedSum, totalCreditsAll)
+      : calculateCGPA(sgpaList.map(s => s.sgpa));
 
-    res.json({ cgpa, sgpaList, totalSemesters: semesters.length });
+    const result = { cgpa, sgpaList, totalSemesters: semesters.length };
+    cgpaCache.set(cacheKey, result);
+    res.json(result);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -141,6 +142,7 @@ exports.addSemester = async (req, res) => {
 
     const semester = new Semester({ student: req.user.id, semesterNumber, semesterName, subjects });
     await semester.save();
+    cgpaCache.del(`cgpa-semester:${req.user.id}`);
     res.status(201).json({ semester });
   } catch (err) {
     if (err.name === 'ValidationError')
@@ -161,6 +163,7 @@ exports.updateSemester = async (req, res) => {
     if (semesterName   !== undefined) semester.semesterName   = semesterName;
     if (subjects       !== undefined) semester.subjects       = subjects;
     await semester.save();
+    cgpaCache.del(`cgpa-semester:${semester.student}`);
     res.json({ semester });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -187,6 +190,7 @@ exports.addManualSGPA = async (req, res) => {
       subjects: [],
     });
     await semester.save();
+    cgpaCache.del(`cgpa-semester:${req.user.id}`);
     res.status(201).json({ semester });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -198,6 +202,7 @@ exports.deleteSemester = async (req, res) => {
   try {
     const deleted = await Semester.findOneAndDelete({ _id: req.params.id, student: req.user.id });
     if (!deleted) return res.status(404).json({ message: 'Semester not found' });
+    cgpaCache.del(`cgpa-semester:${req.user.id}`);
     res.json({ message: 'Semester deleted' });
   } catch (err) {
     res.status(500).json({ message: err.message });
