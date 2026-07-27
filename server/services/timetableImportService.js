@@ -175,7 +175,7 @@ async function parseTimetablePDF(buffer) {
   if (hasText) {
     try {
       const rawText = await generateContent([
-        { text: `Extracted Timetable Text:\n${text}\n\n${TEXT_PROMPT}` }
+        { role: 'user', parts: [{ text: `Extracted Timetable Text:\n${text}\n\n${TEXT_PROMPT}` }] }
       ], {
         model: LIGHT_MODEL,
         temperature: 0,
