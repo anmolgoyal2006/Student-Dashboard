@@ -1,5 +1,5 @@
-const { generateContentWithInlineData, HEAVY_MODEL } = require('./aiService');
-const { renderPDFPagesToImages } = require('./pdfParser');
+const { generateContentWithInlineData, generateContent, HEAVY_MODEL, LIGHT_MODEL } = require('./aiService');
+const { renderPDFPagesToImages, extractTextFromPDF } = require('./pdfParser');
 const { extractJSON } = require('../utils/extractJSON');
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -43,6 +43,29 @@ How to read the grid — this is an IMAGE, use visual position, not text order:
 Never invent a value. If something is genuinely not visible, use "" for
 strings and null for credits. Return every subject you find, even if some of
 its fields are incomplete. Never drop a row because it is partial.`;
+
+const TEXT_PROMPT = `You extract class timetables from the text of a timetable grid into JSON.
+
+Return ONLY a JSON object of this exact shape:
+{"subjects":[{"name":"","code":"","instructor":"","credits":null,"schedule":[{"day":"","startTime":"","endTime":"","room":""}]}]}
+
+Field rules — these names are fixed, do not rename or add fields:
+- name: the subject/course title. Required.
+- code: the course code exactly as printed (e.g. "CS201"). "" if absent.
+- instructor: teacher name. "" if absent.
+- credits: a number 1-6, or null if not printed. Never guess.
+- day: one of Sun, Mon, Tue, Wed, Thu, Fri, Sat. Map abbreviations
+  (MON/M/Monday -> Mon, TUES/TUE -> Tue, THURS/THU/TH -> Thu, etc).
+- startTime / endTime: 24-hour "HH:MM". Convert 12-hour times ("2:00 PM" ->
+  "14:00"). A timetable running 9-5 with a bare "1:00" start means "13:00".
+- room: room/venue as printed. "" if absent.
+
+How to read the text:
+- The extracted text represents a grid layout. The column headers define time ranges (e.g. 9:00 - 10:00) and the rows represent days of the week (Monday, Tuesday, etc.).
+- A subject's schedule entry is defined by the day row it belongs to and the time column(s) it sits under.
+- Match subjects to their day and time carefully.
+- A cell's duration is determined strictly by the vertical grid lines separating the columns. Do not assume a cell spans multiple columns just because adjacent cells (above or below it) are blank.
+- Return every subject you find, even if some of its fields are incomplete. Never drop a row because it is partial.`;
 
 function flagEntry(raw) {
   const issues = [];
@@ -139,35 +162,69 @@ function mergeDuplicates(subjects) {
 }
 
 async function parseTimetablePDF(buffer) {
-  let images;
+  let text = '';
   try {
-    images = await renderPDFPagesToImages(buffer);
+    text = await extractTextFromPDF(buffer);
   } catch (err) {
-    const e = new Error('That PDF could not be read. It may be corrupted or password-protected.');
-    e.code = 'UNREADABLE_PDF';
-    throw e;
+    console.warn('[Timetable Import] Text extraction failed:', err.message);
   }
 
-  if (!images || images.length === 0) {
-    const e = new Error('That PDF has no pages to read.');
-    e.code = 'UNREADABLE_PDF';
-    throw e;
+  const hasText = text && text.trim().length > 100;
+  let parsedJson = null;
+
+  if (hasText) {
+    try {
+      const rawText = await generateContent([
+        { text: `Extracted Timetable Text:\n${text}\n\n${TEXT_PROMPT}` }
+      ], {
+        model: LIGHT_MODEL,
+        temperature: 0,
+        responseMimeType: 'application/json',
+      });
+      parsedJson = extractJSON((rawText || '').trim());
+    } catch (err) {
+      console.warn('[Timetable Import] Text-based parsing failed, falling back to vision:', err.message);
+    }
   }
 
-  const parts = images.map(img => ({
-    inlineData: { mimeType: img.mimeType, data: img.data },
-  }));
-  parts.push({ text: PROMPT });
+  // Fallback to visual parsing if text-based parsing didn't return subjects
+  if (!parsedJson?.subjects || parsedJson.subjects.length === 0) {
+    let images;
+    try {
+      images = await renderPDFPagesToImages(buffer);
+    } catch (err) {
+      console.error('[Timetable Import] Rendering PDF to images failed:', err.message);
+      const e = new Error(
+        hasText
+          ? 'Could not parse timetable from PDF text.'
+          : 'That PDF could not be read. It may be corrupted, password-protected, or missing native dependencies (canvas) on the server.'
+      );
+      e.code = 'UNREADABLE_PDF';
+      throw e;
+    }
 
-  const rawText = await generateContentWithInlineData(parts, {
-    model: HEAVY_MODEL,
-    temperature: 0,
-    maxOutputTokens: 8000,
-    responseMimeType: 'application/json',
-  });
+    if (!images || images.length === 0) {
+      const e = new Error('That PDF has no pages to read.');
+      e.code = 'UNREADABLE_PDF';
+      throw e;
+    }
 
-  const parsed = extractJSON((rawText || '').trim());
-  const subjects = Array.isArray(parsed?.subjects) ? parsed.subjects : null;
+    const parts = images.map(img => ({
+      inlineData: { mimeType: img.mimeType, data: img.data },
+    }));
+    parts.push({ text: PROMPT });
+
+    const rawText = await generateContentWithInlineData(parts, {
+      model: HEAVY_MODEL,
+      temperature: 0,
+      maxOutputTokens: 8000,
+      responseMimeType: 'application/json',
+    });
+
+    parsedJson = extractJSON((rawText || '').trim());
+  }
+
+  const subjects = Array.isArray(parsedJson?.subjects) ? parsedJson.subjects : null;
 
   if (!subjects || subjects.length === 0) {
     const e = new Error('Could not find any classes in that PDF.');
