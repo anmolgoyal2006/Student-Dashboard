@@ -298,6 +298,8 @@ export default function Marks() {
         gap: 16,
         borderBottom: '1px solid var(--border)',
         marginBottom: 20,
+        overflowX: 'auto',
+        WebkitOverflowScrolling: 'touch',
       }}>
         {[
           { id: 'marks', label: 'Marks & CGPA', icon: ClipboardList },
@@ -310,9 +312,7 @@ export default function Marks() {
           return (
             <button
               key={t.id}
-              onClick={() => {
-                setActiveTab(t.id);
-              }}
+              onClick={() => setActiveTab(t.id)}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -326,6 +326,8 @@ export default function Marks() {
                 color: active ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
                 borderBottom: active ? '2px solid var(--color-accent)' : '2px solid transparent',
                 transition: 'all 0.15s',
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
               }}
             >
               <IconComponent size={16} />
@@ -471,7 +473,7 @@ export default function Marks() {
                       background: 'var(--color-surface-2)', border: '1px solid var(--border)',
                       color: 'var(--color-text-primary)',
                     }}>
-                      S{i + 1}: {s}
+                      {s.semester}: {s.sgpa}
                     </span>
                   ))}
                 </div>
