@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { LayoutDashboard, Calendar, CheckSquare, BarChart3, Rocket, Clock, User, Bot, LineChart, Users, ChevronLeft, ChevronRight, LogOut, GraduationCap, Menu, X, TrendingUp } from 'lucide-react';
 
 const baseLinks = [
-  { to: '/',             label: 'Dashboard',    icon: LayoutDashboard },
+  { to: '/dashboard',    label: 'Dashboard',    icon: LayoutDashboard },
   { to: '/timetable',    label: 'Timetable',    icon: Calendar },
   { to: '/attendance',   label: 'Attendance',   icon: CheckSquare },
   { to: '/marks',        label: 'Marks & Ranking', icon: BarChart3 },

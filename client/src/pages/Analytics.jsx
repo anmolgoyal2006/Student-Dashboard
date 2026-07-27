@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import API from '../api/axios';
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import { BarChart3, Clock, CheckCircle, AlertTriangle, BookOpen, TrendingUp, Target } from 'lucide-react';
+import { BarChart3, Clock, CheckCircle, AlertTriangle, BookOpen, TrendingUp, Target, GraduationCap } from 'lucide-react';
+import ClassroomConnect from '../components/ClassroomConnect';
 import useResponsive from '../utils/useResponsive';
 
 const card = (isMobile) => ({
@@ -51,7 +52,53 @@ export default function Analytics() {
     );
   }
 
-  if (!data) return <div style={{ color: '#64748b', textAlign: 'center', padding: 40 }}>No analytics data available.</div>;
+  if (!data) {
+    return (
+      <div>
+        <div style={{ marginBottom: 20 }}>
+          <h1 style={{ margin: 0, fontSize: isMobile ? 18 : 20, fontWeight: 600, color: '#f1f5f9', letterSpacing: '-0.3px' }}>
+            <BarChart3 size={isMobile ? 18 : 20} style={{ display: 'inline', marginRight: 8, color: '#6366f1', verticalAlign: -2 }} />
+            Analytics
+          </h1>
+          <p style={{ margin: '4px 0 0', fontSize: isMobile ? 12 : 13, color: '#64748b' }}>Assignment trends, workload distribution, and productivity insights</p>
+        </div>
+        <ClassroomConnect />
+      </div>
+    );
+  }
+
+  if (!data.hasClassroom) {
+    return (
+      <div>
+        <div style={{ marginBottom: 20 }}>
+          <h1 style={{ margin: 0, fontSize: isMobile ? 18 : 20, fontWeight: 600, color: '#f1f5f9', letterSpacing: '-0.3px' }}>
+            <BarChart3 size={isMobile ? 18 : 20} style={{ display: 'inline', marginRight: 8, color: '#6366f1', verticalAlign: -2 }} />
+            Analytics
+          </h1>
+          <p style={{ margin: '4px 0 0', fontSize: isMobile ? 12 : 13, color: '#64748b' }}>Assignment trends, workload distribution, and productivity insights</p>
+        </div>
+        <div style={{
+          background: '#13161f', border: '1px solid rgba(255,255,255,0.07)',
+          borderRadius: 14, padding: isMobile ? '30px 16px' : '40px 24px',
+          textAlign: 'center',
+        }}>
+          <div style={{
+            width: 56, height: 56, borderRadius: '50%',
+            background: 'rgba(99,102,241,0.12)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            margin: '0 auto 16px',
+          }}>
+            <GraduationCap size={26} color="#818cf8" />
+          </div>
+          <h3 style={{ margin: '0 0 6px', fontSize: 16, fontWeight: 600, color: '#e2e8f0' }}>Connect Google Classroom</h3>
+          <p style={{ margin: '0 auto 20px', fontSize: 13, color: '#64748b', maxWidth: 400, lineHeight: 1.5 }}>
+            Link your Google Classroom account to unlock analytics — track assignment completion, workload distribution, deadlines, and productivity trends.
+          </p>
+          <ClassroomConnect />
+        </div>
+      </div>
+    );
+  }
 
   const { overview, charts, atRiskSubjects } = data;
   const COLORS = ['#6366f1', '#22c55e', '#f59e0b', '#ef4444', '#818cf8', '#34d399', '#fbbf24', '#f87171'];

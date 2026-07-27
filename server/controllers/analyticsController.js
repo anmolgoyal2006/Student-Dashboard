@@ -131,6 +131,7 @@ exports.getAnalytics = async (req, res) => {
       .map(([name, d]) => ({ subject: name, percentage: Math.round((d.present / d.total) * 100) }));
 
     res.json({
+      hasClassroom,
       overview: {
         totalAssignments: total,
         completed,
