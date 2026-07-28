@@ -1,8 +1,70 @@
+const { spawn } = require('child_process');
+const path = require('path');
 const { generateContentWithInlineData, generateContent, HEAVY_MODEL, LIGHT_MODEL } = require('./aiService');
 const { renderPDFPagesToImages, extractTextFromPDF } = require('./pdfParser');
 const { extractJSON } = require('../utils/extractJSON');
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+const GRID_PROMPT = `You extract class timetables from a structured list of timetable grid cells with explicit times.
+
+Return ONLY a JSON object of this exact shape:
+{"subjects":[{"name":"","code":"","instructor":"","credits":null,"schedule":[{"day":"","startTime":"","endTime":"","room":""}]}]}
+
+Field rules:
+- name: course name, e.g. "Software Engineering", "SE", "TOC". Clean up section markers like (G1) or (CSE3, CSE4). Never include them.
+- code: course code, e.g. "CSN5003", "CSN5001+AIN5001".
+- instructor: e.g. "Dr. Ashpreet".
+- credits: number or null.
+- day: Sun, Mon, Tue, Wed, Thu, Fri, Sat.
+- startTime / endTime: 24-hour "HH:MM".
+- room: venue, e.g. "L21", "402+L407".
+
+How to parse each cell item:
+- You are given a JSON array of cell objects. Each object has "day", "time" (e.g. "9:00-10:00", "5:00- 7:00"), and "content".
+- Translate the "day" to the standard Sun-Sat value (e.g., "MON" -> "Mon", "TUES" -> "Tue").
+- Translate the "time" to 24-hour format:
+  - "9:00-10:00" -> 09:00 - 10:00.
+  - "11:00-12:00" -> 11:00 - 12:00.
+  - "12:00-1:00" -> 12:00 - 13:00.
+  - "2:00-3:00" -> 14:00 - 15:00.
+  - "3:00-4:00" -> 15:00 - 16:00.
+  - "4:00-5:00" -> 16:00 - 17:00.
+  - "5:00- 7:00" -> 17:00 - 19:00.
+- Extract the course name, course code, instructor, and room from the "content" text.
+- If a cell's "content" contains multiple class blocks (separated by newlines/spaces), split them into separate schedule slots for those subjects. For example, if "content" has SC on line 1 and SE on line 2, split them into two slots (one for SC, one for SE) sharing the same day and time.
+- Ensure all courses are correctly grouped by name/code, and fold duplicate subjects together.`;
+
+function extractStructuredTableFromPDF(buffer) {
+  return new Promise((resolve, reject) => {
+    const scriptPath = path.join(__dirname, '../scripts/extractTable.py');
+    const py = spawn('python', [scriptPath]);
+    
+    let stdout = '';
+    let stderr = '';
+    
+    py.stdout.on('data', data => stdout += data);
+    py.stderr.on('data', data => stderr += data);
+    
+    py.on('close', code => {
+      if (code !== 0) {
+        reject(new Error(stderr || `Python script exited with code ${code}`));
+      } else {
+        try {
+          resolve(JSON.parse(stdout));
+        } catch (err) {
+          reject(err);
+        }
+      }
+    });
+    
+    py.on('error', err => reject(err));
+    
+    py.stdin.write(buffer);
+    py.stdin.end();
+  });
+}
+
 
 const PROMPT = `You extract class timetables from an image of a timetable grid into JSON.
 
@@ -164,33 +226,77 @@ function mergeDuplicates(subjects) {
 }
 
 async function parseTimetablePDF(buffer) {
-  let text = '';
-  try {
-    text = await extractTextFromPDF(buffer);
-  } catch (err) {
-    console.warn('[Timetable Import] Text extraction failed:', err.message);
-  }
-
-  const hasText = text && text.trim().length > 100;
   let parsedJson = null;
+  let hasText = false;
 
-  if (hasText) {
+  // 1. In non-test environments, try structured table parsing using pdfplumber first
+  if (process.env.NODE_ENV !== 'test') {
     try {
-      const rawText = await generateContent([
-        { role: 'user', parts: [{ text: `Extracted Timetable Text:\n${text}\n\n${TEXT_PROMPT}` }] }
-      ], {
-        model: LIGHT_MODEL,
-        temperature: 0,
-        responseMimeType: 'application/json',
-      });
-      parsedJson = extractJSON((rawText || '').trim());
+      const tableData = await extractStructuredTableFromPDF(buffer);
+      const gridTable = tableData?.pages?.[0]?.tables?.[0];
+      if (gridTable && gridTable.length > 1) {
+        const headers = gridTable[0];
+        const cellsWithTimes = [];
+        
+        for (let r = 1; r < gridTable.length; r++) {
+          const row = gridTable[r];
+          const dayName = row[0];
+          for (let c = 1; c < row.length; c++) {
+            const cellContent = row[c];
+            if (cellContent && cellContent.trim() && !/LUNCH|BREAK|RECESS/i.test(cellContent)) {
+              const timeHeader = headers[c] || '';
+              cellsWithTimes.push({
+                day: dayName,
+                time: timeHeader.replace(/\n/g, ' '),
+                content: cellContent
+              });
+            }
+          }
+        }
+
+        const rawText = await generateContent([
+          { role: 'user', parts: [{ text: `${GRID_PROMPT}\n\nStructured Grid Cells:\n${JSON.stringify(cellsWithTimes)}` }] }
+        ], {
+          model: LIGHT_MODEL,
+          temperature: 0,
+          responseMimeType: 'application/json',
+        });
+        parsedJson = extractJSON((rawText || '').trim());
+        console.log('[Timetable Import] Structured grid parsed successfully.');
+      }
     } catch (err) {
-      console.warn('[Timetable Import] Text-based parsing failed, falling back to vision:', err.message);
+      console.warn('[Timetable Import] Structured grid parsing failed, falling back to raw text/vision:', err.message);
     }
   }
 
-  // Fallback to visual parsing if text-based parsing didn't return subjects,
-  // or if it incorrectly scheduled a class at 08:00/08:30 due to column shifting (non-test env only)
+  // 2. Fallback to raw plain-text parsing if structured grid parsing didn't return subjects
+  let text = '';
+  const hasParsedSubjects = parsedJson?.subjects && parsedJson.subjects.length > 0;
+  if (!hasParsedSubjects) {
+    try {
+      text = await extractTextFromPDF(buffer);
+    } catch (err) {
+      console.warn('[Timetable Import] Text extraction failed:', err.message);
+    }
+
+    hasText = text && text.trim().length > 100;
+    if (hasText) {
+      try {
+        const rawText = await generateContent([
+          { role: 'user', parts: [{ text: `Extracted Timetable Text:\n${text}\n\n${TEXT_PROMPT}` }] }
+        ], {
+          model: LIGHT_MODEL,
+          temperature: 0,
+          responseMimeType: 'application/json',
+        });
+        parsedJson = extractJSON((rawText || '').trim());
+      } catch (err) {
+        console.warn('[Timetable Import] Text-based parsing failed:', err.message);
+      }
+    }
+  }
+
+  // 3. Fallback to visual parsing if still no subjects, or if we got an 8:00 class (likely alignment shift)
   const hasEightAmClass = parsedJson?.subjects?.some(s => 
     s.schedule?.some(slot => slot.startTime === '08:00' || slot.startTime === '08:30')
   );
