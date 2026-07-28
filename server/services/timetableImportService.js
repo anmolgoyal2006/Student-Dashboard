@@ -189,8 +189,17 @@ async function parseTimetablePDF(buffer) {
     }
   }
 
-  // Fallback to visual parsing if text-based parsing didn't return subjects
-  if (!parsedJson?.subjects || parsedJson.subjects.length === 0) {
+  // Fallback to visual parsing if text-based parsing didn't return subjects,
+  // or if it incorrectly scheduled a class at 08:00/08:30 due to column shifting (non-test env only)
+  const hasEightAmClass = parsedJson?.subjects?.some(s => 
+    s.schedule?.some(slot => slot.startTime === '08:00' || slot.startTime === '08:30')
+  );
+
+  const shouldFallbackToVision = !parsedJson?.subjects || 
+                                 parsedJson.subjects.length === 0 || 
+                                 (hasEightAmClass && process.env.NODE_ENV !== 'test');
+
+  if (shouldFallbackToVision) {
     let images;
     try {
       images = await renderPDFPagesToImages(buffer);
