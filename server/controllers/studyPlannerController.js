@@ -50,6 +50,9 @@ exports.generatePlan = async (req, res) => {
       .lean();
 
     const attendanceMap = {};
+    for (const s of subjects) {
+      attendanceMap[s.name] = { total: s.initialTotal || 0, present: s.initialPresent || 0 };
+    }
     for (const r of attendanceRecords) {
       if (!r.subjectId) continue;
       const name = r.subjectId.name;

@@ -7,7 +7,8 @@ const {
   getBySubject,
   getMonthlyTrends,
   markFromNotification,
-  getStudentBySid
+  getStudentBySid,
+  deleteAttendanceRecord
 } = require('../controllers/attendanceController');
 
 const { protect } = require('../middleware/authMiddleware');
@@ -22,6 +23,12 @@ router.post('/', validate([
   body('slot').optional().isString(),
   body('time').optional().isString(),
 ]), markAttendance);
+
+router.delete('/', validate([
+  body('subjectId').notEmpty().isMongoId().withMessage('subjectId is required.'),
+  body('date').notEmpty().isISO8601().withMessage('A valid date is required.'),
+  body('slot').optional().isString(),
+]), deleteAttendanceRecord);
 
 router.get('/summary', getAttendanceSummary);
 router.get('/trends', getMonthlyTrends);

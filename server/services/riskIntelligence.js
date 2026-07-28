@@ -13,11 +13,16 @@ async function checkAcademicRisks(userId) {
 
     if (!assignments.length) return [];
 
-    const records = await Attendance.find({ userId })
-      .populate('subjectId', 'name code')
-      .lean();
+    const Subject = require('../models/Subject');
+    const [subjects, records] = await Promise.all([
+      Subject.find({ userId }).lean(),
+      Attendance.find({ userId }).populate('subjectId', 'name code').lean()
+    ]);
 
     const attendanceMap = {};
+    for (const s of subjects) {
+      attendanceMap[s.name] = { total: s.initialTotal || 0, present: s.initialPresent || 0 };
+    }
     for (const r of records) {
       if (!r.subjectId) continue;
       const name = r.subjectId.name;

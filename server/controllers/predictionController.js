@@ -328,6 +328,9 @@ exports.getAIAnalysis = async (req, res) => {
     ]);
 
     const attMap = {};
+    subjects.forEach(s => {
+      attMap[s.name] = { total: s.initialTotal || 0, present: s.initialPresent || 0 };
+    });
     attendanceRecords.forEach(r => {
       if (!r.subjectId) return;
       const name = r.subjectId.name;

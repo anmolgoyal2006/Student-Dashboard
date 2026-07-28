@@ -32,7 +32,7 @@ exports.addSubject = async (req, res) => {
 };
 
 // PUT /api/subjects/:id
-const SUBJECT_UPDATABLE_FIELDS = ['name', 'code', 'instructor', 'credits', 'schedule'];
+const SUBJECT_UPDATABLE_FIELDS = ['name', 'code', 'instructor', 'credits', 'schedule', 'initialPresent', 'initialTotal'];
 
 exports.updateSubject = async (req, res) => {
   try {
@@ -41,6 +41,18 @@ exports.updateSubject = async (req, res) => {
     const updates = {};
     for (const field of SUBJECT_UPDATABLE_FIELDS) {
       if (req.body[field] !== undefined) updates[field] = req.body[field];
+    }
+
+    if (updates.initialPresent !== undefined || updates.initialTotal !== undefined) {
+      const existing = await Subject.findOne({ _id: req.params.id, userId: req.user.id });
+      if (!existing) return res.status(404).json({ message: 'Subject not found.' });
+
+      const newPresent = updates.initialPresent !== undefined ? updates.initialPresent : existing.initialPresent;
+      const newTotal = updates.initialTotal !== undefined ? updates.initialTotal : existing.initialTotal;
+
+      if (newPresent > newTotal) {
+        return res.status(400).json({ message: 'Classes attended cannot exceed total classes conducted.' });
+      }
     }
 
     const subject = await Subject.findOneAndUpdate(

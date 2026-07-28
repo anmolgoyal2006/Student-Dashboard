@@ -6,7 +6,7 @@ import {
   Calendar, Check, X, Flame, BookOpen,
   ChevronLeft, ChevronRight, ShieldAlert, ShieldCheck,
   CalendarCheck, CheckCircle, XCircle,
-  AlertTriangle, CalendarDays, ClipboardList,
+  AlertTriangle, CalendarDays, ClipboardList, SlidersHorizontal,
 } from "lucide-react";
 import EmptyState from "./EmptyState";
 import TodayScheduleCard from "./TodayScheduleCard";
@@ -154,6 +154,23 @@ const StudentAttendanceView = ({ sid }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const recordsPerPage = 10;
 
+  /* ── initial balance modal states ── */
+  const [showAdjustModal, setShowAdjustModal] = useState(false);
+  const [adjustSubject, setAdjustSubject] = useState(null);
+  const [adjustTotal, setAdjustTotal] = useState(0);
+  const [adjustPresent, setAdjustPresent] = useState(0);
+  const [showCalc, setShowCalc] = useState(false);
+  const [calcTotal, setCalcTotal] = useState(0);
+  const [calcPercent, setCalcPercent] = useState("");
+  const [submittingAdjust, setSubmittingAdjust] = useState(false);
+
+  /* ── retroactive marking modal states ── */
+  const [showRetroModal, setShowRetroModal] = useState(false);
+  const [retroDate, setRetroDate] = useState(null);
+  const [retroDateStr, setRetroDateStr] = useState("");
+  const [retroSlots, setRetroSlots] = useState([]);
+  const [markingRetro, setMarkingRetro] = useState({});
+
   /* ── today's scheduled classes from timetable ── */
   const todayClasses = useMemo(() => {
     if (!subjects?.length) return [];
@@ -211,6 +228,135 @@ const StudentAttendanceView = ({ sid }) => {
   }, [sid]);
 
   useEffect(() => { setCurrentPage(1); }, [filter]);
+
+  /* ── retroactive marking click handler ── */
+  const handleDayClick = (date, filterSubjectName) => {
+    const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const dayName = dayNames[date.getDay()];
+    
+    // Find all schedule slots for this day of the week
+    const slots = [];
+    subjects.forEach(s => {
+      // If a subject filter is active on the calendar, show only that subject
+      if (filterSubjectName && s.name !== filterSubjectName) return;
+
+      (s.schedule || [])
+        .filter(sl => sl.day === dayName)
+        .forEach((sl, idx) => {
+          // Check if there is an existing record for this subject + date + slot_index
+          const dateStr = date.toISOString().slice(0, 10);
+          const existing = data.records.find(r => {
+            const rDate = new Date(r.date).toISOString().slice(0, 10);
+            const isMatch = rDate === dateStr && 
+                            (r.subjectId === s._id || r.code === s.code) &&
+                            (r.slot === `slot_${idx}` || (!r.slot && idx === 0));
+            return isMatch;
+          });
+          
+          slots.push({
+            subjectId: s._id,
+            name: s.name,
+            code: s.code,
+            time: sl.startTime || "",
+            endTime: sl.endTime || "",
+            slotIndex: idx,
+            status: existing ? existing.status : null,
+          });
+        });
+    });
+
+    setRetroDate(date);
+    setRetroDateStr(date.toLocaleDateString("en-IN", { weekday: "short", day: "2-digit", month: "short", year: "numeric" }));
+    setRetroSlots(slots);
+    setShowRetroModal(true);
+  };
+
+  const handleMarkRetro = async (subjectId, slotIndex, status) => {
+    const key = `${subjectId}_${slotIndex}`;
+    setMarkingRetro(prev => ({ ...prev, [key]: true }));
+
+    const dateStr = retroDate.toISOString().slice(0, 10);
+    try {
+      if (status === "unmarked") {
+        await API.delete("/attendance", {
+          data: {
+            subjectId,
+            date: dateStr,
+            slot: `slot_${slotIndex}`
+          }
+        });
+        toast.success("Attendance cleared!");
+      } else {
+        await API.post("/attendance", {
+          subjectId,
+          date: dateStr,
+          status,
+          slot: `slot_${slotIndex}`
+        });
+        toast.success(`Marked as ${status}!`);
+      }
+      
+      setRetroSlots(prev => prev.map(s => {
+        if (s.subjectId === subjectId && s.slotIndex === slotIndex) {
+          return { ...s, status: status === "unmarked" ? null : status };
+        }
+        return s;
+      }));
+
+      await refreshAttendanceRecords();
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to update attendance.");
+    } finally {
+      setMarkingRetro(prev => ({ ...prev, [key]: false }));
+    }
+  };
+
+  /* ── initial balance handlers ── */
+  const handleOpenAdjustModal = (subject) => {
+    setAdjustSubject(subject);
+    setAdjustTotal(subject.initialTotal || 0);
+    setAdjustPresent(subject.initialPresent || 0);
+    setCalcTotal(subject.initialTotal || 0);
+    setCalcPercent("");
+    setShowCalc(false);
+    setShowAdjustModal(true);
+  };
+
+  const handleSaveAdjust = async () => {
+    if (parseInt(adjustPresent, 10) > parseInt(adjustTotal, 10)) {
+      toast.error("Attended classes cannot exceed total classes conducted.");
+      return;
+    }
+
+    setSubmittingAdjust(true);
+    try {
+      await API.put(`/timetable/${adjustSubject.subjectId}`, {
+        initialPresent: parseInt(adjustPresent, 10),
+        initialTotal: parseInt(adjustTotal, 10)
+      });
+      toast.success("Initial balance updated successfully!");
+      setShowAdjustModal(false);
+      await fetchAttendance();
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to update initial balance.");
+    } finally {
+      setSubmittingAdjust(false);
+    }
+  };
+
+  const handleApplyCalc = () => {
+    const totalVal = parseInt(calcTotal, 10);
+    const pctVal = parseFloat(calcPercent);
+    if (isNaN(totalVal) || isNaN(pctVal) || totalVal < 0 || pctVal < 0 || pctVal > 100) {
+      toast.error("Please enter valid positive numbers. Percentage must be between 0 and 100.");
+      return;
+    }
+    const attended = Math.round(totalVal * (pctVal / 100));
+    setAdjustTotal(totalVal);
+    setAdjustPresent(attended);
+    setShowCalc(false);
+    toast.info(`Calculated: ${attended} attended out of ${totalVal} classes (${pctVal}%).`);
+  };
 
   /* ── quick mark (from TodayScheduleCard) ── */
   const handleQuickMark = async (subjectId, date, status, slot) => {
@@ -405,6 +551,38 @@ const StudentAttendanceView = ({ sid }) => {
       <style>{`
         @keyframes sa-spin { to { transform: rotate(360deg); } }
 
+        /* Custom premium styles for Adjust Balance inputs */
+        .sa-modal-input::-webkit-outer-spin-button,
+        .sa-modal-input::-webkit-inner-spin-button {
+          -webkit-appearance: none;
+          margin: 0;
+        }
+        .sa-modal-input {
+          -moz-appearance: textfield;
+          outline: none;
+          transition: all 0.15s ease-in-out;
+        }
+        .sa-modal-input:focus {
+          border-color: var(--color-accent) !important;
+          box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.18) !important;
+        }
+
+        .sa-adjust-btn {
+          font-size: 10.5px; font-family: inherit; font-weight: 600;
+          color: var(--color-accent);
+          background: rgba(99,102,241,0.06);
+          border: 1px solid rgba(99,102,241,0.18);
+          padding: 3.5px 10px; border-radius: var(--radius-sm);
+          cursor: pointer; transition: all 0.15s ease;
+          display: inline-flex; align-items: center; justify-content: center;
+          white-space: nowrap;
+        }
+        .sa-adjust-btn:hover {
+          background: rgba(99,102,241,0.14);
+          border-color: rgba(99,102,241,0.35);
+          box-shadow: 0 0 8px rgba(99,102,241,0.1);
+        }
+
         .sa-ftab {
           background: none; border: none;
           padding: 7px 14px 9px; margin-bottom: -1px;
@@ -474,7 +652,7 @@ const StudentAttendanceView = ({ sid }) => {
           existingRecords={data.records}
           onQuickMark={handleQuickMark}
         />
-        <MonthlyCalendarCard records={data.records} />
+        <MonthlyCalendarCard records={data.records} onDayClick={handleDayClick} />
       </div>
 
       {/* ── SUBJECT BREAKDOWN + RECORDS ── */}
@@ -484,10 +662,19 @@ const StudentAttendanceView = ({ sid }) => {
         <Card>
           <div style={{ marginBottom: 16 }}>
             <SectionHeader icon={BookOpen}>Subject breakdown</SectionHeader>
-            <div style={{ display: "flex", gap: "var(--space-4)", marginTop: -8 }}>
+            <div style={{ display: "flex", gap: "var(--space-4)", marginTop: -8, marginBottom: 12 }}>
               <LegendChip colorVar="var(--color-success)" label="≥ 75%" />
               <LegendChip colorVar="var(--color-warning)" label="50–74%" />
               <LegendChip colorVar="var(--color-danger)"  label="< 50%" />
+            </div>
+            <div style={{
+              fontSize: "11px", color: "var(--color-text-secondary)",
+              background: "rgba(255,255,255,0.02)", padding: "8px 12px",
+              borderRadius: "var(--radius-sm)", border: "1px dashed rgba(255,255,255,0.06)",
+              display: "flex", gap: "8px", alignItems: "center"
+            }}>
+              <span>💡</span>
+              <span>Need to set your starting balance or manual offset? Click the <strong>Adjust Balance</strong> button next to any subject.</span>
             </div>
           </div>
 
@@ -506,34 +693,48 @@ const StudentAttendanceView = ({ sid }) => {
                   const col    = pctColorVar(subject.percentage);
                   return (
                     <div key={subject.code} className="sa-sub-card">
-                      <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", marginBottom: 8, flexWrap: "wrap" }}>
-                        <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: "var(--color-text-primary)", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {subject.subject}
-                        </span>
-                        <span style={{
-                          fontSize: 10, fontWeight: 600, color: "var(--color-text-tertiary)",
-                          background: "var(--color-surface-2)",
-                          border: "1px solid rgba(255,255,255,0.08)",
-                          padding: "2px 7px", borderRadius: "var(--radius-sm)",
-                          fontFamily: "monospace", whiteSpace: "nowrap",
-                        }}>{subject.code}</span>
-                        {streak >= 2 && (
-                          <span style={{
-                            display: "inline-flex", alignItems: "center", gap: 3,
-                            fontSize: 10, fontWeight: 700, color: "var(--color-warning)",
-                            background: "var(--color-warning-muted)",
-                            border: "1px solid rgba(245,158,11,0.2)",
-                            padding: "2px 7px", borderRadius: "var(--radius-sm)",
-                          }}>
-                            <Flame size={9} fill="var(--color-warning)" /> {streak}
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--space-2)", marginBottom: 8, flexWrap: "wrap" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", minWidth: 0, flex: 1 }}>
+                          <span style={{ fontSize: 13.5, fontWeight: 600, color: "var(--color-text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {subject.subject}
                           </span>
-                        )}
-                        <span style={{ fontSize: 11, color: "var(--color-text-tertiary)", whiteSpace: "nowrap" }}>
-                          {subject.present}/{subject.total}
-                        </span>
-                        <span style={{ fontSize: 13.5, fontWeight: 700, color: col, whiteSpace: "nowrap" }}>
-                          {subject.percentage}%
-                        </span>
+                          <span style={{
+                            fontSize: 10, fontWeight: 600, color: "var(--color-text-tertiary)",
+                            background: "var(--color-surface-2)",
+                            border: "1px solid rgba(255,255,255,0.08)",
+                            padding: "2px 7px", borderRadius: "var(--radius-sm)",
+                            fontFamily: "monospace", whiteSpace: "nowrap",
+                          }}>{subject.code}</span>
+                        </div>
+
+                        <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+                          {streak >= 2 && (
+                            <span style={{
+                              display: "inline-flex", alignItems: "center", gap: 3,
+                              fontSize: 10, fontWeight: 700, color: "var(--color-warning)",
+                              background: "var(--color-warning-muted)",
+                              border: "1px solid rgba(245,158,11,0.2)",
+                              padding: "2px 7px", borderRadius: "var(--radius-sm)",
+                            }}>
+                              <Flame size={9} fill="var(--color-warning)" /> {streak}
+                            </span>
+                          )}
+                          <span style={{ fontSize: 11, color: "var(--color-text-tertiary)", whiteSpace: "nowrap" }}>
+                            {subject.present}/{subject.total}
+                          </span>
+                          <span style={{ fontSize: 13.5, fontWeight: 700, color: col, whiteSpace: "nowrap", width: 44, textAlign: "right" }}>
+                            {subject.percentage}%
+                          </span>
+                          {subject.subjectId && (
+                            <button
+                              onClick={() => handleOpenAdjustModal(subject)}
+                              className="sa-adjust-btn"
+                              title="Adjust initial attendance offset"
+                            >
+                              Adjust Balance
+                            </button>
+                          )}
+                        </div>
                       </div>
                       <div style={{ height: 4, background: "rgba(255,255,255,0.05)", borderRadius: "var(--radius-pill)", overflow: "hidden" }}>
                         <div style={{
@@ -642,6 +843,307 @@ const StudentAttendanceView = ({ sid }) => {
           )}
         </Card>
       </div>
+
+      {/* ── Adjust Initial Balance Modal ── */}
+      {showAdjustModal && adjustSubject && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)",
+          backdropFilter: "blur(8px)", display: "flex", alignItems: "center",
+          justifyContent: "center", zIndex: 9999, padding: 16
+        }}>
+          <div style={{
+            background: "var(--color-surface-2)",
+            border: "1px solid rgba(255,255,255,0.08)",
+            borderRadius: "var(--radius-lg)", padding: 24, maxWidth: 450,
+            width: "100%", boxShadow: "0 20px 25px -5px rgba(0,0,0,0.5)"
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: "var(--color-text-primary)" }}>
+                Adjust Initial Balance: {adjustSubject.subject}
+              </h3>
+              <button
+                onClick={() => setShowAdjustModal(false)}
+                style={{
+                  background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)",
+                  cursor: "pointer", width: 26, height: 26, borderRadius: "50%",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  color: "var(--color-text-tertiary)", transition: "all 0.15s"
+                }}
+                onMouseEnter={e => { e.currentTarget.style.color = "var(--color-text-primary)"; e.currentTarget.style.background = "rgba(255,255,255,0.08)"; }}
+                onMouseLeave={e => { e.currentTarget.style.color = "var(--color-text-tertiary)"; e.currentTarget.style.background = "rgba(255,255,255,0.03)"; }}
+              >
+                <X size={14} />
+              </button>
+            </div>
+
+            <p style={{ fontSize: 12, color: "var(--color-text-secondary)", margin: "0 0 16px 0" }}>
+              Configure your attendance history for this subject before you started tracking here.
+            </p>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 14, marginBottom: 20 }}>
+              <div>
+                <label style={{ fontSize: 11.5, fontWeight: 600, color: "var(--color-text-secondary)", display: "block", marginBottom: 6 }}>
+                  Total Classes Conducted
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={adjustTotal}
+                  className="sa-modal-input"
+                  onChange={e => setAdjustTotal(parseInt(e.target.value, 10) || 0)}
+                  style={{
+                    width: "100%", padding: "10px 14px", background: "var(--color-surface-3)",
+                    border: "1px solid rgba(255,255,255,0.08)", borderRadius: "var(--radius-md)",
+                    color: "var(--color-text-primary)", fontSize: 13, fontFamily: "inherit"
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: 11.5, fontWeight: 600, color: "var(--color-text-secondary)", display: "block", marginBottom: 6 }}>
+                  Classes Attended
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  max={adjustTotal}
+                  value={adjustPresent}
+                  className="sa-modal-input"
+                  onChange={e => setAdjustPresent(parseInt(e.target.value, 10) || 0)}
+                  style={{
+                    width: "100%", padding: "10px 14px", background: "var(--color-surface-3)",
+                    border: "1px solid rgba(255,255,255,0.08)", borderRadius: "var(--radius-md)",
+                    color: "var(--color-text-primary)", fontSize: 13, fontFamily: "inherit"
+                  }}
+                />
+              </div>
+
+              {/* Calculator Toggle */}
+              <div>
+                <button
+                  onClick={() => setShowCalc(!showCalc)}
+                  style={{
+                    background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)",
+                    cursor: "pointer", fontSize: 11, color: "var(--color-accent)",
+                    padding: "4px 10px", borderRadius: "var(--radius-pill)",
+                    fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 4,
+                    transition: "all 0.15s"
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = "rgba(99,102,241,0.06)"; e.currentTarget.style.borderColor = "rgba(99,102,241,0.2)"; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.03)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)"; }}
+                >
+                  {showCalc ? "✕ Close Calculator" : "💡 Calculate Attendance from Percentage"}
+                </button>
+
+                {showCalc && (
+                  <div style={{
+                    marginTop: 10, padding: 14, background: "rgba(99,102,241,0.04)",
+                    borderRadius: "var(--radius-md)", border: "1px solid rgba(99,102,241,0.12)",
+                    display: "flex", gap: 10, alignItems: "flex-end"
+                  }}>
+                    <div style={{ flex: 1 }}>
+                      <label style={{ fontSize: 10, fontWeight: 600, color: "var(--color-accent)", display: "block", marginBottom: 5, textTransform: "uppercase", letterSpacing: "0.03em" }}>
+                        Conducted Classes
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={calcTotal}
+                        className="sa-modal-input"
+                        onChange={e => setCalcTotal(parseInt(e.target.value, 10) || 0)}
+                        style={{
+                          width: "100%", padding: "8px 10px", background: "var(--color-surface-2)",
+                          border: "1px solid rgba(255,255,255,0.08)", borderRadius: "var(--radius-sm)",
+                          color: "var(--color-text-primary)", fontSize: 12, fontFamily: "inherit"
+                        }}
+                      />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <label style={{ fontSize: 10, fontWeight: 600, color: "var(--color-accent)", display: "block", marginBottom: 5, textTransform: "uppercase", letterSpacing: "0.03em" }}>
+                        Percentage (%)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. 75"
+                        value={calcPercent}
+                        className="sa-modal-input"
+                        onChange={e => setCalcPercent(e.target.value)}
+                        style={{
+                          width: "100%", padding: "8px 10px", background: "var(--color-surface-2)",
+                          border: "1px solid rgba(255,255,255,0.08)", borderRadius: "var(--radius-sm)",
+                          color: "var(--color-text-primary)", fontSize: 12, fontFamily: "inherit"
+                        }}
+                      />
+                    </div>
+                    <button
+                      onClick={handleApplyCalc}
+                      style={{
+                        padding: "8px 14px", background: "var(--color-accent)", color: "white",
+                        border: "none", borderRadius: "var(--radius-sm)", cursor: "pointer",
+                        fontSize: 12, fontWeight: 600, height: 33, transition: "filter 0.15s"
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.filter = "brightness(1.15)"}
+                      onMouseLeave={e => e.currentTarget.style.filter = "none"}
+                    >
+                      Compute
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+              <button
+                onClick={() => setShowAdjustModal(false)}
+                style={{
+                  padding: "9px 16px", background: "transparent", border: "1px solid rgba(255,255,255,0.1)",
+                  borderRadius: "var(--radius-md)", color: "var(--color-text-secondary)", cursor: "pointer",
+                  fontSize: 13, fontWeight: 600
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveAdjust}
+                disabled={submittingAdjust}
+                style={{
+                  padding: "9px 18px", background: "var(--color-accent)", color: "white",
+                  border: "none", borderRadius: "var(--radius-md)", cursor: "pointer",
+                  fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 6,
+                  transition: "filter 0.15s"
+                }}
+                onMouseEnter={e => e.currentTarget.style.filter = "brightness(1.15)"}
+                onMouseLeave={e => e.currentTarget.style.filter = "none"}
+              >
+                {submittingAdjust ? "Saving..." : "Save Adjustments"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Retroactive Attendance Modal ── */}
+      {showRetroModal && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)",
+          backdropFilter: "blur(8px)", display: "flex", alignItems: "center",
+          justifyContent: "center", zIndex: 9999, padding: 16
+        }}>
+          <div style={{
+            background: "var(--color-surface-2)",
+            border: "1px solid rgba(255,255,255,0.08)",
+            borderRadius: "var(--radius-lg)", padding: 24, maxWidth: 500,
+            width: "100%", maxHeight: "90vh", overflowY: "auto",
+            boxShadow: "0 20px 25px -5px rgba(0,0,0,0.5)"
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: "var(--color-text-primary)" }}>
+                Mark Attendance for {retroDateStr}
+              </h3>
+              <button
+                onClick={() => setShowRetroModal(false)}
+                style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: 16, color: "var(--color-text-tertiary)" }}
+              >✕</button>
+            </div>
+
+            {retroSlots.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "32px 0", color: "var(--color-text-tertiary)" }}>
+                <p style={{ fontSize: 14, fontWeight: 500, marginBottom: 4 }}>No classes scheduled on this weekday.</p>
+                <p style={{ fontSize: 12 }}>Check your timetable configuration if you think this is a mistake.</p>
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 14, marginBottom: 20 }}>
+                {retroSlots.map((slot, idx) => {
+                  const isMarking = markingRetro[`${slot.subjectId}_${slot.slotIndex}`];
+                  return (
+                    <div
+                      key={idx}
+                      style={{
+                        padding: 12, background: "var(--color-surface-3)",
+                        border: "1px solid rgba(255,255,255,0.05)", borderRadius: "var(--radius-md)",
+                        display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12
+                      }}
+                    >
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: "var(--color-text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {slot.name}
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4 }}>
+                          <span style={{ fontSize: 10, fontFamily: "monospace", background: "var(--color-surface-2)", padding: "1px 5px", borderRadius: 3, color: "var(--color-text-secondary)" }}>
+                            {slot.code}
+                          </span>
+                          <span style={{ fontSize: 11, color: "var(--color-text-tertiary)" }}>
+                            ⏰ {slot.time}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+                        <button
+                          onClick={() => handleMarkRetro(slot.subjectId, slot.slotIndex, "present")}
+                          disabled={isMarking}
+                          title="Mark Present"
+                          style={{
+                            width: 28, height: 28, borderRadius: "var(--radius-sm)", border: "none", cursor: "pointer",
+                            background: slot.status === "present" ? "var(--color-success)" : "rgba(34,197,94,0.1)",
+                            color: slot.status === "present" ? "white" : "var(--color-success)",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            transition: "all 0.15s"
+                          }}
+                        >
+                          <Check size={14} strokeWidth={2.5} />
+                        </button>
+                        <button
+                          onClick={() => handleMarkRetro(slot.subjectId, slot.slotIndex, "absent")}
+                          disabled={isMarking}
+                          title="Mark Absent"
+                          style={{
+                            width: 28, height: 28, borderRadius: "var(--radius-sm)", border: "none", cursor: "pointer",
+                            background: slot.status === "absent" ? "var(--color-danger)" : "rgba(239,68,68,0.1)",
+                            color: slot.status === "absent" ? "white" : "var(--color-danger)",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            transition: "all 0.15s"
+                          }}
+                        >
+                          <X size={14} strokeWidth={2.5} />
+                        </button>
+                        <button
+                          onClick={() => handleMarkRetro(slot.subjectId, slot.slotIndex, "unmarked")}
+                          disabled={isMarking || slot.status === null}
+                          title="Clear Status"
+                          style={{
+                            fontSize: 10, padding: "0 8px", borderRadius: "var(--radius-sm)", border: "1px solid rgba(255,255,255,0.08)",
+                            cursor: slot.status === null ? "not-allowed" : "pointer",
+                            background: "transparent",
+                            color: slot.status === null ? "var(--color-text-tertiary)" : "var(--color-text-secondary)",
+                            height: 28, display: "flex", alignItems: "center", justifyContent: "center",
+                            transition: "all 0.15s"
+                          }}
+                        >
+                          Clear
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              <button
+                onClick={() => setShowRetroModal(false)}
+                style={{
+                  padding: "9px 20px", background: "var(--color-accent)", color: "white",
+                  border: "none", borderRadius: "var(--radius-md)", cursor: "pointer",
+                  fontSize: 13, fontWeight: 600
+                }}
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

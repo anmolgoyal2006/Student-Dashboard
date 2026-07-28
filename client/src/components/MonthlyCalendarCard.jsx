@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react';
 
-export default function MonthlyCalendarCard({ records }) {
+export default function MonthlyCalendarCard({ records, onDayClick }) {
   const [monthOffset, setMonthOffset] = useState(0);
   const [selectedSubject, setSelectedSubject] = useState(null);
 
@@ -116,7 +116,7 @@ export default function MonthlyCalendarCard({ records }) {
         .mc-day-cell.mc-no-class { color: var(--color-text-tertiary); }
         .mc-day-cell.mc-today { outline: 2px solid var(--color-accent); outline-offset: 1px; }
         .mc-day-cell.mc-future { opacity: 0.35; }
-        .mc-day-cell:hover:not(.mc-future):not(.mc-no-class) { filter: brightness(1.1); }
+        .mc-day-cell:hover:not(.mc-future) { filter: brightness(1.15); background: rgba(255,255,255,0.04); }
       `}</style>
 
       {/* Header */}
@@ -197,6 +197,15 @@ export default function MonthlyCalendarCard({ records }) {
             <div
               key={idx}
               className={`mc-day-cell mc-${status || 'none'}${today ? ' mc-today' : ''}${future ? ' mc-future' : ''}`}
+              onClick={() => {
+                if (!future && onDayClick) {
+                  const checkDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
+                  onDayClick(checkDate, selectedSubject);
+                }
+              }}
+              style={{
+                cursor: future ? 'default' : 'pointer'
+              }}
             >
               {day}
             </div>

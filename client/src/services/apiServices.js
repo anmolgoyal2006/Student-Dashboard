@@ -25,6 +25,7 @@ export const subjectService = {
 // ─── Attendance ───────────────────────────────────────────────────────────
 export const attendanceService = {
   mark:            (data) => apiRequest('post', '/attendance', data),
+  removeRecord:    (data) => apiRequest('delete', '/attendance', data),
   getClassSummary: ()     => apiRequest('get',  '/attendance/class-summary'),
 
   // [UNCHANGED] summary now returns { summary, overview } — overview used for insight cards

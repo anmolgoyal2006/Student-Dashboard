@@ -15,6 +15,8 @@ const subjectSchema = new mongoose.Schema({
     endTime:   { type: String },
     room:      { type: String, default: '' },
   }],
+  initialPresent: { type: Number, default: 0, min: 0 },
+  initialTotal:   { type: Number, default: 0, min: 0 },
 }, { timestamps: true });
 
 // [CHANGED] Auto-generate code from name if still empty before saving

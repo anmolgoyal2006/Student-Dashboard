@@ -113,10 +113,16 @@ exports.getAnalytics = async (req, res) => {
     const productivityData = Object.entries(dayCount).map(([day, count]) => ({ day, tasks: count }));
 
     // ── Attendance risk summary ──
-    const records = await Attendance.find({ userId })
-      .populate('subjectId', 'name')
-      .lean();
+    const Subject = require('../models/Subject');
+    const [subjects, records] = await Promise.all([
+      Subject.find({ userId }).lean(),
+      Attendance.find({ userId }).populate('subjectId', 'name').lean()
+    ]);
+
     const attMap = {};
+    for (const s of subjects) {
+      attMap[s.name] = { total: s.initialTotal || 0, present: s.initialPresent || 0 };
+    }
     for (const r of records) {
       if (!r.subjectId) continue;
       const name = r.subjectId.name;

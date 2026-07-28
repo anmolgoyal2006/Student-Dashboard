@@ -33,6 +33,8 @@ const subjectFields = [
   body('schedule.*.startTime').optional().isString(),
   body('schedule.*.endTime').optional().isString(),
   body('schedule.*.room').optional().isString(),
+  body('initialPresent').optional().isInt({ min: 0 }).withMessage('initialPresent must be a non-negative integer.'),
+  body('initialTotal').optional().isInt({ min: 0 }).withMessage('initialTotal must be a non-negative integer.'),
 ];
 
 router.get('/', getSubjects);

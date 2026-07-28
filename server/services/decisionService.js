@@ -7,8 +7,17 @@ const ClassroomAssignment = require('../models/ClassroomAssignment');
    Scoring helpers
 ───────────────────────────────────────────────────────────── */
 const getAttendanceScore = async (userId) => {
-  const records = await Attendance.find({ userId }).populate('subjectId', 'name');
+  const Subject = require('../models/Subject');
+  const [subjectsList, records] = await Promise.all([
+    Subject.find({ userId }).lean(),
+    Attendance.find({ userId }).populate('subjectId', 'name').lean()
+  ]);
+
   const map = {};
+  for (const s of subjectsList) {
+    map[s._id.toString()] = { name: s.name, total: s.initialTotal || 0, present: s.initialPresent || 0 };
+  }
+
   for (const r of records) {
     if (!r.subjectId) continue;
     const key = r.subjectId._id.toString();

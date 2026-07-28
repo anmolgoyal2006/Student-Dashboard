@@ -528,8 +528,8 @@ let result   = null;
     const subject = await Subject.findOne({ userId, name: new RegExp(parsed.data.subjectName, 'i') });
     if (subject) {
       const records = await Attendance.find({ userId, subjectId: subject._id, status: { $ne: 'cancelled' } });
-      const total   = records.length;
-      const present = records.filter(r => r.status === 'present').length;
+      const total   = records.length + (subject.initialTotal || 0);
+      const present = records.filter(r => r.status === 'present').length + (subject.initialPresent || 0);
       const pct     = total ? (present / total * 100).toFixed(1) : 0;
       const needed  = total && present / total < 0.75 ? Math.ceil((0.75 * total - present) / 0.25) : 0;
       const msg     = needed > 0
@@ -560,8 +560,8 @@ let result   = null;
       });
     }
     const records = await Attendance.find({ userId, subjectId: subject._id, status: { $ne: 'cancelled' } });
-    const total = records.length;
-    const present = records.filter(r => r.status === 'present').length;
+    const total = records.length + (subject.initialTotal || 0);
+    const present = records.filter(r => r.status === 'present').length + (subject.initialPresent || 0);
     const pct = total ? (present / total * 100).toFixed(1) : 0;
 
     if (total === 0) {
@@ -820,6 +820,9 @@ if (parsed.data?.query === 'marks_status' || parsed.entity === 'marks') {
     ]);
 
     const attMap = {};
+    subjects.forEach(s => {
+      attMap[s._id.toString()] = { total: s.initialTotal || 0, present: s.initialPresent || 0 };
+    });
     attendance.forEach(r => {
       const id = r.subjectId?.toString();
       if (!id) return;
@@ -1071,11 +1074,11 @@ else if (parsed.entity === 'attendance') {
       return res.json({ success: false, message: `Subject "${parsed.data.subjectName}" not found.` });
     }
     const records = await Attendance.find({ userId, subjectId: subject._id, status: { $ne: 'cancelled' } });
-    const total   = records.length;
-    const present = records.filter(r => r.status === 'present').length;
+    const total   = records.length + (subject.initialTotal || 0);
+    const present = records.filter(r => r.status === 'present').length + (subject.initialPresent || 0);
     const absent  = total - present;
     const pct     = total ? ((present / total) * 100).toFixed(1) : 0;
-    const needed  = present / total < 0.75 && total > 0
+    const needed  = total && present / total < 0.75
       ? Math.ceil((0.75 * total - present) / 0.25) : 0;
     const status  = pct >= 75 ? '✅ Safe' : pct >= 60 ? '⚠️ At Risk' : '🚨 Critical';
 

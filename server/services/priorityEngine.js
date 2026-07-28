@@ -21,13 +21,16 @@ async function calculatePriority(assignment, userId) {
   const subjectName = assignment.courseName || '';
 
   if (subjectName) {
-    const records = await Attendance.find({ userId })
-      .populate('subjectId', 'name');
+    const Subject = require('../models/Subject');
+    const [subject, records] = await Promise.all([
+      Subject.findOne({ userId, name: new RegExp(`^${subjectName}$`, 'i') }).lean(),
+      Attendance.find({ userId }).populate('subjectId', 'name').lean()
+    ]);
     const subjectRecords = records.filter(r =>
       r.subjectId && r.subjectId.name.toLowerCase() === subjectName.toLowerCase()
     );
-    const total = subjectRecords.filter(r => r.status !== 'cancelled').length;
-    const present = subjectRecords.filter(r => r.status === 'present').length;
+    const total = subjectRecords.filter(r => r.status !== 'cancelled').length + (subject?.initialTotal || 0);
+    const present = subjectRecords.filter(r => r.status === 'present').length + (subject?.initialPresent || 0);
     const pct = total > 0 ? (present / total) * 100 : 100;
 
     if (pct < 75) boostCount++;

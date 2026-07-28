@@ -38,8 +38,11 @@ function daysFromNow(date) {
 
 // ── Data Formatters ───────────────────────────────────────────────────────────
 
-function formatAttendance(records) {
+function formatAttendance(records, subjects = []) {
   const map = {};
+  for (const s of subjects) {
+    map[s.name] = { total: s.initialTotal || 0, present: s.initialPresent || 0 };
+  }
   for (const r of records) {
     if (!r.subjectId) continue;
     const name = r.subjectId.name;
@@ -205,8 +208,10 @@ function formatCareer(career) {
 // ── Rule-Based Fallback ───────────────────────────────────────────────────────
 
 async function getFallbackRecommendations(userId) {
-  const [attendanceRecords, marksRecords, tasks, career, classroomAssignments] = await Promise.all([
-    Attendance.find({ userId }).populate('subjectId', 'name'),
+  const Subject = require('../models/Subject');
+  const [subjects, attendanceRecords, marksRecords, tasks, career, classroomAssignments] = await Promise.all([
+    Subject.find({ userId }).lean(),
+    Attendance.find({ userId }).populate('subjectId', 'name').lean(),
     Marks.find({ userId, examType: 'final' }).populate('subjectId', 'name credits'),
     Task.find({ user: userId, status: { $ne: 'completed' } }),
     CareerProgress.findOne({ userId }),
@@ -216,7 +221,7 @@ async function getFallbackRecommendations(userId) {
   const suggestions = [];
 
   // Attendance
-  const attData = formatAttendance(attendanceRecords);
+  const attData = formatAttendance(attendanceRecords, subjects);
   for (const s of attData.filter(a => a.atRisk)) {
     suggestions.push({ type: 'warning', priority: 'high', icon: '⚠️', title: `Low Attendance: ${s.subject}`, message: `${s.percentage}% attendance. Attend ${s.classesNeeded} more classes to reach 75%.` });
   }
@@ -304,7 +309,7 @@ async function computeRecommendations(userId) {
       ClassroomAssignment.find({ userId, status: { $ne: 'submitted' } }).sort({ dueDate: 1 }).limit(10),
     ]);
 
-    const attData         = formatAttendance(attendanceRecords);
+    const attData         = formatAttendance(attendanceRecords, subjects);
     const marksData       = formatMarks(marksRecords);
     const taskData        = formatTasks(pendingTasks);
     const lcData          = formatLeetCode(career);

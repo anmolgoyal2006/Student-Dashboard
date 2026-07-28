@@ -125,14 +125,30 @@ exports.getAttendanceSummary = async (req, res) => {
     const cached = summaryCache.get(cacheKey);
     if (cached) return res.json(cached);
 
-    const records = await Attendance
-      .find({ userId })
-      .populate('subjectId', 'name code credits')
-      .sort({ date: 1 })
-      .lean(); // chronological for streak calculation
+    const [subjects, records] = await Promise.all([
+      Subject.find({ userId }).lean(),
+      Attendance
+        .find({ userId })
+        .populate('subjectId', 'name code credits')
+        .sort({ date: 1 })
+        .lean()
+    ]);
 
-    // [CHANGED] Build per-subject map with streak tracking
+    // Build per-subject map initialized with initial balance values
     const map = {};
+    for (const s of subjects) {
+      const key = s._id.toString();
+      map[key] = {
+        subject       : s.name,
+        code          : s.code,
+        credits       : s.credits ?? null,
+        total         : s.initialTotal || 0,
+        present       : s.initialPresent || 0,
+        absent        : (s.initialTotal || 0) - (s.initialPresent || 0),
+        currentStreak : 0, // consecutive present classes
+        lastStatuses  : [], // track last N statuses for streak
+      };
+    }
 
     for (const r of records) {
       if (!r.subjectId) continue;
@@ -147,8 +163,8 @@ exports.getAttendanceSummary = async (req, res) => {
           total         : 0,
           present       : 0,
           absent        : 0,
-          currentStreak : 0, // consecutive present classes
-          lastStatuses  : [], // track last N statuses for streak
+          currentStreak : 0,
+          lastStatuses  : [],
         };
       }
 
@@ -425,9 +441,12 @@ exports.getStudentBySid = async (req, res) => {
       return res.status(403).json({ message: 'You are not authorized to view this student\'s attendance.' });
     }
 
-    const rawRecords = await Attendance.find({ userId: student._id })
-      .populate('subjectId', 'name code')
-      .sort({ date: -1, createdAt: -1 });
+    const [subjectsList, rawRecords] = await Promise.all([
+      Subject.find({ userId: student._id }).lean(),
+      Attendance.find({ userId: student._id })
+        .populate('subjectId', 'name code')
+        .sort({ date: -1, createdAt: -1 })
+    ]);
 
     // Deduplicate records by { subjectId, date, slot }
     // Keep only the most recent record if duplicates exist
@@ -453,12 +472,36 @@ exports.getStudentBySid = async (req, res) => {
 
     // Per-subject summary for the breakdown bars
     const subjectMap = {};
+    for (const s of subjectsList) {
+      const key = s._id.toString();
+      subjectMap[key] = {
+        subjectId: key,
+        subject: s.name,
+        code: s.code || '—',
+        present: s.initialPresent || 0,
+        total: s.initialTotal || 0,
+        initialPresent: s.initialPresent || 0,
+        initialTotal: s.initialTotal || 0,
+      };
+    }
+
     for (const r of dedupedRecords) {
       if (r.status === 'cancelled') continue;
-      const key  = r.subjectId?._id?.toString() || 'unknown';
-      const name = r.subjectId?.name || 'Unknown';
-      const code = r.subjectId?.code || '—';
-      if (!subjectMap[key]) subjectMap[key] = { subject: name, code, present: 0, total: 0 };
+      const key  = r.subjectId?._id?.toString();
+      if (!key) continue;
+
+      if (!subjectMap[key]) {
+        subjectMap[key] = {
+          subjectId: key,
+          subject: r.subjectId?.name || 'Unknown',
+          code: r.subjectId?.code || '—',
+          present: 0,
+          total: 0,
+          initialPresent: 0,
+          initialTotal: 0,
+        };
+      }
+
       subjectMap[key].total++;
       if (r.status === 'present') subjectMap[key].present++;
     }
@@ -470,9 +513,14 @@ exports.getStudentBySid = async (req, res) => {
         : 0,
     }));
 
-    const present = records.filter(r => r.status === 'present').length;
-    const absent  = records.filter(r => r.status === 'absent').length;
-    const total   = present + absent;
+    // Overall stats sum initial balances + logged markings
+    let present = 0;
+    let total = 0;
+    for (const s of Object.values(subjectMap)) {
+      present += s.present;
+      total += s.total;
+    }
+    const absent = total - present;
 
     res.json({
       student: { name: student.name, email: student.email, sid: student.sid },
@@ -485,6 +533,37 @@ exports.getStudentBySid = async (req, res) => {
   } catch (err) {
     console.error('[getStudentBySid]', err);
     res.status(500).json({ message: 'Failed to fetch student attendance.' });
+  }
+};
+
+// DELETE /api/attendance
+exports.deleteAttendanceRecord = async (req, res) => {
+  const { subjectId, date, slot } = req.body;
+  const userId = req.user.id;
+
+  if (!subjectId || !date) {
+    return res.status(400).json({ message: 'subjectId and date are required.' });
+  }
+
+  const parsedDate = new Date(date);
+  if (isNaN(parsedDate.getTime())) {
+    return res.status(400).json({ message: 'Invalid date format.' });
+  }
+  parsedDate.setUTCHours(0, 0, 0, 0);
+
+  try {
+    await Attendance.findOneAndDelete({
+      userId,
+      subjectId,
+      date: parsedDate,
+      slot: slot || null
+    });
+
+    summaryCache.del(`summary:${userId}`);
+    res.json({ message: 'Attendance record deleted' });
+  } catch (err) {
+    console.error('[deleteAttendanceRecord]', err);
+    res.status(500).json({ message: 'Failed to delete attendance record.' });
   }
 };
 

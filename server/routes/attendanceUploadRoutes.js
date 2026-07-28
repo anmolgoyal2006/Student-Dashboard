@@ -28,9 +28,6 @@ router.post('/upload-url', validate([
   body('url').notEmpty().isURL({ protocols: ['http', 'https'], require_protocol: true }).withMessage('URL link is required.'),
 ]), uploadBulkAttendanceFromUrl);
 
-// GET  /api/attendance/student/:sid  — fetch attendance by SID
-router.get('/student/:sid', getAttendanceBySid);
-
 // GET  /api/attendance/template  — download sample Excel
 router.get('/template',      downloadTemplate);
 router.get('/class-summary', getClassSummary);
