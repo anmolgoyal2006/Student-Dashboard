@@ -22,8 +22,9 @@ Field rules:
 
 How to parse each cell item:
 - You are given a JSON array of cell objects. Each object has "day", "time" (e.g. "9:00-10:00", "5:00- 7:00"), and "content".
-- Translate the "day" to the standard Sun-Sat value (e.g., "MON" -> "Mon", "TUES" -> "Tue").
-- Translate the "time" to 24-hour format:
+- Note that sometimes the day and time headers might be swapped in the PDF (e.g., the "day" field contains a time range and the "time" field contains a weekday). Identify which field holds the weekday and which holds the time, and map them correctly to "day", "startTime", and "endTime" regardless of the property name.
+- Translate the weekday to the standard Sun-Sat value (e.g., "MON" -> "Mon", "TUES" -> "Tue").
+- Translate the time to 24-hour format:
   - "9:00-10:00" -> 09:00 - 10:00.
   - "11:00-12:00" -> 11:00 - 12:00.
   - "12:00-1:00" -> 12:00 - 13:00.
