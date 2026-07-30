@@ -244,9 +244,9 @@ const StudentAttendanceView = ({ sid }) => {
         .filter(sl => sl.day === dayName)
         .forEach((sl, idx) => {
           // Check if there is an existing record for this subject + date + slot_index
-          const dateStr = date.toISOString().slice(0, 10);
+          const dateStr = date.toLocaleDateString('en-CA');
           const existing = data.records.find(r => {
-            const rDate = new Date(r.date).toISOString().slice(0, 10);
+            const rDate = new Date(r.date).toLocaleDateString('en-CA', { timeZone: 'UTC' });
             const isMatch = rDate === dateStr && 
                             (r.subjectId === s._id || r.code === s.code) &&
                             (r.slot === `slot_${idx}` || (!r.slot && idx === 0));
@@ -275,7 +275,7 @@ const StudentAttendanceView = ({ sid }) => {
     const key = `${subjectId}_${slotIndex}`;
     setMarkingRetro(prev => ({ ...prev, [key]: true }));
 
-    const dateStr = retroDate.toISOString().slice(0, 10);
+    const dateStr = retroDate.toLocaleDateString('en-CA');
     try {
       if (status === "unmarked") {
         await API.delete("/attendance", {
@@ -438,15 +438,15 @@ const StudentAttendanceView = ({ sid }) => {
   /* ════════════════════════════════════════
      STAT CARD COMPUTATIONS
      ════════════════════════════════════════ */
-  const todayDate = new Date().toISOString().slice(0, 10);
+  const todayDate = new Date().toLocaleDateString('en-CA');
 
   /* Card 1 — Classes Today: count from timetable schedule, not marked records */
   const classesToday = todayClasses.length;
 
   /* Card 2 — Can Still Miss */
-  const presentCount  = data?.records?.filter(r => r.status === "present").length || 0;
-  const absentCount   = data?.records?.filter(r => r.status === "absent").length || 0;
-  const totalClasses  = presentCount + absentCount;
+  const presentCount  = data?.present || 0;
+  const absentCount   = data?.absent || 0;
+  const totalClasses  = data?.total || 0;
   const rawMaxMiss    = totalClasses > 0 ? Math.floor(presentCount / 0.75 - totalClasses) : 0;
   const canStillMiss  = Math.max(0, rawMaxMiss);
   const canMissColor  = rawMaxMiss <= 0 ? "var(--color-danger)" : rawMaxMiss <= 3 ? "var(--color-warning)" : "var(--color-success)";
@@ -467,7 +467,7 @@ const StudentAttendanceView = ({ sid }) => {
 
   /* Card 4 — Unmarked Today: count unmarked slots using todayClasses (slot-level, not subject-level) */
   const markedTodayBySubject = {};
-  (data?.records?.filter(r => new Date(r.date).toISOString().slice(0, 10) === todayDate) || []).forEach(r => {
+  (data?.records?.filter(r => new Date(r.date).toLocaleDateString('en-CA', { timeZone: 'UTC' }) === todayDate) || []).forEach(r => {
     const key = r.subjectId || r.code;
     markedTodayBySubject[key] = (markedTodayBySubject[key] || 0) + 1;
   });

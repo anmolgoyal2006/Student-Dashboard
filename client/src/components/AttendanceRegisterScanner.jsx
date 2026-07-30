@@ -155,7 +155,7 @@ export default function AttendanceRegisterScanner({
   const [rows, setRows]                 = useState([]);
   const [globalSubject, setGlobalSubject] = useState("");
   const [globalDate, setGlobalDate]     = useState(
-    () => new Date().toISOString().slice(0, 10)
+    () => new Date().toLocaleDateString('en-CA')
   );
   const [imagePreviewUrl, setImagePreviewUrl] = useState(null);
   const [submitResult, setSubmitResult] = useState(null);

@@ -4,7 +4,7 @@ import { CalendarDays, Clock, Check, X } from 'lucide-react';
 export default function TodayScheduleCard({ todayClasses, existingRecords, onQuickMark }) {
   const todayDate = new Date();
   const dateStr = todayDate.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' });
-  const isoDate = todayDate.toISOString().slice(0, 10);
+  const isoDate = todayDate.toLocaleDateString('en-CA');
 
   const displayClasses = todayClasses || [];
   const moreCount = 0;
@@ -17,7 +17,7 @@ export default function TodayScheduleCard({ todayClasses, existingRecords, onQui
   const todayRecordsBySubject = useMemo(() => {
     const map = {};
     (existingRecords || [])
-      .filter(r => new Date(r.date).toISOString().slice(0, 10) === isoDate)
+      .filter(r => new Date(r.date).toLocaleDateString('en-CA', { timeZone: 'UTC' }) === isoDate)
       .forEach(r => {
         const key = r.subjectId || r.code;
         if (!map[key]) map[key] = [];
@@ -65,7 +65,7 @@ export default function TodayScheduleCard({ todayClasses, existingRecords, onQui
         const subjectRecs = (existingRecords || [])
           .filter(r =>
             (r.subjectId === subjectId || r.code === subjectId) &&
-            new Date(r.date).toISOString().slice(0, 10) === isoDate
+            new Date(r.date).toLocaleDateString('en-CA', { timeZone: 'UTC' }) === isoDate
           )
           .sort((a, b) => {
             if (!a.slot && !b.slot) return 0;
