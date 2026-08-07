@@ -361,12 +361,15 @@ const StudentAttendanceView = ({ sid }) => {
 
   /* ── quick mark (from TodayScheduleCard) ── */
   const handleQuickMark = async (subjectId, date, status, slot) => {
-    // TodayScheduleCard already reflects the mark optimistically and rolls back
-    // on throw, so surface errors and refresh only the attendance records
-    // (not the timetable) to reconcile.
     try {
-      await API.post(`/attendance`, { subjectId, date, status, slot });
-      toast.success(`Marked ${status}!`);
+      if (status === 'delete') {
+        // Deselect — remove the record
+        await API.delete(`/attendance`, { data: { subjectId, date, slot } });
+        toast.success("Attendance cleared!");
+      } else {
+        await API.post(`/attendance`, { subjectId, date, status, slot });
+        toast.success(`Marked ${status}!`);
+      }
       refreshAttendanceRecords();
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to mark attendance.");
@@ -445,13 +448,16 @@ const StudentAttendanceView = ({ sid }) => {
   const classesToday = todayClasses.length;
 
   /* Card 2 — Can Still Miss */
-  const presentCount  = data?.present || 0;
-  const absentCount   = data?.absent || 0;
-  const totalClasses  = data?.total || 0;
-  const rawMaxMiss    = totalClasses > 0 ? Math.floor(presentCount / 0.75 - totalClasses) : 0;
-  const canStillMiss  = Math.max(0, rawMaxMiss);
-  const canMissColor  = rawMaxMiss <= 0 ? "var(--color-danger)" : rawMaxMiss <= 3 ? "var(--color-warning)" : "var(--color-success)";
-  const canMissMuted  = rawMaxMiss <= 0 ? "var(--color-danger-muted)" : rawMaxMiss <= 3 ? "var(--color-warning-muted)" : "var(--color-success-muted)";
+  // Count subjects where the student can still miss at least 1 class
+  // (i.e. subjects currently safe enough to absorb 1 more absence)
+  const subjectMissValues = (data?.summary || [])
+    .filter(s => s.subject && s.subject !== "Unknown" && s.total > 0)
+    .map(s => Math.floor(s.present / 0.75 - s.total));
+
+  const canStillMiss  = subjectMissValues.filter(v => v >= 1).length;
+  const rawMaxMiss    = canStillMiss; // kept for color logic reuse
+  const canMissColor  = canStillMiss === 0 ? "var(--color-danger)" : canStillMiss <= 2 ? "var(--color-warning)" : "var(--color-success)";
+  const canMissMuted  = canStillMiss === 0 ? "var(--color-danger-muted)" : canStillMiss <= 2 ? "var(--color-warning-muted)" : "var(--color-success-muted)";
 
   /* Card 3 — Subjects At Risk */
   const atRiskSubjects  = data?.summary?.filter(s => s.percentage < 75) || [];
@@ -525,7 +531,7 @@ const StudentAttendanceView = ({ sid }) => {
       icon: ShieldCheck,
       colorVar: canMissColor,
       mutedVar: canMissMuted,
-      subLabel: "before 75% drops",
+      subLabel: canStillMiss === 0 ? "no safe subjects" : `subject${canStillMiss > 1 ? "s" : ""} with buffer`,
     },
     {
       label: "SUBJECTS AT RISK",
@@ -640,10 +646,11 @@ const StudentAttendanceView = ({ sid }) => {
         .sa-sub-left {
           display: flex;
           align-items: center;
-          gap: 6px;
+          flex-wrap: wrap;
+          gap: 5px;
           min-width: 0;
           flex: 1 1 0;
-          overflow: hidden;
+          row-gap: 3px;
         }
         .sa-sub-right {
           display: flex;
@@ -743,7 +750,7 @@ const StudentAttendanceView = ({ sid }) => {
                     <div key={subject.code} className="sa-sub-card">
                       <div className="sa-sub-row">
                         <div className="sa-sub-left">
-                          <span style={{ fontSize: 13.5, fontWeight: 600, color: "var(--color-text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          <span style={{ fontSize: 13.5, fontWeight: 600, color: "var(--color-text-primary)", whiteSpace: "nowrap" }}>
                             {subject.subject}
                           </span>
                           <span style={{
@@ -1130,9 +1137,9 @@ const StudentAttendanceView = ({ sid }) => {
 
                       <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
                         <button
-                          onClick={() => handleMarkRetro(slot.subjectId, slot.slotIndex, "present")}
+                          onClick={() => handleMarkRetro(slot.subjectId, slot.slotIndex, slot.status === "present" ? "unmarked" : "present")}
                           disabled={isMarking}
-                          title="Mark Present"
+                          title={slot.status === "present" ? "Unmark Present" : "Mark Present"}
                           style={{
                             width: 28, height: 28, borderRadius: "var(--radius-sm)", border: "none", cursor: "pointer",
                             background: slot.status === "present" ? "var(--color-success)" : "rgba(34,197,94,0.1)",
@@ -1144,9 +1151,9 @@ const StudentAttendanceView = ({ sid }) => {
                           <Check size={14} strokeWidth={2.5} />
                         </button>
                         <button
-                          onClick={() => handleMarkRetro(slot.subjectId, slot.slotIndex, "absent")}
+                          onClick={() => handleMarkRetro(slot.subjectId, slot.slotIndex, slot.status === "absent" ? "unmarked" : "absent")}
                           disabled={isMarking}
-                          title="Mark Absent"
+                          title={slot.status === "absent" ? "Unmark Absent" : "Mark Absent"}
                           style={{
                             width: 28, height: 28, borderRadius: "var(--radius-sm)", border: "none", cursor: "pointer",
                             background: slot.status === "absent" ? "var(--color-danger)" : "rgba(239,68,68,0.1)",
@@ -1156,21 +1163,6 @@ const StudentAttendanceView = ({ sid }) => {
                           }}
                         >
                           <X size={14} strokeWidth={2.5} />
-                        </button>
-                        <button
-                          onClick={() => handleMarkRetro(slot.subjectId, slot.slotIndex, "unmarked")}
-                          disabled={isMarking || slot.status === null}
-                          title="Clear Status"
-                          style={{
-                            fontSize: 10, padding: "0 8px", borderRadius: "var(--radius-sm)", border: "1px solid rgba(255,255,255,0.08)",
-                            cursor: slot.status === null ? "not-allowed" : "pointer",
-                            background: "transparent",
-                            color: slot.status === null ? "var(--color-text-tertiary)" : "var(--color-text-secondary)",
-                            height: 28, display: "flex", alignItems: "center", justifyContent: "center",
-                            transition: "all 0.15s"
-                          }}
-                        >
-                          Clear
                         </button>
                       </div>
                     </div>

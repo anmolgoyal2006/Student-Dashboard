@@ -33,16 +33,19 @@ export default function TodayScheduleCard({ todayClasses, existingRecords, onQui
     return map;
   }, [existingRecords, isoDate]);
 
-  const handleMark = async (subjectId, status, slotIndex) => {
+  const handleMark = async (subjectId, status, slotIndex, currentStatus) => {
     const key = `${subjectId}_${slotIndex}`;
     if (markingSlots[key]) return;
 
-    // Optimistically show as marked immediately
-    setOptimisticMarks(p => ({ ...p, [key]: status }));
+    // If clicking the already-active button → deselect (delete the record)
+    const isDeselect = currentStatus === status;
+    const optimisticStatus = isDeselect ? null : status;
+
+    setOptimisticMarks(p => ({ ...p, [key]: optimisticStatus }));
     setMarkingSlots(p => ({ ...p, [key]: true }));
 
     try {
-      await onQuickMark(subjectId, isoDate, status, `slot_${slotIndex}`);
+      await onQuickMark(subjectId, isoDate, isDeselect ? 'delete' : status, `slot_${slotIndex}`);
     } catch {
       // Revert optimistic mark on error
       setOptimisticMarks(p => {
@@ -153,6 +156,9 @@ export default function TodayScheduleCard({ todayClasses, existingRecords, onQui
               subjectSlotCounter[key]++;
               const subjectRecords = todayRecordsBySubject[key] || [];
               const status = subjectRecords[slotIndex]?.status || null;
+              const effectiveStatus = optimisticMarks[`${cls.subjectId}_${slotIndex}`] !== undefined
+                  ? optimisticMarks[`${cls.subjectId}_${slotIndex}`]
+                  : status;
               return (
                 <div key={idx} className="ts-class-row">
                   <div className="ts-time-col">
@@ -166,16 +172,16 @@ export default function TodayScheduleCard({ todayClasses, existingRecords, onQui
                   <div className="ts-action-col">
                     <>
                       <button
-                        className={`ts-toggle-btn ts-present ${status === 'present' ? 'ts-active' : ''}`}
-                        onClick={() => handleMark(cls.subjectId, 'present', slotIndex)}
-                        title="Mark present"
+                        className={`ts-toggle-btn ts-present`}
+                        onClick={() => handleMark(cls.subjectId, 'present', slotIndex, effectiveStatus)}
+                        title={effectiveStatus === 'present' ? 'Unmark present' : 'Mark present'}
                         disabled={!!markingSlots[`${cls.subjectId}_${slotIndex}`]}
                         style={{
                           opacity: markingSlots[`${cls.subjectId}_${slotIndex}`] ? 0.5 : 1,
                           cursor: markingSlots[`${cls.subjectId}_${slotIndex}`] ? 'not-allowed' : 'pointer',
-                          ...(status === 'present' ? {
+                          ...(effectiveStatus === 'present' ? {
                             background: 'var(--color-success)',
-                            border: 'var(--color-success)',
+                            borderColor: 'var(--color-success)',
                             color: 'white'
                           } : {})
                         }}
@@ -183,16 +189,16 @@ export default function TodayScheduleCard({ todayClasses, existingRecords, onQui
                         <Check size={12} strokeWidth={2.5} />
                       </button>
                       <button
-                        className={`ts-toggle-btn ts-absent ${status === 'absent' ? 'ts-active' : ''}`}
-                        onClick={() => handleMark(cls.subjectId, 'absent', slotIndex)}
-                        title="Mark absent"
+                        className={`ts-toggle-btn ts-absent`}
+                        onClick={() => handleMark(cls.subjectId, 'absent', slotIndex, effectiveStatus)}
+                        title={effectiveStatus === 'absent' ? 'Unmark absent' : 'Mark absent'}
                         disabled={!!markingSlots[`${cls.subjectId}_${slotIndex}`]}
                         style={{
                           opacity: markingSlots[`${cls.subjectId}_${slotIndex}`] ? 0.5 : 1,
                           cursor: markingSlots[`${cls.subjectId}_${slotIndex}`] ? 'not-allowed' : 'pointer',
-                          ...(status === 'absent' ? {
+                          ...(effectiveStatus === 'absent' ? {
                             background: 'var(--color-danger)',
-                            border: 'var(--color-danger)',
+                            borderColor: 'var(--color-danger)',
                             color: 'white'
                           } : {})
                         }}
