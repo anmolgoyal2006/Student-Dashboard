@@ -533,7 +533,7 @@ export default function Attendance() {
 
         @media (max-width: 768px) {
           .attendance-container {
-            padding: 0;
+            padding: 0 4px;
             max-width: 100%;
           }
           .page-title {

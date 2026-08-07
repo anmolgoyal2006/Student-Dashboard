@@ -125,11 +125,12 @@ const Insight = ({ present, total }) => {
 
 /* ─── Card shell ─── */
 const Card = ({ children, style = {} }) => (
-  <div style={{
+  <div className="sa-card" style={{
     background: "var(--color-surface-2)",
     border: "1px solid rgba(255,255,255,0.06)",
     borderRadius: "var(--radius-lg)",
     padding: "var(--space-5)",
+    minWidth: 0,
     ...style,
   }}>
     {children}
@@ -625,8 +626,43 @@ const StudentAttendanceView = ({ sid }) => {
           border-radius: var(--radius-md);
           padding: 12px 14px;
           transition: border-color 0.15s;
+          min-width: 0;
         }
         .sa-sub-card:hover { border-color: rgba(255,255,255,0.10); }
+        .sa-sub-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 6px;
+          margin-bottom: 8px;
+          flex-wrap: nowrap;
+        }
+        .sa-sub-left {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          min-width: 0;
+          flex: 1 1 0;
+          overflow: hidden;
+        }
+        .sa-sub-right {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          flex-shrink: 0;
+        }
+        .sa-table-scroll {
+          overflow-x: auto;
+          -webkit-overflow-scrolling: touch;
+          width: 100%;
+        }
+        .sa-table-scroll table {
+          min-width: 300px;
+        }
+        @media (max-width: 480px) {
+          .sa-sub-right { gap: 6px; }
+          .sa-adjust-btn { font-size: 10px !important; padding: 3px 8px !important; }
+        }
 
         .sa-2col { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
         .sa-4col { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-3); }
@@ -639,6 +675,9 @@ const StudentAttendanceView = ({ sid }) => {
         }
         @media (max-width: 480px) {
           .sa-4col { grid-template-columns: 1fr 1fr; gap: var(--space-2); }
+        }
+        @media (max-width: 768px) {
+          .sa-card { padding: 14px !important; }
         }
         @media (max-width: 360px) {
           .sa-4col { grid-template-columns: 1fr; }
@@ -702,8 +741,8 @@ const StudentAttendanceView = ({ sid }) => {
                   const col    = pctColorVar(subject.percentage);
                   return (
                     <div key={subject.code} className="sa-sub-card">
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--space-2)", marginBottom: 8, flexWrap: "wrap" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", minWidth: 0, flex: 1 }}>
+                      <div className="sa-sub-row">
+                        <div className="sa-sub-left">
                           <span style={{ fontSize: 13.5, fontWeight: 600, color: "var(--color-text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                             {subject.subject}
                           </span>
@@ -713,10 +752,8 @@ const StudentAttendanceView = ({ sid }) => {
                             border: "1px solid rgba(255,255,255,0.08)",
                             padding: "2px 7px", borderRadius: "var(--radius-sm)",
                             fontFamily: "monospace", whiteSpace: "nowrap",
+                            flexShrink: 0,
                           }}>{subject.code}</span>
-                        </div>
-
-                        <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
                           {streak >= 2 && (
                             <span style={{
                               display: "inline-flex", alignItems: "center", gap: 3,
@@ -724,14 +761,18 @@ const StudentAttendanceView = ({ sid }) => {
                               background: "var(--color-warning-muted)",
                               border: "1px solid rgba(245,158,11,0.2)",
                               padding: "2px 7px", borderRadius: "var(--radius-sm)",
+                              flexShrink: 0,
                             }}>
                               <Flame size={9} fill="var(--color-warning)" /> {streak}
                             </span>
                           )}
-                          <span style={{ fontSize: 11, color: "var(--color-text-tertiary)", whiteSpace: "nowrap" }}>
+                          <span style={{ fontSize: 11, color: "var(--color-text-tertiary)", whiteSpace: "nowrap", flexShrink: 0 }}>
                             {subject.present}/{subject.total}
                           </span>
-                          <span style={{ fontSize: 13.5, fontWeight: 700, color: col, whiteSpace: "nowrap", width: 44, textAlign: "right" }}>
+                        </div>
+
+                        <div className="sa-sub-right">
+                          <span style={{ fontSize: 13.5, fontWeight: 700, color: col, whiteSpace: "nowrap" }}>
                             {subject.percentage}%
                           </span>
                           {subject.subjectId && (
@@ -774,7 +815,7 @@ const StudentAttendanceView = ({ sid }) => {
             ))}
           </div>
 
-          <div style={{ overflowX: "auto" }}>
+          <div className="sa-table-scroll">
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
                 <tr>

@@ -631,11 +631,7 @@ tr:hover td { background: rgba(168,129,254,0.03); }
 
   /* Prevent any overflowing element from making the page horizontally scrollable */
   html, body, #root {
-    overflow-x: hidden !important;
-    max-width: 100vw !important;
-  }
-  .layout, .main-content {
-    overflow-x: hidden !important;
+    overflow-x: clip !important;
     max-width: 100vw !important;
   }
 }
