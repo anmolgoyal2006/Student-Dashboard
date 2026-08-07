@@ -87,29 +87,35 @@ export default function TodayScheduleCard({ todayClasses, existingRecords, onQui
       border: '1px solid rgba(255,255,255,0.06)',
       borderRadius: 'var(--radius-lg)',
       padding: 'var(--space-5)',
+      width: '100%',
+      minWidth: 0,
+      boxSizing: 'border-box',
     }}>
       <style>{`
+        @media (max-width: 768px) {
+          .ts-card-inner { padding: 14px !important; }
+        }
         .ts-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-4); }
         .ts-header-left { display: flex; align-items: center; gap: 8px; }
         .ts-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--color-accent); }
         .ts-header-title { font-size: 13.5px; font-weight: 700; color: var(--color-text-primary); }
-        .ts-date-badge { font-size: 11px; padding: 4px 10px; background: var(--color-accent-muted); color: var(--color-accent); border-radius: var(--radius-pill); font-weight: 600; }
+        .ts-date-badge { font-size: 11px; padding: 4px 10px; background: var(--color-accent-muted); color: var(--color-accent); border-radius: var(--radius-pill); font-weight: 600; white-space: nowrap; }
         .ts-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 20px; text-align: center; }
         .ts-empty-icon { width: 48px; height: 48px; border-radius: 50%; background: var(--color-accent-muted); display: flex; align-items: center; justify-content: center; margin-bottom: 12px; }
         .ts-empty-title { font-size: 14px; font-weight: 600; color: var(--color-text-primary); margin-bottom: 4px; }
         .ts-empty-sub { font-size: 12px; color: var(--color-text-tertiary); }
-        .ts-class-row { display: flex; align-items: center; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
+        .ts-class-row { display: flex; align-items: center; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.04); gap: 8px; }
         .ts-class-row:last-child { border-bottom: none; }
-        .ts-time-col { width: 60px; flex-shrink: 0; }
-        .ts-time { font-size: 12px; color: var(--color-text-tertiary); font-weight: 500; }
+        .ts-time-col { width: 54px; flex-shrink: 0; }
+        .ts-time { font-size: 11px; color: var(--color-text-tertiary); font-weight: 500; }
         .ts-slot { font-size: 10px; color: var(--color-text-tertiary); margin-top: 2px; }
-        .ts-subject-col { flex: 1; min-width: 0; }
-        .ts-subject-name { font-size: 13px; font-weight: 700; color: var(--color-text-primary); margin-bottom: 4px; }
+        .ts-subject-col { flex: 1; min-width: 0; overflow: hidden; }
+        .ts-subject-name { font-size: 13px; font-weight: 700; color: var(--color-text-primary); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .ts-code-badge { font-family: monospace; font-size: 10px; background: var(--color-surface-3); padding: 2px 6px; border-radius: 4px; color: var(--color-text-secondary); }
         .ts-action-col { flex-shrink: 0; display: flex; gap: 6px; }
         .ts-status-badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: var(--radius-pill); font-size: 11px; font-weight: 600; }
         .ts-status-dot { width: 6px; height: 6px; border-radius: 50%; }
-        .ts-toggle-btn { width: 32px; height: 32px; border-radius: var(--radius-md); border: 1px solid rgba(255,255,255,0.1); background: var(--color-surface-3); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s ease; font-size: 10px; font-weight: 700; color: var(--color-text-tertiary); }
+        .ts-toggle-btn { width: 32px; height: 32px; border-radius: var(--radius-md); border: 1px solid rgba(255,255,255,0.1); background: var(--color-surface-3); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s ease; font-size: 10px; font-weight: 700; color: var(--color-text-tertiary); flex-shrink: 0; }
         .ts-toggle-btn:hover { background: var(--color-surface-1); }
         .ts-toggle-btn.ts-present { background: var(--color-success-muted); border-color: var(--color-success); color: var(--color-success); }
         .ts-toggle-btn.ts-absent { background: var(--color-danger-muted); border-color: var(--color-danger); color: var(--color-danger); }

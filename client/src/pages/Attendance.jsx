@@ -73,7 +73,8 @@ function TabSwitcher({ activeTab, onTabChange, isTeacher, isStudent }) {
           display: flex;
           border-bottom: 1px solid var(--border);
           margin-bottom: 16px;
-          gap: 24px;
+          gap: 16px;
+          flex-wrap: wrap;
         }
       `}</style>
     </div>
@@ -526,6 +527,18 @@ export default function Attendance() {
           max-width: 1200px;
           margin: 0 auto;
           padding: 32px 24px;
+          width: 100%;
+          box-sizing: border-box;
+        }
+
+        @media (max-width: 768px) {
+          .attendance-container {
+            padding: 0;
+            max-width: 100%;
+          }
+          .page-title {
+            font-size: 20px !important;
+          }
         }
 
         .page-header {

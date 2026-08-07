@@ -547,7 +547,7 @@ const StudentAttendanceView = ({ sid }) => {
   ];
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)", width: "100%", minWidth: 0 }}>
       <style>{`
         @keyframes sa-spin { to { transform: rotate(360deg); } }
 
@@ -631,12 +631,21 @@ const StudentAttendanceView = ({ sid }) => {
         .sa-2col { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
         .sa-4col { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-3); }
 
-        @media (max-width: 700px) {
-          .sa-4col { grid-template-columns: 1fr 1fr; }
+        @media (max-width: 900px) {
           .sa-2col { grid-template-columns: 1fr; }
         }
-        @media (max-width: 400px) {
+        @media (max-width: 700px) {
+          .sa-4col { grid-template-columns: 1fr 1fr; }
+        }
+        @media (max-width: 480px) {
+          .sa-4col { grid-template-columns: 1fr 1fr; gap: var(--space-2); }
+        }
+        @media (max-width: 360px) {
           .sa-4col { grid-template-columns: 1fr; }
+        }
+        @media (max-width: 768px) {
+          .sa-2col { gap: var(--space-3); }
+          .sa-4col { gap: var(--space-2); }
         }
       `}</style>
 

@@ -88,6 +88,9 @@ export default function MonthlyCalendarCard({ records, onDayClick }) {
       border: '1px solid rgba(255,255,255,0.06)',
       borderRadius: 'var(--radius-lg)',
       padding: 'var(--space-5)',
+      width: '100%',
+      minWidth: 0,
+      boxSizing: 'border-box',
     }}>
       <style>{`
         .mc-header { display: flex; align-items: center; gap: 8px; margin-bottom: var(--space-4); }
@@ -103,13 +106,13 @@ export default function MonthlyCalendarCard({ records, onDayClick }) {
         .mc-subject-chip.unselected { background: var(--color-surface-3); border: 1px solid rgba(255,255,255,0.07); color: var(--color-text-tertiary); }
         .mc-subject-chip.selected { background: var(--color-accent-muted); border: 1px solid rgba(99,102,241,0.28); color: var(--color-accent); font-weight: 600; }
         .mc-subject-chip:hover:not(.selected) { background: var(--color-surface-1); border-color: rgba(255,255,255,0.12); }
-        .mc-legend { display: flex; gap: 16px; margin-bottom: var(--space-3); }
+        .mc-legend { display: flex; flex-wrap: wrap; gap: 10px 16px; margin-bottom: var(--space-3); }
         .mc-legend-item { display: flex; align-items: center; gap: 6px; }
         .mc-legend-dot { width: 6px; height: 6px; border-radius: 50%; }
         .mc-legend-label { font-size: 11px; color: var(--color-text-secondary); font-weight: 500; }
-        .mc-calendar-grid { display: grid; grid-template-columns: repeat(7, 30px); gap: 4px; justify-content: center; }
+        .mc-calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; width: 100%; }
         .mc-day-header { font-size: 10px; color: var(--color-text-tertiary); text-align: center; text-transform: uppercase; font-weight: 600; padding-bottom: 4px; }
-        .mc-day-cell { width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; font-size: 12px; border-radius: var(--radius-sm); cursor: default; transition: all 0.15s ease; }
+        .mc-day-cell { width: 100%; aspect-ratio: 1; display: flex; align-items: center; justify-content: center; font-size: 12px; border-radius: var(--radius-sm); cursor: default; transition: all 0.15s ease; min-width: 0; }
         .mc-day-cell.mc-present { background: var(--color-success-muted); color: var(--color-success); }
         .mc-day-cell.mc-absent { background: var(--color-danger-muted); color: var(--color-danger); }
         .mc-day-cell.mc-mixed { background: var(--color-warning-muted); color: var(--color-warning); }
