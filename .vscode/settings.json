@@ -1,2 +1,19 @@
 {
+  // Suppress "Unknown at rule @tailwind" warnings in the built-in CSS linter
+  "css.lint.unknownAtRules": "ignore",
+  "scss.lint.unknownAtRules": "ignore",
+
+  // Tell the CSS language server that @tailwind, @apply, @layer etc. are valid
+  "css.customData": [],
+
+  // Use Tailwind IntelliSense for CSS files that contain Tailwind directives
+  "tailwindCSS.includeLanguages": {
+    "css": "css"
+  },
+
+  // Validate Tailwind-specific files with the Tailwind extension, not the built-in linter
+  "tailwindCSS.experimental.configFile": "./client/tailwind.config.js",
+
+  // Use bundled JSON schemas instead of fetching from schemastore.org (fixes network error)
+  "json.schemaDownload.enable": false
 }

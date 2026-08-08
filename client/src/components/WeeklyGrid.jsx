@@ -133,6 +133,24 @@ export default function WeeklyGrid({ subjects }) {
         .grid-cell-container:hover .empty-cell-plus-hover {
           opacity: 0.3;
         }
+        .wg-event-name {
+          font-size: 12px;
+          font-weight: 500;
+          overflow: hidden;
+          word-break: break-word;
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
+        }
+        @media (max-width: 640px) {
+          .wg-event-name {
+            font-size: 10px;
+            -webkit-line-clamp: 3;
+          }
+          .wg-event-time {
+            font-size: 9px !important;
+          }
+        }
       `}</style>
 
       {/* Conflict warnings */}
@@ -150,9 +168,9 @@ export default function WeeklyGrid({ subjects }) {
       <div style={{ overflowX: 'auto' }}>
         <div style={{
           display: 'grid',
-          gridTemplateColumns: `64px repeat(${displayDays.length}, 1fr)`,
+          gridTemplateColumns: `50px repeat(${displayDays.length}, minmax(0, 1fr))`,
           gap: 2,
-          minWidth: 480,
+          minWidth: `${50 + displayDays.length * 72}px`,
         }}>
           {/* Header row */}
           <div style={{ height: 40 }} />
@@ -261,21 +279,16 @@ export default function WeeklyGrid({ subjects }) {
                   borderRadius: 6,
                   background: ev.color.bg,
                   borderLeft: `3px solid ${ev.color.border}`,
-                  padding: '4px 8px',
+                  padding: '4px 5px',
                   display: 'flex',
                   flexDirection: 'column',
                   justifyContent: 'center',
                   overflow: 'hidden',
                 }}>
-                  <div style={{
-                    fontSize: 12, fontWeight: 500,
-                    color: ev.color.text,
-                    whiteSpace: 'nowrap', overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                  }}>
+                  <div className="wg-event-name" style={{ color: ev.color.text }}>
                     {ev.name}
                   </div>
-                  <div style={{ fontSize: 10, color: 'var(--color-text-secondary)', marginTop: 1 }}>
+                  <div className="wg-event-time" style={{ fontSize: 10, color: 'var(--color-text-secondary)', marginTop: 1 }}>
                     {fmt12(ev.startTime)}–{fmt12(ev.endTime)}
                     {ev.room ? ` · ${ev.room}` : ''}
                   </div>
