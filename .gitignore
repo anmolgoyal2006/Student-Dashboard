@@ -5,3 +5,12 @@ build/
 dist/
 *.log
 server/config/serviceAccountKey.json
+
+# AI tool internals — never commit these
+.opencode/
+.claude/
+.agents/
+brag-output/
+
+# Debug/scratch scripts
+test_ocr_debug.py
