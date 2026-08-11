@@ -7,7 +7,7 @@ import numpy as np
 import cv2
 import pypdfium2 as pdfium
 
-pdf_path = 'test.pdf'
+pdf_path = 'Timetable (CSE3, G1).pdf'
 out_dir = 'test_cells_output'
 os.makedirs(out_dir, exist_ok=True)
 
@@ -16,29 +16,24 @@ for page_index in range(len(doc)):
     page = doc[page_index]
     pil_image = page.render(scale=3).to_pil().convert("RGB")
     page_image = np.array(pil_image)
-    page_image = deskew(page_image)
-    height, width = page_image.shape[:2]
-    
+    bgr = cv2.cvtColor(page_image, cv2.COLOR_RGB2BGR)
+    gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
+    height, width = gray.shape[:2]
+
     print(f"\n=== Page {page_index+1} ({width}x{height}) ===")
-    
+
     # Detect rows
-    ys = detect_rows_by_horizontal_lines(page_image)
+    ys = detect_horizontal_lines(gray)
     print(f"  Grid-line rows: {len(ys)}")
     if len(ys) >= 3:
         print(f"  Y centers: {[int(y) for y in ys[:10]]}...")
-    
-    ys_text = detect_rows_by_text_projection(page_image)
-    print(f"  Text-projection rows: {len(ys_text)}")
-    if len(ys_text) >= 3:
-        print(f"  Y centers: {[int(y) for y in ys_text[:10]]}...")
-    
+
+    bands = detect_rows_by_projection(gray)
+    merged = merge_nearby_bands(bands, gap=8)
+    print(f"  Text-projection bands: {len(merged)}")
+    if len(merged) >= 3:
+        print(f"  Bands: {[(int(y1), int(y2)) for y1, y2 in merged[:10]]}...")
+
     # Detect columns
-    x_centers = detect_columns_by_grid(page_image, ys if len(ys) >= 3 else ys_text)
-    print(f"  Column X centers: {[int(x) for x in x_centers]}")
-    
-    col_map = build_column_regions(x_centers, width)
-    if col_map:
-        print(f"  Column regions: { {k: [int(v[0]), int(v[1])] for k,v in col_map.items()} }")
-    else:
-        fallback = build_column_regions_fallback(width)
-        print(f"  Using fallback: { {k: [int(v[0]), int(v[1])] for k,v in fallback.items()} }")
+    col_map = map_columns([], width)
+    print(f"  Column regions: { {k: [int(v[0]), int(v[1])] for k, v in col_map.items()} }")

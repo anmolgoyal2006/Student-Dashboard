@@ -4,11 +4,14 @@ const Notification = require('../models/Notification');
 
 async function sendNotification(userId, title, body, data = {}) {
   try {
-    // ── Deduplication: skip if same title+type was sent to this user in the last 24h ──
+    // ── Deduplication: skip if same title+body+type was sent to this user in the last 24h ──
+    // We include `body` in the key so two different assignments with the same urgency tier
+    // (same title like "🚨 Due in 6 hours") are treated as distinct notifications.
     const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
     const recentDupe = await Notification.findOne({
       userId,
       title,
+      body,
       type: data.type || 'INFO',
       createdAt: { $gte: since },
     }).lean();

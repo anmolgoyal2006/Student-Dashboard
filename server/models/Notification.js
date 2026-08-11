@@ -35,6 +35,8 @@ const notificationSchema = new mongoose.Schema(
       // Study session
       'SESSION_SOON',
       'SESSION_START',
+      // Risk / academic
+      'RISK_ALERT',
       // Digest / general
       'DIGEST',
       'INFO',
@@ -55,6 +57,6 @@ const notificationSchema = new mongoose.Schema(
   { timestamps: true }   // createdAt + updatedAt added automatically
 );
 
-notificationSchema.index({ userId: 1, type: 1, title: 1, createdAt: -1 });
+notificationSchema.index({ userId: 1, type: 1, title: 1, body: 1, createdAt: -1 });
 
 module.exports = mongoose.model('Notification', notificationSchema);

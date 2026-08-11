@@ -144,20 +144,27 @@ async function sendTodayNotifications() {
     const user = await User.findById(subject.userId).select('fcmToken').lean();
     if (!user || !user.fcmToken) continue;
 
-    const tokens = [user.fcmToken];
     const payload = buildPayload(subject, subject.userId, startTime, dateStr);
+    const title = payload.notification.title;
+    const body  = payload.notification.body;
 
-    notifDocs.push({
-      userId:    subject.userId,
-      subjectId: subject._id,
-      title:     payload.notification.title,
-      body:      payload.notification.body,
-    });
-
-    for (const token of tokens) {
-      const sent = await sendNotification(token, payload);
-      if (sent) totalSent++;
+    // ── Dedup: skip if same subject start-of-day notification already sent today ──
+    const todayStart = new Date(dateStr + 'T00:00:00.000Z');
+    const alreadySent = await Notification.findOne({
+      userId: subject.userId,
+      title,
+      type:  'ATTENDANCE_MARK',
+      createdAt: { $gte: todayStart },
+    }).lean();
+    if (alreadySent) {
+      console.log(`[FCM] Skipping duplicate start-of-day for ${subject.name}`);
+      continue;
     }
+
+    notifDocs.push({ userId: subject.userId, subjectId: subject._id, title, body, type: 'ATTENDANCE_MARK' });
+
+    const sent = await sendNotification(user.fcmToken, payload);
+    if (sent) totalSent++;
   }
 
   await saveNotificationsToDB(notifDocs);
@@ -205,6 +212,19 @@ async function sendEndOfClassNotifications() {
     const title = `📋 Did you attend ${subject.name}?`;
     const body = `Class just ended${slot?.room ? ` in ${slot.room}` : ''}. Mark your attendance.`;
 
+    // ── Dedup: only send once per class-end per day ──
+    const todayStart = new Date(dateStr + 'T00:00:00.000Z');
+    const alreadySent = await Notification.findOne({
+      userId: subject.userId,
+      title,
+      type:   'ATTENDANCE_MARK',
+      createdAt: { $gte: todayStart },
+    }).lean();
+    if (alreadySent) {
+      console.log(`[FCM] Skipping duplicate end-of-class for ${subject.name}`);
+      continue;
+    }
+
     const payload = {
       notification: { title, body },
       data: {
@@ -237,7 +257,7 @@ async function sendEndOfClassNotifications() {
     };
 
     await sendNotification(user.fcmToken, payload);
-    notifDocs.push({ userId: subject.userId, subjectId: subject._id, title, body });
+    notifDocs.push({ userId: subject.userId, subjectId: subject._id, title, body, type: 'ATTENDANCE_MARK' });
 
     console.log(`[FCM] End-of-class notification sent: ${subject.name} at ${currentTime} IST`);
   }

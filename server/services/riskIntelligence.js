@@ -50,7 +50,7 @@ async function checkAcademicRisks(userId) {
 
           await sendNotification(
             userId,
-            '⚠️ Academic Risk Detected',
+            `⚠️ Academic Risk: ${a.courseName}`,
             alert.message,
             { type: 'RISK_ALERT', subject: a.courseName, assignmentId: a.assignmentId }
           );
