@@ -450,3 +450,29 @@ GENERAL:
   console.log('[AI Recommendation] Using rule-based fallback.');
   return getFallbackRecommendations(userId);
 }
+
+// ── Non-blocking variant ──────────────────────────────────────────────────────
+// Returns cached data instantly. If nothing is cached yet, kicks off generation
+// in the background and returns { suggestions: [], generating: true } so the
+// client can paint the page immediately and re-poll after ~8 s.
+
+exports.getRecommendationsNonBlocking = (userId) => {
+  const cacheKey = `recs:${userId}`;
+  const cached   = recsCache.get(cacheKey);
+
+  if (cached) {
+    // Stale-while-revalidate: refresh in background if older than 5 min
+    if (Date.now() - cached.generatedAt > RECS_STALE_REFRESH_MS) {
+      generateAndCacheRecommendations(userId, cacheKey).catch(err =>
+        console.error('[AI Recommendation] Background refresh failed:', err.message)
+      );
+    }
+    return Promise.resolve({ suggestions: cached.data, generating: false });
+  }
+
+  // Nothing cached — fire generation in background, respond instantly
+  generateAndCacheRecommendations(userId, cacheKey).catch(err =>
+    console.error('[AI Recommendation] Background generation failed:', err.message)
+  );
+  return Promise.resolve({ suggestions: [], generating: true });
+};

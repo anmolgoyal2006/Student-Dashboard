@@ -3,8 +3,10 @@ const jwt = require('jsonwebtoken');
 
 jest.mock('../services/aiService', () => require('./helpers/mockAiService').factory());
 const mockRenderPDF = jest.fn();
+// Pure mock — do NOT spread jest.requireActual here. The real pdfParser.js
+// loads pdfjs-dist/legacy at require-time, which spins up internal workers
+// that never terminate inside Jest and cause the suite to hang indefinitely.
 jest.mock('../services/pdfParser', () => ({
-  ...jest.requireActual('../services/pdfParser'),
   extractTextFromPDF: jest.fn(),
   renderPDFPagesToImages: mockRenderPDF,
 }));

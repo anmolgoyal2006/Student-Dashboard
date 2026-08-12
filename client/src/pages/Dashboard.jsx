@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Bar, Doughnut } from 'react-chartjs-2';
 import { Link } from 'react-router-dom';
 import {
@@ -53,12 +53,15 @@ export default function Dashboard() {
   const [notifs,       setNotifs]       = useState([]);
   const [subjects,     setSubjects]     = useState([]);
   const [subjectCount, setSubjectCount] = useState(0);
-  const [loading,      setLoading]      = useState(true);
+  // Granular loading so sections paint as data arrives
+  const [loadingCore,  setLoadingCore]  = useState(true);  // stats + chart
+  const [loadingRecs,  setLoadingRecs]  = useState(true);  // AI recs (slow)
   const [classSummary, setClassSummary] = useState([]);
 
   useEffect(() => {
     const isTeacher = user?.role === 'teacher';
 
+    // Priority 1 — fast DB reads: show stats + charts ASAP
     Promise.all([
       attendanceService.getSummary(),
       marksService.getCGPAbySemester(),
@@ -72,12 +75,30 @@ export default function Dashboard() {
       setSubjects(s.data.subjects || []);
       setSubjectCount((s.data.subjects || []).length);
       if (cs) setClassSummary(cs.data.students || []);
-      setLoading(false);
-    }).catch(() => setLoading(false));
+    }).catch(() => {}).finally(() => setLoadingCore(false));
 
-    aiService.getRecommendations()
-      .then(r => setRecs(r.data?.suggestions || []))
-      .catch(() => setRecs([]));
+    // Priority 2 — AI call: runs in background, populates when ready.
+    // Server returns { suggestions, generating: true } on first visit (cold cache).
+    // We poll once after 8 s to pick up the freshly-generated result.
+    const fetchRecs = () =>
+      aiService.getRecommendations()
+        .then(r => {
+          setRecs(r.data?.suggestions || []);
+          if (r.data?.generating) {
+            // Server is generating — poll once after 8 s
+            setTimeout(() => {
+              aiService.getRecommendations()
+                .then(r2 => setRecs(r2.data?.suggestions || []))
+                .catch(() => {})
+                .finally(() => setLoadingRecs(false));
+            }, 8000);
+          } else {
+            setLoadingRecs(false);
+          }
+        })
+        .catch(() => { setRecs([]); setLoadingRecs(false); });
+
+    fetchRecs();
   }, [user]);
 
   /* ── derived values ────────────────────────────────────────────────────── */
@@ -85,32 +106,38 @@ export default function Dashboard() {
 
   const classSummaryList = classSummary || [];
 
-  const subjectAverages = {};
-  classSummaryList.forEach(student =>
-    (student.subjects || []).forEach(sub => {
-      if (!subjectAverages[sub.subject]) subjectAverages[sub.subject] = { sum: 0, count: 0 };
-      subjectAverages[sub.subject].sum   += parseFloat(sub.percentage || 0);
-      subjectAverages[sub.subject].count += 1;
-    })
-  );
-  const classSubjectLabels = Object.keys(subjectAverages);
-  const classSubjectData   = classSubjectLabels.map(l =>
-    (subjectAverages[l].sum / subjectAverages[l].count).toFixed(1)
-  );
+  const { subjectAverages, classSubjectLabels, classSubjectData } = useMemo(() => {
+    const avgs = {};
+    classSummaryList.forEach(student =>
+      (student.subjects || []).forEach(sub => {
+        if (!avgs[sub.subject]) avgs[sub.subject] = { sum: 0, count: 0 };
+        avgs[sub.subject].sum   += parseFloat(sub.percentage || 0);
+        avgs[sub.subject].count += 1;
+      })
+    );
+    const labels = Object.keys(avgs);
+    const data   = labels.map(l => (avgs[l].sum / avgs[l].count).toFixed(1));
+    return { subjectAverages: avgs, classSubjectLabels: labels, classSubjectData: data };
+  }, [classSummaryList]);
 
-  const lowCnt  = isStudent
+  const lowCnt = useMemo(() => isStudent
     ? summary.filter(s => s.isLow).length
-    : classSummaryList.filter(s => parseFloat(s.overall || 0) < 75).length;
+    : classSummaryList.filter(s => parseFloat(s.overall || 0) < 75).length,
+  [isStudent, summary, classSummaryList]);
 
   /* ── schedule ──────────────────────────────────────────────────────────── */
   const dayNames  = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   const todayName = dayNames[new Date().getDay()];
-  const todayClasses = [];
-  subjects.forEach(sub =>
-    (sub.schedule || []).filter(sl => sl.day === todayName).forEach(sl =>
-      todayClasses.push({ ...sl, name: sub.name })
-    )
-  );
+
+  const todayClasses = useMemo(() => {
+    const out = [];
+    subjects.forEach(sub =>
+      (sub.schedule || []).filter(sl => sl.day === todayName).forEach(sl =>
+        out.push({ ...sl, name: sub.name })
+      )
+    );
+    return out;
+  }, [subjects, todayName]);
   const todayScheduleSummary = todayClasses.length > 0
     ? `Today · ${todayClasses.length} class${todayClasses.length > 1 ? 'es' : ''}: ${todayClasses.map(c => c.name).join(', ')}`
     : 'No classes scheduled for today';
@@ -246,7 +273,7 @@ export default function Dashboard() {
   };
 
   /* ── loading skeleton ──────────────────────────────────────────────────── */
-  if (loading) {
+  if (loadingCore) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
@@ -574,7 +601,20 @@ export default function Dashboard() {
             </Link>
           </div>
 
-          {recs.length > 0
+          {loadingRecs ? (
+            // Skeleton while AI call is in-flight
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {[1,2,3].map(i => (
+                <div key={i} style={{ display: 'flex', gap: 10, padding: '10px 12px', borderRadius: 10, background: 'rgba(99,102,241,0.04)', border: '1px solid rgba(99,102,241,0.08)' }}>
+                  <Skeleton variant="circle" width="28px" height="28px" style={{ flexShrink: 0 }} />
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <Skeleton width="55%" height="13px" />
+                    <Skeleton width="85%" height="11px" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : recs.length > 0
             ? recs.map((r, i) => (
                 <div key={i} style={{
                   display: 'flex', gap: 12, alignItems: 'flex-start',

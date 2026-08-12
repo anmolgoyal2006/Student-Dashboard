@@ -1,6 +1,7 @@
-const pdfParse = require('pdf-parse');
-const { createCanvas, Image } = require('canvas');
-global.Image = Image;
+// Heavy PDF/canvas dependencies are loaded lazily (inside the functions that
+// need them) rather than at module-load time. This prevents Jest from hanging
+// when this module is required in tests — pdfjs-dist/legacy spins up internal
+// workers that never terminate inside the Node test runner.
 
 // Suppress PDF.js warning logs (like "Warning: TT: undefined function: 21")
 const originalLog = console.log;
@@ -19,15 +20,17 @@ console.warn = function (...args) {
   originalWarn.apply(console, args);
 };
 
-const pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js');
-pdfjsLib.verbosity = pdfjsLib.VerbosityLevel.ERRORS;
-
 async function extractTextFromPDF(buffer) {
+  const pdfParse = require('pdf-parse');
   const data = await pdfParse(buffer);
   return data.text;
 }
 
 async function renderPDFPagesToImages(buffer, { maxPages = 5, scale = 2.2 } = {}) {
+  const { createCanvas } = require('canvas');
+  const pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js');
+  pdfjsLib.verbosity = pdfjsLib.VerbosityLevel.ERRORS;
+
   const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(buffer) });
   const doc = await loadingTask.promise;
   const pageCount = Math.min(doc.numPages, maxPages);

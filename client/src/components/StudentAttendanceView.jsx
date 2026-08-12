@@ -198,6 +198,8 @@ const StudentAttendanceView = ({ sid }) => {
   const fetchAttendance = async () => {
     try {
       setLoading(true); setError(null);
+      // Fire both in parallel but DON'T block render on the slower one.
+      // Timetable is needed for today's schedule card — load it concurrently.
       const [ar, sr] = await Promise.all([
         API.get(`/attendance/student/${sid}`),
         API.get(`/timetable`),
@@ -395,17 +397,71 @@ const StudentAttendanceView = ({ sid }) => {
   const totalPages  = Math.ceil(filteredRecords.length / recordsPerPage) || 1;
   const pageRecords = filteredRecords.slice((currentPage - 1) * recordsPerPage, currentPage * recordsPerPage);
 
-  /* ── loading ── */
+  /* ── loading skeleton ── */
   if (loading) return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "60vh" }}>
-      <div style={{
-        width: 34, height: 34,
-        border: "3px solid rgba(255,255,255,0.08)",
-        borderTopColor: "var(--color-accent)",
-        borderRadius: "50%",
-        animation: "sa-spin 0.7s linear infinite",
-      }} />
-      <style>{`@keyframes sa-spin { to { transform: rotate(360deg); } }`}</style>
+    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)", width: "100%" }}>
+      <style>{`
+        @keyframes sa-shimmer {
+          0%   { background-position: 200% 0; }
+          100% { background-position: -200% 0; }
+        }
+        .sa-skel {
+          background: linear-gradient(90deg,
+            var(--color-surface-3) 25%,
+            rgba(255,255,255,0.04) 50%,
+            var(--color-surface-3) 75%);
+          background-size: 200% 100%;
+          animation: sa-shimmer 1.4s infinite;
+          border-radius: 8px;
+        }
+      `}</style>
+
+      {/* 4 stat cards */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12 }}>
+        {[1,2,3,4].map(i => (
+          <div key={i} style={{ background: "var(--color-surface-2)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 14, padding: "24px 16px", display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
+            <div className="sa-skel" style={{ width: 40, height: 40, borderRadius: "50%" }} />
+            <div className="sa-skel" style={{ width: "60%", height: 28 }} />
+            <div className="sa-skel" style={{ width: "45%", height: 11 }} />
+          </div>
+        ))}
+      </div>
+
+      {/* Today + Calendar row */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+        {[1,2].map(i => (
+          <div key={i} style={{ background: "var(--color-surface-2)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 14, padding: 20, display: "flex", flexDirection: "column", gap: 12 }}>
+            <div className="sa-skel" style={{ width: "50%", height: 16 }} />
+            {[1,2,3].map(j => (
+              <div key={j} style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                <div className="sa-skel" style={{ width: 36, height: 36, borderRadius: "50%", flexShrink: 0 }} />
+                <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
+                  <div className="sa-skel" style={{ width: "65%", height: 13 }} />
+                  <div className="sa-skel" style={{ width: "40%", height: 11 }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+
+      {/* Subject breakdown + records row */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+        {[3,4].map((rows, idx) => (
+          <div key={idx} style={{ background: "var(--color-surface-2)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 14, padding: 20, display: "flex", flexDirection: "column", gap: 14 }}>
+            <div className="sa-skel" style={{ width: "45%", height: 16 }} />
+            {Array.from({ length: rows }).map((_, j) => (
+              <div key={j} style={{ padding: "10px 14px", background: "var(--color-surface-3)", borderRadius: 8, display: "flex", flexDirection: "column", gap: 8 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div className="sa-skel" style={{ width: "55%", height: 13 }} />
+                  <div className="sa-skel" style={{ width: "18%", height: 13 }} />
+                </div>
+                <div className="sa-skel" style={{ width: "100%", height: 6, borderRadius: 100 }} />
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
     </div>
   );
 

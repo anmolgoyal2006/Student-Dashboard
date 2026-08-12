@@ -23,7 +23,8 @@ export default function Marks() {
   const [subjects,     setSubjects]     = useState([]);
   const [cgpaData,     setCgpaData]     = useState(null);
   const [form,         setForm]         = useState(EMPTY);
-  const [loading,      setLoading]      = useState(true);
+  const [loading,      setLoading]      = useState(true);   // core data
+  const [loadingExtra, setLoadingExtra] = useState(true);   // semesters, grades, pdfs
   const [savedPdfs,    setSavedPdfs]    = useState([]);
 
   const [semesters,    setSemesters]    = useState([]);
@@ -45,29 +46,36 @@ export default function Marks() {
     setLoading(true);
     setLoadError(null);
     try {
-      const [m, s, c, sems, grades, cgpas, pdfs] = await Promise.all([
+      // Priority 1 — fast: marks, subjects, cgpa → paint content immediately
+      const [m, s, c] = await Promise.all([
         marksService.getAll(),
         subjectService.getAll(),
         marksService.getCGPA(),
-        marksService.getSemesters(),
-        marksService.getGradeOptions(),
-        marksService.getCGPAbySemester(),
-        marksService.getSavedPdfs(),
       ]);
-
       setMarks(m.data.marks || []);
       setSubjects(s.data.subjects || []);
       setCgpaData(c.data);
-      setSemesters(sems.data.semesters || []);
-      setGradeOptions(grades.data.gradeOptions || []);
-      setCgpaSem(cgpas.data);
-      setSavedPdfs(pdfs.data.pdfs || []);
     } catch (err) {
       console.error('FAILED API:', err.config?.url, err);
       setLoadError(err.response?.data?.message || 'Failed to load your marks. Please try again.');
     } finally {
       setLoading(false);
     }
+
+    // Priority 2 — background: semesters, grades, pdfs, cgpa-by-semester
+    try {
+      const [sems, grades, cgpas, pdfs] = await Promise.all([
+        marksService.getSemesters(),
+        marksService.getGradeOptions(),
+        marksService.getCGPAbySemester(),
+        marksService.getSavedPdfs(),
+      ]);
+      setSemesters(sems.data.semesters || []);
+      setGradeOptions(grades.data.gradeOptions || []);
+      setCgpaSem(cgpas.data);
+      setSavedPdfs(pdfs.data.pdfs || []);
+    } catch { /* non-fatal — sections show empty state */ }
+    finally { setLoadingExtra(false); }
   };
 
   useEffect(() => { load(); }, []);
@@ -195,7 +203,70 @@ export default function Marks() {
     }],
   };
 
-  if (loading) return <div className="spinner" />;
+  if (loading) return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <style>{`
+        @keyframes mk-shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+        .mk-skel {
+          background: linear-gradient(90deg, var(--color-surface-3) 25%, rgba(255,255,255,0.04) 50%, var(--color-surface-3) 75%);
+          background-size: 200% 100%;
+          animation: mk-shimmer 1.4s infinite;
+          border-radius: 8px;
+        }
+      `}</style>
+
+      {/* Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div className="mk-skel" style={{ width: 180, height: 22 }} />
+          <div className="mk-skel" style={{ width: 260, height: 13 }} />
+        </div>
+      </div>
+
+      {/* Tab row */}
+      <div style={{ display: 'flex', gap: 24, borderBottom: '1px solid var(--border)', paddingBottom: 10 }}>
+        {[80, 100, 90].map((w, i) => <div key={i} className="mk-skel" style={{ width: w, height: 14 }} />)}
+      </div>
+
+      {/* Stat cards row */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 14 }}>
+        {[1,2,3].map(i => (
+          <div key={i} style={{ background: 'var(--color-surface-2)', border: '1px solid var(--border)', borderRadius: 12, padding: '18px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div className="mk-skel" style={{ width: '55%', height: 28 }} />
+            <div className="mk-skel" style={{ width: '40%', height: 12 }} />
+          </div>
+        ))}
+      </div>
+
+      {/* Bar chart placeholder */}
+      <div style={{ background: 'var(--color-surface-2)', border: '1px solid var(--border)', borderRadius: 12, padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div className="mk-skel" style={{ width: '40%', height: 16 }} />
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, height: 140 }}>
+          {[60, 80, 50, 90, 70, 55, 85].map((h, i) => (
+            <div key={i} className="mk-skel" style={{ flex: 1, height: `${h}%`, borderRadius: '6px 6px 0 0' }} />
+          ))}
+        </div>
+        <div style={{ display: 'flex', gap: 10 }}>
+          {[55, 70, 50, 80, 65, 50, 75].map((w, i) => (
+            <div key={i} className="mk-skel" style={{ flex: 1, height: 10 }} />
+          ))}
+        </div>
+      </div>
+
+      {/* Marks list skeleton */}
+      <div style={{ background: 'var(--color-surface-2)', border: '1px solid var(--border)', borderRadius: 12, padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div className="mk-skel" style={{ width: '30%', height: 16 }} />
+        {[1,2,3,4].map(i => (
+          <div key={i} style={{ display: 'flex', gap: 12, alignItems: 'center', paddingBottom: 12, borderBottom: '1px solid var(--border)' }}>
+            <div className="mk-skel" style={{ width: '35%', height: 13 }} />
+            <div className="mk-skel" style={{ width: '20%', height: 13 }} />
+            <div className="mk-skel" style={{ width: '15%', height: 13 }} />
+            <div className="mk-skel" style={{ width: '15%', height: 13, marginLeft: 'auto' }} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 
   if (loadError) {
     return (

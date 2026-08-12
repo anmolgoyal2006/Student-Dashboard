@@ -47,4 +47,7 @@ const taskSchema = new mongoose.Schema({
   },
 }, { timestamps: true });
 
+// Cron queries: find non-completed tasks with dueDate in a time window
+taskSchema.index({ status: 1, dueDate: 1 });
+
 module.exports = mongoose.model('Task', taskSchema);

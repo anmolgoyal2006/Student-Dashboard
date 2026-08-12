@@ -31,4 +31,8 @@ subjectSchema.pre('save', function (next) {
   next();
 });
 
+// Query indexes: userId is the primary filter on every read path
+subjectSchema.index({ userId: 1 });
+subjectSchema.index({ userId: 1, name: 1 }); // dedup check in timetable import
+
 module.exports = mongoose.model('Subject', subjectSchema);

@@ -25,14 +25,19 @@ const READINESS_CONFIG = {
 
 export default function Career() {
   const [career,    setCareer]    = useState(null);
-  const [loading,   setLoading]   = useState(true);
+  const [loading,   setLoading]   = useState(true);   // career data (fast)
   const [plan,      setPlan]      = useState(null);
-  const [planLoad,  setPlanLoad]  = useState(true);
+  const [planLoad,  setPlanLoad]  = useState(true);   // plan (can be slow)
   const [activeDay, setActiveDay] = useState(0);
   const [todayProgress, setTodayProgress] = useState({ done: 0, remaining: 0 });
   const [manualDsaOpen, setManualDsaOpen] = useState(false);
   const [saveStatus, setSaveStatus] = useState('idle'); // 'idle' | 'saving' | 'saved' | 'error'
   const isFirstRender = useRef(true);
+
+  // Stable serializations so the auto-save effect only fires when content changes,
+  // not on every render (JSON.stringify in a dep array creates a new ref each time)
+  const skillsKey   = useMemo(() => JSON.stringify(career?.skills),    [career?.skills]);
+  const dsaTopicsKey = useMemo(() => JSON.stringify(career?.dsaTopics), [career?.dsaTopics]);
 
   // Tab switching
   const [activeTab, setActiveTab] = useState('dsa');
@@ -44,6 +49,7 @@ export default function Career() {
   const [savedEventIds, setSavedEventIds] = useState(new Set());
   const [hackathonView, setHackathonView] = useState('all'); // 'all' | 'recommended' | 'saved' | 'closing'
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   
   // Filter state
@@ -413,13 +419,22 @@ export default function Career() {
     }
   };
 
-  // Reload hackathons when view or filters change
+  // Debounce searchQuery so we don't re-fetch on every keystroke
+  useEffect(() => {
+    const id = setTimeout(() => setDebouncedSearchQuery(searchQuery), 350);
+    return () => clearTimeout(id);
+  }, [searchQuery]);
+
+  // Reload hackathons when view or debounced filters change
   useEffect(() => {
     if (activeTab === 'hackathons') {
-      loadHackathons(hackathonView, filters);
+      const activeFilters = debouncedSearchQuery
+        ? { ...filters, search: debouncedSearchQuery }
+        : filters;
+      loadHackathons(hackathonView, activeFilters);
       loadSavedEventIds();
     }
-  }, [activeTab, hackathonView, filters]);
+  }, [activeTab, hackathonView, filters, debouncedSearchQuery]);
 
   useEffect(() => { load(); loadPlan(); }, []);
 
@@ -484,8 +499,8 @@ export default function Career() {
     career?.targetCompany,
     career?.targetRole,
     career?.problemsSolved,
-    JSON.stringify(career?.skills),
-    JSON.stringify(career?.dsaTopics)
+    skillsKey,
+    dsaTopicsKey,
   ]);
 
   const toggleTopic = (topicName, completed) => {
@@ -502,7 +517,75 @@ export default function Career() {
     }));
   };
 
-  if (loading) return <div className="spinner" />;
+  if (loading) return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      {/* shimmer keyframes */}
+      <style>{`
+        @keyframes cr-shimmer {
+          0%   { background-position: 200% 0; }
+          100% { background-position: -200% 0; }
+        }
+        .cr-skel {
+          background: linear-gradient(90deg,
+            var(--color-surface-3) 25%,
+            rgba(255,255,255,0.04) 50%,
+            var(--color-surface-3) 75%);
+          background-size: 200% 100%;
+          animation: cr-shimmer 1.4s infinite;
+          border-radius: 8px;
+        }
+      `}</style>
+
+      {/* Page header */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <div className="cr-skel" style={{ width: 200, height: 22 }} />
+          <div className="cr-skel" style={{ width: 300, height: 13 }} />
+        </div>
+        <div className="cr-skel" style={{ width: 80, height: 18, borderRadius: 100 }} />
+      </div>
+
+      {/* Tabs row */}
+      <div style={{ display: "flex", gap: 24, borderBottom: "1px solid var(--border)", paddingBottom: 12 }}>
+        {[90, 110, 100].map((w, i) => (
+          <div key={i} className="cr-skel" style={{ width: w, height: 14 }} />
+        ))}
+      </div>
+
+      {/* Stat pills */}
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        {[80, 70, 80, 70].map((w, i) => (
+          <div key={i} className="cr-skel" style={{ width: w, height: 26, borderRadius: 100 }} />
+        ))}
+      </div>
+
+      {/* Two-column cards */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+        {[5, 4].map((rows, ci) => (
+          <div key={ci} style={{ background: "var(--color-surface-2)", border: "1px solid var(--border)", borderRadius: 14, padding: 20, display: "flex", flexDirection: "column", gap: 14 }}>
+            <div className="cr-skel" style={{ width: "50%", height: 16 }} />
+            {Array.from({ length: rows }).map((_, j) => (
+              <div key={j} style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                <div className="cr-skel" style={{ width: 18, height: 18, borderRadius: 4, flexShrink: 0 }} />
+                <div className="cr-skel" style={{ flex: 1, height: 13 }} />
+                <div className="cr-skel" style={{ width: 40, height: 13, flexShrink: 0 }} />
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+
+      {/* Wide card */}
+      <div style={{ background: "var(--color-surface-2)", border: "1px solid var(--border)", borderRadius: 14, padding: 20, display: "flex", flexDirection: "column", gap: 14 }}>
+        <div className="cr-skel" style={{ width: "35%", height: 16 }} />
+        <div className="cr-skel" style={{ width: "100%", height: 8, borderRadius: 100 }} />
+        <div style={{ display: "flex", justifyContent: "space-between" }}>
+          <div className="cr-skel" style={{ width: "20%", height: 12 }} />
+          <div className="cr-skel" style={{ width: "15%", height: 12 }} />
+        </div>
+      </div>
+    </div>
+  );
   if (!career) return <p className="text-muted">Failed to load career data.</p>;
 
   const completedTopics = career.dsaTopics.filter(t => t.completed).length;

@@ -20,5 +20,7 @@ const classroomAssignmentSchema = new mongoose.Schema({
 });
 
 classroomAssignmentSchema.index({ userId: 1, courseId: 1, assignmentId: 1 }, { unique: true });
+// Cron queries: filter by status + dueDate across all users every hour
+classroomAssignmentSchema.index({ status: 1, dueDate: 1 });
 
 module.exports = mongoose.model('ClassroomAssignment', classroomAssignmentSchema);

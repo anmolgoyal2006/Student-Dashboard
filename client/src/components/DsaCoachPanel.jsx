@@ -356,9 +356,27 @@ export default function DsaCoachPanel({ career, onCareerUpdate, plan }) {
         </div>
 
         {loading && !coach ? (
-          <div style={{ textAlign: 'center', padding: 24 }}>
-            <div className="spinner" />
-            <p className="text-muted" style={{ marginTop: 10 }}>Building your placement plan…</p>
+          // Inline skeleton — Career page stays visible while plan loads
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 14 }}>
+            <style>{`
+              @keyframes dsa-shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+              .dsa-skel {
+                background: linear-gradient(90deg, var(--color-surface-3) 25%, rgba(255,255,255,0.04) 50%, var(--color-surface-3) 75%);
+                background-size: 200% 100%;
+                animation: dsa-shimmer 1.4s infinite;
+                border-radius: 8px;
+              }
+            `}</style>
+            <div className="dsa-skel" style={{ width: '60%', height: 14 }} />
+            {[1,2,3].map(i => (
+              <div key={i} style={{ display: 'flex', gap: 10, padding: '10px 14px', background: 'var(--color-surface-3)', borderRadius: 8, alignItems: 'center' }}>
+                <div className="dsa-skel" style={{ width: 32, height: 32, borderRadius: '50%', flexShrink: 0 }} />
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div className="dsa-skel" style={{ width: '65%', height: 13 }} />
+                  <div className="dsa-skel" style={{ width: '40%', height: 11 }} />
+                </div>
+              </div>
+            ))}
           </div>
         ) : coach ? (
           <>

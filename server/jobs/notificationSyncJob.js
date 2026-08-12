@@ -115,8 +115,15 @@ async function checkRisks() {
   try {
     const User = require('../models/User');
     const users = await User.find({ role: 'student' }).select('_id').lean();
-    for (const u of users) {
-      await checkAcademicRisks(u._id);
+
+    // Run in parallel with a concurrency limit of 10 so we don't hammer the DB
+    const CONCURRENCY = 10;
+    for (let i = 0; i < users.length; i += CONCURRENCY) {
+      await Promise.all(
+        users.slice(i, i + CONCURRENCY).map(u => checkAcademicRisks(u._id).catch(err =>
+          console.error(`[CheckRisks] user ${u._id}:`, err.message)
+        ))
+      );
     }
   } catch (err) {
     console.error('[CheckRisks]', err.message);

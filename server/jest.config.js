@@ -6,4 +6,17 @@ module.exports = {
   testMatch: ['<rootDir>/tests/**/*.test.js'],
   // mongodb-memory-server may download a binary on first run.
   testTimeout: 60000,
+  // Coverage
+  collectCoverage: false, // driven by --coverage flag; keeps normal runs fast
+  collectCoverageFrom: [
+    '**/*.js',
+    '!server.js',          // entry point — hard to unit-test in isolation
+    '!jest.config.js',
+    '!scripts/**',
+    '!collectors/**',
+    '!tests/**',
+    '!node_modules/**',
+  ],
+  coverageReporters: ['text', 'lcov', 'text-summary'],
+  coverageDirectory: 'coverage',
 };

@@ -1,4 +1,8 @@
 ﻿const CareerProgress = require('../models/CareerProgress');
+const { TTLCache } = require('../utils/ttlCache');
+
+// 2-minute read cache — avoids hitting MongoDB on every Career page mount
+const careerCache = new TTLCache({ ttlMs: 2 * 60 * 1000, maxEntries: 500 });
 
 const DSA_TOPICS = [
   'Arrays', 'Strings', 'Linked Lists', 'Stacks & Queues',
@@ -8,15 +12,19 @@ const DSA_TOPICS = [
 
 // GET /api/career
 exports.getCareer = async (req, res) => {
+  const uid = req.user.id;
   try {
-    let career = await CareerProgress.findOne({ userId: req.user.id });
+    const cached = careerCache.get(uid);
+    if (cached) return res.json({ career: cached, cached: true });
+
+    let career = await CareerProgress.findOne({ userId: uid });
     if (!career) {
-      // Auto-create with default DSA topics
       career = await CareerProgress.create({
-        userId: req.user.id,
+        userId: uid,
         dsaTopics: DSA_TOPICS.map(name => ({ name, completed: false, problems: 0 })),
       });
     }
+    careerCache.set(uid, career);
     res.json({ career });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -43,6 +51,7 @@ exports.updateCareer = async (req, res) => {
       { $set },
       { new: true, upsert: true, runValidators: true }
     );
+    careerCache.del(req.user.id);
     res.json({ message: 'Career progress updated', career });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -63,6 +72,7 @@ exports.updateTopic = async (req, res) => {
       },
       { new: true }
     );
+    careerCache.del(req.user.id);
     res.json({ message: 'Topic updated', career });
   } catch (err) {
     res.status(500).json({ message: err.message });
