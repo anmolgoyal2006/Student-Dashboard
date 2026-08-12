@@ -11,5 +11,7 @@ const attendanceSchema = new mongoose.Schema({
 
 // Prevent duplicate entries for same subject + date + slot
 attendanceSchema.index({ userId: 1, subjectId: 1, date: 1, slot: 1 }, { unique: true });
+// Fast range scans for monthly trends and summary (leading userId portion)
+attendanceSchema.index({ userId: 1, date: 1 });
 
 module.exports = mongoose.model('Attendance', attendanceSchema);

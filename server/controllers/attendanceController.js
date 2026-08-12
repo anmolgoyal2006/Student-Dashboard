@@ -14,7 +14,9 @@ const Subject    = require('../models/Subject');
 const User       = require('../models/User');
 const mongoose   = require('mongoose');
 
-const summaryCache = new TTLCache({ ttlMs: 5 * 60 * 1000, maxEntries: 1000 });
+const summaryCache  = new TTLCache({ ttlMs: 5  * 60 * 1000, maxEntries: 1000 });
+// Shorter TTL for the student view — invalidated on every mark write
+const studentCache  = new TTLCache({ ttlMs: 60 * 1000,      maxEntries: 500  });
 
 // ── Shared pure helpers ───────────────────────────────────────────────────────
 
@@ -106,6 +108,7 @@ exports.markAttendance = async (req, res) => {
     }
 
     summaryCache.del(`summary:${userId}`);
+    studentCache.del(`student:${userId}`);
     res.status(201).json({ message: 'Attendance marked', attendance: record });
   } catch (err) {
     console.error('[markAttendance]', err);
@@ -418,6 +421,7 @@ exports.markFromNotification = async (req, res) => {
 
     console.log(`🔔 Attendance marked via notification: ${mappedStatus}`);
     summaryCache.del(`summary:${userId}`);
+    studentCache.del(`student:${userId}`);
 
     res.json({ success: true, record });
 
@@ -441,15 +445,28 @@ exports.getStudentBySid = async (req, res) => {
       return res.status(403).json({ message: 'You are not authorized to view this student\'s attendance.' });
     }
 
+    // Serve from cache on repeated hits (quick-mark refreshes, tab switches)
+    // Cache key includes sid so teachers viewing different students don't collide
+    const cacheKey = `student:${student._id}`;
+    const cached = studentCache.get(cacheKey);
+    if (cached) return res.json({ ...cached, cached: true });
+
+    // Fetch subjects + recent records in parallel.
+    // We limit records to the last 90 days for the table/calendar display —
+    // older attendance is already baked into initialPresent/initialTotal on the
+    // Subject document, so the per-subject summary is still complete.
+    const since90 = new Date();
+    since90.setDate(since90.getDate() - 90);
+
     const [subjectsList, rawRecords] = await Promise.all([
       Subject.find({ userId: student._id }).lean(),
-      Attendance.find({ userId: student._id })
+      Attendance.find({ userId: student._id, date: { $gte: since90 } })
         .populate('subjectId', 'name code')
         .sort({ date: -1, createdAt: -1 })
+        .lean()
     ]);
 
     // Deduplicate records by { subjectId, date, slot }
-    // Keep only the most recent record if duplicates exist
     const dedupMap = new Map();
     rawRecords.forEach(r => {
       const key = `${r.subjectId?._id?.toString()}_${r.date.toISOString().slice(0, 10)}_${r.slot || 'null'}`;
@@ -459,7 +476,7 @@ exports.getStudentBySid = async (req, res) => {
     });
     const dedupedRecords = Array.from(dedupMap.values());
 
-    // Flatten records for the table
+    // Flatten records for the table/calendar
     const records = dedupedRecords.map(r => ({
       date:      r.date,
       status:    r.status,
@@ -470,7 +487,9 @@ exports.getStudentBySid = async (req, res) => {
       time:      r.time || null,
     }));
 
-    // Per-subject summary for the breakdown bars
+    // Per-subject summary — start from the stored initial balances (which
+    // already encode all attendance before the 90-day window), then layer
+    // the recent records on top.
     const subjectMap = {};
     for (const s of subjectsList) {
       const key = s._id.toString();
@@ -508,12 +527,11 @@ exports.getStudentBySid = async (req, res) => {
 
     const summary = Object.values(subjectMap).map(s => ({
       ...s,
-      percentage: s.total 
-        ? Math.round((s.present / s.total) * 100) 
+      percentage: s.total
+        ? Math.round((s.present / s.total) * 100)
         : 0,
     }));
 
-    // Overall stats sum initial balances + logged markings
     let present = 0;
     let total = 0;
     for (const s of Object.values(subjectMap)) {
@@ -522,14 +540,16 @@ exports.getStudentBySid = async (req, res) => {
     }
     const absent = total - present;
 
-    res.json({
+    const result = {
       student: { name: student.name, email: student.email, sid: student.sid },
       records,
       summary,
       total,
       present,
       absent,
-    });
+    };
+    studentCache.set(cacheKey, result);
+    res.json(result);
   } catch (err) {
     console.error('[getStudentBySid]', err);
     res.status(500).json({ message: 'Failed to fetch student attendance.' });
@@ -560,6 +580,7 @@ exports.deleteAttendanceRecord = async (req, res) => {
     });
 
     summaryCache.del(`summary:${userId}`);
+    studentCache.del(`student:${userId}`);
     res.json({ message: 'Attendance record deleted' });
   } catch (err) {
     console.error('[deleteAttendanceRecord]', err);

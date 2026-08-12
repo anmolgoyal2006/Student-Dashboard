@@ -215,12 +215,14 @@ const StudentAttendanceView = ({ sid }) => {
   // marked, so quick-mark reconciliation shouldn't re-pull it or flip the
   // page into a full loading state (TodayScheduleCard already shows the mark
   // optimistically).
+  // NOTE: The server now has a 60-second cache on getStudentBySid, so even if
+  // we do refetch it returns instantly on a cache hit.
   const refreshAttendanceRecords = async () => {
     try {
       const ar = await API.get(`/attendance/student/${sid}`);
       setData(ar.data);
     } catch {
-      /* keep existing data; TodayScheduleCard rolls back its own optimistic mark on error */
+      /* keep existing data on error */
     }
   };
 
@@ -282,31 +284,56 @@ const StudentAttendanceView = ({ sid }) => {
     try {
       if (status === "unmarked") {
         await API.delete("/attendance", {
-          data: {
-            subjectId,
-            date: dateStr,
-            slot: `slot_${slotIndex}`
-          }
+          data: { subjectId, date: dateStr, slot: `slot_${slotIndex}` }
         });
         toast.success("Attendance cleared!");
+        // Remove from local state
+        setData(prev => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            records: prev.records.filter(r => {
+              const rDate = new Date(r.date).toLocaleDateString('en-CA', { timeZone: 'UTC' });
+              return !(rDate === dateStr &&
+                (r.subjectId === subjectId || r.subjectId?.toString() === subjectId) &&
+                r.slot === `slot_${slotIndex}`);
+            }),
+          };
+        });
       } else {
-        await API.post("/attendance", {
-          subjectId,
-          date: dateStr,
-          status,
-          slot: `slot_${slotIndex}`
+        const { data: res } = await API.post("/attendance", {
+          subjectId, date: dateStr, status, slot: `slot_${slotIndex}`
         });
         toast.success(`Marked as ${status}!`);
+        // Upsert in local state
+        setData(prev => {
+          if (!prev) return prev;
+          const subj = subjects.find(s => s._id === subjectId || s._id?.toString() === subjectId);
+          const newRecord = {
+            date: new Date(dateStr + 'T00:00:00Z'),
+            status,
+            subject: subj?.name || 'Unknown',
+            code: subj?.code || '—',
+            subjectId,
+            slot: `slot_${slotIndex}`,
+            time: null,
+          };
+          const filtered = prev.records.filter(r => {
+            const rDate = new Date(r.date).toLocaleDateString('en-CA', { timeZone: 'UTC' });
+            return !(rDate === dateStr &&
+              (r.subjectId === subjectId || r.subjectId?.toString() === subjectId) &&
+              r.slot === `slot_${slotIndex}`);
+          });
+          return { ...prev, records: [newRecord, ...filtered] };
+        });
       }
-      
+
       setRetroSlots(prev => prev.map(s => {
         if (s.subjectId === subjectId && s.slotIndex === slotIndex) {
           return { ...s, status: status === "unmarked" ? null : status };
         }
         return s;
       }));
-
-      await refreshAttendanceRecords();
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to update attendance.");
     } finally {
@@ -365,16 +392,54 @@ const StudentAttendanceView = ({ sid }) => {
   const handleQuickMark = async (subjectId, date, status, slot) => {
     try {
       if (status === 'delete') {
-        // Deselect — remove the record
         await API.delete(`/attendance`, { data: { subjectId, date, slot } });
-        toast.success("Attendance cleared!");
+        // Remove the record from local state immediately — no round-trip needed
+        setData(prev => {
+          if (!prev) return prev;
+          const dateObj = new Date(date + 'T00:00:00Z');
+          return {
+            ...prev,
+            records: prev.records.filter(r => {
+              const rDate = new Date(r.date).toLocaleDateString('en-CA', { timeZone: 'UTC' });
+              return !(rDate === date &&
+                (r.subjectId === subjectId || r.subjectId?.toString() === subjectId) &&
+                r.slot === slot);
+            }),
+          };
+        });
       } else {
-        await API.post(`/attendance`, { subjectId, date, status, slot });
-        toast.success(`Marked ${status}!`);
+        const { data: res } = await API.post(`/attendance`, { subjectId, date, status, slot });
+        // Upsert the record in local state — avoids a full page refetch
+        setData(prev => {
+          if (!prev) return prev;
+          const newRecord = res.attendance || {
+            date: new Date(date + 'T00:00:00Z'),
+            status,
+            subjectId,
+            slot: slot || null,
+          };
+          // Find subject name/code from the subjects list for the record shape the UI expects
+          const subj = subjects.find(s => s._id === subjectId || s._id?.toString() === subjectId);
+          const flatRecord = {
+            date: newRecord.date || new Date(date + 'T00:00:00Z'),
+            status: newRecord.status || status,
+            subject: subj?.name || newRecord.subject || 'Unknown',
+            code: subj?.code || newRecord.code || '—',
+            subjectId,
+            slot: slot || null,
+            time: newRecord.time || null,
+          };
+          const existing = prev.records.filter(r => {
+            const rDate = new Date(r.date).toLocaleDateString('en-CA', { timeZone: 'UTC' });
+            return !(rDate === date &&
+              (r.subjectId === subjectId || r.subjectId?.toString() === subjectId) &&
+              r.slot === slot);
+          });
+          return { ...prev, records: [flatRecord, ...existing] };
+        });
       }
-      refreshAttendanceRecords();
     } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to mark attendance.");
+      toast.error(err.response?.data?.message || 'Failed to mark attendance.');
       throw err;
     }
   };
