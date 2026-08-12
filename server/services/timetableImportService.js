@@ -226,6 +226,62 @@ function mergeDuplicates(subjects) {
   return [...byKey.values()];
 }
 
+/**
+ * Detect scheduling conflicts across all subjects in the parsed set.
+ *
+ * A conflict is any pair of distinct subjects (A, B) that share the same day
+ * and have overlapping time windows (start < other.end && end > other.start).
+ *
+ * Returns an array of conflict descriptors added as `issues` entries on the
+ * affected subject entries (mutates `results` in place), and also returns a
+ * flat list for logging.
+ *
+ * @param {Array<{entry: object, issues: Array}>} results - output of flagEntry
+ * @returns {number} number of conflicts detected
+ */
+function detectAndFlagConflicts(results) {
+  const toMin = (t) => {
+    if (!t || !/^\d\d:\d\d$/.test(t)) return -1;
+    const [h, m] = t.split(':').map(Number);
+    return h * 60 + m;
+  };
+
+  let conflictCount = 0;
+
+  for (let i = 0; i < results.length; i++) {
+    for (let j = i + 1; j < results.length; j++) {
+      const a = results[i].entry;
+      const b = results[j].entry;
+
+      for (const slotA of (a.schedule || [])) {
+        for (const slotB of (b.schedule || [])) {
+          if (slotA.day !== slotB.day) continue;
+
+          const aStart = toMin(slotA.startTime);
+          const aEnd   = toMin(slotA.endTime);
+          const bStart = toMin(slotB.startTime);
+          const bEnd   = toMin(slotB.endTime);
+
+          if (aStart < 0 || aEnd < 0 || bStart < 0 || bEnd < 0) continue;
+
+          // Overlap: A starts before B ends AND A ends after B starts
+          if (aStart < bEnd && aEnd > bStart) {
+            const msg = `Conflicts with "${b.name}" on ${slotA.day} (${slotA.startTime}–${slotA.endTime} overlaps ${slotB.startTime}–${slotB.endTime})`;
+            results[i].issues.push({ field: 'schedule', reason: msg, conflict: true });
+
+            const msgB = `Conflicts with "${a.name}" on ${slotB.day} (${slotB.startTime}–${slotB.endTime} overlaps ${slotA.startTime}–${slotA.endTime})`;
+            results[j].issues.push({ field: 'schedule', reason: msgB, conflict: true });
+
+            conflictCount++;
+          }
+        }
+      }
+    }
+  }
+
+  return conflictCount;
+}
+
 async function parseTimetablePDF(buffer) {
   let parsedJson = null;
   let hasText = false;
@@ -352,10 +408,15 @@ async function parseTimetablePDF(buffer) {
   }
 
   const results = mergeDuplicates(subjects).map(flagEntry);
+  const conflicts = detectAndFlagConflicts(results);
+  if (conflicts > 0) {
+    console.warn(`[Timetable Import] Detected ${conflicts} schedule conflict(s) across imported subjects.`);
+  }
   return {
     entries: results.map((r, i) => ({ ...r.entry, index: i, issues: r.issues })),
     flagged: results.reduce((n, r) => n + (r.issues.length > 0 ? 1 : 0), 0),
+    conflicts,
   };
 }
 
-module.exports = { parseTimetablePDF, flagEntry, mergeDuplicates };
+module.exports = { parseTimetablePDF, flagEntry, mergeDuplicates, detectAndFlagConflicts };

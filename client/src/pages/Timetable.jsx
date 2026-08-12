@@ -136,7 +136,8 @@ export default function Timetable() {
       fd.append('file', file);
       const { data } = await subjectService.importPdf(fd);
       setPreview({ entries: data.entries, fileName: file.name });
-      if (data.flagged) toast.warning(`${data.flagged} subject(s) need review.`);
+      if (data.conflicts > 0) toast.warning(`${data.conflicts} schedule conflict(s) detected — check highlighted entries.`);
+      else if (data.flagged) toast.warning(`${data.flagged} subject(s) need review.`);
     } catch (err) {
       const res = err.response?.data;
       toast.error([res?.message, res?.hint].filter(Boolean).join(' ') || 'Could not read that PDF.');

@@ -82,8 +82,8 @@ exports.deleteSubject = async (req, res) => {
 exports.importSubjectsFromPDF = async (req, res) => {
   if (!req.file) return res.status(400).json({ message: 'No PDF uploaded.' });
   try {
-    const { entries, flagged } = await parseTimetablePDF(req.file.buffer);
-    res.json({ entries, flagged });
+    const { entries, flagged, conflicts } = await parseTimetablePDF(req.file.buffer);
+    res.json({ entries, flagged, conflicts: conflicts || 0 });
   } catch (err) {
     // The service marks user-fixable failures with a code; everything else is ours.
     if (err.code === 'NO_TEXT' || err.code === 'NO_TIMETABLE' || err.code === 'UNREADABLE_PDF') {
