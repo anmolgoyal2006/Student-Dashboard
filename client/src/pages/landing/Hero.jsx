@@ -145,16 +145,15 @@ export default function Hero() {
             >
               <div className="hero-eyebrow">
                 <span className="hero-eyebrow-dot" />
-                AI-Powered Platform
+                Built for students
               </div>
               <h1 className="hero-headline">
-                AI-Powered{' '}
-                <span className="gradient-text">Academic Success</span>{' '}
-                Platform
+                Your Academics,{' '}
+                <span className="gradient-text">Finally in One Place</span>
               </h1>
               <p className="hero-subtitle">
-                One platform to unify grades, attendance, notes, placements, and opportunities.
-                Powered by Gemini AI and Google Classroom.
+                Grades, attendance, notes, placements — all connected.
+                AI handles the busy work so you can focus on what matters.
               </p>
               <div className="hero-ctas">
                 <Link to={ctaTarget} className="btn-primary">
