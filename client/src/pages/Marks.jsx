@@ -373,10 +373,10 @@ export default function Marks() {
         WebkitOverflowScrolling: 'touch',
       }}>
         {[
+          { id: 'upload', label: 'Upload PDF & Rank', icon: FileText },
+          { id: 'saved-pdfs', label: 'Saved PDFs Library', icon: Folder },
           { id: 'marks', label: 'Marks & CGPA', icon: ClipboardList },
           { id: 'semester', label: 'Semesters', icon: Layers },
-          { id: 'upload', label: 'Upload PDF & Rank', icon: FileText },
-          { id: 'saved-pdfs', label: 'Saved PDFs Library', icon: Folder }
         ].map(t => {
           const active = activeTab === t.id;
           const IconComponent = t.icon;
