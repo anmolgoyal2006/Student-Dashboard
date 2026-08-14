@@ -67,8 +67,10 @@ exports.markAttendance = async (req, res) => {
   if (isNaN(parsedDate.getTime())) {
     return res.status(400).json({ message: 'Invalid date format.' });
   }
-  // Normalize to midnight UTC to avoid timezone-related date shifts
-  parsedDate.setUTCHours(0, 0, 0, 0);
+  // Store at noon UTC so the date never shifts across day boundaries for any
+  // timezone (±12h window). UTC midnight would place IST users' records on the
+  // previous UTC day (2025-08-15 IST → 2025-08-14T18:30Z).
+  parsedDate.setUTCHours(12, 0, 0, 0);
   const nowUTC = new Date();
   nowUTC.setUTCHours(23, 59, 59, 999); // allow marking for today
   if (parsedDate > nowUTC) {
@@ -83,24 +85,30 @@ exports.markAttendance = async (req, res) => {
     }
 
     // slot is always provided from frontend (slot_0, slot_1, etc.)
-    // unique index on { userId, subjectId, date, slot } handles deduplication
-    // re-marking same slot correctly updates the existing record
-    const updateData = { status };
+    // re-marking same slot correctly updates the existing record.
+    //
+    // Query uses a 24h window (start-of-day to end-of-day UTC) so records
+    // written at UTC midnight (old) and noon UTC (new) are both matched.
+    const updateData = { status, date: parsedDate };
     if (slot) updateData.slot = slot;
     if (time) updateData.time = time;
+
+    // Date window: any time on the same UTC calendar day
+    const dayStart = new Date(parsedDate); dayStart.setUTCHours(0, 0, 0, 0);
+    const dayEnd   = new Date(parsedDate); dayEnd.setUTCHours(23, 59, 59, 999);
 
     let record;
     try {
       record = await Attendance.findOneAndUpdate(
-        { userId, subjectId, date: parsedDate, slot: slot || null },
-        updateData,
+        { userId, subjectId, date: { $gte: dayStart, $lte: dayEnd }, slot: slot || null },
+        { $set: updateData },
         { upsert: true, new: true, setDefaultsOnInsert: true }
       );
     } catch (upsertErr) {
-      // E11000 = duplicate key (stale 3-field index or concurrent request)
+      // E11000 = duplicate key — retry as a straight update without upsert
       if (upsertErr.code !== 11000) throw upsertErr;
       record = await Attendance.findOneAndUpdate(
-        { userId, subjectId, date: parsedDate },
+        { userId, subjectId, date: { $gte: dayStart, $lte: dayEnd } },
         { $set: updateData },
         { new: true }
       );
@@ -386,7 +394,7 @@ exports.markFromNotification = async (req, res) => {
     }
 
     const attendanceDate = date ? new Date(date) : new Date();
-    attendanceDate.setUTCHours(0, 0, 0, 0);
+    attendanceDate.setUTCHours(12, 0, 0, 0);
 
     // 🔒 Ensure subject belongs to user (same as your existing logic)
     const isValidId = mongoose.Types.ObjectId.isValid(subjectId);
@@ -569,13 +577,19 @@ exports.deleteAttendanceRecord = async (req, res) => {
   if (isNaN(parsedDate.getTime())) {
     return res.status(400).json({ message: 'Invalid date format.' });
   }
-  parsedDate.setUTCHours(0, 0, 0, 0);
+  // Use noon UTC (same as markAttendance) so delete finds the record regardless
+  // of whether it was created before or after this fix was deployed.
+  parsedDate.setUTCHours(12, 0, 0, 0);
+
+  // Match any record on the same calendar day (handles old midnight + new noon UTC)
+  const dayStart = new Date(parsedDate); dayStart.setUTCHours(0, 0, 0, 0);
+  const dayEnd   = new Date(parsedDate); dayEnd.setUTCHours(23, 59, 59, 999);
 
   try {
     await Attendance.findOneAndDelete({
       userId,
       subjectId,
-      date: parsedDate,
+      date: { $gte: dayStart, $lte: dayEnd },
       slot: slot || null
     });
 

@@ -11,17 +11,20 @@ export default function TodayScheduleCard({ todayClasses, existingRecords, onQui
   const [markingSlots, setMarkingSlots] = useState({});
   const [optimisticMarks, setOptimisticMarks] = useState({});
 
+  // Consistent local-date normaliser — avoids UTC midnight shift (e.g. IST = UTC+5:30).
+  const toLocalDate = (d) => {
+    const dt = new Date(d);
+    return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+  };
+
   // Slot-aware status: matches records to slots positionally.
-  // First occurrence of subject → first record, second → second record.
-  // Works correctly as long as records are created in chronological order.
   const todayRecordsBySubject = useMemo(() => {
     const map = {};
     (existingRecords || [])
-      .filter(r => new Date(r.date).toLocaleDateString('en-CA', { timeZone: 'UTC' }) === isoDate)
+      .filter(r => toLocalDate(r.date) === isoDate)
       .forEach(r => {
         const key = r.subjectId || r.code;
         if (!map[key]) map[key] = [];
-        // Sort by slot identifier so slot_0 is always index 0
         map[key].push(r);
         map[key].sort((a, b) => {
           if (!a.slot && !b.slot) return 0;
@@ -58,7 +61,10 @@ export default function TodayScheduleCard({ todayClasses, existingRecords, onQui
     }
   };
 
-  // Clear optimistic marks when real records come in
+  // Clear optimistic marks when real records come in — but only remove an
+  // optimistic entry if the real state matches it. Specifically, keep
+  // optimistic `null` (cleared) entries until the parent's records array
+  // no longer contains that slot, so the button doesn't flash back to active.
   useEffect(() => {
     setOptimisticMarks(prev => {
       const next = { ...prev };
@@ -68,7 +74,7 @@ export default function TodayScheduleCard({ todayClasses, existingRecords, onQui
         const subjectRecs = (existingRecords || [])
           .filter(r =>
             (r.subjectId === subjectId || r.code === subjectId) &&
-            new Date(r.date).toLocaleDateString('en-CA', { timeZone: 'UTC' }) === isoDate
+            toLocalDate(r.date) === isoDate
           )
           .sort((a, b) => {
             if (!a.slot && !b.slot) return 0;
@@ -76,9 +82,16 @@ export default function TodayScheduleCard({ todayClasses, existingRecords, onQui
             if (!b.slot) return -1;
             return a.slot.localeCompare(b.slot);
           });
-        if (subjectRecs[slotIndex]) {
-          delete next[key]; // real record exists, remove optimistic
+        const realRecord = subjectRecs[slotIndex];
+        // Only remove the optimistic entry if:
+        // - it was a mark (non-null) and the real record now confirms it, OR
+        // - it was a clear (null) and the real record is gone
+        if (next[key] !== null && realRecord) {
+          delete next[key]; // real mark confirmed
+        } else if (next[key] === null && !realRecord) {
+          delete next[key]; // real clear confirmed
         }
+        // Otherwise keep the optimistic value until reality catches up
       });
       return next;
     });

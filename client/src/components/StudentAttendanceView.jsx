@@ -284,7 +284,14 @@ const StudentAttendanceView = ({ sid }) => {
   const handleDayClick = (date, filterSubjectName) => {
     const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     const dayName = dayNames[date.getDay()];
-    
+
+    // Consistent local-date normaliser — avoids UTC midnight shift in IST/similar zones.
+    const toLocalDate = (d) => {
+      const dt = new Date(d);
+      return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+    };
+    const dateStr = toLocalDate(date);
+
     // Find all schedule slots for this day of the week
     const slots = [];
     subjects.forEach(s => {
@@ -294,16 +301,16 @@ const StudentAttendanceView = ({ sid }) => {
       (s.schedule || [])
         .filter(sl => sl.day === dayName)
         .forEach((sl, idx) => {
-          // Check if there is an existing record for this subject + date + slot_index
-          const dateStr = date.toLocaleDateString('en-CA');
+          // Check if there is an existing record for this subject + date + slot_index.
+          // Use the local-date normaliser (defined above) — NOT { timeZone: 'UTC' } —
+          // so records stored near midnight don't shift to the wrong day in IST.
           const existing = data.records.find(r => {
-            const rDate = new Date(r.date).toLocaleDateString('en-CA', { timeZone: 'UTC' });
-            const isMatch = rDate === dateStr && 
-                            (r.subjectId === s._id || r.code === s.code) &&
-                            (r.slot === `slot_${idx}` || (!r.slot && idx === 0));
-            return isMatch;
+            const rDate = toLocalDate(r.date);
+            return rDate === dateStr &&
+                   (r.subjectId === s._id || r.code === s.code) &&
+                   (r.slot === `slot_${idx}` || (!r.slot && idx === 0));
           });
-          
+
           slots.push({
             subjectId: s._id,
             name: s.name,
@@ -326,7 +333,14 @@ const StudentAttendanceView = ({ sid }) => {
     const key = `${subjectId}_${slotIndex}`;
     setMarkingRetro(prev => ({ ...prev, [key]: true }));
 
-    const dateStr = retroDate.toLocaleDateString('en-CA');
+    // Always send the date as a local YYYY-MM-DD string — the server normalises
+    // it to UTC midnight. For local state comparisons, use the same local string
+    // on both sides to avoid timezone-shift mismatches (e.g. IST = UTC+5:30).
+    const toLocalDate = (d) => {
+      const dt = new Date(d);
+      return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+    };
+    const dateStr = toLocalDate(retroDate);
     try {
       if (status === "unmarked") {
         await API.delete("/attendance", {
@@ -339,7 +353,7 @@ const StudentAttendanceView = ({ sid }) => {
           return {
             ...prev,
             records: prev.records.filter(r => {
-              const rDate = new Date(r.date).toLocaleDateString('en-CA', { timeZone: 'UTC' });
+              const rDate = toLocalDate(r.date);
               return !(rDate === dateStr &&
                 (r.subjectId === subjectId || r.subjectId?.toString() === subjectId) &&
                 r.slot === `slot_${slotIndex}`);
@@ -356,7 +370,7 @@ const StudentAttendanceView = ({ sid }) => {
           if (!prev) return prev;
           const subj = subjects.find(s => s._id === subjectId || s._id?.toString() === subjectId);
           const newRecord = {
-            date: new Date(dateStr + 'T00:00:00Z'),
+            date: new Date(dateStr + 'T00:00:00'),
             status,
             subject: subj?.name || 'Unknown',
             code: subj?.code || '—',
@@ -365,7 +379,7 @@ const StudentAttendanceView = ({ sid }) => {
             time: null,
           };
           const filtered = prev.records.filter(r => {
-            const rDate = new Date(r.date).toLocaleDateString('en-CA', { timeZone: 'UTC' });
+            const rDate = toLocalDate(r.date);
             return !(rDate === dateStr &&
               (r.subjectId === subjectId || r.subjectId?.toString() === subjectId) &&
               r.slot === `slot_${slotIndex}`);
@@ -436,17 +450,22 @@ const StudentAttendanceView = ({ sid }) => {
 
   /* ── quick mark (from TodayScheduleCard) ── */
   const handleQuickMark = async (subjectId, date, status, slot) => {
+    // date is already a local "YYYY-MM-DD" string from TodayScheduleCard.
+    // Use a consistent local-date normaliser for all state filter comparisons.
+    const toLocalDate = (d) => {
+      const dt = new Date(d);
+      return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+    };
     try {
       if (status === 'delete') {
         await API.delete(`/attendance`, { data: { subjectId, date, slot } });
         // Remove the record from local state immediately — no round-trip needed
         setData(prev => {
           if (!prev) return prev;
-          const dateObj = new Date(date + 'T00:00:00Z');
           return {
             ...prev,
             records: prev.records.filter(r => {
-              const rDate = new Date(r.date).toLocaleDateString('en-CA', { timeZone: 'UTC' });
+              const rDate = toLocalDate(r.date);
               return !(rDate === date &&
                 (r.subjectId === subjectId || r.subjectId?.toString() === subjectId) &&
                 r.slot === slot);
@@ -459,7 +478,7 @@ const StudentAttendanceView = ({ sid }) => {
         setData(prev => {
           if (!prev) return prev;
           const newRecord = res.attendance || {
-            date: new Date(date + 'T00:00:00Z'),
+            date: new Date(date + 'T00:00:00'),
             status,
             subjectId,
             slot: slot || null,
@@ -467,7 +486,7 @@ const StudentAttendanceView = ({ sid }) => {
           // Find subject name/code from the subjects list for the record shape the UI expects
           const subj = subjects.find(s => s._id === subjectId || s._id?.toString() === subjectId);
           const flatRecord = {
-            date: newRecord.date || new Date(date + 'T00:00:00Z'),
+            date: newRecord.date || new Date(date + 'T00:00:00'),
             status: newRecord.status || status,
             subject: subj?.name || newRecord.subject || 'Unknown',
             code: subj?.code || newRecord.code || '—',
@@ -476,7 +495,7 @@ const StudentAttendanceView = ({ sid }) => {
             time: newRecord.time || null,
           };
           const existing = prev.records.filter(r => {
-            const rDate = new Date(r.date).toLocaleDateString('en-CA', { timeZone: 'UTC' });
+            const rDate = toLocalDate(r.date);
             return !(rDate === date &&
               (r.subjectId === subjectId || r.subjectId?.toString() === subjectId) &&
               r.slot === slot);
@@ -640,8 +659,9 @@ const StudentAttendanceView = ({ sid }) => {
     : atRiskCount === 0 ? "above 75%" : "";
 
   /* Card 4 — Unmarked Today: count unmarked slots using todayClasses (slot-level, not subject-level) */
+  const _toLocalDate = (d) => { const dt = new Date(d); return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`; };
   const markedTodayBySubject = {};
-  (data?.records?.filter(r => new Date(r.date).toLocaleDateString('en-CA', { timeZone: 'UTC' }) === todayDate) || []).forEach(r => {
+  (data?.records?.filter(r => _toLocalDate(r.date) === todayDate) || []).forEach(r => {
     const key = r.subjectId || r.code;
     markedTodayBySubject[key] = (markedTodayBySubject[key] || 0) + 1;
   });

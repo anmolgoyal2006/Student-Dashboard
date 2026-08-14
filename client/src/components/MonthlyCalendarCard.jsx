@@ -40,27 +40,34 @@ export default function MonthlyCalendarCard({ records, onDayClick }) {
 
   const getDayStatus = (day) => {
     if (!day) return null;
-    const dateStr = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    
+    // Build a local-date string to compare against record dates.
+    // Always use local year/month/day to avoid UTC-offset shift issues
+    // (e.g. IST = UTC+5:30, so new Date("YYYY-MM-DD").toDateString() gives
+    // the previous day because the string is parsed as UTC midnight).
+    const y   = currentMonth.getFullYear();
+    const m   = String(currentMonth.getMonth() + 1).padStart(2, '0');
+    const d   = String(day).padStart(2, '0');
+    const dateStr = `${y}-${m}-${d}`;
+
     let dayRecords = records?.filter(r => {
-      // Normalize date comparison - handle different date formats
-      const recordDate = new Date(r.date);
-      const checkDate = new Date(dateStr);
-      return recordDate.toDateString() === checkDate.toDateString();
+      // Normalise both sides to a local YYYY-MM-DD string for comparison.
+      const rd = new Date(r.date);
+      const rStr = `${rd.getFullYear()}-${String(rd.getMonth() + 1).padStart(2, '0')}-${String(rd.getDate()).padStart(2, '0')}`;
+      return rStr === dateStr;
     }) || [];
-    
+
     // Filter by selected subject if one is selected
     if (selectedSubject) {
       dayRecords = dayRecords.filter(r => r.subject === selectedSubject);
     }
-    
+
     if (dayRecords.length === 0) return 'no-class';
 
     const hasPresent = dayRecords.some(r => r.status === 'present');
-    const hasAbsent = dayRecords.some(r => r.status === 'absent');
+    const hasAbsent  = dayRecords.some(r => r.status === 'absent');
 
     if (hasPresent && !hasAbsent) return 'present';
-    if (hasAbsent && !hasPresent) return 'absent';
+    if (hasAbsent  && !hasPresent) return 'absent';
     return 'mixed';
   };
 
