@@ -457,65 +457,68 @@ export default function AIAssistant() {
     }
   };
 
-  const handleVoice = async () => {
+  const handleVoice = () => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      toast.error('Voice input is not supported in this browser. Try Chrome.');
+      return;
+    }
+
     if (listening) {
-      mediaRecorderRef.current?.stop();
-      return;
-    }
-
-    if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
-      toast.error('Voice recording is not supported in this browser. Try Chrome.');
-      return;
-    }
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-        ? 'audio/webm;codecs=opus'
-        : MediaRecorder.isTypeSupported('audio/webm')
-        ? 'audio/webm'
-        : '';
-
-      audioChunksRef.current = [];
-      audioStreamRef.current = stream;
-
-      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
-      mediaRecorderRef.current = recorder;
-
-      recorder.ondataavailable = (event) => {
-        if (event.data?.size > 0) audioChunksRef.current.push(event.data);
-      };
-
-      recorder.onstop = () => {
-        const chunks = audioChunksRef.current;
-        const blobType = chunks[0]?.type || mimeType || 'audio/webm';
-        const audioBlob = new Blob(chunks, { type: blobType });
-        audioChunksRef.current = [];
-        setListening(false);
-        cleanupVoiceRecording();
-        transcribeAndSend(audioBlob);
-      };
-
-      recorder.start();
-      setListening(true);
-      toast.info('Listening... click the mic again to stop.', { duration: 2500, icon: <Mic size={16} /> });
-      voiceTimerRef.current = setTimeout(() => {
-        if (mediaRecorderRef.current?.state === 'recording') {
-          mediaRecorderRef.current.stop();
-        }
-      }, 8000);
-    } catch (err) {
-      cleanupVoiceRecording();
       setListening(false);
-      if (err.name === 'NotAllowedError' || err.name === 'SecurityError') {
-        toast.error('Microphone access is blocked. Allow mic access for localhost in the browser.');
-      } else if (err.name === 'NotFoundError') {
-        toast.error('No microphone was found. Check your input device.');
-      } else {
-        console.warn('Voice recording error:', err);
-        toast.error('Voice recording could not start. Please try again.');
-      }
+      return;
     }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'en-US';
+    recognition.interimResults = true;   // show text as user speaks
+    recognition.maxAlternatives = 1;
+    recognition.continuous = false;
+
+    recognition.onstart = () => {
+      setListening(true);
+      setInput('');  // clear previous input
+    };
+
+    recognition.onend = () => setListening(false);
+
+    recognition.onresult = (e) => {
+      let interim = '';
+      let final = '';
+
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const transcript = e.results[i][0].transcript;
+        if (e.results[i].isFinal) {
+          final += transcript;
+        } else {
+          interim += transcript;
+        }
+      }
+
+      // Show interim text live in the input box as user speaks
+      if (interim) setInput(interim);
+
+      // When speech ends, use the final transcript
+      if (final) {
+        const text = final.trim();
+        setInput(text);
+        handleSend(text);
+      }
+    };
+
+    recognition.onerror = (e) => {
+      setListening(false);
+      if (e.error === 'not-allowed') {
+        toast.error('Microphone access is blocked. Allow mic access in the browser.');
+      } else if (e.error === 'no-speech') {
+        toast.info('No speech detected. Try again.');
+      } else {
+        toast.error('Voice input failed. Please try again.');
+      }
+    };
+
+    recognition.start();
+    setListening(true);
   };
 
   const handleAction = async (action) => {
