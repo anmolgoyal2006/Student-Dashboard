@@ -1,9 +1,13 @@
 services:
   - type: web
     name: student-dashboard-api
-    runtime: docker
-    dockerfilePath: ./server/Dockerfile
-    dockerContext: ./server
+    runtime: node
+    rootDir: server
+    buildCommand: >-
+      npm install &&
+      (apt-get install -y tesseract-ocr poppler-utils libgl1 2>/dev/null || true) &&
+      pip3 install opencv-python-headless pdf2image pytesseract pdfplumber Pillow numpy
+    startCommand: node server.js
     envVars:
       - key: NODE_ENV
         value: production

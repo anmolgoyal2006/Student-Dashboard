@@ -26,70 +26,84 @@ async function extractTextFromPDF(buffer) {
   return data.text;
 }
 
+// Cache whether canvas loaded successfully so we don't retry on every call.
+let _canvasAvailable = null;
+function canvasAvailable() {
+  if (_canvasAvailable !== null) return _canvasAvailable;
+  try {
+    require('canvas');
+    _canvasAvailable = true;
+  } catch {
+    _canvasAvailable = false;
+  }
+  return _canvasAvailable;
+}
+
 /**
  * Render PDF pages to JPEG images.
  *
  * Strategy (tried in order):
- *  1. canvas + pdfjs-dist  — pure-Node, but pdfjs v3 requires a custom
- *                             NodeCanvasFactory to be injected explicitly.
- *  2. Python pdf2image      — uses poppler (always present in the Docker image),
- *                             spawned as a child process via renderPdfPages.py.
- *
- * This lets the server work on both local dev (canvas installed) and the
- * production Render environment (poppler-utils available via Dockerfile).
+ *  1. canvas + pdfjs-dist  — pure-Node. pdfjs v3 requires a custom
+ *                             NodeCanvasFactory injected explicitly.
+ *                             Skipped if the `canvas` native module isn't built
+ *                             (e.g. Render Node runtime without Cairo libs).
+ *  2. Python pdf2image      — uses poppler-utils (installed via the Render build
+ *                             command or the Dockerfile). Primary path on Render.
  */
 async function renderPDFPagesToImages(buffer, { maxPages = 5, scale = 2.2 } = {}) {
   // ── Strategy 1: canvas + pdfjs (with explicit NodeCanvasFactory for v3) ──
-  try {
-    const { createCanvas } = require('canvas');
-    const pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js');
-    pdfjsLib.verbosity = pdfjsLib.VerbosityLevel.ERRORS;
+  if (canvasAvailable()) {
+    try {
+      const { createCanvas } = require('canvas');
+      const pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js');
+      pdfjsLib.verbosity = pdfjsLib.VerbosityLevel.ERRORS;
 
-    // pdfjs-dist v3 removed the built-in NodeCanvasFactory — must be provided.
-    class NodeCanvasFactory {
-      create(width, height) {
-        const canvas = createCanvas(width, height);
-        return { canvas, context: canvas.getContext('2d') };
+      // pdfjs-dist v3 removed the built-in NodeCanvasFactory — must be provided.
+      class NodeCanvasFactory {
+        create(width, height) {
+          const canvas = createCanvas(width, height);
+          return { canvas, context: canvas.getContext('2d') };
+        }
+        reset(canvasAndContext, width, height) {
+          canvasAndContext.canvas.width = width;
+          canvasAndContext.canvas.height = height;
+        }
+        destroy(canvasAndContext) {
+          canvasAndContext.canvas.width = 0;
+          canvasAndContext.canvas.height = 0;
+        }
       }
-      reset(canvasAndContext, width, height) {
-        canvasAndContext.canvas.width = width;
-        canvasAndContext.canvas.height = height;
-      }
-      destroy(canvasAndContext) {
-        canvasAndContext.canvas.width = 0;
-        canvasAndContext.canvas.height = 0;
-      }
-    }
 
-    const canvasFactory = new NodeCanvasFactory();
-    const loadingTask = pdfjsLib.getDocument({
-      data: new Uint8Array(buffer),
-      canvasFactory,
-    });
-    const doc = await loadingTask.promise;
-    const pageCount = Math.min(doc.numPages, maxPages);
-    const images = [];
-
-    for (let i = 1; i <= pageCount; i++) {
-      const page = await doc.getPage(i);
-      const viewport = page.getViewport({ scale });
-      const canvasAndCtx = canvasFactory.create(viewport.width, viewport.height);
-      await page.render({
-        canvasContext: canvasAndCtx.context,
-        viewport,
+      const canvasFactory = new NodeCanvasFactory();
+      const loadingTask = pdfjsLib.getDocument({
+        data: new Uint8Array(buffer),
         canvasFactory,
-      }).promise;
-
-      images.push({
-        mimeType: 'image/jpeg',
-        data: canvasAndCtx.canvas.toBuffer('image/jpeg', { quality: 0.92 }).toString('base64'),
       });
-    }
+      const doc = await loadingTask.promise;
+      const pageCount = Math.min(doc.numPages, maxPages);
+      const images = [];
 
-    if (images.length > 0) return images;
-    throw new Error('pdfjs rendered 0 pages');
-  } catch (canvasErr) {
-    console.warn('[pdfParser] canvas/pdfjs render failed, trying pdf2image fallback:', canvasErr.message);
+      for (let i = 1; i <= pageCount; i++) {
+        const page = await doc.getPage(i);
+        const viewport = page.getViewport({ scale });
+        const canvasAndCtx = canvasFactory.create(viewport.width, viewport.height);
+        await page.render({
+          canvasContext: canvasAndCtx.context,
+          viewport,
+          canvasFactory,
+        }).promise;
+
+        images.push({
+          mimeType: 'image/jpeg',
+          data: canvasAndCtx.canvas.toBuffer('image/jpeg', { quality: 0.92 }).toString('base64'),
+        });
+      }
+
+      if (images.length > 0) return images;
+      throw new Error('pdfjs rendered 0 pages');
+    } catch (canvasErr) {
+      console.warn('[pdfParser] canvas/pdfjs render failed, trying pdf2image fallback:', canvasErr.message);
+    }
   }
 
   // ── Strategy 2: Python pdf2image (poppler) ──────────────────────────────
