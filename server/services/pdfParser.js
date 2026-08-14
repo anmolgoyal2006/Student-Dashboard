@@ -26,29 +26,108 @@ async function extractTextFromPDF(buffer) {
   return data.text;
 }
 
+/**
+ * Render PDF pages to JPEG images.
+ *
+ * Strategy (tried in order):
+ *  1. canvas + pdfjs-dist  — pure-Node, but pdfjs v3 requires a custom
+ *                             NodeCanvasFactory to be injected explicitly.
+ *  2. Python pdf2image      — uses poppler (always present in the Docker image),
+ *                             spawned as a child process via renderPdfPages.py.
+ *
+ * This lets the server work on both local dev (canvas installed) and the
+ * production Render environment (poppler-utils available via Dockerfile).
+ */
 async function renderPDFPagesToImages(buffer, { maxPages = 5, scale = 2.2 } = {}) {
-  const { createCanvas } = require('canvas');
-  const pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js');
-  pdfjsLib.verbosity = pdfjsLib.VerbosityLevel.ERRORS;
+  // ── Strategy 1: canvas + pdfjs (with explicit NodeCanvasFactory for v3) ──
+  try {
+    const { createCanvas } = require('canvas');
+    const pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js');
+    pdfjsLib.verbosity = pdfjsLib.VerbosityLevel.ERRORS;
 
-  const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(buffer) });
-  const doc = await loadingTask.promise;
-  const pageCount = Math.min(doc.numPages, maxPages);
-  const images = [];
+    // pdfjs-dist v3 removed the built-in NodeCanvasFactory — must be provided.
+    class NodeCanvasFactory {
+      create(width, height) {
+        const canvas = createCanvas(width, height);
+        return { canvas, context: canvas.getContext('2d') };
+      }
+      reset(canvasAndContext, width, height) {
+        canvasAndContext.canvas.width = width;
+        canvasAndContext.canvas.height = height;
+      }
+      destroy(canvasAndContext) {
+        canvasAndContext.canvas.width = 0;
+        canvasAndContext.canvas.height = 0;
+      }
+    }
 
-  for (let i = 1; i <= pageCount; i++) {
-    const page = await doc.getPage(i);
-    const viewport = page.getViewport({ scale });
-    const canvas = createCanvas(viewport.width, viewport.height);
-    const context = canvas.getContext('2d');
-    await page.render({ canvasContext: context, viewport }).promise;
-
-    images.push({
-      mimeType: 'image/jpeg',
-      data: canvas.toBuffer('image/jpeg', { quality: 0.92 }).toString('base64'),
+    const canvasFactory = new NodeCanvasFactory();
+    const loadingTask = pdfjsLib.getDocument({
+      data: new Uint8Array(buffer),
+      canvasFactory,
     });
+    const doc = await loadingTask.promise;
+    const pageCount = Math.min(doc.numPages, maxPages);
+    const images = [];
+
+    for (let i = 1; i <= pageCount; i++) {
+      const page = await doc.getPage(i);
+      const viewport = page.getViewport({ scale });
+      const canvasAndCtx = canvasFactory.create(viewport.width, viewport.height);
+      await page.render({
+        canvasContext: canvasAndCtx.context,
+        viewport,
+        canvasFactory,
+      }).promise;
+
+      images.push({
+        mimeType: 'image/jpeg',
+        data: canvasAndCtx.canvas.toBuffer('image/jpeg', { quality: 0.92 }).toString('base64'),
+      });
+    }
+
+    if (images.length > 0) return images;
+    throw new Error('pdfjs rendered 0 pages');
+  } catch (canvasErr) {
+    console.warn('[pdfParser] canvas/pdfjs render failed, trying pdf2image fallback:', canvasErr.message);
   }
-  return images;
+
+  // ── Strategy 2: Python pdf2image (poppler) ──────────────────────────────
+  return spawnPdf2Image(buffer, maxPages, Math.round(scale * 72));
+}
+
+function spawnPdf2Image(buffer, maxPages, dpi) {
+  return new Promise((resolve, reject) => {
+    const { spawn } = require('child_process');
+    const path = require('path');
+    const scriptPath = path.join(__dirname, '../scripts/renderPdfPages.py');
+
+    const trySpawn = (cmd) => new Promise((res, rej) => {
+      const py = spawn(cmd, [scriptPath, String(maxPages), String(dpi)]);
+      let stdout = '', stderr = '';
+      py.stdout.on('data', (d) => { stdout += d; });
+      py.stderr.on('data', (d) => { stderr += d; });
+      py.on('error', rej);
+      py.on('close', () => {
+        try {
+          const result = JSON.parse(stdout);
+          if (result.error) return rej(new Error(`pdf2image: ${result.error}`));
+          const pages = Array.isArray(result.pages) ? result.pages : [];
+          if (pages.length === 0) return rej(new Error('pdf2image returned 0 pages'));
+          res(pages.map((data) => ({ mimeType: 'image/jpeg', data })));
+        } catch (e) {
+          rej(new Error(`pdf2image parse error: ${e.message}. stderr: ${stderr.slice(0, 300)}`));
+        }
+      });
+      py.stdin.write(buffer);
+      py.stdin.end();
+    });
+
+    // Try python3 first, fall back to python
+    trySpawn('python3')
+      .then(resolve)
+      .catch(() => trySpawn('python').then(resolve).catch(reject));
+  });
 }
 
 function parseStudentMarks(rawText) {

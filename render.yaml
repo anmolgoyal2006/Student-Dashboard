@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: student-dashboard-api
+    runtime: docker
+    dockerfilePath: ./server/Dockerfile
+    dockerContext: ./server
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 5000

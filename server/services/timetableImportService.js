@@ -232,6 +232,10 @@ function mergeDuplicates(subjects) {
  * A conflict is any pair of distinct subjects (A, B) that share the same day
  * and have overlapping time windows (start < other.end && end > other.start).
  *
+ * Slots that share the exact same time window but are in different rooms are
+ * treated as parallel/combined sections (common in Indian university timetables
+ * where two groups share a lecture block) and are NOT flagged as conflicts.
+ *
  * Returns an array of conflict descriptors added as `issues` entries on the
  * affected subject entries (mutates `results` in place), and also returns a
  * flat list for logging.
@@ -266,6 +270,16 @@ function detectAndFlagConflicts(results) {
 
           // Overlap: A starts before B ends AND A ends after B starts
           if (aStart < bEnd && aEnd > bStart) {
+            // Skip parallel/combined-section slots: exact same window in
+            // different rooms. These are common in Indian timetables where two
+            // subjects share a combined lecture block (e.g. CSN5003 SE in L407
+            // and CSN5002 SC in L406 both at Thu 11:00-12:00).
+            const exactSameWindow = (aStart === bStart && aEnd === bEnd);
+            const differentRooms = (slotA.room || '') !== (slotB.room || '') &&
+                                   (slotA.room || '').trim() !== '' &&
+                                   (slotB.room || '').trim() !== '';
+            if (exactSameWindow && differentRooms) continue;
+
             const msg = `Conflicts with "${b.name}" on ${slotA.day} (${slotA.startTime}–${slotA.endTime} overlaps ${slotB.startTime}–${slotB.endTime})`;
             results[i].issues.push({ field: 'schedule', reason: msg, conflict: true });
 
@@ -294,20 +308,57 @@ async function parseTimetablePDF(buffer) {
       if (gridTable && gridTable.length > 1) {
         const headers = gridTable[0];
         const cellsWithTimes = [];
-        
+
+        // Normalise a cell's text for dedup comparison:
+        // collapse whitespace + newlines so minor line-break differences
+        // (e.g. "DBMS\nLab" vs "DBMS Lab") don't prevent adjacent-cell merging.
+        const normalizeCell = (s) => (s || '').replace(/\s+/g, ' ').trim().toLowerCase();
+
         for (let r = 1; r < gridTable.length; r++) {
           const row = gridTable[r];
           const dayName = row[0];
+
+          // Merge adjacent cells with identical (normalised) content — e.g. a
+          // 2-hour lab that pdfplumber extracts as two 1-hour cells with the
+          // same subject text (possibly with different internal line-breaks).
+          const mergedCells = [];
           for (let c = 1; c < row.length; c++) {
-            const cellContent = row[c];
-            if (cellContent && cellContent.trim() && !/LUNCH|BREAK|RECESS/i.test(cellContent)) {
-              const timeHeader = headers[c] || '';
-              cellsWithTimes.push({
-                day: dayName,
-                time: timeHeader.replace(/\n/g, ' '),
-                content: cellContent
-              });
+            const content = (row[c] || '').trim();
+            if (!content || /^(LUNCH|BREAK|RECESS)$/i.test(content)) continue;
+
+            const last = mergedCells[mergedCells.length - 1];
+            // Collapse into previous cell if same day + same normalised content
+            // and the column is strictly adjacent.
+            if (last && normalizeCell(last.content) === normalizeCell(content) && last.endCol === c - 1) {
+              last.endCol = c;
+            } else {
+              mergedCells.push({ startCol: c, endCol: c, content });
             }
+          }
+
+          for (const cell of mergedCells) {
+            // Build a composite time range from the first-column and last-column headers.
+            const startHeader = (headers[cell.startCol] || '').replace(/\n/g, ' ').trim();
+            const endHeader   = (headers[cell.endCol]   || '').replace(/\n/g, ' ').trim();
+
+            // Extract the start time from startHeader and end time from endHeader.
+            // Header format examples: "9:00-10:00", "3:00-4:00", "5:00- 7:00"
+            const startMatch = startHeader.match(/^(\d{1,2}:\d{2})/);
+            const endMatch   = endHeader.match(/-\s*(\d{1,2}:\d{2})\s*$/);
+
+            let timeStr;
+            if (startMatch && endMatch && cell.startCol !== cell.endCol) {
+              // Multi-column merged cell → span from first start to last end
+              timeStr = `${startMatch[1]}-${endMatch[1]}`;
+            } else {
+              timeStr = startHeader;
+            }
+
+            cellsWithTimes.push({
+              day: dayName,
+              time: timeStr,
+              content: cell.content,
+            });
           }
         }
 

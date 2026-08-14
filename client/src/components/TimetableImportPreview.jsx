@@ -117,6 +117,14 @@ export default function TimetableImportPreview({ entries, fileName, existingSubj
         const bEnd = toMinutes(b.endTime);
 
         if (aStart < bEnd && bStart < aEnd) {
+          // Skip parallel/combined-section slots: exact same time window in
+          // different rooms. These are common in Indian university timetables
+          // (e.g. SE in L407 and SC in L406 both at Thu 11:00-12:00).
+          const exactSameWindow = (aStart === bStart && aEnd === bEnd);
+          const differentRooms = a.room && b.room && a.room !== b.room;
+          if (exactSameWindow && differentRooms) {
+            continue;
+          }
           group.push(b);
           visited.add(j);
         }
