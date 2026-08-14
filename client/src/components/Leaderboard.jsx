@@ -153,11 +153,27 @@ export default function Leaderboard({
     );
   }
 
+  const RANK_CONFIG = {
+    1: { emoji: '🥇', label: '1st', bg: 'rgba(250,204,21,0.12)', color: '#facc15', border: 'rgba(250,204,21,0.3)', shadow: '0 0 8px rgba(250,204,21,0.2)' },
+    2: { emoji: '🥈', label: '2nd', bg: 'rgba(148,163,184,0.12)', color: '#94a3b8', border: 'rgba(148,163,184,0.3)', shadow: '0 0 8px rgba(148,163,184,0.15)' },
+    3: { emoji: '🥉', label: '3rd', bg: 'rgba(205,124,47,0.12)', color: '#cd7c2f', border: 'rgba(205,124,47,0.3)', shadow: '0 0 8px rgba(205,124,47,0.15)' },
+  };
+
   const medalFor = rank => {
-    if (rank === 1) return <span style={{ display:'inline-flex', alignItems:'center', gap:3, color:'#facc15', fontWeight:700 }}><Trophy size={14} color="#facc15" /> 1st</span>;
-    if (rank === 2) return <span style={{ display:'inline-flex', alignItems:'center', gap:3, color:'#94a3b8', fontWeight:700 }}><Trophy size={14} color="#94a3b8" /> 2nd</span>;
-    if (rank === 3) return <span style={{ display:'inline-flex', alignItems:'center', gap:3, color:'#cd7c2f', fontWeight:700 }}><Trophy size={14} color="#cd7c2f" /> 3rd</span>;
-    return `#${rank}`;
+    const cfg = RANK_CONFIG[rank];
+    if (cfg) return (
+      <span style={{
+        display: 'inline-flex', alignItems: 'center', gap: 5,
+        padding: '3px 9px', borderRadius: 20,
+        background: cfg.bg, color: cfg.color,
+        border: `1px solid ${cfg.border}`,
+        boxShadow: cfg.shadow,
+        fontWeight: 700, fontSize: 12, letterSpacing: '0.3px',
+      }}>
+        {cfg.emoji} {cfg.label}
+      </span>
+    );
+    return <span style={{ color: 'var(--muted)', fontSize: 13, fontWeight: 500 }}>#{rank}</span>;
   };
 
   const fmt = val => {
@@ -313,21 +329,8 @@ export default function Leaderboard({
                     Roll/SID: {st.roll || '—'} · Score: {fmt(st.totalScore)}
                   </div>
                 </div>
-                <div style={{
-                  fontSize: 18,
-                  fontWeight: 900,
-                  color: st.rank === 1 ? '#facc15' : st.rank === 2 ? '#94a3b8' : st.rank === 3 ? '#cd7c2f' : 'var(--color-accent)',
-                  paddingLeft: 8,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 4,
-                }}>
-                  {st.rank <= 3
-                    ? <><Trophy size={16} color={st.rank === 1 ? "#facc15" : st.rank === 2 ? "#94a3b8" : "#cd7c2f"} />
-                        <span style={{ fontSize: 14 }}>{st.rank === 1 ? '1st' : st.rank === 2 ? '2nd' : '3rd'}</span>
-                      </>
-                    : `#${st.rank}`
-                  }
+                <div style={{ paddingLeft: 8 }}>
+                  {medalFor(st.rank)}
                 </div>
               </div>
             ))}
@@ -528,20 +531,23 @@ export default function Leaderboard({
                 style={{ background: s.rank <= 3 ? 'rgba(250,204,21,0.04)' : 'transparent' }}
               >
                 <td>
-                  <span style={{ fontWeight: 700, fontSize: 15, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                    {s.rank <= 3
-                      ? <>
-                          <Trophy
-                            size={16}
-                            color={s.rank === 1 ? "#facc15" : s.rank === 2 ? "#94a3b8" : "#cd7c2f"}
-                          />
-                          <span style={{ color: s.rank === 1 ? "#facc15" : s.rank === 2 ? "#94a3b8" : "#cd7c2f" }}>
-                            {s.rank === 1 ? '1st' : s.rank === 2 ? '2nd' : '3rd'}
-                          </span>
-                        </>
-                      : `#${s.rank}`
-                    }
-                  </span>
+                  {s.rank <= 3 ? (() => {
+                    const cfg = RANK_CONFIG[s.rank];
+                    return (
+                      <span style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 5,
+                        padding: '3px 9px', borderRadius: 20,
+                        background: cfg.bg, color: cfg.color,
+                        border: `1px solid ${cfg.border}`,
+                        boxShadow: cfg.shadow,
+                        fontWeight: 700, fontSize: 12, letterSpacing: '0.3px',
+                      }}>
+                        {cfg.emoji} {cfg.label}
+                      </span>
+                    );
+                  })() : (
+                    <span style={{ color: 'var(--muted)', fontSize: 13, fontWeight: 500 }}>#{s.rank}</span>
+                  )}
                 </td>
                 <td style={{ fontWeight: s.rank <= 3 ? 600 : 400 }}>{s.name}</td>
                 <td style={{ color: 'var(--muted)', fontSize: 13 }}>{s.roll || '—'}</td>
