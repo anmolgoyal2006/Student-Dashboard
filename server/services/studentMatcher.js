@@ -24,14 +24,18 @@ function fuzzyNameMatch(a, b) {
   const ta = nameTokens(a);
   const tb = nameTokens(b);
   if (!ta.length || !tb.length) return false;
+
+  // Exact normalized match (handles word-order differences like "KUMAR SUMIT" vs "SUMIT KUMAR")
   if (normalizeName(a) === normalizeName(b)) return true;
+
+  // Token overlap — require ALL tokens of BOTH names to overlap.
+  // This prevents "SUMIT" (1 token) from matching "SUMIT KUMAR" (2 tokens):
+  // overlap=1, ta.length=1, tb.length=2 → 1 < 2 → no match.
   const setB = new Set(tb);
   const overlap = ta.filter((t) => setB.has(t)).length;
-  const minLen = Math.min(ta.length, tb.length);
-  if (overlap >= minLen && overlap >= 1) return true;
-  const joinedA = ta.join(' ');
-  const joinedB = tb.join(' ');
-  return joinedA.includes(joinedB) || joinedB.includes(joinedA);
+  if (overlap === ta.length && overlap === tb.length) return true;
+
+  return false;
 }
 
 function studentKey(name, roll) {

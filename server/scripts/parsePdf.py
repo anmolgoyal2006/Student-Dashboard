@@ -82,6 +82,27 @@ def row_to_obj(headers, row):
     for i, header in enumerate(headers):
         cell = row[i] if i < len(row) else ''
         obj[header] = str(cell).strip() if cell else ''
+
+    # ── Fix bleeding-digit artefact ───────────────────────────────────────
+    # Some PDFs encode the roll number and student name as one concatenated
+    # text run without a space (e.g. "MCO24386NAMAN TIWARI").  pdfplumber
+    # then splits at the wrong character boundary, producing:
+    #   roll → "MCO2438"   name → "6NAMAN TIWARI"
+    # Detect: name cell starts with one-or-more digits followed by a letter.
+    # Fix:    strip those leading digits from the name and append them to the
+    #         roll cell so both values are restored correctly.
+    id_col   = next((h for h in headers if looks_like_student_id(obj.get(h, '')) or
+                     re.search(r'roll|sid|s\.no|enrollment', h, re.IGNORECASE)), None)
+    name_col = next((h for h in headers if looks_like_person_name(
+                     re.sub(r'^\d+', '', obj.get(h, '')))), None)
+
+    if id_col and name_col and id_col != name_col:
+        name_val = obj[name_col]
+        bleed = re.match(r'^(\d+)([A-Za-z].*)$', name_val)
+        if bleed:
+            obj[name_col] = bleed.group(2).strip()
+            obj[id_col]   = obj[id_col] + bleed.group(1)
+
     return obj
 
 
