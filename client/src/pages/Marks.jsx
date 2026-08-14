@@ -17,7 +17,7 @@ const EMPTY = { subjectId: '', examType: 'midterm', marksObtained: '', maxMarks:
 const DEFAULT_SEM_CREDITS = [22, 21, 22, 24, 20, 12, 19, 21];
 
 export default function Marks() {
-  const [activeTab,    setActiveTab]    = useState('marks'); // Student sees Marks & CGPA by default
+  const [activeTab,    setActiveTab]    = useState('upload'); // Default to Upload PDF & Rank
 
   const [marks,        setMarks]        = useState([]);
   const [subjects,     setSubjects]     = useState([]);
