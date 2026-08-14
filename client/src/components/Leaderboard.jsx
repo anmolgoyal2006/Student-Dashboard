@@ -153,8 +153,12 @@ export default function Leaderboard({
     );
   }
 
-  const medalFor = rank =>
-    rank === 1 ? <Trophy size={14} color="var(--color-warning)" /> : rank === 2 ? <Trophy size={14} color="var(--color-text-secondary)" /> : rank === 3 ? <Trophy size={14} color="#cd7c2f" /> : `#${rank}`;
+  const medalFor = rank => {
+    if (rank === 1) return <span style={{ display:'inline-flex', alignItems:'center', gap:3, color:'#facc15', fontWeight:700 }}><Trophy size={14} color="#facc15" /> 1st</span>;
+    if (rank === 2) return <span style={{ display:'inline-flex', alignItems:'center', gap:3, color:'#94a3b8', fontWeight:700 }}><Trophy size={14} color="#94a3b8" /> 2nd</span>;
+    if (rank === 3) return <span style={{ display:'inline-flex', alignItems:'center', gap:3, color:'#cd7c2f', fontWeight:700 }}><Trophy size={14} color="#cd7c2f" /> 3rd</span>;
+    return `#${rank}`;
+  };
 
   const fmt = val => {
     const n = parseFloat(val);
@@ -312,10 +316,18 @@ export default function Leaderboard({
                 <div style={{
                   fontSize: 18,
                   fontWeight: 900,
-                  color: st.rank === 1 ? 'var(--color-warning)' : st.rank === 2 ? 'var(--color-text-secondary)' : st.rank === 3 ? 'var(--color-warning)' : 'var(--color-accent)',
+                  color: st.rank === 1 ? '#facc15' : st.rank === 2 ? '#94a3b8' : st.rank === 3 ? '#cd7c2f' : 'var(--color-accent)',
                   paddingLeft: 8,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
                 }}>
-                  {st.rank <= 3 ? <Trophy size={16} color={st.rank === 1 ? "#facc15" : st.rank === 2 ? "var(--color-text-secondary)" : "#cd7c2f"} /> : `#${st.rank}`}
+                  {st.rank <= 3
+                    ? <><Trophy size={16} color={st.rank === 1 ? "#facc15" : st.rank === 2 ? "#94a3b8" : "#cd7c2f"} />
+                        <span style={{ fontSize: 14 }}>{st.rank === 1 ? '1st' : st.rank === 2 ? '2nd' : '3rd'}</span>
+                      </>
+                    : `#${st.rank}`
+                  }
                 </div>
               </div>
             ))}
@@ -516,7 +528,20 @@ export default function Leaderboard({
                 style={{ background: s.rank <= 3 ? 'rgba(250,204,21,0.04)' : 'transparent' }}
               >
                 <td>
-                  <span style={{ fontWeight: 700, fontSize: 15 }}>{s.rank <= 3 ? <Trophy size={16} color={s.rank === 1 ? "#facc15" : s.rank === 2 ? "var(--color-text-secondary)" : "#cd7c2f"} /> : `#${s.rank}`}</span>
+                  <span style={{ fontWeight: 700, fontSize: 15, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    {s.rank <= 3
+                      ? <>
+                          <Trophy
+                            size={16}
+                            color={s.rank === 1 ? "#facc15" : s.rank === 2 ? "#94a3b8" : "#cd7c2f"}
+                          />
+                          <span style={{ color: s.rank === 1 ? "#facc15" : s.rank === 2 ? "#94a3b8" : "#cd7c2f" }}>
+                            {s.rank === 1 ? '1st' : s.rank === 2 ? '2nd' : '3rd'}
+                          </span>
+                        </>
+                      : `#${s.rank}`
+                    }
+                  </span>
                 </td>
                 <td style={{ fontWeight: s.rank <= 3 ? 600 : 400 }}>{s.name}</td>
                 <td style={{ color: 'var(--muted)', fontSize: 13 }}>{s.roll || '—'}</td>
