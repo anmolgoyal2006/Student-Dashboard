@@ -172,6 +172,52 @@ const StudentAttendanceView = ({ sid }) => {
   const [retroSlots, setRetroSlots] = useState([]);
   const [markingRetro, setMarkingRetro] = useState({});
 
+  /* ── live summary: recomputed whenever records change ──────────────────────
+     data.summary from the server is used ONLY for the initial per-subject
+     balances (initialPresent / initialTotal). Every mark/clear optimistically
+     updates data.records, so we recompute percentages here so the subject
+     breakdown and stat cards stay in sync without a round-trip.
+  ── */
+  const liveSummary = useMemo(() => {
+    if (!data) return [];
+
+    // Seed the map from the server summary (carries initialPresent/initialTotal)
+    const map = {};
+    for (const s of (data.summary || [])) {
+      const key = s.subjectId || s.code || s.subject;
+      map[key] = {
+        ...s,
+        present: s.initialPresent ?? s.present ?? 0,
+        total:   s.initialTotal   ?? s.total   ?? 0,
+      };
+    }
+
+    // Layer the current records on top
+    for (const r of (data.records || [])) {
+      if (r.status === 'cancelled') continue;
+      const key = r.subjectId || r.code;
+      if (!key) continue;
+      if (!map[key]) {
+        map[key] = {
+          subjectId: r.subjectId,
+          subject: r.subject || 'Unknown',
+          code: r.code || '—',
+          present: 0,
+          total: 0,
+          initialPresent: 0,
+          initialTotal: 0,
+        };
+      }
+      map[key].total++;
+      if (r.status === 'present') map[key].present++;
+    }
+
+    return Object.values(map).map(s => ({
+      ...s,
+      percentage: s.total ? Math.round((s.present / s.total) * 100) : 0,
+    }));
+  }, [data]);
+
   /* ── today's scheduled classes from timetable ── */
   const todayClasses = useMemo(() => {
     if (!subjects?.length) return [];
@@ -571,7 +617,7 @@ const StudentAttendanceView = ({ sid }) => {
   /* Card 2 — Can Still Miss */
   // Count subjects where the student can still miss at least 1 class
   // (i.e. subjects currently safe enough to absorb 1 more absence)
-  const subjectMissValues = (data?.summary || [])
+  const subjectMissValues = liveSummary
     .filter(s => s.subject && s.subject !== "Unknown" && s.total > 0)
     .map(s => Math.floor(s.present / 0.75 - s.total));
 
@@ -581,8 +627,8 @@ const StudentAttendanceView = ({ sid }) => {
   const canMissMuted  = canStillMiss === 0 ? "var(--color-danger-muted)" : canStillMiss <= 2 ? "var(--color-warning-muted)" : "var(--color-success-muted)";
 
   /* Card 3 — Subjects At Risk */
-  const atRiskSubjects  = data?.summary?.filter(s => s.percentage < 75) || [];
-  const criticalSubjects = data?.summary?.filter(s => s.percentage < 50) || [];
+  const atRiskSubjects  = liveSummary.filter(s => s.percentage < 75);
+  const criticalSubjects = liveSummary.filter(s => s.percentage < 50);
   const atRiskCount     = atRiskSubjects.length;
   const criticalCount   = criticalSubjects.length;
   const atRiskColor     = criticalCount > 0 ? "var(--color-danger)" : atRiskCount > 0 ? "var(--color-warning)" : "var(--color-success)";
@@ -854,7 +900,7 @@ const StudentAttendanceView = ({ sid }) => {
             </div>
           </div>
 
-          {data.summary.filter(s => s.subject && s.subject !== "Unknown").length === 0 ? (
+          {liveSummary.filter(s => s.subject && s.subject !== "Unknown").length === 0 ? (
             <EmptyState
               illustration="attendance"
               title="No records found"
@@ -862,7 +908,7 @@ const StudentAttendanceView = ({ sid }) => {
             />
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
-              {data.summary
+              {liveSummary
                 .filter(s => s.subject && s.subject !== "Unknown")
                 .map(subject => {
                   const streak = getSubjectStreak(subject.code);
