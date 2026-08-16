@@ -77,11 +77,50 @@ def find_header_index(table):
     return best_i if best_score >= 2 else 0
 
 
+# ── Cell cleaning ─────────────────────────────────────────────────────────────
+
+_FOOTNOTE_RE = re.compile(
+    r'[\u00a6\u00a7\u00b6\u00b9\u00b2\u00b3\u2070-\u2079'  # superscript digits
+    r'\u2020\u2021\u2022\u2023\u204b'                        # dagger/bullet variants
+    r'\u00ab\u00bb]',                                         # angle quotes (footnote markers)
+    re.UNICODE,
+)
+
+# Page-break artefacts injected by pdfplumber into cells that span a page
+# boundary, e.g. "32\nPage 2" or "31\nContinued".
+_PAGE_BREAK_RE = re.compile(r'\n[^\n]*$', re.MULTILINE)
+
+
+def _clean_cell(raw):
+    """Normalise a single PDF cell value.
+
+    - Strip page-break artefacts like "32\\nPage 2" → "32".
+    - Collapse remaining whitespace (including \\n from multi-line cells).
+    - Strip Unicode footnote markers (superscript digits ¹²³, daggers †‡, etc.).
+    """
+    if raw is None:
+        return ''
+    s = str(raw)
+    # Remove page-break artefact first (keep only text before the first \n
+    # when the part after looks like a page label rather than real data).
+    pb = _PAGE_BREAK_RE.search(s)
+    if pb:
+        after = pb.group(0).strip()
+        # Only strip if the trailing fragment is a page label, not real data
+        if re.match(r'^(page\s*\d+|continued|cont\.?|\.{2,})$', after, re.IGNORECASE):
+            s = s[:pb.start()]
+    # Collapse remaining newlines and whitespace runs.
+    s = re.sub(r'\s+', ' ', s)
+    # Remove footnote/annotation characters.
+    s = _FOOTNOTE_RE.sub('', s)
+    return s.strip()
+
+
 def row_to_obj(headers, row):
     obj = {}
     for i, header in enumerate(headers):
         cell = row[i] if i < len(row) else ''
-        obj[header] = str(cell).strip() if cell else ''
+        obj[header] = _clean_cell(cell)
 
     # ── Fix bleeding-digit artefact ───────────────────────────────────────
     # Some PDFs encode the roll number and student name as one concatenated
@@ -110,10 +149,10 @@ def looks_like_person_name(val):
     s = str(val or '').strip()
     if not s or len(s) < 2:
         return False
-    # A person's name never contains digits (0-9)
-    if re.search(r'\d', s):
-        return False
-    
+    # Allow names with digits only if they follow alphanumeric-identifier patterns
+    # like "R2D2 KUMAR" or "RAHUL 2 SHARMA" — real student names in some datasets.
+    # Pure-digit strings are still rejected below via looks_like_student_id.
+
     lower = s.lower()
     bad_keywords = {
         'total', 'average', 'avg', 'maximum', 'minimum', 'max', 'min', 'mean', 'median', 'std dev', 'highest', 'lowest',
@@ -127,17 +166,18 @@ def looks_like_person_name(val):
         'sl no', 'sr no', 's no', 'sl. no', 'sr. no', 'serial no', 'academic', 'college', 'university', 'department',
         'institute', 'btech', 'mtech', 'b.tech', 'm.tech', 'examination', 'semester', 'academic year', 'group', 'section'
     }
-    
+
     for kw in bad_keywords:
         if lower == kw or lower.startswith(kw) or lower.endswith(kw) or (' ' + kw) in lower or (kw + ' ') in lower:
             return False
-            
+
     return bool(re.search(r'[a-zA-Z]{2,}', s))
 
 
 def looks_like_student_id(val):
     s = str(val or '').strip()
-    return bool(re.match(r'^\d{5,12}$', s))
+    # Pure digit run (student number) OR alphanumeric code like CO24366, MCO24386
+    return bool(re.match(r'^\d{5,12}$', s)) or bool(re.match(r'^[A-Z]{1,4}\d{4,10}$', s))
 
 
 def is_likely_data_row(obj):
@@ -180,15 +220,9 @@ def group_words_into_lines(words):
 
 
 def find_column_boundaries(lines, bucket_size=2.0, min_frequency=0.4):
-    """Detect column-separator x-positions that recur across most rows on the page.
-
-    A gap between two words that lands at the SAME x-position on many rows is a real
-    column boundary. A gap within a multi-word cell (e.g. a two-word name) lands at a
-    different x-position on every row (names have different lengths), so it never
-    accumulates enough frequency to be picked up here.
-    """
+    """Detect column-separator x-positions that recur across most rows on the page."""
     if len(lines) < 3:
-        return []  # not enough rows for a reliable frequency signal
+        return []
 
     bucket_counts = {}
     for line in lines:
@@ -203,15 +237,7 @@ def find_column_boundaries(lines, bucket_size=2.0, min_frequency=0.4):
 
 
 def split_line_into_cells(line_words, boundaries, large_gap=8.0):
-    """Split a line into cells.
-
-    A boundary is crossed when either (a) it falls at one of the page-wide consistent
-    positions from find_column_boundaries — catches dense numeric columns whose gaps
-    are small but recur at the same x on every row — or (b) the gap itself is larger
-    than `large_gap` — catches ordinary transitions (e.g. name column -> first score
-    column) whose exact x-position isn't consistent (names vary in length) but whose
-    gap is reliably wide.
-    """
+    """Split a line into cells."""
     cells = []
     current_cell = []
     prev_word = None
@@ -238,12 +264,7 @@ def split_line_into_cells(line_words, boundaries, large_gap=8.0):
 
 
 def words_to_table(words):
-    """Reconstruct tabular rows from a flat word list (borderless/invisible tables).
-
-    Column boundaries are detected from cross-row positional consistency (see
-    find_column_boundaries) rather than a per-line distance heuristic, since dense
-    numeric columns can have smaller gaps than the gap inside a multi-word name cell.
-    """
+    """Reconstruct tabular rows from a flat word list (borderless/invisible tables)."""
     if not words or len(words) < 5:
         return []
 
@@ -255,8 +276,6 @@ def words_to_table(words):
         if not line:
             continue
         cells = split_line_into_cells(line, boundaries)
-
-        # Only keep rows that look like they belong to a table (at least 2 columns)
         if len(cells) >= 2:
             table.append(cells)
 
@@ -274,7 +293,7 @@ def extract_table_from_words(page):
 
 
 def table_is_consistent(table, min_ratio=0.7):
-    """Reject tables whose row lengths vary wildly — a sign the strategy mis-detected columns."""
+    """Reject tables whose row lengths vary wildly."""
     lengths = [len(row) for row in table if row]
     if len(lengths) < 2:
         return True
@@ -298,7 +317,6 @@ def extract_tables_from_page(page):
                 if key not in seen:
                     seen.append(key)
                     yield t
-            # If we successfully extracted tables with a strict strategy, don't fall back to looser ones
             break
 
 
@@ -309,12 +327,7 @@ def extract_header_cap(header):
 
 
 def flag_implausible_marks(obj, tolerance=1.5):
-    """Cheap sanity check: flag (but keep) values that exceed their column's declared
-    max by more than a small tolerance — the signature of a concatenation parsing bug
-    (e.g. '7784677' landing in a column meant to hold a single quiz score out of 10).
-    Logged to stderr rather than added to the row, so the JSON output shape (consumed
-    by columnDetector.js's Object.keys-based header discovery) stays unchanged.
-    """
+    """Flag (but keep) values that exceed their column's declared max."""
     for header, value in obj.items():
         cap = extract_header_cap(header)
         if cap is None:
@@ -333,15 +346,10 @@ def flag_implausible_marks(obj, tolerance=1.5):
 def assign_tables_to_sections(tables):
     """Group extracted tables into sections by header schema.
 
-    Real marksheets often contain several structurally different tables in one
-    document (e.g. a totals summary, a Minor-1 quiz breakdown, a Minor-2 quiz
-    breakdown, a Final-Exam breakdown). Locking onto the first schema seen and
-    force-fitting every later table's rows onto it silently drops rows that don't
-    fit (too few columns) and mislabels rows that do (a Minor-2 Q1 score written
-    under the Minor-1 Q1 label). Instead, each distinct header schema gets its own
-    section. A table with no header row of its own (row_header_score < 2) is
-    treated as a continuation of whichever section was most recently active — e.g.
-    the same table's data spilling onto the next page without repeating headers.
+    Pages that share the same header schema are merged into one section (same
+    schema repeating on every page of a multi-page marks sheet).  Tables with a
+    genuinely different schema (e.g. Minor-1 breakdown vs Minor-2 breakdown) each
+    get their own section so they can be merged per-student later.
     """
     sections = []
     last_section = None
@@ -366,8 +374,6 @@ def assign_tables_to_sections(tables):
         elif last_section is not None:
             last_section['rows'].extend(table)
         else:
-            # First table doesn't look like it has a recognizable header row —
-            # best effort: treat row 0 as headers anyway (legacy behavior).
             candidate_headers = normalize_headers(table[0])
             section = {'headers': candidate_headers, 'rows': table[1:]}
             sections.append(section)
@@ -377,20 +383,13 @@ def assign_tables_to_sections(tables):
 
 
 def extract_table_rows(pdf_path):
-    """Open a PDF and return a list of sections: [{'headers': [...], 'rows': [...]}, ...].
-
-    For each page, tries strategy-based table extraction first (extract_tables_from_page),
-    falling back to word-coordinate clustering (extract_table_from_words) when no
-    consistent table is found. Tables are then grouped into sections by schema — see
-    assign_tables_to_sections.
-    """
+    """Open a PDF and return sections: [{'headers': [...], 'rows': [...]}, ...]."""
     tables = []
 
     with pdfplumber.open(pdf_path) as pdf:
         for page in pdf.pages:
             page_tables = list(extract_tables_from_page(page))
 
-            # Fallback strategy: If no consistent tables were extracted, reconstruct from coordinates!
             if not page_tables:
                 word_table = extract_table_from_words(page)
                 if word_table and len(word_table) >= 2:
@@ -402,7 +401,7 @@ def extract_table_rows(pdf_path):
 
 
 def pick_column_by_predicate(headers, objs, predicate):
-    """Pick the header whose values most often satisfy `predicate` across all rows."""
+    """Pick the header whose values most often satisfy `predicate`."""
     best_header, best_hits = None, 0
     for h in headers:
         hits = sum(1 for o in objs if predicate(o.get(h, '')))
@@ -412,7 +411,7 @@ def pick_column_by_predicate(headers, objs, predicate):
 
 
 def section_label(headers, index):
-    """Derive a short disambiguating label for a section, e.g. 'Total-Minor 1' -> 'Minor 1'."""
+    """Derive a short disambiguating label for a section."""
     for h in headers:
         m = re.search(r'total[-_\s]*(.+)', str(h), re.IGNORECASE)
         if m and m.group(1).strip():
@@ -420,16 +419,123 @@ def section_label(headers, index):
     return f'Table {index + 1}'
 
 
-def merge_sections_by_identity(sections):
-    """Join rows across sections into one record per student, keyed by roll number
-    (or name if roll is unavailable) — e.g. a Minor-1 breakdown, a Minor-2 breakdown
-    and a Final-Exam breakdown for the same student become one row with all three
-    sets of marks, instead of three separate mislabeled rows.
+# ── Page-break row stitching ──────────────────────────────────────────────────
 
-    Columns that collide between sections (every quiz breakdown table using the same
-    'Q1'..'Q6' labels) are disambiguated with each section's own label, except the
-    first section encountered, whose columns are kept as the canonical/unprefixed
-    names — this matches the common case where the first table is the primary one.
+def _stitch_split_rows(rows, headers, id_col, name_col):
+    """Fix rows split across a page boundary by pdfplumber.
+
+    When a row straddles a page boundary pdfplumber sometimes emits two partial
+    rows:
+      - Row A: roll + name cells filled, all mark cells empty/None
+      - Row B: roll + name cells empty,  all mark cells filled
+
+    If row A and row B are adjacent AND their non-overlapping cells would form a
+    complete row, merge them into one.  Only merges when the identity cells of
+    row A are non-empty and the identity cells of row B are empty (or vice-versa).
+    """
+    if not rows:
+        return rows
+
+    result = []
+    skip_next = False
+
+    for i, row in enumerate(rows):
+        if skip_next:
+            skip_next = False
+            continue
+
+        if i + 1 >= len(rows):
+            result.append(row)
+            continue
+
+        next_row = rows[i + 1]
+
+        # Identity presence in each row
+        a_roll = row.get(id_col, '') if id_col else ''
+        a_name = row.get(name_col, '') if name_col else ''
+        b_roll = next_row.get(id_col, '') if id_col else ''
+        b_name = next_row.get(name_col, '') if name_col else ''
+
+        a_has_identity = bool(a_roll or a_name)
+        b_has_identity = bool(b_roll or b_name)
+
+        # Non-identity (marks) values in each row
+        mark_headers = [h for h in headers if h not in (id_col, name_col)]
+        a_has_marks = any(row.get(h, '').strip() for h in mark_headers)
+        b_has_marks = any(next_row.get(h, '').strip() for h in mark_headers)
+
+        # Stitch: row A has identity only, row B has marks only
+        if a_has_identity and not a_has_marks and not b_has_identity and b_has_marks:
+            merged = dict(row)
+            for h in mark_headers:
+                if next_row.get(h, '').strip():
+                    merged[h] = next_row[h]
+            result.append(merged)
+            skip_next = True
+            continue
+
+        # Stitch: row A has marks only, row B has identity only (rare but possible)
+        if not a_has_identity and a_has_marks and b_has_identity and not b_has_marks:
+            merged = dict(next_row)
+            for h in mark_headers:
+                if row.get(h, '').strip():
+                    merged[h] = row[h]
+            result.append(merged)
+            skip_next = True
+            continue
+
+        result.append(row)
+
+    return result
+
+
+# ── Core output builder ───────────────────────────────────────────────────────
+
+def _single_schema_rows(sections):
+    """All sections share the same header schema — emit every data row as its own
+    record without any deduplication.
+
+    This is the correct strategy for a standard marks sheet where:
+      - Multiple students can share the same name (NAMAN SHARMA appears 6× with
+        different roll numbers).
+      - Duplicate roll numbers exist intentionally (CO24430 assigned to two
+        different students).
+      - A blank roll number does NOT mean the row should be dropped.
+    """
+    if not sections:
+        return []
+
+    # Use the first section's headers as canonical (they are all identical).
+    headers = sections[0]['headers']
+    all_rows_raw = []
+    for section in sections:
+        all_rows_raw.extend(section['rows'])
+
+    # Convert raw cells → dicts
+    objs = [row_to_obj(headers, row) for row in all_rows_raw]
+
+    # Identify id / name columns
+    id_col   = pick_column_by_predicate(headers, objs, looks_like_student_id)
+    name_col = pick_column_by_predicate(headers, objs, looks_like_person_name)
+
+    # Stitch page-break split rows before filtering
+    objs = _stitch_split_rows(objs, headers, id_col, name_col)
+
+    result = []
+    for obj in objs:
+        if not is_likely_data_row(obj):
+            continue
+        flag_implausible_marks(obj)
+        result.append(obj)
+
+    return result
+
+
+def _multi_schema_rows(sections):
+    """Sections have distinct header schemas — merge per student across sections.
+
+    Example: Minor-1 breakdown + Minor-2 breakdown + Final-Exam breakdown in the
+    same document.  Here deduplication by identity is intentional and correct.
     """
     merged = {}
     order = []
@@ -440,13 +546,16 @@ def merge_sections_by_identity(sections):
         headers = section['headers']
         objs = [row_to_obj(headers, row) for row in section['rows']]
 
-        id_col = pick_column_by_predicate(headers, objs, looks_like_student_id)
+        id_col   = pick_column_by_predicate(headers, objs, looks_like_student_id)
         name_col = pick_column_by_predicate(headers, objs, looks_like_person_name)
 
         if id_col and canonical_id_key is None:
             canonical_id_key = id_col
         if name_col and canonical_name_key is None:
             canonical_name_key = name_col
+
+        # Stitch page-break rows within each section before merging
+        objs = _stitch_split_rows(objs, headers, id_col, name_col)
 
         label = section_label(headers, idx)
 
@@ -483,9 +592,34 @@ def merge_sections_by_identity(sections):
     return [merged[k] for k in order]
 
 
+def merge_sections(sections):
+    """Choose single-schema (no dedup) vs multi-schema (merge by identity) strategy.
+
+    A document is single-schema when all extracted sections share the same header
+    layout — i.e. the same marks sheet spanning multiple pages.  In that case every
+    source row must appear in the output, including rows with duplicate names or
+    duplicate roll numbers.
+
+    A document is multi-schema when it genuinely contains tables with different
+    column layouts (e.g. Minor-1 + Minor-2 + Final), where merging per student is
+    correct.
+    """
+    if not sections:
+        return []
+
+    # Check whether all sections share the same header schema
+    first_headers = sections[0]['headers']
+    all_same = all(header_lists_match(s['headers'], first_headers) for s in sections)
+
+    if all_same:
+        return _single_schema_rows(sections)
+    else:
+        return _multi_schema_rows(sections)
+
+
 def parse_pdf(path):
     sections = extract_table_rows(path)
-    return merge_sections_by_identity(sections)
+    return merge_sections(sections)
 
 
 if __name__ == '__main__':

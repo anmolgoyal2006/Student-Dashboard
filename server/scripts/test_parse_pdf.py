@@ -18,9 +18,12 @@ from parsePdf import (
     normalize_headers,
     header_lists_match,
     assign_tables_to_sections,
-    merge_sections_by_identity,
+    merge_sections,
     extract_table_rows,
     parse_pdf,
+    _stitch_split_rows,
+    looks_like_student_id,
+    looks_like_person_name,
 )
 
 FIXTURES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'test_fixtures')
@@ -228,9 +231,9 @@ def test_assign_tables_to_sections_keeps_distinct_schemas_separate():
     assert len(sections[2]['rows']) == 2
 
 
-def test_merge_sections_by_identity_joins_rows_without_mislabeling():
+def test_merge_sections_joins_rows_without_mislabeling():
     sections = assign_tables_to_sections([SUMMARY_TABLE, MINOR1_TABLE, MINOR2_TABLE])
-    merged = merge_sections_by_identity(sections)
+    merged = merge_sections(sections)
 
     assert len(merged) == 2  # 2 real students, not 6 mislabeled rows
 
@@ -280,3 +283,183 @@ def test_real_pdf_rows_have_consistent_columns_and_no_concatenation(pdf_path):
         for header, value in row.items():
             if suspicious.match(str(value).strip()):
                 pytest.fail(f'Suspicious concatenated value {value!r} in column {header!r}: {row}')
+
+
+# ── Adversarial PDF tests ─────────────────────────────────────────────────────
+
+ADVERSARIAL_PDF = os.path.join(FIXTURES_DIR, 'pdfplumber_adversarial_student_marks.pdf')
+
+
+def _get_adversarial_rows():
+    if not os.path.isfile(ADVERSARIAL_PDF):
+        return None
+    return parse_pdf(ADVERSARIAL_PDF)
+
+
+def _skip_if_no_adversarial():
+    if not os.path.isfile(ADVERSARIAL_PDF):
+        pytest.skip('Adversarial PDF fixture not found.')
+
+
+# 1. Row count — must be ≥ 65 (PDF has 68 non-empty rows; a few are legitimately
+#    empty or header-only rows that should be dropped)
+def test_adversarial_row_count():
+    _skip_if_no_adversarial()
+    rows = _get_adversarial_rows()
+    assert len(rows) >= 65, (
+        f'Expected ≥65 rows from adversarial PDF, got {len(rows)}. '
+        'Many student records are being dropped.'
+    )
+
+
+# 2. SUMIT / SUMIT KUMAR must remain 3 separate records (CO24366, CO24367, CO24368)
+def test_adversarial_sumit_variants_separate():
+    _skip_if_no_adversarial()
+    rows = _get_adversarial_rows()
+    rolls = {r.get('ROLL NO', '') for r in rows}
+    for expected in ('CO24366', 'CO24367', 'CO24368'):
+        assert expected in rolls, (
+            f'Roll {expected} (SUMIT variant) missing — rows with same name were merged.'
+        )
+
+
+# 3. NAMAN SHARMA / GUPTA / TIWARI at CO24361-363 must all be present
+def test_adversarial_naman_variants_separate():
+    _skip_if_no_adversarial()
+    rows = _get_adversarial_rows()
+    rolls = {r.get('ROLL NO', '') for r in rows}
+    for expected in ('CO24361', 'CO24362', 'CO24363'):
+        assert expected in rolls, (
+            f'Roll {expected} (Naman variant) missing — prefix-name rows were merged.'
+        )
+
+
+# 4. RAM / RAM KUMAR / RAM KUMAR SINGH / KUMAR must all survive (CO24370-373)
+def test_adversarial_ram_prefix_names_separate():
+    _skip_if_no_adversarial()
+    rows = _get_adversarial_rows()
+    rolls = {r.get('ROLL NO', '') for r in rows}
+    for expected in ('CO24370', 'CO24371', 'CO24372', 'CO24373'):
+        assert expected in rolls, (
+            f'Roll {expected} (RAM prefix variant) missing.'
+        )
+
+
+# 5. Blank MST-1 must not shift columns — CO24411 should have MST-2=14, not MST-2=blank
+def test_adversarial_blank_mst1_no_column_shift():
+    _skip_if_no_adversarial()
+    rows = _get_adversarial_rows()
+    target = next((r for r in rows if r.get('ROLL NO', '') == 'CO24411'), None)
+    assert target is not None, 'CO24411 (ROHIT SHARMA blank MST-1) row missing.'
+    mst1 = target.get('MST-1', 'ABSENT')
+    mst2 = target.get('MST-2', 'ABSENT')
+    # MST-1 must be blank/empty, MST-2 must be '14'
+    assert mst1 == '', (
+        f'CO24411 MST-1 should be blank but got {mst1!r} — column shift bug.'
+    )
+    assert mst2 == '14', (
+        f'CO24411 MST-2 should be 14 but got {mst2!r} — blank MST-1 caused column shift.'
+    )
+
+
+# 6. Missing roll number — student with blank roll should still appear
+def test_adversarial_missing_roll_row_preserved():
+    _skip_if_no_adversarial()
+    rows = _get_adversarial_rows()
+    # The row with blank roll + name=ROHIT SHARMA + Att=4 + MST-1=14
+    blank_roll_rows = [
+        r for r in rows
+        if not r.get('ROLL NO', '').strip()
+        and 'ROHIT' in r.get('NAME', '').upper()
+    ]
+    assert blank_roll_rows, (
+        'Row with blank Roll No. (ROHIT SHARMA, Att=4) was dropped — '
+        'parser must not discard rows solely because roll is missing.'
+    )
+
+
+# 7. Duplicate roll CO24430 — both RAHUL SHARMA and ROHIT SHARMA must survive
+def test_adversarial_duplicate_roll_both_rows_kept():
+    _skip_if_no_adversarial()
+    rows = _get_adversarial_rows()
+    co24430 = [r for r in rows if r.get('ROLL NO', '') == 'CO24430']
+    assert len(co24430) == 2, (
+        f'CO24430 should appear twice (RAHUL + ROHIT) but found {len(co24430)} row(s). '
+        'Duplicate roll numbers must not be deduplicated.'
+    )
+    names = {r.get('NAME', '') for r in co24430}
+    assert 'RAHUL SHARMA' in names, 'CO24430 RAHUL SHARMA row missing.'
+    assert 'ROHIT SHARMA' in names, 'CO24430 ROHIT SHARMA row missing.'
+
+
+# 8. Duplicate roll+name CO24440 SUMIT KUMAR — both records must survive
+def test_adversarial_duplicate_roll_and_name_both_kept():
+    _skip_if_no_adversarial()
+    rows = _get_adversarial_rows()
+    co24440 = [r for r in rows if r.get('ROLL NO', '') == 'CO24440']
+    assert len(co24440) == 2, (
+        f'CO24440 SUMIT KUMAR should appear twice (scores 80 and 90) but found {len(co24440)} row(s). '
+        'Records with identical roll+name but different marks must not be deduplicated.'
+    )
+
+
+# 9. Page-break split row — CO24560 ABHISHEK KUMAR split across pages 3 and 4
+def test_adversarial_page_break_row_stitched():
+    _skip_if_no_adversarial()
+    rows = _get_adversarial_rows()
+    co24560 = [r for r in rows if r.get('ROLL NO', '') == 'CO24560']
+    # Expect exactly one fully-populated CO24560 row (stitched from the two halves)
+    complete = [
+        r for r in co24560
+        if r.get('Att Marks', '').strip() and r.get('MST-1', '').strip()
+    ]
+    assert complete, (
+        'CO24560 ABHISHEK KUMAR (page-break split) has no complete row with marks. '
+        'The two partial rows across the page boundary must be stitched.'
+    )
+
+
+# 10. Footnote characters stripped — CO24590/CO24591 should have clean values
+def test_adversarial_footnote_chars_stripped():
+    _skip_if_no_adversarial()
+    rows = _get_adversarial_rows()
+    import re as _re
+    footnote_pat = _re.compile(
+        r'[\u00b9\u00b2\u00b3\u2070-\u2079\u2020\u2021\u2022\u00b6\u00a7†‡•]'
+    )
+    for row in rows:
+        for k, v in row.items():
+            assert not footnote_pat.search(str(v)), (
+                f'Footnote character found in column {k!r}: {v!r}'
+            )
+
+
+# 11. Page-break artefact in EST cell stripped — "32\nPage 2" → "32"
+def test_adversarial_page_break_artefact_in_cell_stripped():
+    _skip_if_no_adversarial()
+    rows = _get_adversarial_rows()
+    for row in rows:
+        for k, v in row.items():
+            assert '\n' not in str(v), (
+                f'Newline found in cell {k!r}: {v!r} — page-break artefact not cleaned.'
+            )
+
+
+# 12. looks_like_student_id recognises alphanumeric roll codes
+def test_looks_like_student_id_alphanumeric():
+    assert looks_like_student_id('CO24366')
+    assert looks_like_student_id('MCO24386')
+    assert looks_like_student_id('12345678')
+    assert not looks_like_student_id('ABC')
+    assert not looks_like_student_id('NAMAN')
+
+
+# 13. Names with digits / special chars (R2D2, O'BRIEN, A.-K.) must survive
+def test_adversarial_special_name_rows_present():
+    _skip_if_no_adversarial()
+    rows = _get_adversarial_rows()
+    rolls = {r.get('ROLL NO', '') for r in rows}
+    for expected in ('CO24460', 'CO24461', 'CO24462', 'CO24463'):
+        assert expected in rolls, (
+            f'Roll {expected} (special-char name) missing from output.'
+        )
