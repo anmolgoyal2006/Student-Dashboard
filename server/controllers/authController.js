@@ -58,18 +58,21 @@ res.json({
 };
 
 // POST /api/auth/logout-all
-// Ordinary logout is client-side only (the token is simply discarded), which
-// does nothing about a copy an attacker already holds. This bumps tokenVersion
-// so every outstanding session for this user is rejected server-side.
+// Bumps tokenVersion so every outstanding JWT is rejected, and removes all
+// FCM tokens so the user stops receiving push notifications on every device.
 exports.logoutAll = async (req, res) => {
   try {
     const user = await User.findByIdAndUpdate(
       req.user.id,
-      { $inc: { tokenVersion: 1 } },
+      { $inc: { tokenVersion: 1 }, $unset: { fcmToken: '' } },
       { new: true }
     ).select('tokenVersion');
 
     if (!user) return res.status(404).json({ message: 'User not found.' });
+
+    // Remove all FCM tokens for this user
+    const NotificationToken = require('../models/NotificationToken');
+    await NotificationToken.deleteMany({ userId: req.user.id });
 
     invalidateUserTokens(req.user.id);
     res.json({ message: 'Signed out of all devices. Please log in again.' });

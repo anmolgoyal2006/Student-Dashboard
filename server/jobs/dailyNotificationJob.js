@@ -1,19 +1,16 @@
 const cron = require('node-cron');
 const { sendEndOfClassNotifications, sendTodayNotifications } = require('../services/notificationService');
 
-let isRunning = false;
+// Note: concurrency guards (isRunning flags) live inside notificationService.js.
+// Both functions are safe to call without additional guards here.
 
 function startDailyNotificationJob() {
   // Every minute: check for classes ending NOW and send "Did you attend?" prompt
   cron.schedule('* * * * *', async () => {
-    if (isRunning) return;
-    isRunning = true;
     try {
       await sendEndOfClassNotifications();
     } catch (err) {
       console.error('[CRON] End-of-class error:', err.message);
-    } finally {
-      isRunning = false;
     }
   }, {
     scheduled: true,

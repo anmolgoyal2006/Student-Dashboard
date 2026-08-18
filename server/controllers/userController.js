@@ -228,6 +228,36 @@ exports.saveToken = async (req, res) => {
   }
 };
 
+// DELETE /api/user/remove-token
+// Removes one specific FCM token (normal logout) or ALL tokens (logout-all).
+// Also clears User.fcmToken if it matches the removed token.
+exports.removeToken = async (req, res) => {
+  try {
+    const NotificationToken = require('../models/NotificationToken');
+    const { token } = req.body;
+
+    if (token) {
+      // Single-device logout — remove just this token
+      await NotificationToken.deleteOne({ userId: req.user._id, token });
+
+      // Clear the legacy fcmToken field on User if it matches
+      await User.updateOne(
+        { _id: req.user._id, fcmToken: token },
+        { $unset: { fcmToken: '' } }
+      );
+    } else {
+      // Logout-all path — wipe every token for this user
+      await NotificationToken.deleteMany({ userId: req.user._id });
+      await User.updateOne({ _id: req.user._id }, { $unset: { fcmToken: '' } });
+    }
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[removeToken]', err.message);
+    res.status(500).json({ message: 'Failed to remove token' });
+  }
+};
+
 // PUT /api/user/update-sid
 exports.updateSID = async (req, res) => {
   const { sid } = req.body;

@@ -7,6 +7,7 @@ const {
   forgotPassword,
   resetPassword,
   saveToken,
+  removeToken,
   updateSID,
 } = require('../controllers/userController');
 const { protect } = require('../middleware/authMiddleware');
@@ -41,6 +42,13 @@ router.post('/reset-password/:token', validate([
 router.post('/save-token', protect, validate([
   body('token').notEmpty().isString().withMessage('Token required'),
 ]), saveToken);
+
+// DELETE /api/user/remove-token
+// Called on logout so this device stops receiving push notifications.
+// Body is optional — if omitted, removes ALL tokens for this user (logout-all path).
+router.delete('/remove-token', protect, validate([
+  body('token').optional().isString(),
+]), removeToken);
 
 router.put('/update-sid', protect, validate([
   body('sid').trim().notEmpty().withMessage('SID cannot be empty.'),

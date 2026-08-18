@@ -6,6 +6,16 @@ import { authService } from '../services/apiServices';
 
 const AuthContext = createContext();
 
+// Read the current FCM token from the firebase module (may be null if not granted).
+async function getCurrentFCMToken() {
+  try {
+    const { getFCMToken } = await import('../firebase');
+    return await getFCMToken();
+  } catch {
+    return null;
+  }
+}
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(() => {
     const token = localStorage.getItem('token');
@@ -14,7 +24,26 @@ export const AuthProvider = ({ children }) => {
     catch { return null; }
   });
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    // Tell the server to remove this device's FCM token so pushes stop immediately.
+    try {
+      const jwt      = localStorage.getItem('token');
+      const fcmToken = await getCurrentFCMToken();
+      if (jwt) {
+        await fetch(`${process.env.REACT_APP_API_URL}/user/remove-token`, {
+          method : 'DELETE',
+          headers: {
+            'Content-Type' : 'application/json',
+            'Authorization': `Bearer ${jwt}`,
+          },
+          // Send the specific token so only this device is removed, not others.
+          body: JSON.stringify({ token: fcmToken || undefined }),
+        });
+      }
+    } catch {
+      // Best-effort — don't block the logout if the request fails.
+    }
+
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     clearTokenFromIDB();

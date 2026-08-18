@@ -109,8 +109,30 @@ async function saveNotificationToDB(userId, subjectId, title, body) {
   }
 }
 
+// Atomic dedup upsert for attendance notifications.
+// Returns true if the doc was newly inserted (we should send the push),
+// false if it already existed (duplicate — skip the push).
+async function tryInsertNotification(doc) {
+  // dedupKey scopes the unique index to one notification per subject per UTC day.
+  const day      = new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
+  const dedupKey = `${doc.type}:${doc.title}:${day}`;
+
+  try {
+    const result = await Notification.findOneAndUpdate(
+      { userId: doc.userId, type: doc.type, title: doc.title, dedupKey },
+      { $setOnInsert: { ...doc, dedupKey, read: false } },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+    // New insert if createdAt is within the last 2 seconds
+    return (Date.now() - result.createdAt.getTime()) < 2000;
+  } catch (err) {
+    if (err.code === 11000) return false; // duplicate key → already sent
+    throw err;
+  }
+}
+
 // Batched variant: insert many notification docs in a single round trip.
-// Used by the cron loops, which would otherwise issue one insert per subject.
+// Kept for backward-compat but no longer used by the cron loops.
 async function saveNotificationsToDB(docs) {
   if (!docs.length) return;
   try {
@@ -121,148 +143,146 @@ async function saveNotificationsToDB(docs) {
   }
 }
 
+// Guard flags — prevent overlapping cron executions for both jobs
+let isTodayRunning = false;
+let isEndOfClassRunning = false;
+
 // ─── Start-of-day reminder ───────────────────────────────────────
 async function sendTodayNotifications() {
-  const dayShort = getISTDayShort();
-  const dateStr  = getISTDateString();
-  const subjects = await fetchTodaySubjects(dayShort);
+  if (isTodayRunning) return;
+  isTodayRunning = true;
 
-  if (!subjects.length) {
-    console.log(`[FCM] No subjects found for ${dayShort}.`);
-    return;
-  }
+  try {
+    const dayShort = getISTDayShort();
+    const dateStr  = getISTDateString();
+    const subjects = await fetchTodaySubjects(dayShort);
 
-  let totalSent = 0;
-  const notifDocs = [];
-
-  for (const subject of subjects) {
-    const todaySchedule = subject.schedule.find((s) => s.day === dayShort);
-    if (!todaySchedule) continue;
-
-    const startTime = todaySchedule.startTime || '';
-
-    const user = await User.findById(subject.userId).select('fcmToken').lean();
-    if (!user || !user.fcmToken) continue;
-
-    const payload = buildPayload(subject, subject.userId, startTime, dateStr);
-    const title = payload.notification.title;
-    const body  = payload.notification.body;
-
-    // ── Dedup: skip if same subject start-of-day notification already sent today ──
-    const todayStart = new Date(dateStr + 'T00:00:00.000Z');
-    const alreadySent = await Notification.findOne({
-      userId: subject.userId,
-      title,
-      type:  'ATTENDANCE_MARK',
-      createdAt: { $gte: todayStart },
-    }).lean();
-    if (alreadySent) {
-      console.log(`[FCM] Skipping duplicate start-of-day for ${subject.name}`);
-      continue;
+    if (!subjects.length) {
+      console.log(`[FCM] No subjects found for ${dayShort}.`);
+      return;
     }
 
-    notifDocs.push({ userId: subject.userId, subjectId: subject._id, title, body, type: 'ATTENDANCE_MARK' });
+    let totalSent = 0;
 
-    const sent = await sendNotification(user.fcmToken, payload);
-    if (sent) totalSent++;
+    for (const subject of subjects) {
+      const todaySchedule = subject.schedule.find((s) => s.day === dayShort);
+      if (!todaySchedule) continue;
+
+      const startTime = todaySchedule.startTime || '';
+      const user = await User.findById(subject.userId).select('fcmToken').lean();
+      if (!user?.fcmToken) continue;
+
+      const payload = buildPayload(subject, subject.userId, startTime, dateStr);
+      const title   = payload.notification.title;
+      const body    = payload.notification.body;
+
+      // ── Atomic dedup: insert only if not already sent today ──
+      const isNew = await tryInsertNotification({
+        userId: subject.userId, subjectId: subject._id, title, body, type: 'ATTENDANCE_MARK',
+      });
+      if (!isNew) {
+        console.log(`[FCM] Skipping duplicate start-of-day for ${subject.name}`);
+        continue;
+      }
+
+      const sent = await sendNotification(user.fcmToken, payload);
+      if (sent) totalSent++;
+    }
+
+    console.log(`[FCM] Total start-of-day notifications sent: ${totalSent}`);
+  } finally {
+    isTodayRunning = false;
   }
-
-  await saveNotificationsToDB(notifDocs);
-
-  console.log(`[FCM] Total start-of-day notifications sent: ${totalSent}`);
 }
 
 // ─── End-of-class "Did you attend?" prompt ───────────────────────
 async function sendEndOfClassNotifications() {
-  const dayShort = getISTDayShort();
-  const currentTime = getISTTimeHHMM();
-  const dateStr     = getISTDateString();
+  if (isEndOfClassRunning) return;
+  isEndOfClassRunning = true;
 
-  if (dayShort === 'Sat' || dayShort === 'Sun') return;
+  try {
+    const dayShort = getISTDayShort();
+    const currentTime = getISTTimeHHMM();
+    const dateStr     = getISTDateString();
 
-  // Also build 12h format for safety
-  const [h, m] = currentTime.split(':').map(Number);
-  const hours12 = h % 12 || 12;
-  const ampm = h >= 12 ? 'PM' : 'AM';
-  const currentTime12 = `${hours12}:${String(m).padStart(2, '0')} ${ampm}`;
+    if (dayShort === 'Sat' || dayShort === 'Sun') return;
 
-  const subjects = await Subject.find({
-    schedule: {
-      $elemMatch: {
-        day    : dayShort,
-        endTime: { $in: [currentTime, currentTime12] },
-      },
-    },
-  }).lean();
+    // Also build 12h format for safety
+    const [h, m] = currentTime.split(':').map(Number);
+    const hours12 = h % 12 || 12;
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    const currentTime12 = `${hours12}:${String(m).padStart(2, '0')} ${ampm}`;
 
-  if (!subjects.length) return;
-
-  console.log(`[FCM] ${subjects.length} class(es) ending at ${currentTime} IST on ${dayShort}`);
-
-  const notifDocs = [];
-
-  for (const subject of subjects) {
-    const user = await User.findById(subject.userId).select('fcmToken').lean();
-    if (!user?.fcmToken) continue;
-
-    const slot = subject.schedule.find(
-      (s) => s.day === dayShort && [currentTime, currentTime12].includes(s.endTime)
-    );
-
-    const title = `📋 Did you attend ${subject.name}?`;
-    const body = `Class just ended${slot?.room ? ` in ${slot.room}` : ''}. Mark your attendance.`;
-
-    // ── Dedup: only send once per class-end per day ──
-    const todayStart = new Date(dateStr + 'T00:00:00.000Z');
-    const alreadySent = await Notification.findOne({
-      userId: subject.userId,
-      title,
-      type:   'ATTENDANCE_MARK',
-      createdAt: { $gte: todayStart },
-    }).lean();
-    if (alreadySent) {
-      console.log(`[FCM] Skipping duplicate end-of-class for ${subject.name}`);
-      continue;
-    }
-
-    const payload = {
-      notification: { title, body },
-      data: {
-        type     : 'ATTENDANCE_MARK',
-        subjectId: String(subject._id),
-        userId   : String(subject.userId),
-        subject  : subject.name,
-        date     : dateStr,
-      },
-      webpush: {
-        notification: {
-          title,
-          body,
-          icon   : '/logo192.png',
-          badge  : '/logo192.png',
-          actions: [
-            { action: 'attended',     title: '✅ Attended'    },
-            { action: 'not_attended', title: '❌ Not Attended' },
-            { action: 'not_held',     title: '⏸️ Not Held'    },
-          ],
-          data: {
-            type     : 'ATTENDANCE_MARK',
-            subjectId: String(subject._id),
-            userId   : String(subject.userId),
-            subject  : subject.name,
-            date     : dateStr,
-          },
+    const subjects = await Subject.find({
+      schedule: {
+        $elemMatch: {
+          day    : dayShort,
+          endTime: { $in: [currentTime, currentTime12] },
         },
       },
-    };
+    }).lean();
 
-    await sendNotification(user.fcmToken, payload);
-    notifDocs.push({ userId: subject.userId, subjectId: subject._id, title, body, type: 'ATTENDANCE_MARK' });
+    if (!subjects.length) return;
 
-    console.log(`[FCM] End-of-class notification sent: ${subject.name} at ${currentTime} IST`);
+    console.log(`[FCM] ${subjects.length} class(es) ending at ${currentTime} IST on ${dayShort}`);
+
+    for (const subject of subjects) {
+      const user = await User.findById(subject.userId).select('fcmToken').lean();
+      if (!user?.fcmToken) continue;
+
+      const slot = subject.schedule.find(
+        (s) => s.day === dayShort && [currentTime, currentTime12].includes(s.endTime)
+      );
+
+      const title = `📋 Did you attend ${subject.name}?`;
+      const body  = `Class just ended${slot?.room ? ` in ${slot.room}` : ''}. Mark your attendance.`;
+
+      // ── Atomic dedup: insert only once per class-end per day ──
+      const isNew = await tryInsertNotification({
+        userId: subject.userId, subjectId: subject._id, title, body, type: 'ATTENDANCE_MARK',
+      });
+      if (!isNew) {
+        console.log(`[FCM] Skipping duplicate end-of-class for ${subject.name}`);
+        continue;
+      }
+
+      const payload = {
+        notification: { title, body },
+        data: {
+          type     : 'ATTENDANCE_MARK',
+          subjectId: String(subject._id),
+          userId   : String(subject.userId),
+          subject  : subject.name,
+          date     : dateStr,
+        },
+        webpush: {
+          notification: {
+            title,
+            body,
+            icon   : '/logo192.png',
+            badge  : '/logo192.png',
+            actions: [
+              { action: 'attended',     title: '✅ Attended'    },
+              { action: 'not_attended', title: '❌ Not Attended' },
+              { action: 'not_held',     title: '⏸️ Not Held'    },
+            ],
+            data: {
+              type     : 'ATTENDANCE_MARK',
+              subjectId: String(subject._id),
+              userId   : String(subject.userId),
+              subject  : subject.name,
+              date     : dateStr,
+            },
+          },
+        },
+      };
+
+      await sendNotification(user.fcmToken, payload);
+      console.log(`[FCM] End-of-class notification sent: ${subject.name} at ${currentTime} IST`);
+    }
+  } finally {
+    isEndOfClassRunning = false;
   }
-
-  await saveNotificationsToDB(notifDocs);
 }
 
 module.exports = { sendTodayNotifications, sendEndOfClassNotifications, sendNotification, buildPayload };

@@ -49,6 +49,12 @@ const notificationSchema = new mongoose.Schema(
     type:    String,
     default: null,
   },
+  // Deduplication key — set to a stable string (e.g. "YYYY-MM-DD") so the unique
+  // index above can prevent duplicate documents without a racy findOne check.
+  dedupKey: {
+    type:    String,
+    default: null,
+  },
   read: {
       type:    Boolean,
       default: false,
@@ -57,6 +63,14 @@ const notificationSchema = new mongoose.Schema(
   { timestamps: true }   // createdAt + updatedAt added automatically
 );
 
+// For fast lookup/dedup queries
 notificationSchema.index({ userId: 1, type: 1, title: 1, body: 1, createdAt: -1 });
+
+// Dedup key: one notification per user+type+title per "bucket" day (stored as a separate field).
+// This lets us do an atomic findOneAndUpdate upsert instead of a racy check-then-insert.
+notificationSchema.index(
+  { userId: 1, type: 1, title: 1, dedupKey: 1 },
+  { unique: true, sparse: true }   // sparse so existing docs without dedupKey are unaffected
+);
 
 module.exports = mongoose.model('Notification', notificationSchema);
