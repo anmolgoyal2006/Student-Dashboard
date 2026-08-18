@@ -1,4 +1,4 @@
-﻿import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ToastProvider } from './context/ToastContext';
 import { useEffect } from 'react';
 import { useAuth } from './context/AuthContext';
@@ -23,6 +23,7 @@ import AttendancePrompt from './components/AttendancePrompt';
 import AdminPanel from './pages/AdminPanel';
 import AdminOpportunities from './pages/admin/Opportunities';
 import LoginSuccess from './pages/LoginSuccess';
+import useFirebaseNotifications from './hooks/useFirebaseNotifications';
 
 
 const ProtectedRoute = ({ children }) => {
@@ -61,6 +62,7 @@ const AppLayout = ({ children }) => {
 
 export default function App() {
   const { isLoggedIn } = useAuth();
+  useFirebaseNotifications(isLoggedIn);
 
   useEffect(() => {
     if (!isLoggedIn) return;
