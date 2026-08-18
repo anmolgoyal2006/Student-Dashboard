@@ -32,10 +32,22 @@ const GRADE_POINTS = {
 };
 
 // ── Python resolver ───────────────────────────────────────────────────────
+// Resolved once at module load time and cached — these execSync calls block
+// the event loop, so running them on every PDF upload would starve node-cron.
+
+let _cachedPython = null;
+let _cachedEnv    = null;
 
 function resolvePython() {
-  if (process.env.PYTHON_PATH) return process.env.PYTHON_PATH;
-  if (process.platform !== 'win32') return 'python3';
+  if (_cachedPython) return _cachedPython;
+  if (process.env.PYTHON_PATH) {
+    _cachedPython = process.env.PYTHON_PATH;
+    return _cachedPython;
+  }
+  if (process.platform !== 'win32') {
+    _cachedPython = 'python3';
+    return _cachedPython;
+  }
 
   const { execSync } = require('child_process');
 
@@ -43,20 +55,26 @@ function resolvePython() {
     const lines = execSync('where.exe python', { encoding: 'utf8' })
       .split(/\r?\n/).map(s => s.trim()).filter(Boolean);
     const real = lines.find(p => !p.includes('WindowsApps'));
-    if (real) return real;
+    if (real) { _cachedPython = real; return _cachedPython; }
   } catch (_) {}
 
   try {
     execSync('py -3 --version', { stdio: 'ignore' });
-    return 'py';
+    _cachedPython = 'py';
+    return _cachedPython;
   } catch (_) {}
 
-  return 'python';
+  _cachedPython = 'python';
+  return _cachedPython;
 }
 
 function buildChildEnv() {
+  if (_cachedEnv) return _cachedEnv;
   const env = { ...process.env };
-  if (process.platform !== 'win32') return env;
+  if (process.platform !== 'win32') {
+    _cachedEnv = env;
+    return _cachedEnv;
+  }
 
   const { execSync } = require('child_process');
   try {
@@ -70,8 +88,14 @@ function buildChildEnv() {
     }
   } catch (_) {}
 
-  return env;
+  _cachedEnv = env;
+  return _cachedEnv;
 }
+
+// Eagerly resolve at module load so the execSync calls happen once during
+// server startup — not during a live request while cron is ticking.
+resolvePython();
+buildChildEnv();
 
 // ── Grade helpers ─────────────────────────────────────────────────────────
 

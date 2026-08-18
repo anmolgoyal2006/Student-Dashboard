@@ -154,12 +154,14 @@ async function sendAssignmentNotification(assignment, userId) {
 
 // ─── Session notifications ───────────────────────────────────────────────────
 async function sendSessionNotification(task, userId, minutesBefore) {
-  const taskId = task._id.toString();
+  // Task model uses `title`, not `taskTitle`
+  const taskTitle = task.taskTitle || task.title || 'Study Session';
+  const taskId    = task._id.toString();
   if (minutesBefore === 15) {
-    return sendNotification(userId, '📖 Starting Soon', `${task.taskTitle} starts in 15 minutes`,
+    return sendNotification(userId, '📖 Starting Soon', `${taskTitle} starts in 15 minutes`,
       { type: 'SESSION_SOON', taskId });
   }
-  return sendNotification(userId, '🚀 Time to Study', `${task.taskTitle} — your session begins now`,
+  return sendNotification(userId, '🚀 Time to Study', `${taskTitle} — your session begins now`,
     { type: 'SESSION_START', taskId });
 }
 

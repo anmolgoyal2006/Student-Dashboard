@@ -89,7 +89,7 @@ async function checkSessions() {
       const taskTime = new Date(t.dueDate).getTime();
 
       if (taskTime > now.getTime() && taskTime < in15min.getTime()) {
-        const result = await sendSessionNotification(t, t.user, 0);
+        const result = await sendSessionNotification(t, t.user, 15); // tasks in next 15 min → SESSION_SOON
         if (result.success) {
           sent++;
         } else if (result.reason === 'Duplicate within 24h') {
