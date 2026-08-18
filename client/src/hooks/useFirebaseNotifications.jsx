@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+﻿import { useEffect } from 'react';
 import axios from 'axios';
 import { getFCMToken, getMessagingInstance } from '../firebase';
 import { onMessage } from 'firebase/messaging';
@@ -40,13 +40,13 @@ async function showNotification(payload) {
   const body  = payload?.notification?.body  || '';
   const data  = payload?.data || {};
 
-  // ── Always show an in-app toast immediately ───────────────────────────────
+  // ΓöÇΓöÇ Always show an in-app toast immediately ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
   // Chrome blocks registration.showNotification() when the page tab is focused.
   // The toast is the reliable foreground notification; the SW notification is a
   // bonus that fires when the tab is in the background.
   toast.info(`${title}${body ? `: ${body}` : ''}`);
 
-  // ── Also try a SW notification (works when tab is in background) ──────────
+  // ΓöÇΓöÇ Also try a SW notification (works when tab is in background) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
   try {
     const registration = await navigator.serviceWorker.ready;
     await registration.showNotification(title, {
@@ -60,14 +60,14 @@ async function showNotification(payload) {
       },
       actions: data.subjectId
         ? [
-            { action: 'attended',     title: '✅ Attended'    },
-            { action: 'not_attended', title: '❌ Not Attended' },
-            { action: 'not_held',     title: '⏸ Not Held'     },
+            { action: 'attended',     title: 'Γ£à Attended'    },
+            { action: 'not_attended', title: 'Γ¥î Not Attended' },
+            { action: 'not_held',     title: 'ΓÅ╕ Not Held'     },
           ]
         : [],
     });
   } catch (_) {
-    // Silently ignore — toast above already handled the foreground case.
+    // Silently ignore ΓÇö toast above already handled the foreground case.
   }
 }
 
@@ -76,7 +76,7 @@ function registerForegroundHandler() {
   return onMessage(messaging, async (payload) => {
     // showNotification always fires a toast (foreground) and attempts a
     // SW notification (background/minimized). No permission re-check needed
-    // here — getFCMToken already required permission to produce a token.
+    // here ΓÇö getFCMToken already required permission to produce a token.
     await showNotification(payload);
   });
 }

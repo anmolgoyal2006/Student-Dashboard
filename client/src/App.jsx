@@ -1,10 +1,7 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+﻿import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ToastProvider } from './context/ToastContext';
 import { useEffect } from 'react';
 import { useAuth } from './context/AuthContext';
-import useFirebaseNotifications from './hooks/useFirebaseNotifications';
-import axios from 'axios';
-import { getFCMToken } from './firebase';
 import Sidebar    from './components/Sidebar';
 import LandingPage from './pages/landing/LandingPage';
 import { motion } from 'framer-motion';
@@ -65,9 +62,6 @@ const AppLayout = ({ children }) => {
 export default function App() {
   const { isLoggedIn } = useAuth();
 
-  // Register FCM token + foreground push handler
-  useFirebaseNotifications(isLoggedIn);
-
   useEffect(() => {
     if (!isLoggedIn) return;
 
@@ -86,32 +80,13 @@ export default function App() {
     };
 
     saveJwtToCache();
-
-    // Register FCM token with the server so push notifications work.
-    // This mirrors what was working before — runs on every login/mount.
-    const initFCM = async () => {
-      try {
-        const fcmToken = await getFCMToken();
-        if (fcmToken) {
-          const jwt = localStorage.getItem('token');
-          await axios.post(
-            `${process.env.REACT_APP_API_URL}/user/save-token`,
-            { token: fcmToken },
-            { headers: { Authorization: `Bearer ${jwt}` } }
-          );
-          console.log('[FCM] Token saved');
-        }
-      } catch (err) {
-        console.error('[FCM Init]', err.message);
-      }
-    };
-    initFCM();
-    // Foreground push handler → useFirebaseNotifications hook
+    // FCM token registration ΓåÆ AuthContext.login()
+    // Foreground push handler   ΓåÆ useFirebaseNotifications hook
   }, [isLoggedIn]);
 
   return (
     <ToastProvider>
-      <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <BrowserRouter>
         <Routes>
           <Route path="/login"  element={<PublicRoute><Login /></PublicRoute>} />
           <Route path="/signup" element={<PublicRoute><Signup /></PublicRoute>} />
