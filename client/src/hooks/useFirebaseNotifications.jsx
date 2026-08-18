@@ -37,45 +37,47 @@ async function registerFcmToken() {
 
 async function showNotification(payload) {
   const title = payload?.notification?.title || 'StudentAI';
-  const body = payload?.notification?.body || '';
-  const data = payload?.data || {};
+  const body  = payload?.notification?.body  || '';
+  const data  = payload?.data || {};
 
-  const registration = await navigator.serviceWorker.ready;
+  // ── Always show an in-app toast immediately ───────────────────────────────
+  // Chrome blocks registration.showNotification() when the page tab is focused.
+  // The toast is the reliable foreground notification; the SW notification is a
+  // bonus that fires when the tab is in the background.
+  toast.info(`${title}${body ? `: ${body}` : ''}`);
+
+  // ── Also try a SW notification (works when tab is in background) ──────────
   try {
+    const registration = await navigator.serviceWorker.ready;
     await registration.showNotification(title, {
       body,
-      icon: '/logo192.png',
+      icon : '/logo192.png',
       badge: '/logo192.png',
-      data: {
+      data : {
         subjectId: data.subjectId || '',
-        date: data.date || '',
-        url: data.url || '/',
+        date      : data.date      || '',
+        url       : data.url       || '/',
       },
       actions: data.subjectId
         ? [
-            { action: 'attended', title: '✅ Attended' },
+            { action: 'attended',     title: '✅ Attended'    },
             { action: 'not_attended', title: '❌ Not Attended' },
-            { action: 'not_held', title: '⏸ Not Held' },
+            { action: 'not_held',     title: '⏸ Not Held'     },
           ]
         : [],
     });
-  } catch (error) {
-    console.error('[FCM Hook] showNotification failed:', error);
-    toast.info(`${title}: ${body}`);
+  } catch (_) {
+    // Silently ignore — toast above already handled the foreground case.
   }
 }
 
 function registerForegroundHandler() {
   const messaging = getMessagingInstance();
   return onMessage(messaging, async (payload) => {
-    const permission = await requestNotificationPermission();
-    if (permission === 'granted') {
-      await showNotification(payload);
-      return;
-    }
-    const title = payload?.notification?.title || 'StudentAI';
-    const body = payload?.notification?.body || '';
-    toast.info(`${title}: ${body}`);
+    // showNotification always fires a toast (foreground) and attempts a
+    // SW notification (background/minimized). No permission re-check needed
+    // here — getFCMToken already required permission to produce a token.
+    await showNotification(payload);
   });
 }
 
