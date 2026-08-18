@@ -35,6 +35,17 @@ async function tryInsert(doc) {
 
 // Build a dedupKey that is stable per notification type + entity + UTC day.
 function makeDedupKey(type, entityId, day) {
+  const permanentTypes = [
+    'NEW_ASSIGNMENT',
+    'OVERDUE',
+    'URGENT',
+    'DUE_SOON',
+    'SESSION_SOON',
+    'SESSION_START',
+  ];
+  if (permanentTypes.includes(type)) {
+    return `${type}:${entityId}`;
+  }
   return `${type}:${entityId}:${day}`;
 }
 

@@ -1,20 +1,34 @@
 const ClassroomAssignment = require('../models/ClassroomAssignment');
 const Task = require('../models/Task');
 const Attendance = require('../models/Attendance');
+const ClassroomCourse = require('../models/ClassroomCourse');
 
 exports.getAnalytics = async (req, res) => {
   try {
     const userId = req.user.id;
 
-    // ── Fetch from both ClassroomAssignments and Tasks ──
-    const [assignments, tasks] = await Promise.all([
+    // ── Fetch ClassroomAssignments, Tasks, and ClassroomCourses ──
+    const [assignments, tasks, importedCourses] = await Promise.all([
       ClassroomAssignment.find({ userId }).lean(),
       Task.find({ user: userId }).lean(),
+      ClassroomCourse.find({ userId }).lean(),
     ]);
 
+    const hasImportedCourses = importedCourses.length > 0;
+    const importedCourseNames = new Set(importedCourses.map(c => c.courseName.toLowerCase()));
+
+    // Filter assignments and tasks to only show imported ones (if Classroom is used)
+    const filteredAssignments = hasImportedCourses
+      ? assignments.filter(a => a.courseName && importedCourseNames.has(a.courseName.toLowerCase()))
+      : assignments;
+
+    const filteredTasks = hasImportedCourses
+      ? tasks.filter(t => t.subject && importedCourseNames.has(t.subject.toLowerCase()))
+      : tasks;
+
     // Use Classroom data if available, otherwise fall back to Tasks
-    const hasClassroom = assignments.length > 0;
-    const dataSource = hasClassroom ? assignments : tasks;
+    const hasClassroom = filteredAssignments.length > 0;
+    const dataSource = hasClassroom ? filteredAssignments : filteredTasks;
 
     // ── Assignment metrics ──
     const total = dataSource.length;
@@ -46,8 +60,8 @@ exports.getAnalytics = async (req, res) => {
     );
     const avgCompletionHours = completedItems.length > 0
       ? Math.round(completedItems.reduce((s, a) => s + (a.estimatedHours || 0), 0) / completedItems.length)
-      : tasks.length > 0
-        ? Math.round(tasks.filter(t => t.status === 'completed').length / Math.max(tasks.length, 1) * 5)
+      : filteredTasks.length > 0
+        ? Math.round(filteredTasks.filter(t => t.status === 'completed').length / Math.max(filteredTasks.length, 1) * 5)
         : 0;
 
     // ── Weekly completion trend (last 8 weeks) ──
@@ -104,7 +118,7 @@ exports.getAnalytics = async (req, res) => {
     // ── Productivity by day of week ──
     const dayCount = { Sun: 0, Mon: 0, Tue: 0, Wed: 0, Thu: 0, Fri: 0, Sat: 0 };
     const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    tasks.filter(t => t.status === 'completed').forEach(t => {
+    filteredTasks.filter(t => t.status === 'completed').forEach(t => {
       if (t.dueDate) {
         const day = dayNames[new Date(t.dueDate).getDay()];
         dayCount[day]++;
@@ -119,11 +133,19 @@ exports.getAnalytics = async (req, res) => {
       Attendance.find({ userId }).populate('subjectId', 'name').lean()
     ]);
 
+    const filteredSubjects = hasImportedCourses
+      ? subjects.filter(s => importedCourseNames.has(s.name.toLowerCase()))
+      : subjects;
+
+    const filteredRecords = hasImportedCourses
+      ? records.filter(r => r.subjectId && importedCourseNames.has(r.subjectId.name.toLowerCase()))
+      : records;
+
     const attMap = {};
-    for (const s of subjects) {
+    for (const s of filteredSubjects) {
       attMap[s.name] = { total: s.initialTotal || 0, present: s.initialPresent || 0 };
     }
-    for (const r of records) {
+    for (const r of filteredRecords) {
       if (!r.subjectId) continue;
       const name = r.subjectId.name;
       if (!attMap[name]) attMap[name] = { total: 0, present: 0 };
