@@ -17,24 +17,28 @@ export const getMessagingInstance = () => messaging;
 // ─── Get FCM token ────────────────────────────────────────────────────────────
 export async function getFCMToken() {
   try {
-    // Register service worker explicitly — required for getToken to work
+    // Register the service worker
     const swRegistration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
 
+    // Wait for the SW to become active before calling getToken.
+    // After unregister+re-register (or first visit) the SW is in 'installing'
+    // state — getToken's internal pushManager.subscribe() fails if there is
+    // no active worker yet.
+    await waitForActiveServiceWorker(swRegistration);
+
     const token = await getToken(messaging, {
-      vapidKey             : process.env.REACT_APP_VAPID_KEY,  // must be set in .env
+      vapidKey                 : process.env.REACT_APP_VAPID_KEY,
       serviceWorkerRegistration: swRegistration,
     });
 
     if (token) {
-      console.log('[FCM] Token:', token);
+      console.log('[FCM] Token obtained');
       return token;
     } else {
       console.warn('[FCM] No token received — check VAPID key and SW registration.');
       return null;
     }
   } catch (err) {
-    // Declining notifications is a normal user choice, not a fault — logging it
-    // as an error buries real failures in the console.
     if (
       err?.code === 'messaging/permission-blocked' ||
       err?.code === 'messaging/permission-default' ||
@@ -46,6 +50,39 @@ export async function getFCMToken() {
     console.error('[FCM] getToken error:', err);
     return null;
   }
+}
+
+/**
+ * Wait until a service worker registration has an active worker.
+ * Handles three cases:
+ *  1. Already active   → resolves immediately
+ *  2. Installing/waiting → waits for statechange to 'activated'
+ *  3. Timeout (10s)    → resolves anyway so the caller can still try
+ */
+function waitForActiveServiceWorker(registration) {
+  return new Promise((resolve) => {
+    if (registration.active) {
+      resolve();
+      return;
+    }
+
+    const timeout = setTimeout(resolve, 10000); // give up after 10s
+
+    const worker = registration.installing || registration.waiting;
+    if (!worker) {
+      clearTimeout(timeout);
+      resolve();
+      return;
+    }
+
+    worker.addEventListener('statechange', function onStateChange() {
+      if (worker.state === 'activated') {
+        clearTimeout(timeout);
+        worker.removeEventListener('statechange', onStateChange);
+        resolve();
+      }
+    });
+  });
 }
 
 // ─── Foreground message listener ─────────────────────────────────────────────
