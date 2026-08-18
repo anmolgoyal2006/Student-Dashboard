@@ -3,6 +3,8 @@ import { ToastProvider } from './context/ToastContext';
 import { useEffect } from 'react';
 import { useAuth } from './context/AuthContext';
 import useFirebaseNotifications from './hooks/useFirebaseNotifications';
+import axios from 'axios';
+import { getFCMToken } from './firebase';
 import Sidebar    from './components/Sidebar';
 import LandingPage from './pages/landing/LandingPage';
 import { motion } from 'framer-motion';
@@ -84,8 +86,27 @@ export default function App() {
     };
 
     saveJwtToCache();
-    // FCM token registration → AuthContext.login()
-    // Foreground push handler   → useFirebaseNotifications hook
+
+    // Register FCM token with the server so push notifications work.
+    // This mirrors what was working before — runs on every login/mount.
+    const initFCM = async () => {
+      try {
+        const fcmToken = await getFCMToken();
+        if (fcmToken) {
+          const jwt = localStorage.getItem('token');
+          await axios.post(
+            `${process.env.REACT_APP_API_URL}/user/save-token`,
+            { token: fcmToken },
+            { headers: { Authorization: `Bearer ${jwt}` } }
+          );
+          console.log('[FCM] Token saved');
+        }
+      } catch (err) {
+        console.error('[FCM Init]', err.message);
+      }
+    };
+    initFCM();
+    // Foreground push handler → useFirebaseNotifications hook
   }, [isLoggedIn]);
 
   return (
