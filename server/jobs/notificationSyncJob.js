@@ -28,7 +28,7 @@ async function checkDeadlines() {
       const dueTime = new Date(a.dueDate).getTime();
 
       // Due in ~6 hours
-      if (dueTime > now.getTime() && dueTime < in6h.getTime() && dueTime > now.getTime() - 5 * 60 * 1000) {
+      if (dueTime > now.getTime() && dueTime < in6h.getTime()) {
         const result = await sendAssignmentNotification(a, a.userId);
         if (result.success) {
           sent++;
@@ -42,7 +42,7 @@ async function checkDeadlines() {
         }
       }
       // Due in ~24 hours (mutually exclusive with 6h window)
-      if (dueTime >= in6h.getTime() && dueTime < in24h.getTime() && dueTime > now.getTime() - 5 * 60 * 1000) {
+      else if (dueTime >= in6h.getTime() && dueTime < in24h.getTime()) {
         const result = await sendAssignmentNotification(a, a.userId);
         if (result.success) {
           sent++;

@@ -1,7 +1,6 @@
 // services/notificationService.js
 const admin        = require('../config/firebaseAdmin');
 const Subject      = require('../models/Subject');
-const User         = require('../models/User');
 const Notification = require('../models/Notification');
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -176,8 +175,13 @@ async function sendTodayNotifications() {
       if (!todaySchedule) continue;
 
       const startTime = todaySchedule.startTime || '';
-      const user = await User.findById(subject.userId).select('fcmToken').lean();
-      if (!user?.fcmToken) continue;
+
+      // Look up the user's most-recent FCM token from NotificationToken
+      const NotificationToken = require('../models/NotificationToken');
+      const tokenDoc = await NotificationToken.findOne({ userId: subject.userId })
+        .sort({ _id: -1 }).lean();
+      if (!tokenDoc?.token) continue;
+      const fcmToken = tokenDoc.token;
 
       const payload = buildPayload(subject, subject.userId, startTime, dateStr);
       const title   = payload.notification.title;
@@ -192,7 +196,7 @@ async function sendTodayNotifications() {
         continue;
       }
 
-      const sent = await sendNotification(user.fcmToken, payload);
+      const sent = await sendNotification(fcmToken, payload);
       if (sent) totalSent++;
     }
 
@@ -234,8 +238,12 @@ async function sendEndOfClassNotifications() {
     console.log(`[FCM] ${subjects.length} class(es) ending at ${currentTime} IST on ${dayShort}`);
 
     for (const subject of subjects) {
-      const user = await User.findById(subject.userId).select('fcmToken').lean();
-      if (!user?.fcmToken) continue;
+      // Look up the user's most-recent FCM token from NotificationToken
+      const NotificationToken = require('../models/NotificationToken');
+      const tokenDoc = await NotificationToken.findOne({ userId: subject.userId })
+        .sort({ _id: -1 }).lean();
+      if (!tokenDoc?.token) continue;
+      const fcmToken = tokenDoc.token;
 
       const slot = subject.schedule.find(
         (s) => s.day === dayShort && [currentTime, currentTime12].includes(s.endTime)
@@ -284,7 +292,7 @@ async function sendEndOfClassNotifications() {
         },
       };
 
-      await sendNotification(user.fcmToken, payload);
+      await sendNotification(fcmToken, payload);
       console.log(`[FCM] End-of-class notification sent: ${subject.name} at ${currentTime} IST`);
     }
   } finally {

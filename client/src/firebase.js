@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getMessaging, getToken, onMessage } from 'firebase/messaging';
+import { getMessaging, getToken } from 'firebase/messaging';
 
 const firebaseConfig = {
   apiKey            : process.env.REACT_APP_FIREBASE_API_KEY,
@@ -49,20 +49,9 @@ export async function getFCMToken() {
 }
 
 // ─── Foreground message listener ─────────────────────────────────────────────
+// NOTE: Foreground handling is done entirely in useFirebaseNotifications.jsx.
+// This export is kept for backward-compat but should not be called — calling it
+// creates a second parallel listener that shows a duplicate notification.
 export function onMessageListener() {
-  return new Promise((resolve) => {
-    onMessage(messaging, (payload) => {
-      console.log("[FCM] Foreground message:", payload);
-
-      // SHOW notification (THIS FIXES YOUR ISSUE)
-      if (Notification.permission === "granted") {
-        new Notification(payload.notification?.title || "Notification", {
-          body: payload.notification?.body || "",
-          icon: "/logo192.png",
-        });
-      }
-
-      resolve(payload);
-    });
-  });
+  return new Promise(() => {}); // no-op: never resolves, never registers a handler
 }

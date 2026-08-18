@@ -52,7 +52,10 @@ async function checkAcademicRisks(userId) {
             userId,
             `⚠️ Academic Risk: ${a.courseName}`,
             alert.message,
-            { type: 'RISK_ALERT', subject: a.courseName, assignmentId: a.assignmentId }
+            // Use MongoDB _id as the stable entity identifier so the dedupKey is
+            // unique per assignment. a.assignmentId is a Google Classroom string
+            // and may be null/undefined for non-Classroom assignments.
+            { type: 'RISK_ALERT', assignmentId: String(a._id), subject: a.courseName }
           );
         }
       }

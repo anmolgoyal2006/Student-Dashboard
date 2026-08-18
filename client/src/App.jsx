@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { ToastProvider, toast } from './context/ToastContext';
+import { ToastProvider } from './context/ToastContext';
 import { useEffect } from 'react';
 import { useAuth } from './context/AuthContext';
 import Sidebar    from './components/Sidebar';
@@ -23,9 +23,7 @@ import AttendancePrompt from './components/AttendancePrompt';
 import AdminPanel from './pages/AdminPanel';
 import AdminOpportunities from './pages/admin/Opportunities';
 import LoginSuccess from './pages/LoginSuccess';
-import { getFCMToken, getMessagingInstance } from './firebase';
-import { onMessage } from 'firebase/messaging';
-import axios from 'axios';
+
 
 const ProtectedRoute = ({ children }) => {
   const { isLoggedIn } = useAuth();
@@ -67,67 +65,23 @@ export default function App() {
   useEffect(() => {
     if (!isLoggedIn) return;
 
+    // Keep the JWT in Cache API so the service worker can read it for
+    // attendance quick-actions on notification buttons.
     const saveJwtToCache = async () => {
       try {
         const jwt = localStorage.getItem('token');
         if (jwt) {
           const cache = await caches.open('auth-cache');
           await cache.put('auth-token', new Response(JSON.stringify({ token: jwt })));
-          console.log('[Cache] JWT saved for SW');
         }
       } catch (err) {
         console.error('[Cache] Failed:', err);
       }
     };
 
-    const initFCM = async () => {
-      try {
-        const fcmToken = await getFCMToken();
-        if (fcmToken) {
-          const jwt = localStorage.getItem('token');
-          await axios.post(
-            `${process.env.REACT_APP_API_URL}/user/save-token`,
-            { token: fcmToken },
-            { headers: { Authorization: `Bearer ${jwt}` } }
-          );
-          console.log('[FCM] Token saved');
-        }
-      } catch (err) {
-        console.error('[FCM Init]', err.message);
-      }
-    };
-
     saveJwtToCache();
-    initFCM();
-
-    const messaging = getMessagingInstance();
-    const unsubscribe = onMessage(messaging, (payload) => {
-      const { title, body } = payload?.notification || {};
-      const data = payload?.data || {};
-
-      if (Notification.permission === 'granted') {
-        navigator.serviceWorker.ready.then(reg => {
-          reg.showNotification(title || 'StudentAI', {
-            body: body || '',
-            icon: '/logo192.png',
-            badge: '/logo192.png',
-            data: {
-              subjectId: data.subjectId || '',
-              date: data.date || '',
-              url: data.url || '/',
-            },
-            actions: data.subjectId ? [
-              { action: 'attended',     title: '✅ Attended'    },
-              { action: 'not_attended', title: '❌ Not Attended' },
-              { action: 'not_held',     title: '⏸ Not Held'     },
-            ] : [],
-          });
-        });
-      } else if (title || body) {
-        toast.info(`${title}: ${body}`);
-      }
-    });
-    return () => unsubscribe();
+    // FCM token registration → AuthContext.login()
+    // Foreground push handler   → useFirebaseNotifications hook
   }, [isLoggedIn]);
 
   return (

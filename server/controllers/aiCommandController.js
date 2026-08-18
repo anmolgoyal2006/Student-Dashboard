@@ -3,7 +3,7 @@ const Attendance = require('../models/Attendance');
 const Marks      = require('../models/Marks');
 const Task       = require('../models/Task');
 const Semester   = require('../models/Semester.model');
-const { sendNotification } = require('../utils/sendNotification');
+const { sendNotification } = require('../services/notificationEngine');
 const User = require('../models/User');
 const { chatCompletionsCreate, LIGHT_MODEL } = require('../services/aiService');
 const { createSubject, mergeSchedule } = require('../services/subjectService');
@@ -1111,7 +1111,7 @@ else if (parsed.entity === 'attendance') {
         );
      const userForNotif = await User.findById(userId);
 if (userForNotif?.fcmToken) {
-  await sendNotification(userForNotif.fcmToken, '📋 Attendance Marked', parsed.message);
+  await sendNotification(userId, '📋 Attendance Marked', parsed.message, { type: 'INFO' });
 }
       } else if (parsed.action === 'get') {
         const records = await Attendance.find({ userId }).populate('subjectId', 'name');
@@ -1155,7 +1155,7 @@ if (userForNotif?.fcmToken) {
         result = await Marks.create({ ...parsed.data, userId });
         const userForNotif = await User.findById(userId);
 if (userForNotif?.fcmToken) {
-  await sendNotification(userForNotif.fcmToken, '📊 Marks Added', parsed.message);
+  await sendNotification(userId, '📊 Marks Added', parsed.message, { type: 'INFO' });
 }
 
       } else if (parsed.action === 'get') {
@@ -1193,7 +1193,7 @@ if (userForNotif?.fcmToken) {
         result = await Task.create({ ...parsed.data, user: userId });
         const userForNotif = await User.findById(userId);
 if (userForNotif?.fcmToken) {
-  await sendNotification(userForNotif.fcmToken, '✅ Task Added', parsed.message);
+  await sendNotification(userId, '✅ Task Added', parsed.message, { type: 'INFO' });
 }
 
       } else if (parsed.action === 'delete') {

@@ -49,6 +49,23 @@ mongoose.connect(process.env.MONGO_URI, {
       await User.collection.dropIndex('sid_1');
       console.log('[Index] Dropped sid_1 index — sid uniqueness removed from schema');
     } catch (_) {}
+    // ── Ensure notification dedup index exists ────────────────────────
+    // syncIndexes() is intentionally not called globally, but this one index
+    // is critical for atomic dedup — ensure it exists explicitly.
+    try {
+      const Notification = require('./models/Notification');
+      await Notification.collection.createIndex(
+        { userId: 1, dedupKey: 1 },
+        { unique: true, sparse: true, name: 'userId_1_dedupKey_1' }
+      );
+      console.log('[Index] Notification dedup index ensured');
+    } catch (err) {
+      // Code 85 = index already exists with same spec, 86 = different options — both fine
+      if (err.code !== 85 && err.code !== 86) {
+        console.warn('[Index] Could not ensure notification dedup index:', err.message);
+      }
+    }
+
     // NOTE: do NOT call syncIndexes() — it would recreate indexes from schema
     startDailyNotificationJob();
     startClassroomSyncJob();

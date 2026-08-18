@@ -84,25 +84,12 @@ export const AuthProvider = ({ children }) => {
   const login = useCallback((userData, token) => {
     localStorage.setItem('token', token);
     localStorage.setItem('user', JSON.stringify(userData));
-   if (token) {
-  saveTokenToIDB(token);
-  saveTokenToCache(token);
-  // Auto-register FCM token silently on every login
-  import('../firebase').then(({ getFCMToken }) => {
-    getFCMToken().then(fcmToken => {
-      if (fcmToken) {
-        fetch(`${process.env.REACT_APP_API_URL}/user/save-token`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({ token: fcmToken })
-        }).catch(() => {});
-      }
-    }).catch(() => {});
-  }).catch(() => {});
-}
+    if (token) {
+      saveTokenToIDB(token);
+      saveTokenToCache(token);
+      // FCM token registration is handled by useFirebaseNotifications hook
+      // which fires when isLoggedIn becomes true — no need to do it here too.
+    }
     setUser(userData);
   }, []);
 

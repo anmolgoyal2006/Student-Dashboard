@@ -75,15 +75,8 @@ async function sendNotification(userId, title, body, data = {}) {
       return { success: false, reason: 'Duplicate within 24h' };
     }
 
-    // ── Gather push tokens ────────────────────────────────────────────────
+    // ── Gather push tokens from NotificationToken collection ─────────────
     const tokens = await NotificationToken.find({ userId }).lean();
-    if (!tokens.length) {
-      const User = require('../models/User');
-      const user = await User.findById(userId).select('fcmToken').lean();
-      if (user?.fcmToken) {
-        tokens.push({ token: user.fcmToken, platform: 'web', userId });
-      }
-    }
     if (!tokens.length) {
       console.log(`[FCM] No tokens for user ${userId} — saved to DB only`);
       return { success: false, reason: 'No tokens' };

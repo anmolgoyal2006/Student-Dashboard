@@ -213,8 +213,9 @@ exports.saveToken = async (req, res) => {
     const { token } = req.body;
     if (!token) return res.status(400).json({ message: 'Token required' });
 
-    await User.findByIdAndUpdate(req.user._id, { fcmToken: token });
-
+    // Store in NotificationToken (supports multiple devices).
+    // We no longer write User.fcmToken — it's a scalar field that gets
+    // overwritten by every new device and is inconsistent with multi-device use.
     const NotificationToken = require('../models/NotificationToken');
     await NotificationToken.findOneAndUpdate(
       { userId: req.user._id, token },
