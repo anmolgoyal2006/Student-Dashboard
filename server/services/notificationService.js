@@ -113,22 +113,29 @@ async function saveNotificationToDB(userId, subjectId, title, body) {
 // Returns true if the doc was newly inserted (we should send the push),
 // false if it already existed (duplicate — skip the push).
 async function tryInsertNotification(doc) {
-  // dedupKey scopes the unique index to one notification per subject per UTC day.
+  // dedupKey: one notification per subject per UTC day.
+  // Include subjectId so different subjects on the same day don't collide.
   const day      = new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
-  const dedupKey = `${doc.type}:${doc.title}:${day}`;
+  const entityId = doc.subjectId ? String(doc.subjectId) : doc.title;
+  const dedupKey = `${doc.type}:${entityId}:${day}`;
 
-  try {
-    const result = await Notification.findOneAndUpdate(
-      { userId: doc.userId, type: doc.type, title: doc.title, dedupKey },
-      { $setOnInsert: { ...doc, dedupKey, read: false } },
-      { upsert: true, new: true, setDefaultsOnInsert: true }
-    );
-    // New insert if createdAt is within the last 2 seconds
-    return (Date.now() - result.createdAt.getTime()) < 2000;
-  } catch (err) {
-    if (err.code === 11000) return false; // duplicate key → already sent
-    throw err;
-  }
+  const now = new Date();
+  const result = await Notification.collection.updateOne(
+    { userId: doc.userId, dedupKey },          // unique filter
+    {
+      $setOnInsert: {
+        ...doc,
+        dedupKey,
+        read      : false,
+        createdAt : now,
+        updatedAt : now,
+      },
+    },
+    { upsert: true }
+  );
+  // upsertedCount === 1 → new document inserted → send the push
+  // upsertedCount === 0 → doc already existed → duplicate, skip
+  return result.upsertedCount === 1;
 }
 
 // Batched variant: insert many notification docs in a single round trip.

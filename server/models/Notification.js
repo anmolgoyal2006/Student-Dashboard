@@ -66,11 +66,13 @@ const notificationSchema = new mongoose.Schema(
 // For fast lookup/dedup queries
 notificationSchema.index({ userId: 1, type: 1, title: 1, body: 1, createdAt: -1 });
 
-// Dedup key: one notification per user+type+title per "bucket" day (stored as a separate field).
-// This lets us do an atomic findOneAndUpdate upsert instead of a racy check-then-insert.
+// Primary dedup index — one document per (user, dedupKey).
+// dedupKey encodes: type + entity-id + UTC-day, making it unique per
+// logical notification per day. sparse=true so legacy docs without dedupKey
+// are unaffected and don't collide with each other.
 notificationSchema.index(
-  { userId: 1, type: 1, title: 1, dedupKey: 1 },
-  { unique: true, sparse: true }   // sparse so existing docs without dedupKey are unaffected
+  { userId: 1, dedupKey: 1 },
+  { unique: true, sparse: true }
 );
 
 module.exports = mongoose.model('Notification', notificationSchema);
