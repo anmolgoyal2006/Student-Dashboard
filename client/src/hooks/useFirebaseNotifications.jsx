@@ -1,4 +1,4 @@
-﻿import { useEffect } from 'react';
+import { useEffect } from 'react';
 import axios from 'axios';
 import { getFCMToken, getMessagingInstance } from '../firebase';
 import { onMessage } from 'firebase/messaging';
@@ -36,8 +36,8 @@ async function registerFcmToken() {
 }
 
 async function showNotification(payload) {
-  const title = payload?.notification?.title || 'StudentAI';
-  const body  = payload?.notification?.body  || '';
+  const title = payload?.notification?.title || payload?.data?.title || 'StudentAI';
+  const body  = payload?.notification?.body  || payload?.data?.body  || '';
   const data  = payload?.data || {};
 
   // ΓöÇΓöÇ Always show an in-app toast immediately ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ

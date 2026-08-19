@@ -27,8 +27,10 @@ const messaging = firebase.messaging();
 messaging.onBackgroundMessage((payload) => {
   console.log('[SW] Background message received:', payload);
 
-  const { title, body, icon } = payload.notification || {};
-  const data = payload.data || {};
+  const title = payload.notification?.title || payload.data?.title || 'StudentAI';
+  const body  = payload.notification?.body  || payload.data?.body  || '';
+  const icon  = payload.notification?.icon  || payload.data?.icon  || '/logo192.png';
+  const data  = payload.data || {};
 
   const isAttendance = !!data.subjectId;
 

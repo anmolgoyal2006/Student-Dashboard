@@ -46,13 +46,12 @@ async function fetchTodaySubjects(dayShort) {
 }
 
 function buildPayload(subject, userId, startTime, dateStr) {
+  const title = `📚 ${subject.name}`;
+  const body = startTime
+    ? `Class at ${startTime} — Mark your attendance`
+    : 'Mark your attendance for today';
+
   return {
-    notification: {
-      title: `📚 ${subject.name}`,
-      body: startTime
-        ? `Class at ${startTime} — Mark your attendance`
-        : 'Mark your attendance for today',
-    },
     data: {
       type:      'ATTENDANCE_MARK',
       subjectId: String(subject._id),
@@ -60,30 +59,8 @@ function buildPayload(subject, userId, startTime, dateStr) {
       subject:   subject.name,
       time:      startTime || '',
       date:      dateStr,
-    },
-    webpush: {
-      notification: {
-        title: `📚 ${subject.name}`,
-        body: startTime
-          ? `Class at ${startTime} — Mark your attendance`
-          : 'Mark your attendance for today',
-        icon:  '/logo192.png',
-        badge: '/logo192.png',
-        actions: [
-          { action: 'attended',     title: '✅ Attended'    },
-          { action: 'not_attended', title: '❌ Not Attended' },
-          { action: 'not_held',     title: '⏸️ Not Held'    },
-        ],
-        data: {
-          type:      'ATTENDANCE_MARK',
-          subjectId: String(subject._id),
-          userId:    String(userId),
-          subject:   subject.name,
-          time:      startTime || '',
-          date:      dateStr,
-        },
-      },
-      fcmOptions: {},
+      title,
+      body,
     },
   };
 }
@@ -184,8 +161,8 @@ async function sendTodayNotifications() {
       const fcmToken = tokenDoc.token;
 
       const payload = buildPayload(subject, subject.userId, startTime, dateStr);
-      const title   = payload.notification.title;
-      const body    = payload.notification.body;
+      const title   = payload.data.title;
+      const body    = payload.data.body;
 
       // ── Atomic dedup: insert only if not already sent today ──
       const isNew = await tryInsertNotification({
@@ -262,33 +239,14 @@ async function sendEndOfClassNotifications() {
       }
 
       const payload = {
-        notification: { title, body },
         data: {
           type     : 'ATTENDANCE_MARK',
           subjectId: String(subject._id),
           userId   : String(subject.userId),
           subject  : subject.name,
           date     : dateStr,
-        },
-        webpush: {
-          notification: {
-            title,
-            body,
-            icon   : '/logo192.png',
-            badge  : '/logo192.png',
-            actions: [
-              { action: 'attended',     title: '✅ Attended'    },
-              { action: 'not_attended', title: '❌ Not Attended' },
-              { action: 'not_held',     title: '⏸️ Not Held'    },
-            ],
-            data: {
-              type     : 'ATTENDANCE_MARK',
-              subjectId: String(subject._id),
-              userId   : String(subject.userId),
-              subject  : subject.name,
-              date     : dateStr,
-            },
-          },
+          title,
+          body,
         },
       };
 
