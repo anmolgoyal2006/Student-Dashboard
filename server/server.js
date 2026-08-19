@@ -54,9 +54,16 @@ mongoose.connect(process.env.MONGO_URI, {
     // is critical for atomic dedup — ensure it exists explicitly.
     try {
       const Notification = require('./models/Notification');
+      try {
+        await Notification.collection.dropIndex('userId_1_dedupKey_1');
+      } catch (_) {}
       await Notification.collection.createIndex(
         { userId: 1, dedupKey: 1 },
-        { unique: true, sparse: true, name: 'userId_1_dedupKey_1' }
+        {
+          unique: true,
+          partialFilterExpression: { dedupKey: { $type: 'string' } },
+          name: 'userId_1_dedupKey_1'
+        }
       );
       console.log('[Index] Notification dedup index ensured');
     } catch (err) {

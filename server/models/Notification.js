@@ -72,7 +72,10 @@ notificationSchema.index({ userId: 1, type: 1, title: 1, body: 1, createdAt: -1 
 // are unaffected and don't collide with each other.
 notificationSchema.index(
   { userId: 1, dedupKey: 1 },
-  { unique: true, sparse: true }
+  {
+    unique: true,
+    partialFilterExpression: { dedupKey: { $type: 'string' } }
+  }
 );
 
 module.exports = mongoose.model('Notification', notificationSchema);
