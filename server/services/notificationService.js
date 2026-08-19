@@ -1,7 +1,8 @@
 // services/notificationService.js
-const admin        = require('../config/firebaseAdmin');
-const Subject      = require('../models/Subject');
-const Notification = require('../models/Notification');
+const admin             = require('../config/firebaseAdmin');
+const Subject           = require('../models/Subject');
+const Notification      = require('../models/Notification');
+const NotificationToken = require('../models/NotificationToken');
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -9,25 +10,36 @@ const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 // Server likely runs in UTC; all class times are in IST (Asia/Kolkata).
 // These helpers return correct IST values regardless of server timezone.
 
-function getISTDate() {
-  const now = new Date();
-  // IST offset = UTC +5:30
-  const istOffsetMs = 5.5 * 60 * 60 * 1000;
-  return new Date(now.getTime() + istOffsetMs);
-}
-
 function getISTDayShort() {
-  return DAYS[getISTDate().getUTCDay()];
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Kolkata',
+    weekday: 'short'
+  });
+  return formatter.format(new Date());
 }
 
 function getISTTimeHHMM() {
-  const d = getISTDate();
-  return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Kolkata',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23'
+  });
+  return formatter.format(new Date());
 }
 
 function getISTDateString() {
-  const d = getISTDate();
-  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  });
+  const parts = formatter.formatToParts(new Date());
+  const year = parts.find(p => p.type === 'year').value;
+  const month = parts.find(p => p.type === 'month').value;
+  const day = parts.find(p => p.type === 'day').value;
+  return `${year}-${month}-${day}`;
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -75,16 +87,6 @@ async function sendNotification(fcmToken, payload) {
   }
 }
 
-async function saveNotificationToDB(userId, subjectId, title, body) {
-  try {
-    console.log("💾 Saving notification:", { userId, subjectId, title });
-    const saved = await Notification.create({ userId, subjectId, title, body });
-    console.log("✅ Saved to DB:", saved._id);
-  } catch (err) {
-    console.error("❌ DB SAVE ERROR:", err.message);
-  }
-}
-
 // Atomic dedup upsert for attendance notifications.
 // Returns true if the doc was newly inserted (we should send the push),
 // false if it already existed (duplicate — skip the push).
@@ -114,18 +116,6 @@ async function tryInsertNotification(doc) {
   return result.upsertedCount === 1;
 }
 
-// Batched variant: insert many notification docs in a single round trip.
-// Kept for backward-compat but no longer used by the cron loops.
-async function saveNotificationsToDB(docs) {
-  if (!docs.length) return;
-  try {
-    await Notification.insertMany(docs, { ordered: false });
-    console.log(`✅ Saved ${docs.length} notifications to DB`);
-  } catch (err) {
-    console.error("❌ DB BULK SAVE ERROR:", err.message);
-  }
-}
-
 // Guard flags — prevent overlapping cron executions for both jobs
 let isTodayRunning = false;
 let isEndOfClassRunning = false;
@@ -145,6 +135,14 @@ async function sendTodayNotifications() {
       return;
     }
 
+    // Prefetch all notification tokens for the user IDs in subjects in one batch query
+    const userIds = [...new Set(subjects.map(s => String(s.userId)))];
+    const tokenDocs = await NotificationToken.find({ userId: { $in: userIds } }).sort({ _id: 1 }).lean();
+    const tokenMap = {};
+    for (const doc of tokenDocs) {
+      tokenMap[String(doc.userId)] = doc.token;
+    }
+
     let totalSent = 0;
 
     for (const subject of subjects) {
@@ -153,16 +151,13 @@ async function sendTodayNotifications() {
 
       const startTime = todaySchedule.startTime || '';
 
-      // Look up the user's most-recent FCM token from NotificationToken
-      const NotificationToken = require('../models/NotificationToken');
-      const tokenDoc = await NotificationToken.findOne({ userId: subject.userId })
-        .sort({ _id: -1 }).lean();
-      if (!tokenDoc?.token) continue;
-      const fcmToken = tokenDoc.token;
+      const fcmToken = tokenMap[String(subject.userId)];
+      if (!fcmToken) continue;
 
       const payload = buildPayload(subject, subject.userId, startTime, dateStr);
       const title   = payload.data.title;
       const body    = payload.data.body;
+      const dedupKey = `ATTENDANCE_MARK:${subject._id}:${dateStr}:morning`;
 
       // ── Atomic dedup: insert only if not already sent today ──
       const isNew = await tryInsertNotification({
@@ -171,7 +166,7 @@ async function sendTodayNotifications() {
         title,
         body,
         type: 'ATTENDANCE_MARK',
-        dedupKey: `ATTENDANCE_MARK:${subject._id}:${dateStr}:morning`,
+        dedupKey,
       });
       if (!isNew) {
         console.log(`[FCM] Skipping duplicate start-of-day for ${subject.name}`);
@@ -179,7 +174,16 @@ async function sendTodayNotifications() {
       }
 
       const sent = await sendNotification(fcmToken, payload);
-      if (sent) totalSent++;
+      if (sent) {
+        totalSent++;
+      } else {
+        // FCM failed to send — remove notification from DB so it can be retried in the next cron execution
+        try {
+          await Notification.collection.deleteOne({ userId: subject.userId, dedupKey });
+        } catch (err) {
+          console.error('[FCM] Failed to delete failed notification record:', err.message);
+        }
+      }
     }
 
     console.log(`[FCM] Total start-of-day notifications sent: ${totalSent}`);
@@ -219,13 +223,17 @@ async function sendEndOfClassNotifications() {
 
     console.log(`[FCM] ${subjects.length} class(es) ending at ${currentTime} IST on ${dayShort}`);
 
+    // Prefetch all notification tokens for the user IDs in subjects in one batch query
+    const userIds = [...new Set(subjects.map(s => String(s.userId)))];
+    const tokenDocs = await NotificationToken.find({ userId: { $in: userIds } }).sort({ _id: 1 }).lean();
+    const tokenMap = {};
+    for (const doc of tokenDocs) {
+      tokenMap[String(doc.userId)] = doc.token;
+    }
+
     for (const subject of subjects) {
-      // Look up the user's most-recent FCM token from NotificationToken
-      const NotificationToken = require('../models/NotificationToken');
-      const tokenDoc = await NotificationToken.findOne({ userId: subject.userId })
-        .sort({ _id: -1 }).lean();
-      if (!tokenDoc?.token) continue;
-      const fcmToken = tokenDoc.token;
+      const fcmToken = tokenMap[String(subject.userId)];
+      if (!fcmToken) continue;
 
       const slot = subject.schedule.find(
         (s) => s.day === dayShort && [currentTime, currentTime12].includes(s.endTime)
@@ -233,6 +241,7 @@ async function sendEndOfClassNotifications() {
 
       const title = `📋 Did you attend ${subject.name}?`;
       const body  = `Class just ended${slot?.room ? ` in ${slot.room}` : ''}. Mark your attendance.`;
+      const dedupKey = `ATTENDANCE_MARK:${subject._id}:${dateStr}:end:${currentTime}`;
 
       // ── Atomic dedup: insert only once per class-end per day ──
       const isNew = await tryInsertNotification({
@@ -241,7 +250,7 @@ async function sendEndOfClassNotifications() {
         title,
         body,
         type: 'ATTENDANCE_MARK',
-        dedupKey: `ATTENDANCE_MARK:${subject._id}:${dateStr}:end:${currentTime}`,
+        dedupKey,
       });
       if (!isNew) {
         console.log(`[FCM] Skipping duplicate end-of-class for ${subject.name}`);
@@ -260,8 +269,17 @@ async function sendEndOfClassNotifications() {
         },
       };
 
-      await sendNotification(fcmToken, payload);
-      console.log(`[FCM] End-of-class notification sent: ${subject.name} at ${currentTime} IST`);
+      const sent = await sendNotification(fcmToken, payload);
+      if (sent) {
+        console.log(`[FCM] End-of-class notification sent: ${subject.name} at ${currentTime} IST`);
+      } else {
+        // FCM failed to send — remove notification from DB so it can be retried in the next cron execution
+        try {
+          await Notification.collection.deleteOne({ userId: subject.userId, dedupKey });
+        } catch (err) {
+          console.error('[FCM] Failed to delete failed notification record:', err.message);
+        }
+      }
     }
   } finally {
     isEndOfClassRunning = false;
