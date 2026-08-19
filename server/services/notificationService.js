@@ -93,7 +93,7 @@ async function tryInsertNotification(doc) {
   // Include subjectId so different subjects on the same day don't collide.
   const day      = new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
   const entityId = doc.subjectId ? String(doc.subjectId) : doc.title;
-  const dedupKey = `${doc.type}:${entityId}:${day}`;
+  const dedupKey = doc.dedupKey || `${doc.type}:${entityId}:${day}`;
 
   const now = new Date();
   const result = await Notification.collection.updateOne(
@@ -166,7 +166,12 @@ async function sendTodayNotifications() {
 
       // ── Atomic dedup: insert only if not already sent today ──
       const isNew = await tryInsertNotification({
-        userId: subject.userId, subjectId: subject._id, title, body, type: 'ATTENDANCE_MARK',
+        userId: subject.userId,
+        subjectId: subject._id,
+        title,
+        body,
+        type: 'ATTENDANCE_MARK',
+        dedupKey: `ATTENDANCE_MARK:${subject._id}:${dateStr}:morning`,
       });
       if (!isNew) {
         console.log(`[FCM] Skipping duplicate start-of-day for ${subject.name}`);
@@ -231,7 +236,12 @@ async function sendEndOfClassNotifications() {
 
       // ── Atomic dedup: insert only once per class-end per day ──
       const isNew = await tryInsertNotification({
-        userId: subject.userId, subjectId: subject._id, title, body, type: 'ATTENDANCE_MARK',
+        userId: subject.userId,
+        subjectId: subject._id,
+        title,
+        body,
+        type: 'ATTENDANCE_MARK',
+        dedupKey: `ATTENDANCE_MARK:${subject._id}:${dateStr}:end:${currentTime}`,
       });
       if (!isNew) {
         console.log(`[FCM] Skipping duplicate end-of-class for ${subject.name}`);
