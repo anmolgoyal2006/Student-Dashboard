@@ -111,7 +111,9 @@ async function sendNotification(userId, title, body, data = {}) {
     for (const t of sortedTokens) {
       try {
         console.log(`[FCM SEND] attempting token ...${t.token.slice(-8)}`);
-        await admin.messaging().send({ ...message, token: t.token });
+        console.log('[FCM SEND] Sending notification');
+        const messageId = await admin.messaging().send({ ...message, token: t.token });
+        console.log(`[FCM SEND] Message ID: ${messageId}`);
         console.log('[FCM SEND] success');
         fcmSent = true;
         sentResults.push({ token: t.token, success: true });

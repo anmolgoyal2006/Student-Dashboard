@@ -59,12 +59,19 @@ async function showNotification(payload) {
   const body  = payload?.notification?.body  || payload?.data?.body  || '';
   const data  = payload?.data || {};
 
+  console.log('[FCM CLIENT] Foreground message received');
+  console.log('[FCM CLIENT] Page visibility:', document.visibilityState);
+
   // ── Always show an in-app toast immediately ──────────────────────────────
-  // Chrome blocks registration.showNotification() when the page tab is focused.
-  // The toast is the reliable foreground notification; the SW notification is a
-  // bonus that fires when the tab is in the background.
+  console.log('[FCM CLIENT] Showing foreground toast');
   toast.info(`${title}${body ? `: ${body}` : ''}`);
 
+  if (document.visibilityState === 'visible') {
+    console.log('[FCM CLIENT] Browser notification skipped because page is visible');
+    return;
+  }
+
+  console.log('[FCM CLIENT] Page is not visible, attempting browser notification');
   // ── Also try a SW notification (works when tab is in background) ──────────
   try {
     const registration = await navigator.serviceWorker.ready;

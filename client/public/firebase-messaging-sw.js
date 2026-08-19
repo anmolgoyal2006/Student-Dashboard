@@ -30,12 +30,18 @@ console.log('[FCM SW] Messaging initialized');
 messaging.onBackgroundMessage((payload) => {
   console.log('[FCM SW] Background message received:', payload);
 
+  const hasNotification = !!payload.notification;
+  console.log(`[FCM SW] Payload contains notification: ${hasNotification}`);
+
   // If the payload has a notification field, FCM client displays it automatically.
   // We only manually show it if it is a data-only message (e.g. attendance mark prompt).
   if (payload.notification) {
     console.log('[FCM SW] Message contains notification payload, letting browser display it automatically');
+    console.log('[FCM SW] Manual notification display: false');
     return;
   }
+
+  console.log('[FCM SW] Manual notification display: true');
 
   const data = payload.data || {};
   const isAttendance = !!data.subjectId;
