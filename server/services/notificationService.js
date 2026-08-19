@@ -91,9 +91,9 @@ async function sendNotification(fcmToken, payload) {
 // Returns true if the doc was newly inserted (we should send the push),
 // false if it already existed (duplicate — skip the push).
 async function tryInsertNotification(doc) {
-  // dedupKey: one notification per subject per UTC day.
+  // dedupKey: one notification per subject per IST day.
   // Include subjectId so different subjects on the same day don't collide.
-  const day      = new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
+  const day      = getISTDateString();
   const entityId = doc.subjectId ? String(doc.subjectId) : doc.title;
   const dedupKey = doc.dedupKey || `${doc.type}:${entityId}:${day}`;
 
@@ -140,6 +140,8 @@ async function sendTodayNotifications() {
     const tokenDocs = await NotificationToken.find({ userId: { $in: userIds } }).sort({ _id: 1 }).lean();
     const tokenMap = {};
     for (const doc of tokenDocs) {
+      // Since tokenDocs are sorted by _id ascending (oldest -> newest),
+      // the newest token will naturally overwrite older ones in tokenMap.
       tokenMap[String(doc.userId)] = doc.token;
     }
 
@@ -228,6 +230,8 @@ async function sendEndOfClassNotifications() {
     const tokenDocs = await NotificationToken.find({ userId: { $in: userIds } }).sort({ _id: 1 }).lean();
     const tokenMap = {};
     for (const doc of tokenDocs) {
+      // Since tokenDocs are sorted by _id ascending (oldest -> newest),
+      // the newest token will naturally overwrite older ones in tokenMap.
       tokenMap[String(doc.userId)] = doc.token;
     }
 
