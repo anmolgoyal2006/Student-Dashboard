@@ -77,12 +77,18 @@ function buildPayload(subject, userId, startTime, dateStr) {
   };
 }
 
-async function sendNotification(fcmToken, payload) {
+async function sendNotification(fcmToken, payload, userId) {
   try {
     await admin.messaging().send({ ...payload, token: fcmToken });
     return true;
   } catch (err) {
     console.error(`[FCM] Failed to send to token ...${fcmToken.slice(-6)}:`, err.message);
+    if (userId && (err.code === 'messaging/invalid-registration-token' ||
+        err.code === 'messaging/registration-token-not-registered')) {
+      try {
+        await NotificationToken.deleteOne({ userId, token: fcmToken });
+      } catch (_) {}
+    }
     return false;
   }
 }
@@ -137,12 +143,12 @@ async function sendTodayNotifications() {
 
     // Prefetch all notification tokens for the user IDs in subjects in one batch query
     const userIds = [...new Set(subjects.map(s => String(s.userId)))];
-    const tokenDocs = await NotificationToken.find({ userId: { $in: userIds } }).sort({ _id: 1 }).lean();
+    const tokenDocs = await NotificationToken.find({ userId: { $in: userIds } }).sort({ _id: -1 }).lean();
     const tokenMap = {};
     for (const doc of tokenDocs) {
-      // Since tokenDocs are sorted by _id ascending (oldest -> newest),
-      // the newest token will naturally overwrite older ones in tokenMap.
-      tokenMap[String(doc.userId)] = doc.token;
+      const uId = String(doc.userId);
+      if (!tokenMap[uId]) tokenMap[uId] = [];
+      tokenMap[uId].push(doc);
     }
 
     let totalSent = 0;
@@ -153,8 +159,8 @@ async function sendTodayNotifications() {
 
       const startTime = todaySchedule.startTime || '';
 
-      const fcmToken = tokenMap[String(subject.userId)];
-      if (!fcmToken) continue;
+      const userTokens = tokenMap[String(subject.userId)] || [];
+      if (!userTokens.length) continue;
 
       const payload = buildPayload(subject, subject.userId, startTime, dateStr);
       const title   = payload.data.title;
@@ -175,7 +181,11 @@ async function sendTodayNotifications() {
         continue;
       }
 
-      const sent = await sendNotification(fcmToken, payload);
+      let sent = false;
+      for (const t of userTokens) {
+        sent = await sendNotification(t.token, payload, subject.userId);
+        if (sent) break;
+      }
       if (sent) {
         totalSent++;
       } else {
@@ -227,17 +237,17 @@ async function sendEndOfClassNotifications() {
 
     // Prefetch all notification tokens for the user IDs in subjects in one batch query
     const userIds = [...new Set(subjects.map(s => String(s.userId)))];
-    const tokenDocs = await NotificationToken.find({ userId: { $in: userIds } }).sort({ _id: 1 }).lean();
+    const tokenDocs = await NotificationToken.find({ userId: { $in: userIds } }).sort({ _id: -1 }).lean();
     const tokenMap = {};
     for (const doc of tokenDocs) {
-      // Since tokenDocs are sorted by _id ascending (oldest -> newest),
-      // the newest token will naturally overwrite older ones in tokenMap.
-      tokenMap[String(doc.userId)] = doc.token;
+      const uId = String(doc.userId);
+      if (!tokenMap[uId]) tokenMap[uId] = [];
+      tokenMap[uId].push(doc);
     }
 
     for (const subject of subjects) {
-      const fcmToken = tokenMap[String(subject.userId)];
-      if (!fcmToken) continue;
+      const userTokens = tokenMap[String(subject.userId)] || [];
+      if (!userTokens.length) continue;
 
       const slot = subject.schedule.find(
         (s) => s.day === dayShort && [currentTime, currentTime12].includes(s.endTime)
@@ -273,7 +283,11 @@ async function sendEndOfClassNotifications() {
         },
       };
 
-      const sent = await sendNotification(fcmToken, payload);
+      let sent = false;
+      for (const t of userTokens) {
+        sent = await sendNotification(t.token, payload, subject.userId);
+        if (sent) break;
+      }
       if (sent) {
         console.log(`[FCM] End-of-class notification sent: ${subject.name} at ${currentTime} IST`);
       } else {
