@@ -106,20 +106,33 @@ async function sendNotification(userId, title, body, data = {}) {
       },
     };
 
+    let fcmSent = false;
+    const sentResults = [];
     for (const t of sortedTokens) {
       try {
+        console.log(`[FCM SEND] attempting token ...${t.token.slice(-8)}`);
         await admin.messaging().send({ ...message, token: t.token });
-        return { success: true, results: [{ token: t.token, success: true }] };
+        console.log('[FCM SEND] success');
+        fcmSent = true;
+        sentResults.push({ token: t.token, success: true });
+        break; // Stop at first success
       } catch (err) {
+        console.warn(`[FCM SEND] failed for token ...${t.token.slice(-8)}. Code: ${err.code}, Message: ${err.message}`);
         if (err.code === 'messaging/invalid-registration-token' ||
             err.code === 'messaging/registration-token-not-registered') {
+          console.log(`[FCM SEND] removing dead token ...${t.token.slice(-8)}`);
           await NotificationToken.deleteOne({ userId: t.userId, token: t.token });
         }
-        // Try next token
       }
     }
 
-    return { success: false, reason: 'All tokens failed' };
+    if (!fcmSent) {
+      console.log(`[FCM SEND] All tokens failed, rolling back DB notification to allow retry`);
+      await Notification.collection.deleteOne({ userId, dedupKey });
+      return { success: false, reason: 'All tokens failed' };
+    }
+
+    return { success: true, results: sentResults };
   } catch (err) {
     console.error('[NotificationEngine]', err.message);
     return { success: false, error: err.message };

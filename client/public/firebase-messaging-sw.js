@@ -1,4 +1,5 @@
 // public/firebase-messaging-sw.js
+console.log('[FCM SW] Service worker loaded');
 
 importScripts('https://www.gstatic.com/firebasejs/12.11.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/12.11.0/firebase-messaging-compat.js');
@@ -17,26 +18,38 @@ firebase.initializeApp({
   messagingSenderId: "623897490761",
   appId: "1:623897490761:web:e8674ee0dafefa08b79698",
 });
+console.log('[FCM SW] Firebase initialized');
 
 const messaging = firebase.messaging();
+console.log('[FCM SW] Messaging initialized');
 
 
 // ─────────────────────────────────────────────────────────────
 // 🔔 BACKGROUND MESSAGE (SHOW NOTIFICATION WITH BUTTONS)
 // ─────────────────────────────────────────────────────────────
 messaging.onBackgroundMessage((payload) => {
-  console.log('[SW] Background message received:', payload);
+  console.log('[FCM SW] Background message received:', payload);
 
-  const title = payload.notification?.title || payload.data?.title || 'StudentAI';
-  const body  = payload.notification?.body  || payload.data?.body  || '';
-  const icon  = payload.notification?.icon  || payload.data?.icon  || '/logo192.png';
-  const data  = payload.data || {};
+  // If the payload has a notification field, FCM client displays it automatically.
+  // We only manually show it if it is a data-only message (e.g. attendance mark prompt).
+  if (payload.notification) {
+    console.log('[FCM SW] Message contains notification payload, letting browser display it automatically');
+    return;
+  }
 
+  const data = payload.data || {};
   const isAttendance = !!data.subjectId;
 
-  self.registration.showNotification(title || 'StudentAI', {
-    body: body || (isAttendance ? 'Mark your attendance' : ''),
-    icon: icon || '/logo192.png',
+  // For data-only messages, we must display them manually
+  const title = data.title || 'StudentAI';
+  const body = data.body || (isAttendance ? 'Mark your attendance' : '');
+  const icon = data.icon || '/logo192.png';
+
+  console.log('[FCM SW] Displaying manual notification for data-only message');
+
+  self.registration.showNotification(title, {
+    body,
+    icon,
     badge: '/logo192.png',
 
     data: {
@@ -51,6 +64,7 @@ messaging.onBackgroundMessage((payload) => {
       { action: 'not_held',     title: '⏸ Not Held' },
     ] : [],
   });
+  console.log('[FCM SW] Notification displayed');
 });
 
 
@@ -85,7 +99,7 @@ self.addEventListener('notificationclick', (event) => {
 
   // 🔥 Action button clicked — mark attendance directly from SW
   try {
-    const token = await getTokenFromCache();
+    const token = await getJWTToken();
     if (!token) {
       console.error('[SW] No JWT token found');
       await self.registration.showNotification('Please log in again', {
@@ -144,7 +158,7 @@ async function getTokenFromCache() {
     const data = await response.json();
     return data.token || null;
   } catch (err) {
-    console.error('[SW] Cache read error:', err);
+    console.error('[FCM SW] Cache read error:', err);
     return null;
   }
 }
@@ -172,4 +186,23 @@ function getTokenFromIDB() {
 
     request.onerror = () => reject(request.error);
   });
+}
+async function getJWTToken() {
+  console.log('[FCM SW] Attempting to retrieve JWT token...');
+  let token = await getTokenFromCache();
+  if (token) {
+    console.log('[FCM SW] JWT token retrieved from Cache Storage');
+    return token;
+  }
+  try {
+    token = await getTokenFromIDB();
+    if (token) {
+      console.log('[FCM SW] JWT token retrieved from IndexedDB');
+      return token;
+    }
+  } catch (err) {
+    console.error('[FCM SW] IndexedDB read error:', err);
+  }
+  console.log('[FCM SW] No JWT token found in Cache Storage or IndexedDB');
+  return null;
 }

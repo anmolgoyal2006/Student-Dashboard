@@ -67,7 +67,7 @@ const notificationSchema = new mongoose.Schema(
 notificationSchema.index({ userId: 1, type: 1, title: 1, body: 1, createdAt: -1 });
 
 // Primary dedup index — one document per (user, dedupKey).
-// dedupKey encodes: type + entity-id + UTC-day, making it unique per
+// dedupKey encodes: type + entity-id + date (UTC or IST day depending on type), making it unique per
 // logical notification per day. sparse=true so legacy docs without dedupKey
 // are unaffected and don't collide with each other.
 notificationSchema.index(

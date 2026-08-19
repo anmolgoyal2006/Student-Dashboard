@@ -210,7 +210,11 @@ exports.resetPassword = async (req, res) => {
 
 exports.saveToken = async (req, res) => {
   try {
+    console.log('[FCM TOKEN] Request received');
     const { token } = req.body;
+    console.log(`[FCM TOKEN] User: ${req.user?._id || 'unknown'}`);
+    console.log(`[FCM TOKEN] Token received: ${!!token}`);
+
     if (!token) return res.status(400).json({ message: 'Token required' });
 
     // Store in NotificationToken (supports multiple devices).
@@ -223,8 +227,10 @@ exports.saveToken = async (req, res) => {
       { upsert: true, new: true }
     );
 
+    console.log(`[FCM TOKEN] Token saved successfully: ...${token.slice(-8)}`);
     res.json({ success: true });
   } catch (err) {
+    console.error('[FCM TOKEN] Error saving token:', err.message);
     res.status(500).json({ message: 'Failed to save token' });
   }
 };
@@ -285,5 +291,57 @@ exports.updateSID = async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ message: err.message });
+  }
+};
+
+// POST /api/user/test-notification
+exports.testNotification = async (req, res) => {
+  try {
+    const NotificationToken = require('../models/NotificationToken');
+    const admin = require('../config/firebaseAdmin');
+
+    console.log(`[FCM TEST] Testing notification for user: ${req.user._id}`);
+    const tokens = await NotificationToken.find({ userId: req.user._id })
+      .sort({ _id: -1 })
+      .lean();
+
+    if (!tokens.length) {
+      console.warn(`[FCM TEST] No registered tokens found for user: ${req.user._id}`);
+      return res.status(404).json({ success: false, message: 'No registered FCM tokens found for this user.' });
+    }
+
+    const newestToken = tokens[0].token;
+    console.log(`[FCM TEST] Target token suffix: ...${newestToken.slice(-8)}`);
+
+    const message = {
+      token: newestToken,
+      notification: {
+        title: 'StudentAI Test',
+        body: 'FCM notifications are working.',
+      },
+      data: {
+        type: 'TEST',
+        title: 'StudentAI Test',
+        body: 'FCM notifications are working.',
+      }
+    };
+
+    console.log('[FCM TEST] Sending push via admin sdk...');
+    const response = await admin.messaging().send(message);
+    console.log('[FCM TEST] Push successful, ID:', response);
+
+    res.json({
+      success: true,
+      message: 'FCM notification sent successfully',
+      messageId: response,
+      tokenSuffix: newestToken.slice(-8),
+    });
+  } catch (err) {
+    console.error('[FCM TEST] Error sending push:', err.message);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to send test FCM notification',
+      error: err.message,
+    });
   }
 };

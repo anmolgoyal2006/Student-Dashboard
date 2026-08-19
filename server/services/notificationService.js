@@ -4,8 +4,6 @@ const Subject           = require('../models/Subject');
 const Notification      = require('../models/Notification');
 const NotificationToken = require('../models/NotificationToken');
 
-const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-
 // ─── IST-aware time helpers ──────────────────────────────────────
 // Server likely runs in UTC; all class times are in IST (Asia/Kolkata).
 // These helpers return correct IST values regardless of server timezone.
@@ -204,6 +202,29 @@ async function sendTodayNotifications() {
   }
 }
 
+function normalizeTime(timeStr) {
+  if (!timeStr) return '';
+  let str = timeStr.trim().toUpperCase();
+  const match12 = str.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/);
+  if (match12) {
+    let hours = parseInt(match12[1], 10);
+    const minutes = match12[2];
+    const ampm = match12[3];
+    if (ampm === 'PM' && hours < 12) hours += 12;
+    if (ampm === 'AM' && hours === 12) hours = 0;
+    return `${String(hours).padStart(2, '0')}:${minutes}`;
+  }
+  
+  const match24 = str.match(/^(\d{1,2}):(\d{2})$/);
+  if (match24) {
+    const hours = parseInt(match24[1], 10);
+    const minutes = match24[2];
+    return `${String(hours).padStart(2, '0')}:${minutes}`;
+  }
+  
+  return str;
+}
+
 // ─── End-of-class "Did you attend?" prompt ───────────────────────
 async function sendEndOfClassNotifications() {
   if (isEndOfClassRunning) return;
@@ -216,27 +237,33 @@ async function sendEndOfClassNotifications() {
 
     if (dayShort === 'Sat' || dayShort === 'Sun') return;
 
-    // Also build 12h format for safety
-    const [h, m] = currentTime.split(':').map(Number);
-    const hours12 = h % 12 || 12;
-    const ampm = h >= 12 ? 'PM' : 'AM';
-    const currentTime12 = `${hours12}:${String(m).padStart(2, '0')} ${ampm}`;
-
+    // Fetch all subjects with classes on this day
     const subjects = await Subject.find({
       schedule: {
-        $elemMatch: {
-          day    : dayShort,
-          endTime: { $in: [currentTime, currentTime12] },
-        },
+        $elemMatch: { day: dayShort },
       },
     }).lean();
 
     if (!subjects.length) return;
 
-    console.log(`[FCM] ${subjects.length} class(es) ending at ${currentTime} IST on ${dayShort}`);
+    const normalizedCurrentTime = normalizeTime(currentTime);
+    const endingSubjects = [];
+
+    for (const subject of subjects) {
+      const slot = subject.schedule.find(
+        (s) => s.day === dayShort && normalizeTime(s.endTime) === normalizedCurrentTime
+      );
+      if (slot) {
+        endingSubjects.push({ subject, slot });
+      }
+    }
+
+    if (!endingSubjects.length) return;
+
+    console.log(`[FCM] ${endingSubjects.length} class(es) ending at ${currentTime} IST on ${dayShort}`);
 
     // Prefetch all notification tokens for the user IDs in subjects in one batch query
-    const userIds = [...new Set(subjects.map(s => String(s.userId)))];
+    const userIds = [...new Set(endingSubjects.map(item => String(item.subject.userId)))];
     const tokenDocs = await NotificationToken.find({ userId: { $in: userIds } }).sort({ _id: -1 }).lean();
     const tokenMap = {};
     for (const doc of tokenDocs) {
@@ -245,17 +272,13 @@ async function sendEndOfClassNotifications() {
       tokenMap[uId].push(doc);
     }
 
-    for (const subject of subjects) {
+    for (const { subject, slot } of endingSubjects) {
       const userTokens = tokenMap[String(subject.userId)] || [];
       if (!userTokens.length) continue;
 
-      const slot = subject.schedule.find(
-        (s) => s.day === dayShort && [currentTime, currentTime12].includes(s.endTime)
-      );
-
       const title = `📋 Did you attend ${subject.name}?`;
-      const body  = `Class just ended${slot?.room ? ` in ${slot.room}` : ''}. Mark your attendance.`;
-      const dedupKey = `ATTENDANCE_MARK:${subject._id}:${dateStr}:end:${currentTime}`;
+      const body  = `Class just ended${slot.room ? ` in ${slot.room}` : ''}. Mark your attendance.`;
+      const dedupKey = `ATTENDANCE_MARK:${subject._id}:${dateStr}:end:${normalizedCurrentTime}`;
 
       // ── Atomic dedup: insert only once per class-end per day ──
       const isNew = await tryInsertNotification({

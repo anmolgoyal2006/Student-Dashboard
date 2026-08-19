@@ -1,4 +1,4 @@
-﻿import { initializeApp } from 'firebase/app';
+import { initializeApp } from 'firebase/app';
 import { getMessaging, getToken } from 'firebase/messaging';
 
 const firebaseConfig = {
@@ -17,16 +17,18 @@ export const getMessagingInstance = () => messaging;
 // ΓöÇΓöÇΓöÇ Get FCM token ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 export async function getFCMToken() {
   try {
-    // Register service worker explicitly ΓÇö required for getToken to work
+    console.log('[FCM CLIENT] Registering service worker explicitly...');
     const swRegistration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+    console.log('[FCM CLIENT] Service worker registered successfully:', swRegistration.scope);
 
+    console.log('[FCM CLIENT] Requesting FCM token. VAPID Key exists:', !!process.env.REACT_APP_VAPID_KEY);
     const token = await getToken(messaging, {
       vapidKey             : process.env.REACT_APP_VAPID_KEY,  // must be set in .env
       serviceWorkerRegistration: swRegistration,
     });
 
     if (token) {
-      console.log('[FCM] Token:', token);
+      console.log('[FCM CLIENT] FCM token:', token);
       return token;
     } else {
       console.warn('[FCM] No token received ΓÇö check VAPID key and SW registration.');

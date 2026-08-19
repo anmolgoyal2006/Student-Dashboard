@@ -7,10 +7,16 @@ import { toast } from '../context/ToastContext';
 const AUTH_TOKEN_KEY = 'token';
 
 async function requestNotificationPermission() {
-  if (typeof Notification === 'undefined') return 'default';
+  if (typeof Notification === 'undefined') {
+    console.log('[FCM CLIENT] Notification permission: not supported by browser');
+    return 'default';
+  }
+  console.log('[FCM CLIENT] Notification permission:', Notification.permission);
   if (Notification.permission === 'default') {
     try {
-      return await Notification.requestPermission();
+      const result = await Notification.requestPermission();
+      console.log('[FCM CLIENT] Notification permission requested. Result:', result);
+      return result;
     } catch (error) {
       console.warn('[FCM Hook] Notification permission request failed:', error);
       return Notification.permission;
@@ -21,16 +27,29 @@ async function requestNotificationPermission() {
 
 async function registerFcmToken() {
   const token = await getFCMToken();
-  if (!token) return null;
+  if (!token) {
+    console.log('[FCM CLIENT] Saving token aborted: FCM token is empty');
+    return null;
+  }
 
   const jwt = localStorage.getItem(AUTH_TOKEN_KEY);
-  if (!jwt) return null;
+  if (!jwt) {
+    console.log('[FCM CLIENT] Saving token aborted: user is not logged in (no JWT)');
+    return null;
+  }
 
-  await axios.post(
-    `${process.env.REACT_APP_API_URL}/user/save-token`,
-    { token },
-    { headers: { Authorization: `Bearer ${jwt}` } }
-  );
+  console.log('[FCM CLIENT] API URL:', process.env.REACT_APP_API_URL);
+  console.log('[FCM CLIENT] Saving token: true');
+  try {
+    const res = await axios.post(
+      `${process.env.REACT_APP_API_URL}/user/save-token`,
+      { token },
+      { headers: { Authorization: `Bearer ${jwt}` } }
+    );
+    console.log('[FCM CLIENT] Token save response:', res.data);
+  } catch (error) {
+    console.error('[FCM CLIENT] Token save error:', error?.response?.data || error.message);
+  }
 
   return token;
 }
@@ -40,15 +59,16 @@ async function showNotification(payload) {
   const body  = payload?.notification?.body  || payload?.data?.body  || '';
   const data  = payload?.data || {};
 
-  // ΓöÇΓöÇ Always show an in-app toast immediately ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  // ── Always show an in-app toast immediately ──────────────────────────────
   // Chrome blocks registration.showNotification() when the page tab is focused.
   // The toast is the reliable foreground notification; the SW notification is a
   // bonus that fires when the tab is in the background.
   toast.info(`${title}${body ? `: ${body}` : ''}`);
 
-  // ΓöÇΓöÇ Also try a SW notification (works when tab is in background) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  // ── Also try a SW notification (works when tab is in background) ──────────
   try {
     const registration = await navigator.serviceWorker.ready;
+    console.log('[FCM CLIENT] Service worker:', registration ? 'ready' : 'null');
     await registration.showNotification(title, {
       body,
       icon : '/logo192.png',
@@ -60,23 +80,23 @@ async function showNotification(payload) {
       },
       actions: data.subjectId
         ? [
-            { action: 'attended',     title: 'Γ£à Attended'    },
-            { action: 'not_attended', title: 'Γ¥î Not Attended' },
-            { action: 'not_held',     title: 'ΓÅ╕ Not Held'     },
+            { action: 'attended',     title: '✅ Attended'    },
+            { action: 'not_attended', title: '❌ Not Attended' },
+            { action: 'not_held',     title: '⏸️ Not Held'     },
           ]
         : [],
     });
-  } catch (_) {
-    // Silently ignore ΓÇö toast above already handled the foreground case.
+  } catch (err) {
+    console.warn('[FCM CLIENT] SW showNotification failed:', err.message);
   }
 }
 
 function registerForegroundHandler() {
   const messaging = getMessagingInstance();
+  console.log('[FCM CLIENT] Messaging instance:', messaging ? 'initialized' : 'null');
+  console.log('[FCM CLIENT] Foreground handler registered: true');
   return onMessage(messaging, async (payload) => {
-    // showNotification always fires a toast (foreground) and attempts a
-    // SW notification (background/minimized). No permission re-check needed
-    // here ΓÇö getFCMToken already required permission to produce a token.
+    console.log('[FCM CLIENT] Foreground message received:', payload);
     await showNotification(payload);
   });
 }

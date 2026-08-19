@@ -5,8 +5,19 @@ const Task = require('../models/Task');
 const { sendAssignmentNotification, sendSessionNotification, sendNotification } = require('../services/notificationEngine');
 const { checkAcademicRisks } = require('../services/riskIntelligence');
 
+function getISTInfo() {
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hour12: false,
+    weekday: 'short'
+  }).format(new Date());
+}
+
 // Check upcoming deadlines every hour
 async function checkDeadlines() {
+  console.log(`[CRON] assignment notification check started (IST Time: ${getISTInfo()})`);
   try {
     const now = new Date();
     const in24h = new Date(now.getTime() + 24 * 60 * 60 * 1000);
@@ -66,6 +77,7 @@ async function checkDeadlines() {
 
 // Check upcoming study sessions every 15 minutes
 async function checkSessions() {
+  console.log(`[CRON] session notification check started (IST Time: ${getISTInfo()})`);
   try {
     const now = new Date();
     const in15min = new Date(now.getTime() + 15 * 60 * 1000);

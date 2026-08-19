@@ -9,6 +9,7 @@ const {
   saveToken,
   removeToken,
   updateSID,
+  testNotification,
 } = require('../controllers/userController');
 const { protect } = require('../middleware/authMiddleware');
 const { authLimiter } = require('../middleware/rateLimitMiddleware');
@@ -53,5 +54,8 @@ router.delete('/remove-token', protect, validate([
 router.put('/update-sid', protect, validate([
   body('sid').trim().notEmpty().withMessage('SID cannot be empty.'),
 ]), updateSID);
+
+// POST /api/user/test-notification
+router.post('/test-notification', protect, testNotification);
 
 module.exports = router;
