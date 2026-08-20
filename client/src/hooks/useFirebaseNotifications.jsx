@@ -57,6 +57,7 @@ async function registerFcmToken() {
 async function showNotification(payload) {
   const title = payload?.notification?.title || payload?.data?.title || 'StudentAI';
   const body  = payload?.notification?.body  || payload?.data?.body  || '';
+  const data  = payload?.data || {};
 
   console.log('[FCM CLIENT] Foreground message received');
   console.log('[FCM CLIENT] Page visibility:', document.visibilityState);
@@ -65,7 +66,36 @@ async function showNotification(payload) {
   console.log('[FCM CLIENT] Showing foreground toast');
   toast.info(`${title}${body ? `: ${body}` : ''}`);
 
-  console.log('[FCM CLIENT] Browser notification skipped from React page (service worker handles background display)');
+  if (document.visibilityState === 'visible') {
+    console.log('[FCM CLIENT] Browser notification skipped because page is visible');
+    return;
+  }
+
+  console.log('[FCM CLIENT] Page is not visible, attempting browser notification');
+  // ── Also try a SW notification (works when tab is in background) ──────────
+  try {
+    const registration = await navigator.serviceWorker.ready;
+    console.log('[FCM CLIENT] Service worker:', registration ? 'ready' : 'null');
+    await registration.showNotification(title, {
+      body,
+      icon : '/logo192.png',
+      badge: '/logo192.png',
+      data : {
+        subjectId: data.subjectId || '',
+        date      : data.date      || '',
+        url       : data.url       || '/',
+      },
+      actions: data.subjectId
+        ? [
+            { action: 'attended',     title: '✅ Attended'    },
+            { action: 'not_attended', title: '❌ Not Attended' },
+            { action: 'not_held',     title: '⏸️ Not Held'     },
+          ]
+        : [],
+    });
+  } catch (err) {
+    console.warn('[FCM CLIENT] SW showNotification failed:', err.message);
+  }
 }
 
 function registerForegroundHandler() {
