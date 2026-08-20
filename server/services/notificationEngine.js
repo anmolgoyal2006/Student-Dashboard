@@ -17,35 +17,33 @@ const Notification = require('../models/Notification');
 async function tryInsert(doc) {
   const col = Notification.collection;
   const now = new Date();
-  const result = await col.updateOne(
-    { userId: doc.userId, dedupKey: doc.dedupKey },      // filter on the unique key
-    {
-      $setOnInsert: {
-        ...doc,
-        read      : false,
-        createdAt : now,
-        updatedAt : now,
+  try {
+    const result = await col.updateOne(
+      { userId: doc.userId, dedupKey: doc.dedupKey },      // filter on the unique key
+      {
+        $setOnInsert: {
+          ...doc,
+          read      : false,
+          createdAt : now,
+          updatedAt : now,
+        },
       },
-    },
-    { upsert: true }
-  );
-  // upsertedCount === 1 means a new document was inserted → first caller wins
-  return result.upsertedCount === 1;
+      { upsert: true }
+    );
+    // upsertedCount === 1 means a new document was inserted → first caller wins
+    return result.upsertedCount === 1;
+  } catch (err) {
+    console.error('[NotificationEngine] dedup upsert failed:', err.message);
+    return false;
+  }
 }
 
 // Build a dedupKey that is stable per notification type + entity + UTC day.
+// The day is ALWAYS included: dropping it (as previous "permanent type" logic
+// did) made the key exist forever — once a notification fired for an
+// assignment/session it could never fire again, even days later while still
+// pending. One notification per type + entity per day.
 function makeDedupKey(type, entityId, day) {
-  const permanentTypes = [
-    'NEW_ASSIGNMENT',
-    'OVERDUE',
-    'URGENT',
-    'DUE_SOON',
-    'SESSION_SOON',
-    'SESSION_START',
-  ];
-  if (permanentTypes.includes(type)) {
-    return `${type}:${entityId}`;
-  }
   return `${type}:${entityId}:${day}`;
 }
 
@@ -89,7 +87,8 @@ async function sendNotification(userId, title, body, data = {}) {
     // ── Gather push tokens from NotificationToken collection ─────────────
     const tokens = await NotificationToken.find({ userId }).lean();
     if (!tokens.length) {
-      console.log(`[FCM] No tokens for user ${userId} — saved to DB only`);
+      console.log(`[FCM] No tokens for user ${userId} — rolling back DB notification to allow retry later`);
+      await Notification.collection.deleteOne({ userId, dedupKey });
       return { success: false, reason: 'No tokens' };
     }
 

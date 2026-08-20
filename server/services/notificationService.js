@@ -102,22 +102,27 @@ async function tryInsertNotification(doc) {
   const dedupKey = doc.dedupKey || `${doc.type}:${entityId}:${day}`;
 
   const now = new Date();
-  const result = await Notification.collection.updateOne(
-    { userId: doc.userId, dedupKey },          // unique filter
-    {
-      $setOnInsert: {
-        ...doc,
-        dedupKey,
-        read      : false,
-        createdAt : now,
-        updatedAt : now,
+  try {
+    const result = await Notification.collection.updateOne(
+      { userId: doc.userId, dedupKey },          // unique filter
+      {
+        $setOnInsert: {
+          ...doc,
+          dedupKey,
+          read      : false,
+          createdAt : now,
+          updatedAt : now,
+        },
       },
-    },
-    { upsert: true }
-  );
-  // upsertedCount === 1 → new document inserted → send the push
-  // upsertedCount === 0 → doc already existed → duplicate, skip
-  return result.upsertedCount === 1;
+      { upsert: true }
+    );
+    // upsertedCount === 1 → new document inserted → send the push
+    // upsertedCount === 0 → doc already existed → duplicate, skip
+    return result.upsertedCount === 1;
+  } catch (err) {
+    console.error('[FCM] Dedup upsert failed:', err.message);
+    return false;
+  }
 }
 
 // Guard flags — prevent overlapping cron executions for both jobs

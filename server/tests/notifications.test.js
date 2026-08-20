@@ -179,8 +179,8 @@ describe('notificationEngine — sendNotification', () => {
     expect(count).toBe(1);
   });
 
-  // ── 10. No token — saves to DB, returns No tokens ─────────────────────────
-  it('no FCM token: saves to DB but returns No tokens', async () => {
+  // ── 10. No token — rolls back the DB doc so it can fire once a token is registered
+  it('no FCM token: rolls back DB notification, returns No tokens', async () => {
     const { user: tokenlessUser } = await createUserAndToken();
     const { sendNotification } = require('../services/notificationEngine');
 
@@ -192,7 +192,7 @@ describe('notificationEngine — sendNotification', () => {
     expect(result.reason).toBe('No tokens');
 
     const doc = await Notification.findOne({ userId: tokenlessUser._id });
-    expect(doc).not.toBeNull();
+    expect(doc).toBeNull();
     expect(mockSendFn).not.toHaveBeenCalled();
   });
 
