@@ -261,56 +261,61 @@ async function sendEndOfClassNotifications() {
 
   try {
     const dayShort = getISTDayShort();
-    const currentTime = getISTTimeHHMM();
+    const currentTime = getISTTimeHHMM();   // "HH:MM" in IST
     const dateStr     = getISTDateString();
 
-    // Weekend guard removed from end-of-class check — subjects can be
-    // scheduled on Sat/Sun (e.g. lab sessions, test subjects). The morning
-    // reminder (sendTodayNotifications) still skips weekends intentionally
-    // since that's a broad "here are today's classes" digest, but the
-    // per-class end-of-class prompt should fire whenever a class actually ends.
+    // No weekend guard here — subjects can legitimately be scheduled on
+    // Sat/Sun (labs, test subjects, makeup classes). The morning digest
+    // (sendTodayNotifications) still skips weekends intentionally.
 
-    // Fetch all subjects with classes on this day
+    // Fetch ALL subjects scheduled on this day in one query
     const subjects = await Subject.find({
-      schedule: {
-        $elemMatch: { day: dayShort },
-      },
+      schedule: { $elemMatch: { day: dayShort } },
     }).lean();
 
     if (!subjects.length) return;
 
-    const normalizedCurrentTime = normalizeTime(currentTime);
+    // ── Time window ────────────────────────────────────────────────────────
+    // Cron runs every minute but Render free tier can drift by several minutes
+    // on cold starts / deploys. We look back DRIFT_WINDOW minutes so a class
+    // that ended while the cron was delayed is still caught.
+    // The dedup key is anchored to the SLOT's own endTime (not the cron fire
+    // time), so even if multiple cron runs fall inside the window, each slot
+    // fires at most once per day.
+    const DRIFT_WINDOW = 5; // minutes — covers Render free-tier worst-case drift
 
-    // Convert HH:MM string to minutes-since-midnight for window comparison
     function toMinutes(t) {
-      const [h, m] = t.split(':').map(Number);
-      return h * 60 + m;
+      if (!t) return null;
+      const parts = t.split(':').map(Number);
+      if (parts.length < 2 || parts.some(isNaN)) return null;
+      return parts[0] * 60 + parts[1];
     }
-    const currentMinutes = toMinutes(normalizedCurrentTime);
+
+    const nowMinutes = toMinutes(normalizeTime(currentTime));
 
     const endingSubjects = [];
-
     for (const subject of subjects) {
-      // Match slots whose endTime falls within a ±1-minute window around now.
-      // This tolerates Render cron drift of up to 60 seconds so a class ending
-      // at 22:23 is still caught if the cron fires at 22:22 or 22:24.
-      const slot = subject.schedule.find((s) => {
+      // A subject can have multiple schedule entries for the same day (e.g.
+      // two lab sessions). Collect ALL slots that ended within the window.
+      const matchingSlots = subject.schedule.filter((s) => {
         if (s.day !== dayShort) return false;
-        const normalized = normalizeTime(s.endTime);
-        if (!normalized) return false;
-        const diff = Math.abs(toMinutes(normalized) - currentMinutes);
-        return diff <= 1;
+        const slotEnd = toMinutes(normalizeTime(s.endTime));
+        if (slotEnd === null) return false;
+        // slotEnd must be in the range (now - DRIFT_WINDOW, now]
+        // i.e. the class ended AT MOST DRIFT_WINDOW minutes ago and no more than 0 minutes in the future
+        const diff = nowMinutes - slotEnd;
+        return diff >= 0 && diff <= DRIFT_WINDOW;
       });
-      if (slot) {
+      for (const slot of matchingSlots) {
         endingSubjects.push({ subject, slot });
       }
     }
 
     if (!endingSubjects.length) return;
 
-    console.log(`[FCM] ${endingSubjects.length} class(es) ending at ${currentTime} IST on ${dayShort}`);
+    console.log(`[FCM] ${endingSubjects.length} class(es) ending within ${DRIFT_WINDOW}-min window of ${currentTime} IST on ${dayShort}`);
 
-    // Prefetch all notification tokens for the user IDs in subjects in one batch query
+    // Prefetch tokens in one batch query
     const userIds = [...new Set(endingSubjects.map(item => String(item.subject.userId)))];
     const tokenDocs = await NotificationToken.find({ userId: { $in: userIds } }).sort({ _id: -1 }).lean();
     const tokenMap = {};
@@ -326,9 +331,13 @@ async function sendEndOfClassNotifications() {
 
       const title = `📋 Did you attend ${subject.name}?`;
       const body  = `Class just ended${slot.room ? ` in ${slot.room}` : ''}. Mark your attendance.`;
-      const dedupKey = `ATTENDANCE_MARK:${subject._id}:${dateStr}:end:${normalizedCurrentTime}`;
 
-      // ── Atomic dedup: insert only once per class-end per day ──
+      // ── Dedup key anchored to the SLOT's own endTime, NOT the cron fire time.
+      // This means: however many cron runs fall inside the drift window, only
+      // the first one that wins the upsert actually sends the push.
+      const slotEndNormalized = normalizeTime(slot.endTime);
+      const dedupKey = `ATTENDANCE_MARK:${subject._id}:${dateStr}:end:${slotEndNormalized}`;
+
       const isNew = await tryInsertNotification({
         userId: subject.userId,
         subjectId: subject._id,
@@ -338,7 +347,7 @@ async function sendEndOfClassNotifications() {
         dedupKey,
       });
       if (!isNew) {
-        console.log(`[FCM] Skipping duplicate end-of-class for ${subject.name}`);
+        console.log(`[FCM] Skipping duplicate end-of-class for ${subject.name} (slot ${slotEndNormalized})`);
         continue;
       }
 
@@ -354,12 +363,11 @@ async function sendEndOfClassNotifications() {
         },
       };
 
-      // ── Push to ALL devices this user is logged in on ──────────────────
       const sent = await sendToAllTokens(userTokens, payload, subject.userId);
       if (sent) {
-        console.log(`[FCM] End-of-class notification sent: ${subject.name} at ${currentTime} IST`);
+        console.log(`[FCM] End-of-class notification sent: ${subject.name} (ended ${slotEndNormalized}, cron at ${currentTime} IST)`);
       } else {
-        // Every token failed — roll back so the next cron run can retry.
+        // All tokens failed — roll back so the next cron within the window retries
         try {
           await Notification.collection.deleteOne({ userId: subject.userId, dedupKey });
         } catch (err) {
