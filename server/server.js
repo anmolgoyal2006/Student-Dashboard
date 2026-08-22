@@ -5,6 +5,7 @@
 // connecting to the real database or starting cron jobs.
 const app      = require('./app');
 const mongoose = require('mongoose');
+const cron     = require('node-cron');
 const Sentry   = require('./instrument');
 
 const { startDailyNotificationJob } = require('./jobs/dailyNotificationJob');
@@ -21,8 +22,10 @@ setInterval(() => {
   http.get(`http://localhost:${process.env.PORT || 5000}/api/ping`, () => {});
 }, 10 * 60 * 1000);
 
+let server;
+
 const startServer = () => {
-  app.listen(PORT, '0.0.0.0', () => {
+  server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on port ${PORT}`);
   });
 };
@@ -127,3 +130,35 @@ process.on('uncaughtException', (err) => {
   if (err?.code === 'EPIPE') return;
   shutdown('Uncaught exception', err);
 });
+
+// ── Graceful shutdown on deploy/restart ──────────────────────────────────
+// Render sends SIGTERM when stopping a process. Without this, an old process
+// keeps its node-cron jobs ticking during the deploy overlap window, which
+// produces duplicate job runs (visible as doubled cron log lines). Stop all
+// cron tasks and close the HTTP server before exiting.
+function gracefulShutdown(signal) {
+  console.log(`[Shutdown] ${signal} received — stopping cron jobs...`);
+  try {
+    cron.getTasks().forEach((task) => {
+      try {
+        task.stop();
+      } catch (_) {}
+    });
+  } catch (err) {
+    console.error('[Shutdown] Failed to stop cron jobs:', err.message);
+  }
+
+  if (server) {
+    server.close(() => {
+      console.log('[Shutdown] Server closed. Exiting.');
+      process.exit(0);
+    });
+    // Safety net — don't hang if an open connection refuses to close.
+    setTimeout(() => process.exit(0), 5000).unref();
+  } else {
+    process.exit(0);
+  }
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));

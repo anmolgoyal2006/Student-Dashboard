@@ -1,0 +1,302 @@
+/* NotificationDiagnostic.css
+   Uses the project's CSS token variables from tokens.css.
+*/
+
+/* ── Page wrapper ──────────────────────────────────────────────────────────── */
+.diag-page {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 28px 20px 60px;
+  color: var(--color-text-primary, #f5f5f5);
+  font-family: 'DM Sans', sans-serif;
+}
+
+/* ── Header ──────────────────────────────────────────────────────────────── */
+.diag-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 28px;
+}
+
+.diag-header__icon {
+  flex-shrink: 0;
+  color: var(--color-accent, #a881fe);
+  margin-top: 3px;
+}
+
+.diag-header__title {
+  margin: 0 0 4px;
+  font-size: var(--text-heading-sm, 20px);
+  font-weight: 700;
+  letter-spacing: -0.12px;
+  color: var(--color-text-primary, #f5f5f5);
+}
+
+.diag-header__sub {
+  margin: 0;
+  font-size: var(--text-body-sm, 14px);
+  color: var(--color-text-secondary, #aeaeae);
+}
+
+/* ── Section ─────────────────────────────────────────────────────────────── */
+.diag-section {
+  margin-bottom: 28px;
+}
+
+.diag-section__title {
+  display: flex;
+  align-items: center;
+  margin: 0 0 10px;
+  font-size: var(--text-body, 16px);
+  font-weight: 600;
+  color: var(--color-text-primary, #f5f5f5);
+  letter-spacing: -0.1px;
+}
+
+.diag-section__desc {
+  margin: 0 0 12px;
+  font-size: var(--text-body-sm, 14px);
+  color: var(--color-text-secondary, #aeaeae);
+  line-height: 1.55;
+}
+
+/* ── Card ────────────────────────────────────────────────────────────────── */
+.diag-card {
+  background: var(--color-surface-2, #0f0f0f);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 12px;
+}
+
+.diag-card__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.diag-card__row--sub {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.diag-card__label {
+  display: flex;
+  align-items: center;
+  font-size: var(--text-body-sm, 14px);
+  color: var(--color-text-secondary, #aeaeae);
+}
+
+.diag-card__label--muted {
+  font-size: var(--text-caption, 12px);
+  color: var(--color-text-tertiary, #525252);
+}
+
+.diag-card__action {
+  margin-top: 12px;
+}
+
+/* ── Token display ───────────────────────────────────────────────────────── */
+.diag-token {
+  font-family: 'DM Mono', 'Fira Code', monospace;
+  font-size: 11px;
+  color: var(--color-text-tertiary, #525252);
+  word-break: break-all;
+}
+
+/* ── Status badge ────────────────────────────────────────────────────────── */
+.diag-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 20px;
+  font-size: var(--text-caption, 12px);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.badge--success {
+  background: var(--color-success-muted, rgba(16, 185, 129, 0.12));
+  color: var(--color-success, #10b981);
+}
+
+.badge--danger {
+  background: var(--color-danger-muted, rgba(239, 68, 68, 0.12));
+  color: var(--color-danger, #ef4444);
+}
+
+.badge--warning {
+  background: var(--color-warning-muted, rgba(245, 158, 11, 0.12));
+  color: var(--color-warning, #f59e0b);
+}
+
+/* ── Buttons ─────────────────────────────────────────────────────────────── */
+.diag-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 18px;
+  border-radius: 8px;
+  font-size: var(--text-body-sm, 14px);
+  font-weight: 500;
+  font-family: 'DM Sans', sans-serif;
+  cursor: pointer;
+  border: none;
+  transition: opacity 0.15s, transform 0.1s;
+}
+
+.diag-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.diag-btn:not(:disabled):active {
+  transform: scale(0.97);
+}
+
+.diag-btn--primary {
+  background: var(--color-accent, #a881fe);
+  color: #fff;
+}
+
+.diag-btn--primary:not(:disabled):hover {
+  opacity: 0.88;
+}
+
+.diag-btn--secondary {
+  background: var(--color-surface-3, #1a1a1a);
+  color: var(--color-text-secondary, #aeaeae);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.diag-btn--secondary:not(:disabled):hover {
+  color: var(--color-text-primary, #f5f5f5);
+}
+
+/* ── Test result ─────────────────────────────────────────────────────────── */
+.diag-result {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  font-size: var(--text-body-sm, 14px);
+  line-height: 1.5;
+}
+
+.diag-result--success {
+  background: var(--color-success-muted, rgba(16, 185, 129, 0.12));
+  color: var(--color-success, #10b981);
+}
+
+.diag-result--danger {
+  background: var(--color-danger-muted, rgba(239, 68, 68, 0.12));
+  color: var(--color-danger, #ef4444);
+}
+
+.diag-result svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+/* ── Hints ───────────────────────────────────────────────────────────────── */
+.diag-hint {
+  margin: 10px 0 0;
+  font-size: var(--text-caption, 12px);
+  color: var(--color-text-tertiary, #525252);
+  line-height: 1.5;
+}
+
+.diag-hint--danger {
+  color: var(--color-danger, #ef4444);
+}
+
+/* ── OEM guide cards ─────────────────────────────────────────────────────── */
+.diag-oem-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.diag-oem-card {
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--color-surface-2, #0f0f0f);
+}
+
+.diag-oem-card__header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  background: transparent;
+  border: none;
+  color: var(--color-text-secondary, #aeaeae);
+  font-size: var(--text-body-sm, 14px);
+  font-weight: 500;
+  font-family: 'DM Sans', sans-serif;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s;
+}
+
+.diag-oem-card__header:hover {
+  background: var(--color-surface-3, #1a1a1a);
+  color: var(--color-text-primary, #f5f5f5);
+}
+
+.diag-oem-card__body {
+  padding: 0 14px 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.diag-oem-card__steps {
+  margin: 12px 0 10px;
+  padding-left: 20px;
+  font-size: var(--text-caption, 12px);
+  color: var(--color-text-secondary, #aeaeae);
+  line-height: 1.7;
+}
+
+.diag-oem-card__link {
+  display: inline-flex;
+  align-items: center;
+  font-size: var(--text-caption, 12px);
+  color: var(--color-accent, #a881fe);
+  text-decoration: none;
+}
+
+.diag-oem-card__link:hover {
+  text-decoration: underline;
+}
+
+.diag-oem-all-link {
+  display: inline-flex;
+  align-items: center;
+  font-size: var(--text-body-sm, 14px);
+  color: var(--color-accent, #a881fe);
+  text-decoration: none;
+}
+
+.diag-oem-all-link:hover {
+  text-decoration: underline;
+}
+
+/* ── Spinner ─────────────────────────────────────────────────────────────── */
+@keyframes diag-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.spin {
+  animation: diag-spin 0.8s linear infinite;
+}

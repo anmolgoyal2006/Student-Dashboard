@@ -19,7 +19,9 @@ import ResetPassword  from './pages/ResetPassword';
 import AIAssistant from './pages/AIAssistant';
 import Prediction from './pages/Prediction';
 import Analytics from './pages/Analytics';
+import NotificationDiagnostic from './pages/NotificationDiagnostic';
 import AttendancePrompt from './components/AttendancePrompt';
+import IOSInstallBanner from './components/IOSInstallBanner';
 import AdminPanel from './pages/AdminPanel';
 import AdminOpportunities from './pages/admin/Opportunities';
 import LoginSuccess from './pages/LoginSuccess';
@@ -89,6 +91,9 @@ export default function App() {
   return (
     <ToastProvider>
       <BrowserRouter>
+        {/* iOS Safari: prompt non-standalone users to install the PWA so
+            Web Push works. Renders nothing on Android/desktop/installed PWA. */}
+        <IOSInstallBanner />
         <Routes>
           <Route path="/login"  element={<PublicRoute><Login /></PublicRoute>} />
           <Route path="/signup" element={<PublicRoute><Signup /></PublicRoute>} />
@@ -134,6 +139,9 @@ export default function App() {
           } />
           <Route path="/analytics" element={
             <ProtectedRoute><AppLayout><Analytics /></AppLayout></ProtectedRoute>
+          } />
+          <Route path="/notifications/diagnostic" element={
+            <ProtectedRoute><AppLayout><NotificationDiagnostic /></AppLayout></ProtectedRoute>
           } />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>

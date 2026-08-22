@@ -26,31 +26,42 @@ const passport = require('./config/passport');
 app.use(passport.initialize());
 
 const allowedOrigins = [
+  // ── Production Vercel deployments ──────────────────────────────────────────
+  // Primary production alias (set in Vercel project settings → Domains).
+  // If you ever rename the project or add a custom domain, add the new URL here.
   'https://student-dashboard-ashy-rho.vercel.app',
-  // Vercel also assigns a bare project alias; it does not match the preview
-  // pattern below (no `-suffix`), so it needs its own entry.
+  // Vercel also assigns a bare project-name alias that does NOT match the
+  // preview-deploy pattern below (no random suffix), so it needs its own entry.
   'https://student-dashboard.vercel.app',
+  // ── Local development ───────────────────────────────────────────────────────
   'http://localhost:3000',
   'http://localhost:3001',
   'http://localhost:3002',
   'http://localhost:3003',
 ];
 
-// Vercel preview deploys get generated subdomains, so they need a pattern
-// rather than a fixed entry. Scope it to this project's own previews —
-// /\.vercel\.app$/ would match ANY Vercel site, including one an attacker
-// deploys for free, letting it call this API from the browser.
+// Vercel preview deploys get auto-generated subdomains like
+// student-dashboard-abc123-username.vercel.app — handle them with a pattern
+// rather than trying to enumerate every possible URL.
+// Intentionally scoped to THIS project's prefix so a random attacker can't
+// spin up their own Vercel site and call our API cross-origin.
 const VERCEL_PREVIEW = /^https:\/\/student-dashboard-[a-z0-9-]+\.vercel\.app$/;
+
+function isOriginAllowed(origin) {
+  if (!origin) return true; // server-to-server, mobile apps, curl, Postman
+  return allowedOrigins.includes(origin) || VERCEL_PREVIEW.test(origin);
+}
 
 const corsOptions = {
   origin: (origin, cb) => {
-    // allow requests with no origin (mobile apps, curl, Postman)
-    if (
-      !origin ||
-      allowedOrigins.includes(origin) ||
-      VERCEL_PREVIEW.test(origin)
-    ) return cb(null, true);
-    cb(new Error(`CORS blocked for origin: ${origin}`));
+    if (isOriginAllowed(origin)) return cb(null, true);
+    // Return false (not an Error) so Express does NOT throw — this means the
+    // response still goes through normally, just without the CORS headers.
+    // Throwing an Error here caused the global error handler to respond before
+    // cors() could set Access-Control-Allow-Origin, so the browser saw the
+    // "No Access-Control-Allow-Origin header" error even on valid routes
+    // (e.g. GET /api/marks/cgpa from a Vercel preview URL not yet in the list).
+    cb(null, false);
   },
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
@@ -151,7 +162,7 @@ app.use((_req, res) => {
 Sentry.setupExpressErrorHandler(app);
 
 // ─── Global error handler ─────────────────────────────────────────────────
-app.use((err, _req, res, _next) => {
+app.use((err, req, res, _next) => {
   console.error('[Error]', err.message);
 
   // Multer rejects oversized/too-many/disallowed files. These are client

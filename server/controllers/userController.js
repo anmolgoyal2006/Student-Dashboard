@@ -217,17 +217,32 @@ exports.saveToken = async (req, res) => {
 
     if (!token) return res.status(400).json({ message: 'Token required' });
 
+    // Infer platform from the request User-Agent so we can see in the DB
+    // which tokens belong to mobile vs desktop and correlate failed sends
+    // per platform (useful for diagnosing Android OEM battery restrictions).
+    const ua = req.headers['user-agent'] || '';
+    let platform = 'web';
+    if (/iphone|ipad|ipod/i.test(ua)) {
+      platform = 'ios';
+    } else if (/android/i.test(ua)) {
+      platform = 'android';
+    }
+
     // Store in NotificationToken (supports multiple devices).
-    // We no longer write User.fcmToken — it's a scalar field that gets
-    // overwritten by every new device and is inconsistent with multi-device use.
     const NotificationToken = require('../models/NotificationToken');
     await NotificationToken.findOneAndUpdate(
       { userId: req.user._id, token },
-      { userId: req.user._id, token, platform: 'web', lastSeen: new Date() },
+      {
+        userId   : req.user._id,
+        token,
+        platform,
+        userAgent: ua.slice(0, 512), // cap at 512 chars — UA strings can be very long
+        lastSeen : new Date(),
+      },
       { upsert: true, new: true }
     );
 
-    console.log(`[FCM TOKEN] Token saved successfully: ...${token.slice(-8)}`);
+    console.log(`[FCM TOKEN] Token saved (platform: ${platform}): ...${token.slice(-8)}`);
     res.json({ success: true });
   } catch (err) {
     console.error('[FCM TOKEN] Error saving token:', err.message);

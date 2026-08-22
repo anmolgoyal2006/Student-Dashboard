@@ -1,8 +1,10 @@
 const cron = require('node-cron');
+const { lockedJob } = require('../utils/safeJob');
 const { sendEndOfClassNotifications, sendTodayNotifications } = require('../services/notificationService');
 
 // Note: concurrency guards (isRunning flags) live inside notificationService.js.
-// Both functions are safe to call without additional guards here.
+// lockedJob adds a cross-process DB lock so overlapping server processes
+// (deploys/restarts) can't both fire the same job.
 
 function getISTInfo() {
   return new Intl.DateTimeFormat('en-US', {
@@ -16,27 +18,19 @@ function getISTInfo() {
 
 function startDailyNotificationJob() {
   // Every minute: check for classes ending NOW and send "Did you attend?" prompt
-  cron.schedule('* * * * *', async () => {
+  cron.schedule('* * * * *', lockedJob('sendEndOfClassNotifications', async () => {
     console.log(`[CRON] sendEndOfClassNotifications started (IST Time: ${getISTInfo()})`);
-    try {
-      await sendEndOfClassNotifications();
-    } catch (err) {
-      console.error('[CRON] End-of-class error:', err.message);
-    }
-  }, {
+    await sendEndOfClassNotifications();
+  }), {
     scheduled: true,
     timezone: 'Asia/Kolkata',
   });
 
   // Every day at 8:00 AM IST: send start-of-day reminders
-  cron.schedule('0 8 * * 1-5', async () => {
+  cron.schedule('0 8 * * 1-5', lockedJob('sendTodayNotifications', async () => {
     console.log(`[CRON] sendTodayNotifications started (IST Time: ${getISTInfo()})`);
-    try {
-      await sendTodayNotifications();
-    } catch (err) {
-      console.error('[CRON] Start-of-day error:', err.message);
-    }
-  }, {
+    await sendTodayNotifications();
+  }), {
     scheduled: true,
     timezone: 'Asia/Kolkata',
   });

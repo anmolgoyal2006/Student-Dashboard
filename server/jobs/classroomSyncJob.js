@@ -1,5 +1,5 @@
 const cron = require('node-cron');
-const { safeJob } = require('../utils/safeJob');
+const { lockedJob } = require('../utils/safeJob');
 const GoogleIntegration = require('../models/GoogleIntegration');
 const ClassroomAssignment = require('../models/ClassroomAssignment');
 
@@ -147,7 +147,7 @@ async function syncAllUsers() {
 }
 
 function startClassroomSyncJob() {
-  cron.schedule('0 */6 * * *', safeJob('syncAllUsers', async () => {
+  cron.schedule('0 */6 * * *', lockedJob('syncAllUsers', async () => {
     console.log('[Cron] Starting 6-hour classroom sync...');
     await syncAllUsers();
   }), { timezone: 'Asia/Kolkata' });

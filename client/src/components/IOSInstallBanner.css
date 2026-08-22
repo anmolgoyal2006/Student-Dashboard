@@ -1,0 +1,124 @@
+/* IOSInstallBanner.css
+   Fixed banner anchored to the bottom of the viewport on iOS Safari.
+   Uses the project's CSS token variables from tokens.css.
+*/
+
+.ios-banner {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 9999;
+
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+
+  padding: 16px;
+  background: var(--color-surface-1);
+  border-top: 1px solid rgba(168, 129, 254, 0.25); /* accent muted border */
+  box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.5);
+
+  /* Safe-area inset so it doesn't sit behind the iOS home-indicator bar */
+  padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+
+  /* Slide up on first paint */
+  animation: ios-banner-slide-in 0.3s ease-out;
+}
+
+@keyframes ios-banner-slide-in {
+  from { transform: translateY(100%); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+/* ── Icon ─────────────────────────────────────────────────────────────── */
+.ios-banner__icon {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.ios-banner__icon img {
+  border-radius: 10px;
+  display: block;
+}
+
+/* ── Body ─────────────────────────────────────────────────────────────── */
+.ios-banner__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.ios-banner__title {
+  margin: 0 0 4px;
+  font-size: var(--text-body-sm, 14px);
+  font-weight: 600;
+  color: var(--color-text-primary, #f5f5f5);
+  letter-spacing: -0.1px;
+}
+
+.ios-banner__text {
+  margin: 0 0 8px;
+  font-size: var(--text-caption, 12px);
+  color: var(--color-text-secondary, #aeaeae);
+  line-height: 1.5;
+}
+
+/* Ordered step list */
+.ios-banner__steps {
+  margin: 0 0 8px;
+  padding-left: 18px;
+  font-size: var(--text-caption, 12px);
+  color: var(--color-text-secondary, #aeaeae);
+  line-height: 1.6;
+}
+
+.ios-banner__steps li {
+  margin-bottom: 2px;
+}
+
+.ios-banner__steps strong {
+  color: var(--color-text-primary, #f5f5f5);
+}
+
+/* Inline SVG icons inside text lines */
+.ios-banner__inline-icon {
+  display: inline-block;
+  vertical-align: middle;
+  margin-bottom: 2px;
+  color: var(--color-accent, #a881fe);
+}
+
+.ios-banner__note {
+  margin: 0;
+  font-size: 11px;
+  color: var(--color-text-tertiary, #525252);
+  font-style: italic;
+  line-height: 1.4;
+}
+
+/* ── Close button ─────────────────────────────────────────────────────── */
+.ios-banner__close {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 28px;
+  height: 28px;
+  margin-top: 2px;
+  padding: 0;
+
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: var(--color-text-secondary, #aeaeae);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.ios-banner__close:hover,
+.ios-banner__close:focus-visible {
+  background: var(--color-surface-3, #1a1a1a);
+  color: var(--color-text-primary, #f5f5f5);
+  outline: none;
+}

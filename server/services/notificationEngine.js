@@ -92,9 +92,10 @@ async function sendNotification(userId, title, body, data = {}) {
       return { success: false, reason: 'No tokens' };
     }
 
-    // ── Send to ONE token (most recent) — one push per notification ───────
-    const sortedTokens = [...tokens].sort((a, b) => (b._id > a._id ? 1 : -1));
-
+    // ── Send to ALL tokens concurrently — every device the user is logged in on
+    // receives the push. We use Promise.allSettled so a failure on one device
+    // (e.g. an expired token on the phone) never prevents the desktop from
+    // getting the notification. Invalid tokens are pruned individually.
     const message = {
       notification: { title, body },
       data: {
@@ -105,34 +106,42 @@ async function sendNotification(userId, title, body, data = {}) {
       },
     };
 
-    let fcmSent = false;
-    const sentResults = [];
-    for (const t of sortedTokens) {
-      try {
+    const sendResults = await Promise.allSettled(
+      tokens.map(async (t) => {
         console.log(`[FCM SEND] attempting token ...${t.token.slice(-8)}`);
-        console.log('[FCM SEND] Sending notification');
-        const messageId = await admin.messaging().send({ ...message, token: t.token });
-        console.log(`[FCM SEND] Message ID: ${messageId}`);
-        console.log('[FCM SEND] success');
-        fcmSent = true;
-        sentResults.push({ token: t.token, success: true });
-        break; // Stop at first success
-      } catch (err) {
-        console.warn(`[FCM SEND] failed for token ...${t.token.slice(-8)}. Code: ${err.code}, Message: ${err.message}`);
-        if (err.code === 'messaging/invalid-registration-token' ||
-            err.code === 'messaging/registration-token-not-registered') {
-          console.log(`[FCM SEND] removing dead token ...${t.token.slice(-8)}`);
-          await NotificationToken.deleteOne({ userId: t.userId, token: t.token });
+        try {
+          const messageId = await admin.messaging().send({ ...message, token: t.token });
+          console.log(`[FCM SEND] success — messageId: ${messageId}, token ...${t.token.slice(-8)}`);
+          return { token: t.token, success: true, messageId };
+        } catch (err) {
+          console.warn(`[FCM SEND] failed for token ...${t.token.slice(-8)}. Code: ${err.code}, Message: ${err.message}`);
+          // Prune only definitively dead tokens — transient errors (quota, unavailable)
+          // are NOT pruned so we retry them on the next cron run.
+          if (
+            err.code === 'messaging/invalid-registration-token' ||
+            err.code === 'messaging/registration-token-not-registered'
+          ) {
+            console.log(`[FCM SEND] removing dead token ...${t.token.slice(-8)}`);
+            await NotificationToken.deleteOne({ userId: t.userId, token: t.token });
+          }
+          throw err; // re-throw so this settles as 'rejected'
         }
-      }
-    }
+      })
+    );
+
+    const sentResults = sendResults
+      .filter((r) => r.status === 'fulfilled')
+      .map((r) => r.value);
+
+    const fcmSent = sentResults.length > 0;
 
     if (!fcmSent) {
-      console.log(`[FCM SEND] All tokens failed, rolling back DB notification to allow retry`);
+      console.log(`[FCM SEND] All ${tokens.length} token(s) failed — rolling back DB notification to allow retry`);
       await Notification.collection.deleteOne({ userId, dedupKey });
       return { success: false, reason: 'All tokens failed' };
     }
 
+    console.log(`[FCM SEND] Delivered to ${sentResults.length}/${tokens.length} token(s)`);
     return { success: true, results: sentResults };
   } catch (err) {
     console.error('[NotificationEngine]', err.message);

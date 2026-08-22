@@ -125,6 +125,33 @@ async function tryInsertNotification(doc) {
   }
 }
 
+// ─── Send a payload to EVERY token a user has ────────────────────────────────
+// Returns true if at least one device received the push.
+// Invalid tokens are pruned; transient FCM errors are left alone so the next
+// cron run can retry them.
+async function sendToAllTokens(userTokens, payload, userId) {
+  const DEAD_CODES = new Set([
+    'messaging/invalid-registration-token',
+    'messaging/registration-token-not-registered',
+  ]);
+
+  const results = await Promise.allSettled(
+    userTokens.map(async (t) => {
+      try {
+        await admin.messaging().send({ ...payload, token: t.token });
+        return { token: t.token, success: true };
+      } catch (err) {
+        if (DEAD_CODES.has(err.code)) {
+          try { await NotificationToken.deleteOne({ userId, token: t.token }); } catch (_) {}
+        }
+        throw err;
+      }
+    })
+  );
+
+  return results.some((r) => r.status === 'fulfilled');
+}
+
 // Guard flags — prevent overlapping cron executions for both jobs
 let isTodayRunning = false;
 let isEndOfClassRunning = false;
@@ -184,15 +211,12 @@ async function sendTodayNotifications() {
         continue;
       }
 
-      let sent = false;
-      for (const t of userTokens) {
-        sent = await sendNotification(t.token, payload, subject.userId);
-        if (sent) break;
-      }
+      // ── Push to ALL devices this user is logged in on ──────────────────
+      const sent = await sendToAllTokens(userTokens, payload, subject.userId);
       if (sent) {
         totalSent++;
       } else {
-        // FCM failed to send — remove notification from DB so it can be retried in the next cron execution
+        // Every token failed — roll back so the next cron run can retry.
         try {
           await Notification.collection.deleteOne({ userId: subject.userId, dedupKey });
         } catch (err) {
@@ -311,15 +335,12 @@ async function sendEndOfClassNotifications() {
         },
       };
 
-      let sent = false;
-      for (const t of userTokens) {
-        sent = await sendNotification(t.token, payload, subject.userId);
-        if (sent) break;
-      }
+      // ── Push to ALL devices this user is logged in on ──────────────────
+      const sent = await sendToAllTokens(userTokens, payload, subject.userId);
       if (sent) {
         console.log(`[FCM] End-of-class notification sent: ${subject.name} at ${currentTime} IST`);
       } else {
-        // FCM failed to send — remove notification from DB so it can be retried in the next cron execution
+        // Every token failed — roll back so the next cron run can retry.
         try {
           await Notification.collection.deleteOne({ userId: subject.userId, dedupKey });
         } catch (err) {

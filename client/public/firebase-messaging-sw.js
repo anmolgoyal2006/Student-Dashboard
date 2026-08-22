@@ -1,6 +1,16 @@
 // public/firebase-messaging-sw.js
 console.log('[FCM SW] Service worker loaded');
 
+// ─── Lifecycle: replace stale worker immediately on every deploy ─────────────
+// Without skipWaiting() the new SW sits in "waiting" state until all tabs are
+// closed, meaning users can go hours/days on a stale worker that misses pushes.
+self.addEventListener('install', () => self.skipWaiting());
+
+// clients.claim() makes this SW the active controller for every open tab NOW
+// instead of waiting for the next navigation — so the new FCM handler takes
+// effect without requiring a page reload.
+self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()));
+
 importScripts('https://www.gstatic.com/firebasejs/12.11.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/12.11.0/firebase-messaging-compat.js');
 
