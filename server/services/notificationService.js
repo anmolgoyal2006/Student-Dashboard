@@ -264,7 +264,11 @@ async function sendEndOfClassNotifications() {
     const currentTime = getISTTimeHHMM();
     const dateStr     = getISTDateString();
 
-    if (dayShort === 'Sat' || dayShort === 'Sun') return;
+    // Weekend guard removed from end-of-class check — subjects can be
+    // scheduled on Sat/Sun (e.g. lab sessions, test subjects). The morning
+    // reminder (sendTodayNotifications) still skips weekends intentionally
+    // since that's a broad "here are today's classes" digest, but the
+    // per-class end-of-class prompt should fire whenever a class actually ends.
 
     // Fetch all subjects with classes on this day
     const subjects = await Subject.find({
@@ -276,12 +280,27 @@ async function sendEndOfClassNotifications() {
     if (!subjects.length) return;
 
     const normalizedCurrentTime = normalizeTime(currentTime);
+
+    // Convert HH:MM string to minutes-since-midnight for window comparison
+    function toMinutes(t) {
+      const [h, m] = t.split(':').map(Number);
+      return h * 60 + m;
+    }
+    const currentMinutes = toMinutes(normalizedCurrentTime);
+
     const endingSubjects = [];
 
     for (const subject of subjects) {
-      const slot = subject.schedule.find(
-        (s) => s.day === dayShort && normalizeTime(s.endTime) === normalizedCurrentTime
-      );
+      // Match slots whose endTime falls within a ±1-minute window around now.
+      // This tolerates Render cron drift of up to 60 seconds so a class ending
+      // at 22:23 is still caught if the cron fires at 22:22 or 22:24.
+      const slot = subject.schedule.find((s) => {
+        if (s.day !== dayShort) return false;
+        const normalized = normalizeTime(s.endTime);
+        if (!normalized) return false;
+        const diff = Math.abs(toMinutes(normalized) - currentMinutes);
+        return diff <= 1;
+      });
       if (slot) {
         endingSubjects.push({ subject, slot });
       }
