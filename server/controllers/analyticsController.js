@@ -28,7 +28,13 @@ exports.getAnalytics = async (req, res) => {
 
     // Use Classroom data if available, otherwise fall back to Tasks
     const hasClassroom = filteredAssignments.length > 0;
-    const dataSource = hasClassroom ? filteredAssignments : filteredTasks;
+    // Assignments without a due date can't contribute to completion rate,
+    // overdue count, weekly trend, or deadline timeline — exclude them from
+    // all metric calculations. They are still synced and stored, just not
+    // shown in analytics where a date is required to be meaningful.
+    const dataSource = hasClassroom
+      ? filteredAssignments.filter(a => !!a.dueDate)
+      : filteredTasks.filter(t => !!t.dueDate);
 
     // ── Assignment metrics ──
     const total = dataSource.length;
