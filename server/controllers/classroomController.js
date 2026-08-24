@@ -224,22 +224,39 @@ exports.sync = async (req, res) => {
     const { classroom, integration } = await getAuthenticatedClient(req.user.id);
     const userId = req.user.id;
 
-    // Clear all previous classroom data before re-importing
-    await ClassroomCourse.deleteMany({ userId });
-    await ClassroomAssignment.deleteMany({ userId });
-    await Task.deleteMany({ user: userId, type: 'assignment' });
-
-    // Fetch courses
-    const coursesRes = await classroom.courses.list({
-      courseStates: ['ACTIVE'],
-    });
-    let courses = coursesRes.data.courses || [];
-
-    // Filter by selected courseIds if provided
+    // ── Validate course selection ─────────────────────────────────────────
+    // courseIds must be a non-empty array — the frontend never sends an empty
+    // sync (it blocks the button and shows a toast), but validate server-side
+    // too so a raw API call can't wipe everything and re-import all courses.
     const { courseIds } = req.body;
-    if (courseIds && Array.isArray(courseIds) && courseIds.length > 0) {
-      courses = courses.filter(c => courseIds.includes(c.id));
+    const selectedIds = Array.isArray(courseIds) && courseIds.length > 0
+      ? courseIds
+      : null;
+
+    if (!selectedIds) {
+      return res.status(400).json({ message: 'Select at least one course to sync.' });
     }
+
+    // ── Persist the user's course selection ──────────────────────────────
+    // Saved here so the 6-hour background cron can read it and only re-sync
+    // the courses the user actually chose — preventing de-selected courses
+    // from reappearing automatically.
+    integration.syncedCourseIds = selectedIds;
+    integration.lastSync = new Date();
+    await integration.save();
+
+    // ── Fetch ALL active courses from Google, then filter to selection ────
+    const coursesRes = await classroom.courses.list({ courseStates: ['ACTIVE'] });
+    let courses = (coursesRes.data.courses || []).filter(c => selectedIds.includes(c.id));
+
+    // ── Delete stale data: courses and assignments that are NO LONGER in
+    // the user's selection (de-selected since last sync) ──────────────────
+    // This is a precise delete — we only remove courses/assignments whose
+    // courseId is NOT in the new selection, leaving everything else in place
+    // so existing dedup keys and notification history are preserved.
+    await ClassroomCourse.deleteMany({ userId, courseId: { $nin: selectedIds } });
+    await ClassroomAssignment.deleteMany({ userId, courseId: { $nin: selectedIds } });
+    await Task.deleteMany({ user: userId, type: 'assignment', subject: { $nin: courses.map(c => c.name) } });
 
     const courseMap = {};
     for (const c of courses) {
@@ -350,10 +367,7 @@ exports.sync = async (req, res) => {
       }
     }
 
-    integration.lastSync = new Date();
-    await integration.save();
-
-    // Send notifications for new assignments
+    // lastSync + syncedCourseIds already persisted at the top of this function
     let sent = 0;
     let deduped = 0;
     let noTokens = 0;

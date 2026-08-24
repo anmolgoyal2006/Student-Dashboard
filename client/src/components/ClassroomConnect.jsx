@@ -46,12 +46,28 @@ export default function ClassroomConnect({ onSync }) {
 
   const loadCourses = async () => {
     try {
-      const res = await API.get('/classroom/courses/available');
-      const list = res.data.courses || [];
+      // Fetch available courses from Google AND the user's previously synced
+      // selection so we can pre-check only what they already chose.
+      const [availableRes, syncedRes] = await Promise.all([
+        API.get('/classroom/courses/available'),
+        API.get('/classroom/courses'),          // already-synced ClassroomCourse docs
+      ]);
+
+      const list = availableRes.data.courses || [];
+      const syncedIds = new Set(
+        (syncedRes.data.courses || []).map(c => c.courseId)
+      );
+
       setCourses(list);
-      const allSelected = {};
-      list.forEach(c => { allSelected[c.courseId] = true; });
-      setSelectedCourses(allSelected);
+
+      // Pre-check only previously synced courses.
+      // If the user has never synced (syncedIds is empty) nothing is checked —
+      // they must explicitly choose which courses to import.
+      const initial = {};
+      list.forEach(c => {
+        initial[c.courseId] = syncedIds.has(c.courseId);
+      });
+      setSelectedCourses(initial);
       setShowPicker(true);
     } catch {
       toast.error('Failed to load courses');
@@ -64,7 +80,7 @@ export default function ClassroomConnect({ onSync }) {
       .map(([k]) => k);
 
     if (selected.length === 0) {
-      toast.error('Select at least one course');
+      toast.error('Select at least one course to import');
       return;
     }
 
@@ -138,7 +154,14 @@ export default function ClassroomConnect({ onSync }) {
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 marginBottom: 10, fontSize: 12.5, fontWeight: 600, color: '#cbd5e1',
               }}>
-                <span>Select courses to import</span>
+                <span>
+                  Select courses to import
+                  {Object.values(selectedCourses).filter(Boolean).length === 0 && (
+                    <span style={{ fontWeight: 400, color: '#64748b', marginLeft: 6 }}>
+                      — none selected
+                    </span>
+                  )}
+                </span>
                 <button
                   onClick={toggleAll}
                   style={{

@@ -21,7 +21,16 @@ async function syncAllUsers() {
         const user = await User.findById(userId);
         if (!user) continue;
 
-        // Simulate a request to the sync endpoint
+        // ── Respect the user's saved course selection ─────────────────────
+        // If the user has never manually synced (syncedCourseIds is empty),
+        // skip the background sync entirely — we have nothing to refresh and
+        // we must not import courses the user never chose.
+        const syncedCourseIds = integration.syncedCourseIds || [];
+        if (syncedCourseIds.length === 0) {
+          console.log(`[ClassroomSync] Skipping user ${userId} — no courses selected yet`);
+          continue;
+        }
+
         const { google } = require('googleapis');
         const { calculatePriority } = require('../services/priorityEngine');
         const { sendAssignmentNotification } = require('../services/notificationEngine');
@@ -42,10 +51,19 @@ async function syncAllUsers() {
         const classroom = google.classroom({ version: 'v1', auth: oauth2 });
 
         const coursesRes = await classroom.courses.list({ courseStates: ['ACTIVE'] });
-        const courses = coursesRes.data.courses || [];
+        const allCourses = coursesRes.data.courses || [];
+
+        // Filter to only the courses the user explicitly chose at sync time
+        const courses = allCourses.filter(c => syncedCourseIds.includes(c.id));
+
+        // ── Delete stale courses/assignments for courseIds that are no
+        // longer in the user's selection (e.g. a course they de-selected on
+        // last manual sync but the cron hadn't cleaned up yet) ─────────────
+        const ClassroomCourse = require('../models/ClassroomCourse');
+        await ClassroomCourse.deleteMany({ userId, courseId: { $nin: syncedCourseIds } });
+        await ClassroomAssignment.deleteMany({ userId, courseId: { $nin: syncedCourseIds } });
 
         for (const c of courses) {
-          const ClassroomCourse = require('../models/ClassroomCourse');
           await ClassroomCourse.findOneAndUpdate(
             { userId, courseId: c.id },
             {
@@ -133,7 +151,7 @@ async function syncAllUsers() {
 
         integration.lastSync = new Date();
         await integration.save();
-        console.log(`[ClassroomSync] Synced ${userId}: ${courses.length} courses`);
+        console.log(`[ClassroomSync] Synced user ${userId}: ${courses.length}/${allCourses.length} selected course(s)`);
       } catch (userErr) {
         console.error(`[ClassroomSync] Error syncing user ${integration.userId}:`, userErr.message);
       }

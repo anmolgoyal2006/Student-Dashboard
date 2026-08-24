@@ -9,6 +9,13 @@ const googleIntegrationSchema = new mongoose.Schema({
   tokenExpiry: { type: Date },
   connectedAt: { type: Date, default: Date.now },
   lastSync: { type: Date },
+
+  // Persisted list of Google Classroom courseId strings the user explicitly
+  // chose to sync. Empty array = user has never synced or cleared all courses.
+  // The background cron reads this so it only re-syncs courses the user
+  // actually wants — preventing previously de-selected courses from
+  // reappearing automatically every 6 hours.
+  syncedCourseIds: { type: [String], default: [] },
 }, { timestamps: true });
 
 module.exports = mongoose.model('GoogleIntegration', googleIntegrationSchema);
