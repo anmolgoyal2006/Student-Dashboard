@@ -155,6 +155,13 @@ async function sendAssignmentNotification(assignment, userId) {
     return { skipped: true };
   }
 
+  // No due date — can't compute urgency, overdue state, or a meaningful
+  // notification. Skip silently so these never appear as AI recommendations
+  // or push notifications.
+  if (!assignment.dueDate) {
+    return { skipped: true };
+  }
+
   const dueDate    = new Date(assignment.dueDate);
   const now        = new Date();
   const diffHrs    = (dueDate.getTime() - now.getTime()) / (1000 * 60 * 60);

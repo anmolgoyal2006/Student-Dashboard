@@ -215,7 +215,7 @@ async function getFallbackRecommendations(userId) {
     Marks.find({ userId, examType: 'final' }).populate('subjectId', 'name credits'),
     Task.find({ user: userId, status: { $ne: 'completed' } }),
     CareerProgress.findOne({ userId }),
-    ClassroomAssignment.find({ userId, status: { $ne: 'submitted' } }).sort({ dueDate: 1 }).limit(5),
+    ClassroomAssignment.find({ userId, status: { $ne: 'submitted' }, dueDate: { $ne: null } }).sort({ dueDate: 1 }).limit(5),
   ]);
 
   const suggestions = [];
@@ -306,7 +306,7 @@ async function computeRecommendations(userId) {
       getRawMarks(userId),
       Task.find({ user: userId, status: { $ne: 'completed' } }),
       CareerProgress.findOne({ userId }),
-      ClassroomAssignment.find({ userId, status: { $ne: 'submitted' } }).sort({ dueDate: 1 }).limit(10),
+      ClassroomAssignment.find({ userId, status: { $ne: 'submitted' }, dueDate: { $ne: null } }).sort({ dueDate: 1 }).limit(10),
     ]);
 
     const attData         = formatAttendance(attendanceRecords, subjects);
