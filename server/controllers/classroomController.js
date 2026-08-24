@@ -9,6 +9,7 @@ const ClassroomAssignment = require('../models/ClassroomAssignment');
 const Task = require('../models/Task');
 const { calculatePriority } = require('../services/priorityEngine');
 const { sendAssignmentNotification } = require('../services/notificationEngine');
+const { invalidateRecsCache } = require('../services/aiRecommendationService');
 
 const SCOPES = [
   'openid',
@@ -128,6 +129,8 @@ exports.disconnect = async (req, res) => {
     await ClassroomCourse.deleteMany({ userId: req.user.id });
     await ClassroomAssignment.deleteMany({ userId: req.user.id });
     await Task.deleteMany({ user: req.user.id, type: 'assignment' });
+    // Bust cache so dashboard AI recommendations no longer mention deleted assignments
+    invalidateRecsCache(req.user.id);
     res.json({ message: 'Google Classroom disconnected.' });
   } catch (err) {
     console.error('[Classroom Disconnect]', err.message);
@@ -391,6 +394,10 @@ exports.sync = async (req, res) => {
 
     const total = sent + deduped + noTokens + errors;
     console.log(`[Classroom Controller Sync] ${sent} sent, ${deduped} deduped, ${noTokens} no-tokens, ${errors} error${errors !== 1 ? 's' : ''}. Error reasons: ${[...errorReasons].join(', ') || 'none'}`);
+
+    // Bust the AI recommendation cache so the next dashboard load immediately
+    // reflects the newly synced assignments instead of stale pre-sync data.
+    invalidateRecsCache(userId);
 
     res.json({ message: 'Sync completed', courses: courses.length, assignments: allAssignments.length });
   } catch (err) {

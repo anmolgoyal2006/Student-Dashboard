@@ -451,6 +451,14 @@ GENERAL:
   return getFallbackRecommendations(userId);
 }
 
+// ── Cache invalidation ────────────────────────────────────────────────────────
+// Call this whenever the user's classroom data changes (sync / disconnect) so
+// the next recommendation fetch reflects the new assignment set immediately
+// instead of serving stale cache for up to 30 minutes.
+exports.invalidateRecsCache = (userId) => {
+  recsCache.del(`recs:${userId}`);
+};
+
 // ── Non-blocking variant ──────────────────────────────────────────────────────
 // Returns cached data instantly. If nothing is cached yet, kicks off generation
 // in the background and returns { suggestions: [], generating: true } so the
