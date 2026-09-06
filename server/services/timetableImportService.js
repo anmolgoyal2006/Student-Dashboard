@@ -151,13 +151,13 @@ function flagEntry(raw) {
     let day = typeof slot?.day === 'string' ? slot.day.trim() : '';
     const dayLower = day.toLowerCase();
     const dayMap = {
-      sun: 'Sun', sunday: 'Sun',
-      mon: 'Mon', monday: 'Mon',
-      tue: 'Tue', tuesday: 'Tue',
-      wed: 'Wed', wednesday: 'Wed',
-      thu: 'Thu', thursday: 'Thu',
-      fri: 'Fri', friday: 'Fri',
-      sat: 'Sat', saturday: 'Sat'
+      sun: 'Sun', sunday: 'Sun', unday: 'Sun',
+      mon: 'Mon', monday: 'Mon', onday: 'Mon',
+      tue: 'Tue', tuesday: 'Tue', esday: 'Tue',
+      wed: 'Wed', wednesday: 'Wed', nesday: 'Wed',
+      thu: 'Thu', thursday: 'Thu', ursday: 'Thu',
+      fri: 'Fri', friday: 'Fri', riday: 'Fri',
+      sat: 'Sat', saturday: 'Sat', urday: 'Sat',
     };
     if (dayMap[dayLower]) {
       day = dayMap[dayLower];
