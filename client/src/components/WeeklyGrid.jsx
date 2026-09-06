@@ -10,16 +10,15 @@ const FULL_DAYS = {
 };
 
 const MATRIX_SLOTS = [
-  { label: '8–9 AM',   start: 8 * 60,  end: 9 * 60,  isLunch: false },
-  { label: '9–10 AM',  start: 9 * 60,  end: 10 * 60, isLunch: false },
-  { label: '10–11 AM', start: 10 * 60, end: 11 * 60, isLunch: false },
-  { label: '11–12 PM', start: 11 * 60, end: 12 * 60, isLunch: false },
-  { label: '12–1 PM',  start: 12 * 60, end: 13 * 60, isLunch: false },
-  { label: '1–2 PM',   start: 13 * 60, end: 14 * 60, isLunch: true  },
-  { label: '2–3 PM',   start: 14 * 60, end: 15 * 60, isLunch: false },
-  { label: '3–4 PM',   start: 15 * 60, end: 16 * 60, isLunch: false },
-  { label: '4–5 PM',   start: 16 * 60, end: 17 * 60, isLunch: false },
-  { label: '5–7 PM',   start: 17 * 60, end: 19 * 60, isLunch: false },
+  { label: '8–9 AM',   start: 8 * 60,  end: 9 * 60  },
+  { label: '9–10 AM',  start: 9 * 60,  end: 10 * 60 },
+  { label: '10–11 AM', start: 10 * 60, end: 11 * 60 },
+  { label: '11–12 PM', start: 11 * 60, end: 12 * 60 },
+  { label: '12–1 PM',  start: 12 * 60, end: 13 * 60 },
+  { label: '2–3 PM',   start: 14 * 60, end: 15 * 60 },
+  { label: '3–4 PM',   start: 15 * 60, end: 16 * 60 },
+  { label: '4–5 PM',   start: 16 * 60, end: 17 * 60 },
+  { label: '5–7 PM',   start: 17 * 60, end: 19 * 60 },
 ];
 
 /* Web — rich dark saturated cards on black canvas */
@@ -169,8 +168,7 @@ const getDynamicMatrixSlots = (subjects) => {
 
   if (boundaries.size < 2) return MATRIX_SLOTS;
 
-  // If schedule has morning classes and afternoon classes with a lunch gap,
-  // ensure 13:00 (780) and 14:00 (840) exist as boundaries ONLY IF classes don't cross them (e.g. 12:30–1:30)
+  // Ensure 1:00 PM (780) and 2:00 PM (840) exist as boundaries when schedule spans across morning and afternoon
   const hasMorning = rawSlots.some(s => s.start < 13 * 60);
   const hasAfternoon = rawSlots.some(s => s.end > 14 * 60);
   const classCrossing1pm = rawSlots.some(s => s.start < 13 * 60 && s.end > 13 * 60);
@@ -186,28 +184,23 @@ const getDynamicMatrixSlots = (subjects) => {
 
   // Build columns by walking the sorted boundaries in order.
   // Each adjacent pair [sortedBounds[i], sortedBounds[i+1]] becomes one column.
-  // This naturally handles 8:00–9:00, 8:30–9:30, or any mixed offsets because
-  // the boundaries from all subjects are merged and deduplicated first.
   const slots = [];
   for (let i = 0; i < sortedBounds.length - 1; i++) {
     const curr = sortedBounds[i];
     const next = sortedBounds[i + 1];
 
-    // Only include this column if at least one class overlaps it, OR if it is a midday lunch break
     const hasClass = rawSlots.some(s => s.start <= curr && s.end >= next);
-
-    const isMiddayBreak =
+    const isMiddayGap =
       (curr >= 11 * 60 + 30 && next <= 15 * 60 + 30) &&
       (next - curr >= 30) &&
       !rawSlots.some(s => s.start < next && s.end > curr);
 
-    if (!hasClass && !isMiddayBreak) continue;
+    if (!hasClass && !isMiddayGap) continue;
 
     slots.push({
-      label:   fmtSlotLabel(curr, next),
-      start:   curr,
-      end:     next,
-      isLunch: isLunchBreak,
+      label: fmtSlotLabel(curr, next),
+      start: curr,
+      end:   next,
     });
   }
 
