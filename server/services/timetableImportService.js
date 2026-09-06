@@ -299,11 +299,15 @@ function detectAndFlagConflicts(results) {
 async function parseTimetablePDF(buffer) {
   let parsedJson = null;
   let hasText = false;
+  let plumberLayoutText = '';
 
   // 1. In non-test environments, try structured table parsing using pdfplumber first
   if (process.env.NODE_ENV !== 'test') {
     try {
       const tableData = await extractStructuredTableFromPDF(buffer);
+      if (Array.isArray(tableData?.pages)) {
+        plumberLayoutText = tableData.pages.map(p => p.text).filter(Boolean).join('\n\n');
+      }
       const gridTable = tableData?.pages?.[0]?.tables?.[0];
       if (gridTable && gridTable.length > 1) {
         const headers = gridTable[0];
@@ -378,13 +382,15 @@ async function parseTimetablePDF(buffer) {
   }
 
   // 2. Fallback to raw plain-text parsing if structured grid parsing didn't return subjects
-  let text = '';
+  let text = plumberLayoutText || '';
   const hasParsedSubjects = parsedJson?.subjects && parsedJson.subjects.length > 0;
   if (!hasParsedSubjects) {
-    try {
-      text = await extractTextFromPDF(buffer);
-    } catch (err) {
-      console.warn('[Timetable Import] Text extraction failed:', err.message);
+    if (!text) {
+      try {
+        text = await extractTextFromPDF(buffer);
+      } catch (err) {
+        console.warn('[Timetable Import] Text extraction failed:', err.message);
+      }
     }
 
     hasText = text && text.trim().length > 100;
