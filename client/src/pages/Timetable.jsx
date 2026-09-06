@@ -20,8 +20,20 @@ const fmt12 = (t) => {
 
 const toMinutes = (t) => {
   if (!t) return 0;
-  const [h, m] = t.split(':').map(Number);
-  return h * 60 + (m || 0);
+  const str = String(t).trim().toUpperCase();
+  const match = str.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/);
+  if (match) {
+    let h = parseInt(match[1], 10);
+    const m = parseInt(match[2], 10);
+    const ampm = match[3];
+    if (ampm === 'PM' && h < 12) h += 12;
+    if (ampm === 'AM' && h === 12) h = 0;
+    return h * 60 + m;
+  }
+  const parts = str.split(':');
+  const h = parseInt(parts[0], 10) || 0;
+  const m = parseInt(parts[1], 10) || 0;
+  return h * 60 + m;
 };
 
 /* ── palette — pure black canvas, vibrant accents ─────────────────────────── */

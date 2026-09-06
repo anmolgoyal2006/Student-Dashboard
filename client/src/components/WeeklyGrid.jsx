@@ -66,8 +66,20 @@ const DAY_PDF = {
 
 const toMinutes = (t) => {
   if (!t) return 0;
-  const [h, m] = t.split(':').map(Number);
-  return h * 60 + (m || 0);
+  const str = String(t).trim().toUpperCase();
+  const match = str.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/);
+  if (match) {
+    let h = parseInt(match[1], 10);
+    const m = parseInt(match[2], 10);
+    const ampm = match[3];
+    if (ampm === 'PM' && h < 12) h += 12;
+    if (ampm === 'AM' && h === 12) h = 0;
+    return h * 60 + m;
+  }
+  const parts = str.split(':');
+  const h = parseInt(parts[0], 10) || 0;
+  const m = parseInt(parts[1], 10) || 0;
+  return h * 60 + m;
 };
 
 const fmt12 = (t) => {
@@ -158,8 +170,15 @@ const getDynamicMatrixSlots = (subjects) => {
   if (boundaries.size < 2) return MATRIX_SLOTS;
 
   const sortedBounds = [...boundaries].sort((a, b) => a - b);
-  const minStart = sortedBounds[0];
-  const maxEnd = sortedBounds[sortedBounds.length - 1];
+  let minStart = sortedBounds[0];
+  let maxEnd = sortedBounds[sortedBounds.length - 1];
+
+  // Include 8:30 AM morning slot if schedule starts around 8:30 AM or 9:30 AM
+  if (minStart >= 8 * 60 + 30 && minStart <= 9 * 60 + 30) {
+    minStart = 8 * 60 + 30; // 8:30 AM
+  } else if (minStart > 8 * 60 && minStart < 8 * 60 + 30) {
+    minStart = 8 * 60; // 8:00 AM
+  }
 
   const step = 60;
   const slots = [];
