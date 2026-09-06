@@ -17,24 +17,25 @@ Field rules:
 - instructor: e.g. "Dr. Ashpreet".
 - credits: number or null.
 - day: Sun, Mon, Tue, Wed, Thu, Fri, Sat.
-- startTime / endTime: 24-hour "HH:MM".
-- room: venue, e.g. "L21", "402+L407".
+- startTime / endTime: 24-hour "HH:MM". Preserve exact minutes as printed in the header/cell time (e.g., "09:30" to "10:30", "13:30" to "14:30", "14:30" to "15:30"). Never round minutes to whole hours (do not turn 9:30 into 9:00).
+- room: venue, e.g. "L21", "402+L407", "Room No 406", "Room No 215".
 
 How to parse each cell item:
-- You are given a JSON array of cell objects. Each object has "day", "time" (e.g. "9:00-10:00", "5:00- 7:00"), and "content".
+- You are given a JSON array of cell objects. Each object has "day", "time" (e.g. "09:30-10:30", "14:30-16:30"), and "content".
 - Note that sometimes the day and time headers might be swapped in the PDF (e.g., the "day" field contains a time range and the "time" field contains a weekday). Identify which field holds the weekday and which holds the time, and map them correctly to "day", "startTime", and "endTime" regardless of the property name.
-- Translate the weekday to the standard Sun-Sat value (e.g., "MON" -> "Mon", "TUES" -> "Tue").
-- Translate the time to 24-hour format:
-  - "9:00-10:00" -> 09:00 - 10:00.
-  - "11:00-12:00" -> 11:00 - 12:00.
-  - "12:00-1:00" -> 12:00 - 13:00.
-  - "2:00-3:00" -> 14:00 - 15:00.
-  - "3:00-4:00" -> 15:00 - 16:00.
-  - "4:00-5:00" -> 16:00 - 17:00.
-  - "5:00- 7:00" -> 17:00 - 19:00.
-- Extract the course name, course code, instructor, and room from the "content" text.
-- If a cell's "content" contains multiple class blocks (separated by newlines/spaces), split them into separate schedule slots for those subjects. For example, if "content" has SC on line 1 and SE on line 2, split them into two slots (one for SC, one for SE) sharing the same day and time.
-- Ensure all courses are correctly grouped by name/code, and fold duplicate subjects together.`;
+- Translate the weekday to the standard Sun-Sat value (e.g., "MON" -> "Mon", "TUES" -> "Tue", "onday" -> "Mon", "esday" -> "Tue", "nesday" -> "Wed", "ursday" -> "Thu", "riday" -> "Fri").
+- Translate the time range to 24-hour format "HH:MM", preserving exact minutes as printed:
+  - "09:30-10:30" -> startTime: "09:30", endTime: "10:30"
+  - "10:30-11:30" -> startTime: "10:30", endTime: "11:30"
+  - "11:30-12:30" -> startTime: "11:30", endTime: "12:30"
+  - "12:30-13:30" -> startTime: "12:30", endTime: "13:30"
+  - "13:30-14:30" -> startTime: "13:30", endTime: "14:30"
+  - "14:30-15:30" -> startTime: "14:30", endTime: "15:30"
+  - "14:30-16:30" -> startTime: "14:30", endTime: "16:30"
+- Dynamic Breaks: Lunch/recess breaks are dynamic per timetable (e.g. 13:30-14:30, 12:00-13:00, 13:00-14:00, marked as -X-, LUNCH, BREAK, RECESS). Skip non-teaching break cells entirely. Do NOT assume lunch is always 13:00-14:00.
+- Extract course name, code, instructor, and room from content.
+- If a cell's "content" contains multiple class blocks (e.g. for different groups/sections like Gp 1, Gp 2, Gp 3), split them into separate schedule entries for each group/subject slot sharing the same day, time, and respective room.
+- Fold duplicate subjects together into single subject objects with multiple schedule slots.`;
 
 function extractStructuredTableFromPDF(buffer) {
   return new Promise((resolve, reject) => {
@@ -80,40 +81,22 @@ Return ONLY a JSON object of this exact shape:
 {"subjects":[{"name":"","code":"","instructor":"","credits":null,"schedule":[{"day":"","startTime":"","endTime":"","room":""}]}]}
 
 Field rules — these names are fixed, do not rename or add fields:
-- name: the subject/course title. Required.
+- name: the subject/course title. Required. Clean up section/group markers like (Pr) Gp 1, Gp 2 from the subject name.
 - code: the course code exactly as printed (e.g. "CS201"). "" if absent.
-- instructor: teacher name. "" if absent.
+- instructor: teacher name (e.g. "Dr. Ankit Gupta", "Dr. Sunil k Singh"). "" if absent.
 - credits: a number 1-6, or null if not printed. Never guess.
-- day: one of Sun, Mon, Tue, Wed, Thu, Fri, Sat. Map abbreviations
-  (MON/M/Monday -> Mon, TUES/TUE -> Tue, THURS/THU/TH -> Thu, etc).
-- startTime / endTime: 24-hour "HH:MM". Convert 12-hour times ("2:00 PM" ->
-  "14:00"). A timetable running 9-5 with a bare "1:00" start means "13:00".
-- room: room/venue as printed. "" if absent.
+- day: one of Sun, Mon, Tue, Wed, Thu, Fri, Sat. Map abbreviations, full names, or cropped margins
+  (Monday/onday -> Mon, Tuesday/esday -> Tue, Wednesday/nesday -> Wed, Thursday/ursday -> Thu, Friday/riday -> Fri, Saturday/urday -> Sat, Sunday/unday -> Sun).
+- startTime / endTime: 24-hour "HH:MM". Preserve exact minutes as printed in column headers (e.g. "09:30" to "10:30", "10:30" to "11:30", "13:30" to "14:30", "14:30" to "15:30", "14:30" to "16:30"). NEVER round 09:30 to 09:00 or 14:30 to 14:00.
+- room: room/venue as printed (e.g. "Room No 406", "Room No 206", "Room No 215", "Room No 419"). "" if absent.
 
 How to read the grid — this is an IMAGE, use visual position, not text order:
-- The column headers across the top define time ranges. The row labels down
-  the side define days. A cell's time range comes from the column(s) it
-  visually sits under, and its day comes from the row it visually sits in —
-  never infer either from reading order.
-- Row-alignment is critical: Make sure that the day of the week for a slot matches the exact row it is placed in. Each day row may be split into two sub-rows (e.g. for different groups/sections). Verify that the slots are not shifted or assigned to a different day row (for example, do not mix up Thursday afternoon slots with Friday afternoon slots).
-- Check the course code (e.g. CSN4005 vs CSN4006) and course name (e.g. IoT Lab vs AI Lab) printed inside the cell very carefully to ensure you do not assign a slot to the wrong subject. For example, on Friday 15:00-17:00, there is "CSN4005 IoT Lab" in room "301 + 303 + 307" for "CSE4 + CSE5 + CSE6". On Thursday 15:00-17:00, there is "CSN4006 AI Lab" in room "DS Lab" for "CSE4 + CSE5 + CSE6". Check the row labels (Thursday vs Friday) and subject details inside each cell very carefully to avoid swapping them.
-- A cell's duration is determined strictly by the vertical grid lines separating the columns. Do not assume a cell spans multiple columns just because adjacent cells (above or below it) are blank. Each column represents a 1-hour block unless there is no vertical border separating them. For example, on Friday, the bottom row under "9:00 - 10:00" contains "CSN4004 CAO", and the cell next to it under "10:00 - 11:00" contains "CSN4001 DAA" (while the top row under "9:00 - 10:00" is blank). Therefore, "CSN4004 CAO" on Friday is strictly from 09:00 to 10:00, not 09:00 to 11:00.
-- Column alignment: The first period column header might be "8-9AM" (08:00 - 09:00). If the "8-9AM" column is completely empty/blank across all days of the week, then NO classes should be scheduled at "08:00 - 09:00". The first class of every day must start at "09:00" (under "9-10AM"). Check the sequential alignment using "LUNCH" (which is typically 1-2 PM / 13:00 - 14:00) as a fixed anchor. For example, if there are 4 hours of lectures before Lunch, they must occupy 09:00-13:00 (not 08:00-12:00, which would leave a blank gap before LUNCH). Do not shift classes to the left into the blank "8-9AM" column.
-- A cell spanning several consecutive columns is ONE slot: use the FIRST spanned column's start time and the LAST spanned column's end time. For example, if a "Lab" cell spans two columns from 3:00 - 4:00 and 4:00 - 5:00, it is a single slot from 15:00 to 17:00. DO NOT split it or truncate it to just one of the hours (e.g. 16:00 to 17:00).
-- The same subject appearing on multiple days produces multiple entries in
-  that subject's schedule array — one object per day, not duplicate subjects.
-- A lab meeting twice a week is still one subject with two schedule entries.
-- Group/section labels ("G1", "B2", "CSE3,CSE4") are not part of the subject
-  name and not a room. Drop them unless they are clearly the venue.
-- Skip non-teaching cells entirely: LUNCH, BREAK, RECESS, free/blank periods,
-  and the header row/column itself.
-- Room codes and course codes can look alike; the room is the one printed
-  inside the timetable cell, the code is the one in a legend/subject list
-  elsewhere on the page, if present.
-
-Never invent a value. If something is genuinely not visible, use "" for
-strings and null for credits. Return every subject you find, even if some of
-its fields are incomplete. Never drop a row because it is partial.`;
+- The column headers across the top define exact time ranges (e.g. 09:30-10:30, 10:30-11:30, 11:30-12:30, 12:30-13:30, 13:30-14:30, 14:30-15:30, 15:30-16:30). The row labels down the side define days. A cell's time range comes strictly from the column(s) it visually sits under, and its day comes from the row it visually sits in.
+- Dynamic Lunch / Break Times: Lunch breaks vary per institution and timetable. Read the exact time range of the break column (e.g. 13:30-14:30, 12:30-13:30, 12:00-13:00, 13:00-14:00, marked as -X-, LUNCH, BREAK, RECESS) and skip non-teaching cells entirely. Do NOT assume lunch is always 13:00-14:00.
+- A cell's duration is determined strictly by the vertical grid lines separating the columns. A cell spanning several consecutive time columns is ONE slot: use the FIRST spanned column's start time and the LAST spanned column's end time. For example, if a 2-hour Lab cell spans 14:30-15:30 and 15:30-16:30, it is a single slot from 14:30 to 16:30.
+- Parallel Lab / Group Rows: A day row may be divided into sub-rows for different practical groups (Gp 1, Gp 2, Gp 3). Extract each parallel group slot with its respective subject, instructor, and room.
+- Skip non-teaching cells (-X-, LUNCH, BREAK, RECESS) and header rows/columns entirely.
+- Return every subject found. Fold duplicate subjects into single entries with multiple schedule entries.`;
 
 const TEXT_PROMPT = `You extract class timetables from the text of a timetable grid into JSON.
 
@@ -125,19 +108,15 @@ Field rules — these names are fixed, do not rename or add fields:
 - code: the course code exactly as printed (e.g. "CS201"). "" if absent.
 - instructor: teacher name. "" if absent.
 - credits: a number 1-6, or null if not printed. Never guess.
-- day: one of Sun, Mon, Tue, Wed, Thu, Fri, Sat. Map abbreviations
-  (MON/M/Monday -> Mon, TUES/TUE -> Tue, THURS/THU/TH -> Thu, etc).
-- startTime / endTime: 24-hour "HH:MM". Convert 12-hour times ("2:00 PM" ->
-  "14:00"). A timetable running 9-5 with a bare "1:00" start means "13:00".
+- day: one of Sun, Mon, Tue, Wed, Thu, Fri, Sat. Map cropped day margins (onday->Mon, esday->Tue, nesday->Wed, ursday->Thu, riday->Fri).
+- startTime / endTime: 24-hour "HH:MM". Preserve exact printed minutes (e.g., "09:30", "10:30", "13:30", "14:30"). Never round 9:30 to 9:00.
 - room: room/venue as printed. "" if absent.
 
 How to read the text:
-- The extracted text represents a grid layout. The column headers define time ranges (e.g. 8-9AM, 9-10AM) and the rows represent days of the week (Monday, Tuesday, etc.).
-- A subject's schedule entry is defined by the day row it belongs to and the time column(s) it sits under.
-- Match subjects to their day and time carefully.
-- Column alignment: The first period column header might be "8-9AM" (08:00 - 09:00). If the "8-9AM" column is completely empty/blank across all days of the week, then NO classes should be scheduled at "08:00 - 09:00". The first class of every day must start at "09:00" (under "9-10AM"). Check the sequential alignment using "LUNCH" (which is typically 1-2 PM / 13:00 - 14:00) as a fixed anchor. For example, if there are 4 hours of lectures before Lunch, they must occupy 09:00-13:00 (not 08:00-12:00, which would leave a blank gap before LUNCH). Do not shift classes to the left into the blank "8-9AM" column.
-- A cell's duration is determined strictly by the vertical grid lines separating the columns. Do not assume a cell spans multiple columns just because adjacent cells (above or below it) are blank.
-- Return every subject you find, even if some of its fields are incomplete. Never drop a row because it is partial.`;
+- The extracted text represents a grid layout. The column headers define dynamic time ranges (e.g. 09:30-10:30, 10:30-11:30, 13:30-14:30, 14:30-15:30) and the rows represent days of the week.
+- Match subjects to their exact day row and time column.
+- Dynamic Breaks: Lunch/recess breaks are dynamic per timetable (e.g. 13:30-14:30, 12:00-13:00, 13:00-14:00, -X-). Skip break slots entirely. Do NOT assume lunch is always 13:00-14:00.
+- Return every subject found.`;
 
 function flagEntry(raw) {
   const issues = [];
@@ -335,7 +314,7 @@ async function parseTimetablePDF(buffer) {
           const mergedCells = [];
           for (let c = 1; c < row.length; c++) {
             const content = (row[c] || '').trim();
-            if (!content || /^(LUNCH|BREAK|RECESS)$/i.test(content)) continue;
+            if (!content || /^(LUNCH|BREAK|RECESS|-X-|- X -|---|--|-)$/i.test(content)) continue;
 
             const last = mergedCells[mergedCells.length - 1];
             // Collapse into previous cell if same day + same normalised content

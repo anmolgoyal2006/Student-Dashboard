@@ -118,10 +118,66 @@ const getConflicts = (subjects) => {
   return [...new Set(conflicts)];
 };
 
+const toHHMM = (min) => {
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+};
+
+const getDynamicMatrixSlots = (subjects) => {
+  if (!subjects?.length) return MATRIX_SLOTS;
+
+  const rawSlots = [];
+  const boundaries = new Set();
+
+  subjects.forEach(s => {
+    (s.schedule || []).forEach(slot => {
+      if (!slot.startTime || !slot.endTime) return;
+      const start = toMinutes(slot.startTime);
+      const end = toMinutes(slot.endTime);
+      if (start < end) {
+        boundaries.add(start);
+        boundaries.add(end);
+        rawSlots.push({ start, end });
+      }
+    });
+  });
+
+  if (boundaries.size < 2) return MATRIX_SLOTS;
+
+  const sortedBounds = [...boundaries].sort((a, b) => a - b);
+  const minStart = sortedBounds[0];
+  const maxEnd = sortedBounds[sortedBounds.length - 1];
+
+  const step = 60;
+  const slots = [];
+  let curr = minStart;
+
+  while (curr < maxEnd) {
+    let next = curr + step;
+    const nextBound = sortedBounds.find(b => b > curr && b <= next);
+    if (nextBound && nextBound < next) {
+      next = nextBound;
+    }
+
+    const isBreak = !rawSlots.some(s => s.start < next && s.end > curr);
+    slots.push({
+      label: `${fmt12(toHHMM(curr))}–${fmt12(toHHMM(next))}`,
+      start: curr,
+      end: next,
+      isLunch: isBreak,
+    });
+    curr = next;
+  }
+
+  return slots.length > 0 ? slots : MATRIX_SLOTS;
+};
+
 /* ── PDF export — clean, professional, border-refined design ─────────────── */
 export function exportTimetablePDF(subjects) {
   if (!subjects?.length) return;
 
+  const matrixSlots = getDynamicMatrixSlots(subjects);
   const colorMap = {};
   subjects.forEach((s, i) => { colorMap[s._id] = PDF_PALETTE[i % PDF_PALETTE.length]; });
   const eventsByDay = buildEventsByDay(subjects, colorMap);
@@ -141,8 +197,8 @@ export function exportTimetablePDF(subjects) {
     let cellsHtml = '';
     let sIdx = 0;
 
-    while (sIdx < MATRIX_SLOTS.length) {
-      const slot = MATRIX_SLOTS[sIdx];
+    while (sIdx < matrixSlots.length) {
+      const slot = matrixSlots[sIdx];
       const matchingEvents = dayEvents.filter(ev => ev.startMin < slot.end && ev.endMin > slot.start);
       const startedEarlier = dayEvents.some(ev => ev.startMin < slot.start && ev.endMin > slot.start);
 
@@ -154,7 +210,7 @@ export function exportTimetablePDF(subjects) {
       if (matchingEvents.length > 0) {
         const maxEndMin = Math.max(...matchingEvents.map(ev => ev.endMin));
         let span = 1;
-        while (sIdx + span < MATRIX_SLOTS.length && MATRIX_SLOTS[sIdx + span].start < maxEndMin) {
+        while (sIdx + span < matrixSlots.length && matrixSlots[sIdx + span].start < maxEndMin) {
           span++;
         }
 
@@ -193,7 +249,7 @@ export function exportTimetablePDF(subjects) {
       </tr>`;
   });
 
-  const thsHtml = MATRIX_SLOTS.map(slot =>
+  const thsHtml = matrixSlots.map(slot =>
     `<th style="background:${slot.isLunch ? '#f1f5f9' : '#f8fafc'};color:${slot.isLunch ? '#64748b' : '#0f172a'};border:1px solid #e2e8f0;border-top:${slot.isLunch ? '3px solid #cbd5e1' : '3px solid #6366f1'};padding:9px 3px;font-size:10px;font-weight:800;text-align:center;border-radius:6px;">${slot.label}</th>`
   ).join('');
 
@@ -211,7 +267,7 @@ export function exportTimetablePDF(subjects) {
   }).join('');
 
   const pdfContainer = document.createElement('div');
-  pdfContainer.style.cssText = 'padding:20px;background:#ffffff;color:#0f172a;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;width:1100px;box-sizing:border-box;';
+  pdfContainer.style.cssText = 'padding:20px;background:#ffffff;color:#0f172a;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI,Roboto,sans-serif;width:1100px;box-sizing:border-box;';
 
   pdfContainer.innerHTML = `
     <!-- Top Header Bar -->
@@ -264,6 +320,8 @@ export function exportTimetablePDF(subjects) {
 
 /* ── Web component — black canvas, vibrant grid ──────────────────────────── */
 export default function WeeklyGrid({ subjects }) {
+  const matrixSlots = useMemo(() => getDynamicMatrixSlots(subjects), [subjects]);
+
   const colorMap = useMemo(() => {
     const m = {};
     subjects.forEach((s, i) => { m[s._id] = WEB_PALETTE[i % WEB_PALETTE.length]; });
@@ -282,7 +340,7 @@ export default function WeeklyGrid({ subjects }) {
   [subjects]);
 
   const renderMatrixRowCells = (day) =>
-    MATRIX_SLOTS.map((slot, sIdx) => {
+    matrixSlots.map((slot, sIdx) => {
       const dayEvents = eventsByDay[day] || [];
       const matchingEvents = dayEvents.filter(ev => ev.startMin < slot.end && ev.endMin > slot.start);
 
@@ -495,12 +553,12 @@ export default function WeeklyGrid({ subjects }) {
         <table className="tt-matrix">
           <colgroup>
             <col style={{ width: '110px' }} />
-            {MATRIX_SLOTS.map((_, i) => <col key={i} />)}
+            {matrixSlots.map((_, i) => <col key={i} />)}
           </colgroup>
           <thead>
             <tr>
               <th className="tt-th-day">Day</th>
-              {MATRIX_SLOTS.map((slot, i) => (
+              {matrixSlots.map((slot, i) => (
                 <th key={i} className={slot.isLunch ? 'tt-th-lunch' : ''}>{slot.label}</th>
               ))}
             </tr>
