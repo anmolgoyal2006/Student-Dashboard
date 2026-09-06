@@ -490,22 +490,41 @@ export default function WeeklyGrid({ subjects }) {
           color: rgba(255,255,255,0.7); text-transform: uppercase;
         }
         .tt-matrix thead th.tt-th-day {
-          color: #a5b4fc; background: #0f172a;
-          border: 1px solid rgba(99,102,241,0.3); font-size: 11px;
           position: sticky; left: 0; z-index: 20;
-          box-shadow: 4px 0 12px rgba(0,0,0,0.7);
+          background: var(--tt-black); padding: 0; border: none;
         }
+        .tt-day-header-card {
+          height: 34px; padding: 0 8px; border-radius: 8px;
+          background: #0f172a; border: 1px solid rgba(99,102,241,0.3);
+          color: #a5b4fc; font-size: 11px; font-weight: 800;
+          display: flex; align-items: center; justify-content: center;
+          letter-spacing: 0.05em; text-transform: uppercase;
+        }
+
         .tt-matrix thead th.tt-th-lunch {
           color: rgba(255,255,255,0.35); background: rgba(255,255,255,0.02);
           border-style: dashed;
         }
 
         .tt-day-cell {
-          height: 76px; padding: 0 8px; border-radius: 8px; text-align: center;
-          font-size: 12px; font-weight: 900; vertical-align: middle;
-          letter-spacing: 0.02em;
           position: sticky; left: 0; z-index: 10;
-          box-shadow: 4px 0 12px rgba(0,0,0,0.7);
+          background: var(--tt-black); padding: 0; border: none;
+          height: 76px; vertical-align: middle;
+        }
+        .tt-day-card {
+          height: 70px; border-radius: 8px; text-align: center;
+          font-size: 12px; font-weight: 900; letter-spacing: 0.02em;
+          display: flex; align-items: center; justify-content: center;
+          background: #0f172a; border: 1px solid rgba(255,255,255,0.1);
+          box-sizing: border-box;
+        }
+
+        /* Continuous opaque mask behind column 0 to prevent all horizontal scrolling bleed */
+        .tt-matrix thead th.tt-th-day::after,
+        .tt-matrix tbody td.tt-day-cell::after {
+          content: ''; position: absolute;
+          top: -6px; bottom: -6px; left: -6px; right: -6px;
+          background: var(--tt-black); z-index: -1;
         }
 
         .tt-matrix tbody td { height: 76px; vertical-align: middle; }
@@ -610,7 +629,9 @@ export default function WeeklyGrid({ subjects }) {
           </colgroup>
           <thead>
             <tr>
-              <th className="tt-th-day">Day</th>
+              <th className="tt-th-day">
+                <div className="tt-day-header-card">DAY</div>
+              </th>
               {matrixSlots.map((slot, i) => (
                 <th key={i} className={slot.isLunch ? 'tt-th-lunch' : ''}>{slot.label}</th>
               ))}
@@ -621,16 +642,16 @@ export default function WeeklyGrid({ subjects }) {
               const accent = DAY_WEB[day] || DAY_WEB.Mon;
               return (
                 <tr key={day}>
-                  <td
-                    className="tt-day-cell"
-                    style={{
-                      color: accent.color,
-                      background: '#0f172a',
-                      border: '1px solid rgba(255, 255, 255, 0.1)',
-                      borderLeft: `4px solid ${accent.color}`,
-                    }}
-                  >
-                    {FULL_DAYS[day]}
+                  <td className="tt-day-cell">
+                    <div
+                      className="tt-day-card"
+                      style={{
+                        color: accent.color,
+                        borderLeft: `4px solid ${accent.color}`,
+                      }}
+                    >
+                      {FULL_DAYS[day]}
+                    </div>
                   </td>
                   {renderMatrixRowCells(day)}
                 </tr>
