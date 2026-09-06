@@ -247,11 +247,10 @@ export function exportTimetablePDF(subjects) {
 
   // ── Build time-header cells (mirrors tt-matrix thead th styles) ─────────
   const thsHtml = matrixSlots.map(slot => {
-    const isLunch = slot.isLunch;
     return `<th style="
-      background:${isLunch ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.04)'};
-      color:${isLunch ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.75)'};
-      border:1px ${isLunch ? 'dashed rgba(255,255,255,0.08)' : 'solid rgba(255,255,255,0.10)'};
+      background:rgba(255,255,255,0.04);
+      color:rgba(255,255,255,0.75);
+      border:1px solid rgba(255,255,255,0.10);
       padding:10px 3px;
       font-size:10px;font-weight:800;
       text-align:center;border-radius:8px;
@@ -306,16 +305,13 @@ export function exportTimetablePDF(subjects) {
           </td>`;
         sIdx += span;
       } else {
-        const isLunch = slot.isLunch;
         cellsHtml += `
           <td style="
             height:${CELL_H}px;
-            background:${isLunch ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.01)'};
-            border:1px ${isLunch ? 'dashed rgba(255,255,255,0.08)' : 'solid rgba(255,255,255,0.04)'};
+            background:rgba(255,255,255,0.01);
+            border:1px solid rgba(255,255,255,0.04);
             padding:4px;text-align:center;vertical-align:middle;border-radius:8px;
-          ">
-            ${isLunch ? `<div style="writing-mode:vertical-rl;font-size:9.5px;font-weight:800;color:rgba(255,255,255,0.20);letter-spacing:3px;text-transform:uppercase;margin:0 auto;">LUNCH</div>` : ''}
-          </td>`;
+          "></td>`;
         sIdx++;
       }
     }
@@ -551,9 +547,7 @@ export default function WeeklyGrid({ subjects }) {
         sIdx += span;
       } else {
         cells.push(
-          <td key={sIdx} className={`tt-cell-empty${slot.isLunch ? ' tt-cell-lunch' : ''}`}>
-            {slot.isLunch && <span className="tt-lunch-label">LUNCH</span>}
-          </td>
+          <td key={sIdx} className="tt-cell-empty" />
         );
         sIdx++;
       }
@@ -654,11 +648,6 @@ export default function WeeklyGrid({ subjects }) {
           letter-spacing: 0.05em; text-transform: uppercase;
         }
 
-        .tt-matrix thead th.tt-th-lunch {
-          color: rgba(255,255,255,0.35); background: rgba(255,255,255,0.02);
-          border-style: dashed;
-        }
-
         .tt-day-cell {
           padding: 0; border: none;
           height: 76px; vertical-align: middle;
@@ -678,15 +667,6 @@ export default function WeeklyGrid({ subjects }) {
           padding: 3px; text-align: center;
           border-radius: 8px; border: 1px solid rgba(255,255,255,0.04);
           background: rgba(255,255,255,0.01);
-        }
-        .tt-cell-lunch {
-          background: rgba(255,255,255,0.02); border-style: dashed;
-          border-color: rgba(255,255,255,0.08);
-        }
-        .tt-lunch-label {
-          writing-mode: vertical-rl; text-transform: uppercase;
-          letter-spacing: 3px; font-size: 9.5px; font-weight: 800;
-          color: rgba(255,255,255,0.2); margin: 0 auto; display: block;
         }
         .tt-subject-card {
           border-radius: 8px; border: 1px solid; padding: 6px 8px;
@@ -777,7 +757,7 @@ export default function WeeklyGrid({ subjects }) {
                 <div className="tt-day-header-card">DAY</div>
               </th>
               {matrixSlots.map((slot, i) => (
-                <th key={i} className={slot.isLunch ? 'tt-th-lunch' : ''}>{slot.label}</th>
+                <th key={i}>{slot.label}</th>
               ))}
             </tr>
           </thead>
