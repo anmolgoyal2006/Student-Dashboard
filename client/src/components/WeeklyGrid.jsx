@@ -392,7 +392,6 @@ export function exportTimetablePDF(subjects) {
           </svg>
         </div>
         <div>
-          <div style="font-size:10px;font-weight:900;color:#818cf8;letter-spacing:2px;text-transform:uppercase;margin-bottom:3px;">STUDENT AI</div>
           <div style="font-size:22px;font-weight:800;color:#f8fafc;letter-spacing:-0.4px;line-height:1;"><span style="color:#818cf8;">StudentAI</span> Timetable</div>
           <div style="font-size:13px;color:#64748b;margin-top:5px;">Your weekly class schedule — view, manage, and export</div>
         </div>
