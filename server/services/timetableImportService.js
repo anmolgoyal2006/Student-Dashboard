@@ -446,7 +446,7 @@ async function parseTimetablePDF(buffer) {
     parts.push({ text: PROMPT });
 
     const rawText = await generateContentWithInlineData(parts, {
-      model: HEAVY_MODEL,
+      model: LIGHT_MODEL,
       temperature: 0,
       maxOutputTokens: 8000,
       responseMimeType: 'application/json',

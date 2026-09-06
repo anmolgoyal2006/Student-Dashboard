@@ -13,11 +13,11 @@ const geminiBreaker = getBreaker('gemini', {
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 // Heavy model: used for resume analysis and grade prediction (quality-critical)
-const HEAVY_MODEL = process.env.GEMINI_HEAVY_MODEL || 'gemini-2.5-flash';
+const HEAVY_MODEL = process.env.GEMINI_HEAVY_MODEL || 'gemini-2.0-flash';
 // Light model: used for mid-complexity tasks (DSA coach, chat, AI commands, etc.)
-const LIGHT_MODEL = process.env.GEMINI_LIGHT_MODEL || 'gemini-3.1-flash-lite';
+const LIGHT_MODEL = process.env.GEMINI_LIGHT_MODEL || 'gemini-2.0-flash-lite';
 // Nano model: used for small, fast tasks (transcription, OCR cells, study planner, interview Qs)
-const NANO_MODEL = process.env.GEMINI_NANO_MODEL || 'gemini-3.1-flash-lite';
+const NANO_MODEL = process.env.GEMINI_NANO_MODEL || 'gemini-2.0-flash-lite';
 // GEMINI_MODEL kept for backward compat — any code importing it gets the light model
 const GEMINI_MODEL = LIGHT_MODEL;
 // Embedding model: used for RAG (semantic search over uploaded notes)
@@ -91,7 +91,7 @@ async function withRetry(fn, maxRetries = 3, baseDelay = 1000) {
   let lastError;
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      return await fn();
+      return await fn(attempt);
     } catch (err) {
       lastError = err;
       // A tripped breaker means the dependency is known-down — retrying just
@@ -122,7 +122,8 @@ function buildGeminiContents(messages) {
 
 async function generateContent(contents, options = {}) {
   const model = options.model || LIGHT_MODEL;
-  return withRetry(async () => {
+  return withRetry(async (attempt) => {
+    const targetModel = (attempt > 0 && model === HEAVY_MODEL) ? LIGHT_MODEL : model;
     const body = { contents };
 
     if (options.systemInstruction) {
@@ -137,7 +138,7 @@ async function generateContent(contents, options = {}) {
       body.generationConfig.thinkingConfig = { thinkingBudget: options.thinkingBudget };
     }
 
-    const json = await geminiFetch('generateContent', body, model);
+    const json = await geminiFetch('generateContent', body, targetModel);
     return extractTextFromResponse(json);
   });
 }
@@ -198,7 +199,8 @@ async function transcribeAudio(audioBuffer, mimetype) {
 
 async function generateContentWithInlineData(parts, options = {}) {
   const model = options.model || LIGHT_MODEL;
-  return withRetry(async () => {
+  return withRetry(async (attempt) => {
+    const targetModel = (attempt > 0 && model === HEAVY_MODEL) ? LIGHT_MODEL : model;
     const body = {
       contents: [{ role: 'user', parts }],
     };
@@ -209,7 +211,7 @@ async function generateContentWithInlineData(parts, options = {}) {
     if (options.responseMimeType) body.generationConfig.responseMimeType = options.responseMimeType;
     body.generationConfig.thinkingConfig = { thinkingBudget: options.thinkingBudget ?? 0 };
 
-    const json = await geminiFetch('generateContent', body, model);
+    const json = await geminiFetch('generateContent', body, targetModel);
     return extractTextFromResponse(json);
   });
 }
