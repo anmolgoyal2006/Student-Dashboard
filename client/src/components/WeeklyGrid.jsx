@@ -169,6 +169,16 @@ const getDynamicMatrixSlots = (subjects) => {
 
   if (boundaries.size < 2) return MATRIX_SLOTS;
 
+  // If schedule spans across midday (has classes before 1:00 PM and after 2:00 PM) and no class runs through 1–2 PM,
+  // ensure 13:00 (780) and 14:00 (840) exist as column boundaries so the 1–2 PM lunch slot is preserved.
+  const hasMorning = rawSlots.some(s => s.start < 13 * 60);
+  const hasAfternoon = rawSlots.some(s => s.end > 14 * 60);
+  const classDuringLunch = rawSlots.some(s => s.start < 14 * 60 && s.end > 13 * 60);
+  if (hasMorning && hasAfternoon && !classDuringLunch) {
+    boundaries.add(13 * 60);
+    boundaries.add(14 * 60);
+  }
+
   // Sort every unique boundary (start or end of any class)
   const sortedBounds = [...boundaries].sort((a, b) => a - b);
 
@@ -181,13 +191,15 @@ const getDynamicMatrixSlots = (subjects) => {
     const curr = sortedBounds[i];
     const next = sortedBounds[i + 1];
 
-    // Only include this column if at least one class overlaps it
+    // Only include this column if at least one class overlaps it, OR if it is a midday lunch break
     const hasClass = rawSlots.some(s => s.start <= curr && s.end >= next);
-    if (!hasClass) continue;
 
     const isLunchBreak =
-      (curr >= 12 * 60 && curr < 14 * 60 + 30) &&
+      (curr >= 12 * 60 && next <= 14 * 60 + 30) &&
+      (next - curr >= 30) &&
       !rawSlots.some(s => s.start < next && s.end > curr);
+
+    if (!hasClass && !isLunchBreak) continue;
 
     slots.push({
       label:   fmtSlotLabel(curr, next),
