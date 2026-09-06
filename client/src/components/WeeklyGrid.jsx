@@ -351,19 +351,34 @@ export default function WeeklyGrid({ subjects }) {
     subjects.reduce((n, s) => n + (s.schedule?.length || 0), 0),
   [subjects]);
 
-  const renderMatrixRowCells = (day) =>
-    matrixSlots.map((slot, sIdx) => {
-      const dayEvents = eventsByDay[day] || [];
+  const renderMatrixRowCells = (day) => {
+    const dayEvents = eventsByDay[day] || [];
+    const cells = [];
+    let sIdx = 0;
+
+    while (sIdx < matrixSlots.length) {
+      const slot = matrixSlots[sIdx];
       const matchingEvents = dayEvents.filter(ev => ev.startMin < slot.end && ev.endMin > slot.start);
+      const startedEarlier = dayEvents.some(ev => ev.startMin < slot.start && ev.endMin > slot.start);
+
+      if (startedEarlier) {
+        sIdx++;
+        continue;
+      }
 
       if (matchingEvents.length > 0) {
+        const maxEndMin = Math.max(...matchingEvents.map(ev => ev.endMin));
+        let span = 1;
+        while (sIdx + span < matrixSlots.length && matrixSlots[sIdx + span].start < maxEndMin) {
+          span++;
+        }
+
         const ev = matchingEvents[0];
         const col = ev.color || WEB_PALETTE[0];
         const code = ev.code ? ev.code.replace(/\+/g, ' + ') : '';
-        const isStart = ev.startMin >= slot.start && ev.startMin < slot.end;
 
-        return (
-          <td key={sIdx} className="tt-cell-filled">
+        cells.push(
+          <td key={sIdx} colSpan={span} className="tt-cell-filled">
             <div
               className="tt-subject-card"
               style={{
@@ -379,14 +394,19 @@ export default function WeeklyGrid({ subjects }) {
             </div>
           </td>
         );
+        sIdx += span;
+      } else {
+        cells.push(
+          <td key={sIdx} className={`tt-cell-empty${slot.isLunch ? ' tt-cell-lunch' : ''}`}>
+            {slot.isLunch && <span className="tt-lunch-label">LUNCH</span>}
+          </td>
+        );
+        sIdx++;
       }
+    }
 
-      return (
-        <td key={sIdx} className={`tt-cell-empty${slot.isLunch ? ' tt-cell-lunch' : ''}`}>
-          {slot.isLunch && <span className="tt-lunch-label">LUNCH</span>}
-        </td>
-      );
-    });
+    return cells;
+  };
 
   return (
     <div className="tt-root">
