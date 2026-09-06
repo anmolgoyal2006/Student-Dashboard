@@ -170,15 +170,8 @@ const getDynamicMatrixSlots = (subjects) => {
   if (boundaries.size < 2) return MATRIX_SLOTS;
 
   const sortedBounds = [...boundaries].sort((a, b) => a - b);
-  let minStart = sortedBounds[0];
-  let maxEnd = sortedBounds[sortedBounds.length - 1];
-
-  // Include 8:30 AM morning slot if schedule starts at or before 9:30 AM
-  if (minStart >= 8 * 60 + 30 && minStart <= 9 * 60 + 30) {
-    minStart = 8 * 60 + 30; // 8:30 AM
-  } else if (minStart >= 8 * 60 && minStart < 8 * 60 + 30) {
-    minStart = 8 * 60; // 8:00 AM
-  }
+  const minStart = sortedBounds[0];
+  const maxEnd = sortedBounds[sortedBounds.length - 1];
 
   const step = 60;
   const slots = [];

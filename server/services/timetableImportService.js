@@ -17,14 +17,15 @@ Field rules:
 - instructor: e.g. "Dr. Ashpreet".
 - credits: number or null.
 - day: Sun, Mon, Tue, Wed, Thu, Fri, Sat.
-- startTime / endTime: 24-hour "HH:MM". Preserve exact minutes as printed in the header/cell time (e.g., "09:30" to "10:30", "13:30" to "14:30", "14:30" to "15:30"). Never round minutes to whole hours (do not turn 9:30 into 9:00).
+- startTime / endTime: 24-hour "HH:MM". Preserve exact minutes as printed in the header/cell time (e.g., "08:30" to "09:30", "09:30" to "10:30", "13:30" to "14:30", "14:30" to "15:30"). Never round minutes to whole hours (do not turn 9:30 into 9:00).
 - room: venue, e.g. "L21", "402+L407", "Room No 406", "Room No 215".
 
 How to parse each cell item:
-- You are given a JSON array of cell objects. Each object has "day", "time" (e.g. "09:30-10:30", "14:30-16:30"), and "content".
+- You are given a JSON array of cell objects. Each object has "day", "time" (e.g. "08:30-09:30", "09:30-10:30", "14:30-16:30"), and "content".
 - Note that sometimes the day and time headers might be swapped in the PDF (e.g., the "day" field contains a time range and the "time" field contains a weekday). Identify which field holds the weekday and which holds the time, and map them correctly to "day", "startTime", and "endTime" regardless of the property name.
 - Translate the weekday to the standard Sun-Sat value (e.g., "MON" -> "Mon", "TUES" -> "Tue", "onday" -> "Mon", "esday" -> "Tue", "nesday" -> "Wed", "ursday" -> "Thu", "riday" -> "Fri").
 - Translate the time range to 24-hour format "HH:MM", preserving exact minutes as printed:
+  - "08:30-09:30" -> startTime: "08:30", endTime: "09:30"
   - "09:30-10:30" -> startTime: "09:30", endTime: "10:30"
   - "10:30-11:30" -> startTime: "10:30", endTime: "11:30"
   - "11:30-12:30" -> startTime: "11:30", endTime: "12:30"
@@ -87,11 +88,11 @@ Field rules — these names are fixed, do not rename or add fields:
 - credits: a number 1-6, or null if not printed. Never guess.
 - day: one of Sun, Mon, Tue, Wed, Thu, Fri, Sat. Map abbreviations, full names, or cropped margins
   (Monday/onday -> Mon, Tuesday/esday -> Tue, Wednesday/nesday -> Wed, Thursday/ursday -> Thu, Friday/riday -> Fri, Saturday/urday -> Sat, Sunday/unday -> Sun).
-- startTime / endTime: 24-hour "HH:MM". Preserve exact minutes as printed in column headers (e.g. "09:30" to "10:30", "10:30" to "11:30", "13:30" to "14:30", "14:30" to "15:30", "14:30" to "16:30"). NEVER round 09:30 to 09:00 or 14:30 to 14:00.
+- startTime / endTime: 24-hour "HH:MM". Preserve exact minutes as printed in column headers (e.g. "08:30" to "09:30", "09:30" to "10:30", "10:30" to "11:30", "13:30" to "14:30", "14:30" to "15:30", "14:30" to "16:30"). NEVER round 09:30 to 09:00 or 14:30 to 14:00.
 - room: room/venue as printed (e.g. "Room No 406", "Room No 206", "Room No 215", "Room No 419"). "" if absent.
 
 How to read the grid — this is an IMAGE, use visual position, not text order:
-- The column headers across the top define exact time ranges (e.g. 09:30-10:30, 10:30-11:30, 11:30-12:30, 12:30-13:30, 13:30-14:30, 14:30-15:30, 15:30-16:30). The row labels down the side define days. A cell's time range comes strictly from the column(s) it visually sits under, and its day comes from the row it visually sits in.
+- The column headers across the top define exact time ranges (e.g. 08:30-09:30, 09:30-10:30, 10:30-11:30, 11:30-12:30, 12:30-13:30, 13:30-14:30, 14:30-15:30, 15:30-16:30). The row labels down the side define days. A cell's time range comes strictly from the column(s) it visually sits under, and its day comes from the row it visually sits in.
 - Dynamic Lunch / Break Times: Lunch breaks vary per institution and timetable. Read the exact time range of the break column (e.g. 13:30-14:30, 12:30-13:30, 12:00-13:00, 13:00-14:00, marked as -X-, LUNCH, BREAK, RECESS) and skip non-teaching cells entirely. Do NOT assume lunch is always 13:00-14:00.
 - A cell's duration is determined strictly by the vertical grid lines separating the columns. A cell spanning several consecutive time columns is ONE slot: use the FIRST spanned column's start time and the LAST spanned column's end time. For example, if a 2-hour Lab cell spans 14:30-15:30 and 15:30-16:30, it is a single slot from 14:30 to 16:30.
 - Parallel Lab / Group Rows: A day row may be divided into sub-rows for different practical groups (Gp 1, Gp 2, Gp 3). Extract each parallel group slot with its respective subject, instructor, and room.
@@ -109,11 +110,11 @@ Field rules — these names are fixed, do not rename or add fields:
 - instructor: teacher name. "" if absent.
 - credits: a number 1-6, or null if not printed. Never guess.
 - day: one of Sun, Mon, Tue, Wed, Thu, Fri, Sat. Map cropped day margins (onday->Mon, esday->Tue, nesday->Wed, ursday->Thu, riday->Fri).
-- startTime / endTime: 24-hour "HH:MM". Preserve exact printed minutes (e.g., "09:30", "10:30", "13:30", "14:30"). Never round 9:30 to 9:00.
+- startTime / endTime: 24-hour "HH:MM". Preserve exact printed minutes (e.g., "08:30", "09:30", "10:30", "13:30", "14:30"). Never round 9:30 to 9:00.
 - room: room/venue as printed. "" if absent.
 
 How to read the text:
-- The extracted text represents a grid layout. The column headers define dynamic time ranges (e.g. 09:30-10:30, 10:30-11:30, 13:30-14:30, 14:30-15:30) and the rows represent days of the week.
+- The extracted text represents a grid layout. The column headers define dynamic time ranges (e.g. 08:30-09:30, 09:30-10:30, 10:30-11:30, 13:30-14:30, 14:30-15:30) and the rows represent days of the week.
 - Match subjects to their exact day row and time column.
 - Dynamic Breaks: Lunch/recess breaks are dynamic per timetable (e.g. 13:30-14:30, 12:00-13:00, 13:00-14:00, -X-). Skip break slots entirely. Do NOT assume lunch is always 13:00-14:00.
 - Return every subject found.`;
