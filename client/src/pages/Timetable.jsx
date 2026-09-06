@@ -315,7 +315,7 @@ export default function Timetable() {
             }}>
               <Calendar size={18} color="#fff" />
             </span>
-            Timetable
+            <span style={{ color: '#818cf8', marginRight: 6 }}>StudentAI</span> Timetable
           </h1>
           <p style={{ margin: '6px 0 0 46px', fontSize: 13, color: C.textMuted }}>
             Your weekly class schedule — view, manage, and export
