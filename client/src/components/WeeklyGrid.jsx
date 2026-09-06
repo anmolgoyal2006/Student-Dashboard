@@ -158,7 +158,7 @@ const getDynamicMatrixSlots = (subjects) => {
     (s.schedule || []).forEach(slot => {
       if (!slot.startTime || !slot.endTime) return;
       const start = toMinutes(slot.startTime);
-      const end = toMinutes(slot.endTime);
+      const end   = toMinutes(slot.endTime);
       if (start < end) {
         boundaries.add(start);
         boundaries.add(end);
@@ -169,36 +169,38 @@ const getDynamicMatrixSlots = (subjects) => {
 
   if (boundaries.size < 2) return MATRIX_SLOTS;
 
+  // Sort every unique boundary (start or end of any class)
   const sortedBounds = [...boundaries].sort((a, b) => a - b);
-  const minStart = sortedBounds[0];
-  const maxEnd = sortedBounds[sortedBounds.length - 1];
 
-  const step = 60;
+  // Build columns by walking the sorted boundaries in order.
+  // Each adjacent pair [sortedBounds[i], sortedBounds[i+1]] becomes one column.
+  // This naturally handles 8:00–9:00, 8:30–9:30, or any mixed offsets because
+  // the boundaries from all subjects are merged and deduplicated first.
   const slots = [];
-  let curr = minStart;
+  for (let i = 0; i < sortedBounds.length - 1; i++) {
+    const curr = sortedBounds[i];
+    const next = sortedBounds[i + 1];
 
-  while (curr < maxEnd) {
-    let next = curr + step;
-    const nextBound = sortedBounds.find(b => b > curr && b <= next);
-    if (nextBound && nextBound < next) {
-      next = nextBound;
-    }
+    // Only include this column if at least one class overlaps it
+    const hasClass = rawSlots.some(s => s.start <= curr && s.end >= next);
+    if (!hasClass) continue;
 
-    // Only mark as lunch break if it falls during midday lunch hours (12:00 PM to 2:30 PM) with no classes
-    const isLunchBreak = (curr >= 12 * 60 && curr < 14 * 60 + 30) && !rawSlots.some(s => s.start < next && s.end > curr);
+    const isLunchBreak =
+      (curr >= 12 * 60 && curr < 14 * 60 + 30) &&
+      !rawSlots.some(s => s.start < next && s.end > curr);
+
     slots.push({
-      label: fmtSlotLabel(curr, next),
-      start: curr,
-      end: next,
+      label:   fmtSlotLabel(curr, next),
+      start:   curr,
+      end:     next,
       isLunch: isLunchBreak,
     });
-    curr = next;
   }
 
   return slots.length > 0 ? slots : MATRIX_SLOTS;
 };
 
-/* ── PDF export — dark canvas matching web dashboard style ─────────────── */
+/* ── PDF export — pixel-perfect replica of the web dark grid ───────────── */
 export function exportTimetablePDF(subjects) {
   if (!subjects?.length) return;
 
@@ -212,12 +214,45 @@ export function exportTimetablePDF(subjects) {
   let totalSessions = 0;
   subjects.forEach(s => { totalSessions += (s.schedule || []).length; });
 
-  const CELL_H = 74;
+  // ── Solid fallback colours for each WEB_PALETTE gradient
+  // html2canvas cannot render CSS gradients reliably; we use the richer end-stop
+  const SOLID_COLORS = [
+    { bg: '#4338ca', border: '#818cf8', glow: 'rgba(99,102,241,0.35)'  },
+    { bg: '#059669', border: '#34d399', glow: 'rgba(16,185,129,0.35)'  },
+    { bg: '#d97706', border: '#fbbf24', glow: 'rgba(245,158,11,0.35)'  },
+    { bg: '#dc2626', border: '#f87171', glow: 'rgba(239,68,68,0.35)'   },
+    { bg: '#9333ea', border: '#c084fc', glow: 'rgba(168,85,247,0.35)'  },
+    { bg: '#0284c7', border: '#38bdf8', glow: 'rgba(6,182,212,0.35)'   },
+    { bg: '#db2777', border: '#f472b6', glow: 'rgba(236,72,153,0.35)'  },
+    { bg: '#0d9488', border: '#2dd4bf', glow: 'rgba(20,184,166,0.35)'  },
+  ];
+  // Remap eventsByDay colours to solid equivalents
+  const solidColorMap = {};
+  subjects.forEach((s, i) => { solidColorMap[s._id] = SOLID_COLORS[i % SOLID_COLORS.length]; });
+  const solidEventsByDay = buildEventsByDay(subjects, solidColorMap);
 
+  const CELL_H = 76; // matches .tt-matrix tbody td height in the web component
+
+  // ── Build time-header cells (mirrors tt-matrix thead th styles) ─────────
+  const thsHtml = matrixSlots.map(slot => {
+    const isLunch = slot.isLunch;
+    return `<th style="
+      background:${isLunch ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.04)'};
+      color:${isLunch ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.75)'};
+      border:1px ${isLunch ? 'dashed rgba(255,255,255,0.08)' : 'solid rgba(255,255,255,0.10)'};
+      padding:10px 3px;
+      font-size:10px;font-weight:800;
+      text-align:center;border-radius:8px;
+      text-transform:uppercase;letter-spacing:0;
+      white-space:nowrap;
+    ">${slot.label}</th>`;
+  }).join('');
+
+  // ── Build data rows (mirrors renderMatrixRowCells logic) ────────────────
   let rowsHtml = '';
   displayDays.forEach(day => {
-    const dayTheme = DAY_WEB[day] || { color: '#818cf8', bg: '#0f172a' };
-    const dayEvents = eventsByDay[day] || [];
+    const accent    = DAY_WEB[day] || DAY_WEB.Mon;
+    const dayEvents = solidEventsByDay[day] || [];
 
     let cellsHtml = '';
     let sIdx = 0;
@@ -227,122 +262,213 @@ export function exportTimetablePDF(subjects) {
       const matchingEvents = dayEvents.filter(ev => ev.startMin < slot.end && ev.endMin > slot.start);
       const startedEarlier = dayEvents.some(ev => ev.startMin < slot.start && ev.endMin > slot.start);
 
-      if (startedEarlier) {
-        sIdx++;
-        continue;
-      }
+      if (startedEarlier) { sIdx++; continue; }
 
       if (matchingEvents.length > 0) {
         const maxEndMin = Math.max(...matchingEvents.map(ev => ev.endMin));
         let span = 1;
-        while (sIdx + span < matrixSlots.length && matrixSlots[sIdx + span].start < maxEndMin) {
-          span++;
-        }
+        while (sIdx + span < matrixSlots.length && matrixSlots[sIdx + span].start < maxEndMin) span++;
 
-        const col = matchingEvents[0]?.color || WEB_PALETTE[0];
-        const ev = matchingEvents[0];
+        const ev  = matchingEvents[0];
+        const col = ev.color || SOLID_COLORS[0];
         const formattedCode = ev.code ? ev.code.replace(/\+/g, ' + ') : '';
 
+        // Card mirrors .tt-subject-card + .tt-subject-name/code/room
         cellsHtml += `
           <td colspan="${span}" style="height:${CELL_H}px;padding:3px;vertical-align:middle;">
-            <div style="background:${col.bg};border:1px solid ${col.border};box-shadow:0 4px 16px ${col.glow};border-radius:8px;padding:6px 8px;height:70px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:center;">
-              <div style="font-size:11.5px;font-weight:900;color:#ffffff;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${ev.name}</div>
-              ${formattedCode ? `<div style="font-size:9.5px;font-weight:700;color:rgba(255,255,255,0.8);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">(${formattedCode})</div>` : ''}
-              ${ev.instructor ? `<div style="font-size:8.5px;font-weight:600;color:rgba(255,255,255,0.7);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${ev.instructor}</div>` : ''}
-              ${ev.room ? `<div style="display:inline-block;font-size:9px;font-weight:800;color:#ffffff;background:rgba(255,255,255,0.22);border:1px solid rgba(255,255,255,0.35);padding:2px 6px;border-radius:4px;margin-top:3px;width:fit-content;letter-spacing:0.2px;">Room: ${ev.room}</div>` : ''}
+            <div style="
+              background:${col.bg};
+              border:1px solid ${col.border};
+              box-shadow:0 4px 16px ${col.glow};
+              border-radius:8px;
+              padding:6px 8px;
+              height:70px;
+              box-sizing:border-box;
+              display:flex;flex-direction:column;justify-content:center;
+              overflow:hidden;
+            ">
+              <div style="font-size:11px;font-weight:800;color:#ffffff;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${ev.name}</div>
+              ${formattedCode ? `<div style="font-size:9.5px;font-weight:600;color:rgba(255,255,255,0.75);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">(${formattedCode})</div>` : ''}
+              ${ev.room ? `<div style="display:inline-block;margin-top:3px;font-size:9px;font-weight:800;color:#ffffff;background:rgba(255,255,255,0.22);border:1px solid rgba(255,255,255,0.35);padding:2px 6px;border-radius:4px;letter-spacing:0.2px;white-space:nowrap;max-width:100%;">Room: ${ev.room}</div>` : ''}
             </div>
-          </td>
-        `;
+          </td>`;
         sIdx += span;
       } else {
         const isLunch = slot.isLunch;
         cellsHtml += `
-          <td style="height:${CELL_H}px;background:${isLunch ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.01)'};border:1px ${isLunch ? 'dashed rgba(255,255,255,0.08)' : 'solid rgba(255,255,255,0.04)'};padding:4px;text-align:center;vertical-align:middle;border-radius:8px;">
-            ${isLunch ? '<div style="font-size:9.5px;font-weight:800;color:rgba(255,255,255,0.2);letter-spacing:3px;text-transform:uppercase;">LUNCH</div>' : ''}
-          </td>
-        `;
+          <td style="
+            height:${CELL_H}px;
+            background:${isLunch ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.01)'};
+            border:1px ${isLunch ? 'dashed rgba(255,255,255,0.08)' : 'solid rgba(255,255,255,0.04)'};
+            padding:4px;text-align:center;vertical-align:middle;border-radius:8px;
+          ">
+            ${isLunch ? `<div style="writing-mode:vertical-rl;font-size:9.5px;font-weight:800;color:rgba(255,255,255,0.20);letter-spacing:3px;text-transform:uppercase;margin:0 auto;">LUNCH</div>` : ''}
+          </td>`;
         sIdx++;
       }
     }
 
+    // Day label cell mirrors .tt-day-card
     rowsHtml += `
       <tr>
-        <td style="height:${CELL_H}px;background:#0f172a;border:1px solid ${dayTheme.color}44;color:${dayTheme.color};font-size:12px;font-weight:900;text-align:center;padding:0 6px;border-radius:8px;vertical-align:middle;letter-spacing:0.02em;">
-          ${FULL_DAYS[day]}
+        <td style="height:${CELL_H}px;padding:0;vertical-align:middle;">
+          <div style="
+            height:70px;border-radius:8px;
+            background:#0f172a;
+            border:1px solid ${accent.color}44;
+            color:${accent.color};
+            font-size:12px;font-weight:900;letter-spacing:0.02em;
+            display:flex;align-items:center;justify-content:center;
+            text-align:center;box-sizing:border-box;
+          ">${FULL_DAYS[day]}</div>
         </td>
         ${cellsHtml}
       </tr>`;
   });
 
-  const thsHtml = matrixSlots.map(slot =>
-    `<th style="background:${slot.isLunch ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.04)'};color:${slot.isLunch ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.75)'};border:1px ${slot.isLunch ? 'dashed rgba(255,255,255,0.08)' : 'solid rgba(255,255,255,0.1)'};padding:10px 3px;font-size:10px;font-weight:800;text-align:center;border-radius:8px;text-transform:uppercase;">${slot.label}</th>`
-  ).join('');
-
+  // ── Legend — mirrors .tt-legend + .tt-legend-item ───────────────────────
   const legendHtml = subjects.map((s, i) => {
-    const col = WEB_PALETTE[i % WEB_PALETTE.length];
+    const col          = SOLID_COLORS[i % SOLID_COLORS.length];
     const sessionCount = (s.schedule || []).length;
     return `
-      <span style="display:inline-flex;align-items:center;gap:7px;margin-right:12px;margin-bottom:6px;padding:4px 10px 4px 6px;border-radius:8px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);">
-        <span style="width:10px;height:10px;border-radius:3px;background:${col.border};display:inline-block;"></span>
-        <span style="font-size:11px;font-weight:700;color:#f8fafc;">${s.name}</span>
-        ${s.code ? `<span style="font-size:9.5px;font-weight:600;color:#94a3b8;">(${s.code})</span>` : ''}
-        <span style="font-size:8.5px;font-weight:700;color:#818cf8;background:rgba(99,102,241,0.15);padding:1px 6px;border-radius:10px;margin-left:4px;">${sessionCount}x/wk</span>
-      </span>
-    `;
+      <span style="
+        display:inline-flex;align-items:center;gap:7px;
+        margin-right:10px;margin-bottom:6px;
+        padding:4px 10px 4px 6px;border-radius:8px;
+        background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);
+        font-size:11.5px;font-weight:600;color:#cbd5e1;
+      ">
+        <span style="width:10px;height:10px;border-radius:3px;background:${col.border};display:inline-block;flex-shrink:0;"></span>
+        <span style="color:#f8fafc;font-weight:700;">${s.name}</span>
+        ${s.code ? `<span style="color:#64748b;font-weight:500;">(${s.code})</span>` : ''}
+        <span style="font-size:9px;font-weight:700;color:#818cf8;background:rgba(99,102,241,0.15);padding:1px 6px;border-radius:10px;margin-left:2px;">${sessionCount}×/wk</span>
+      </span>`;
   }).join('');
 
+  // ── Stats pills — mirrors .tt-stat-pill ─────────────────────────────────
+  const statPill = (text) => `
+    <span style="
+      display:inline-flex;align-items:center;gap:5px;
+      padding:4px 10px;border-radius:20px;
+      font-size:11.5px;font-weight:600;
+      background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);
+      color:#94a3b8;margin-right:8px;
+    ">${text}</span>`;
+
+  // ── Assemble the full PDF container ─────────────────────────────────────
   const pdfContainer = document.createElement('div');
-  pdfContainer.style.cssText = 'padding:22px;background:#000000;color:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;width:1100px;box-sizing:border-box;border-radius:16px;';
+  pdfContainer.style.cssText = [
+    'padding:22px',
+    'background:#000000',
+    'color:#f8fafc',
+    'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif',
+    'width:1120px',
+    'box-sizing:border-box',
+    'position:relative',
+  ].join(';');
 
   pdfContainer.innerHTML = `
-    <!-- Top Gradient Bar -->
-    <div style="height:2px;background:linear-gradient(90deg,#6366f1,#a855f7,#ec4899,#6366f1);margin:-22px -22px 18px;border-radius:16px 16px 0 0;"></div>
+    <!-- Rainbow top bar (solid segments — gradients may not render in html2canvas) -->
+    <div style="height:3px;background:#6366f1;margin:-22px -22px 18px;border-radius:4px 4px 0 0;"></div>
 
-    <!-- Top Header Bar -->
-    <div style="border-bottom:1px solid rgba(255,255,255,0.08);padding-bottom:14px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:flex-start;">
+    <!-- Header — mirrors page header section in Timetable.jsx -->
+    <div style="
+      display:flex;justify-content:space-between;align-items:flex-start;
+      padding:20px 22px;border-radius:16px;
+      background:#0a0a0a;
+      border:1px solid rgba(255,255,255,0.14);
+      margin-bottom:16px;
+      position:relative;overflow:hidden;
+    ">
+      <!-- Left side -->
       <div style="display:flex;align-items:center;gap:14px;">
-        <div style="width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,#6366f1 0%,#8b5cf6 50%,#d946ef 100%);color:#ffffff;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:22px;box-shadow:0 4px 16px rgba(99,102,241,0.4);">S</div>
+        <div style="
+          width:36px;height:36px;border-radius:10px;flex-shrink:0;
+          background:#6366f1;
+          display:flex;align-items:center;justify-content:center;
+        ">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+          </svg>
+        </div>
         <div>
-          <div style="font-size:10px;font-weight:900;color:#818cf8;letter-spacing:2px;text-transform:uppercase;margin-bottom:2px;">STUDENT AI · ACADEMIC MANAGEMENT</div>
-          <h1 style="font-size:22px;font-weight:900;color:#ffffff;margin:0;letter-spacing:-0.5px;">Weekly Class Schedule</h1>
-          <p style="font-size:10px;color:#94a3b8;margin:3px 0 0;font-weight:500;">${subjects.length} Enrolled Subjects · ${totalSessions} Weekly Sessions · Generated ${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</p>
+          <div style="font-size:22px;font-weight:800;color:#f8fafc;letter-spacing:-0.4px;line-height:1;">Timetable</div>
+          <div style="font-size:13px;color:#64748b;margin-top:5px;">Your weekly class schedule — view, manage, and export</div>
         </div>
       </div>
-      <div style="text-align:right;">
-        <div style="background:rgba(99,102,241,0.15);border:1.5px solid rgba(99,102,241,0.4);color:#a5b4fc;padding:4px 14px;border-radius:20px;font-size:9.5px;font-weight:900;display:inline-block;letter-spacing:0.5px;">STUDENT AI SCHEDULE</div>
-        <div style="font-size:9px;color:#64748b;margin-top:4px;font-weight:600;">CONFIDENTIAL & PERSONAL USE</div>
+      <!-- Right: stats pills matching toolbar -->
+      <div style="display:flex;align-items:center;gap:0;flex-wrap:wrap;padding-top:4px;">
+        ${statPill(`<strong style="color:#e2e8f0;">${subjects.length}</strong>&nbsp;subjects`)}
+        ${statPill(`<strong style="color:#e2e8f0;">${totalSessions}</strong>&nbsp;sessions/week`)}
+        ${statPill(`<strong style="color:#e2e8f0;">${displayDays.length}</strong>&nbsp;active days`)}
       </div>
     </div>
 
-    <!-- Main Schedule Table -->
-    <table style="width:100%;border-collapse:separate;border-spacing:5px;table-layout:fixed;background:#000000;">
-      <thead>
-        <tr>
-          <th style="background:#0f172a;color:#a5b4fc;border:1px solid rgba(99,102,241,0.3);padding:10px 4px;font-size:11px;font-weight:900;width:105px;text-align:center;border-radius:8px;text-transform:uppercase;letter-spacing:1px;">DAY</th>
-          ${thsHtml}
-        </tr>
-      </thead>
-      <tbody>${rowsHtml}</tbody>
-    </table>
-
-    <!-- Subject Legend Box -->
-    <div style="margin-top:14px;padding:12px 16px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:12px;">
-      <div style="font-size:9.5px;font-weight:900;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Enrolled Subjects & Color Legend</div>
-      <div style="display:flex;flex-wrap:wrap;align-items:center;">${legendHtml}</div>
+    <!-- Legend box — mirrors .tt-legend -->
+    <div style="
+      display:flex;flex-wrap:wrap;gap:0;
+      margin-bottom:14px;padding:12px 14px;
+      border-radius:12px;
+      background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);
+    ">
+      ${legendHtml}
     </div>
 
-    <!-- Footer Notes -->
-    <div style="margin-top:12px;display:flex;justify-content:space-between;font-size:8.5px;color:#64748b;padding:0 4px;font-weight:500;">
-      <span>StudentAI · Academic Schedule Document Export</span>
-      <span>Official Personal Schedule — Generated by StudentAI</span>
+    <!-- Grid wrapper — mirrors .tt-grid-wrap -->
+    <div style="
+      border-radius:16px;
+      background:#000000;
+      border:1px solid rgba(255,255,255,0.10);
+      padding:14px;
+    ">
+      <!-- Accent top stripe inside grid -->
+      <div style="height:2px;background:#6366f1;margin:-14px -14px 12px;border-radius:4px 4px 0 0;"></div>
+
+      <!-- Schedule table — mirrors .tt-matrix -->
+      <table style="
+        width:100%;
+        border-collapse:separate;border-spacing:5px;
+        table-layout:fixed;
+        background:#000000;
+      ">
+        <colgroup>
+          <col style="width:110px;">
+          ${matrixSlots.map(() => '<col>').join('')}
+        </colgroup>
+        <thead>
+          <tr>
+            <!-- DAY header — mirrors .tt-day-header-card -->
+            <th style="padding:0;border:none;">
+              <div style="
+                height:34px;padding:0 8px;border-radius:8px;
+                background:#0f172a;border:1px solid rgba(99,102,241,0.30);
+                color:#a5b4fc;font-size:11px;font-weight:800;
+                display:flex;align-items:center;justify-content:center;
+                letter-spacing:0.05em;text-transform:uppercase;
+              ">DAY</div>
+            </th>
+            ${thsHtml}
+          </tr>
+        </thead>
+        <tbody>${rowsHtml}</tbody>
+      </table>
+    </div>
+
+    <!-- Footer -->
+    <div style="
+      margin-top:12px;display:flex;justify-content:space-between;
+      font-size:8.5px;color:#64748b;padding:0 4px;font-weight:500;
+    ">
+      <span>StudentAI · Academic Schedule Export</span>
+      <span>Generated ${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</span>
     </div>`;
 
   html2pdf().set({
-    margin: [6, 6, 6, 6],
-    filename: 'Student_Timetable.pdf',
-    image: { type: 'jpeg', quality: 0.98 },
+    margin:     [4, 4, 4, 4],
+    filename:   'Student_Timetable.pdf',
+    image:      { type: 'jpeg', quality: 0.99 },
     html2canvas: { scale: 2, useCORS: true, logging: false, backgroundColor: '#000000' },
-    jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
+    jsPDF:       { unit: 'mm', format: 'a4', orientation: 'landscape' },
   }).from(pdfContainer).save();
 }
 
