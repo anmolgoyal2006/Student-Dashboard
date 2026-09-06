@@ -650,7 +650,7 @@ export default function WeeklyGrid({ subjects }) {
                       className="tt-day-card"
                       style={{
                         color: accent.color,
-                        borderLeft: `4px solid ${accent.color}`,
+                        borderColor: `${accent.color}44`,
                       }}
                     >
                       {FULL_DAYS[day]}
