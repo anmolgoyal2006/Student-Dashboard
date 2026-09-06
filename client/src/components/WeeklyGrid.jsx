@@ -198,13 +198,13 @@ const getDynamicMatrixSlots = (subjects) => {
   return slots.length > 0 ? slots : MATRIX_SLOTS;
 };
 
-/* ── PDF export — clean, professional, border-refined design ─────────────── */
+/* ── PDF export — dark canvas matching web dashboard style ─────────────── */
 export function exportTimetablePDF(subjects) {
   if (!subjects?.length) return;
 
   const matrixSlots = getDynamicMatrixSlots(subjects);
   const colorMap = {};
-  subjects.forEach((s, i) => { colorMap[s._id] = PDF_PALETTE[i % PDF_PALETTE.length]; });
+  subjects.forEach((s, i) => { colorMap[s._id] = WEB_PALETTE[i % WEB_PALETTE.length]; });
   const eventsByDay = buildEventsByDay(subjects, colorMap);
   const activeDays = DAYS.filter(d => eventsByDay[d]?.length > 0);
   const displayDays = activeDays.length > 0 ? activeDays : DAYS.slice(0, 5);
@@ -216,7 +216,7 @@ export function exportTimetablePDF(subjects) {
 
   let rowsHtml = '';
   displayDays.forEach(day => {
-    const dayTheme = DAY_PDF[day] || { color: '#334155', bg: '#f8fafc', border: '#6366f1' };
+    const dayTheme = DAY_WEB[day] || { color: '#818cf8', bg: '#0f172a' };
     const dayEvents = eventsByDay[day] || [];
 
     let cellsHtml = '';
@@ -239,17 +239,17 @@ export function exportTimetablePDF(subjects) {
           span++;
         }
 
-        const col = matchingEvents[0]?.color || PDF_PALETTE[0];
+        const col = matchingEvents[0]?.color || WEB_PALETTE[0];
         const ev = matchingEvents[0];
         const formattedCode = ev.code ? ev.code.replace(/\+/g, ' + ') : '';
 
         cellsHtml += `
-          <td colspan="${span}" style="height:${CELL_H}px;background:${col.bg};border:1px solid ${col.border};border-left:5px solid ${col.left};padding:7px 9px;vertical-align:middle;border-radius:6px;">
-            <div style="display:flex;flex-direction:column;justify-content:center;height:100%;">
-              <div style="font-size:11.5px;font-weight:900;color:${col.text};line-height:1.2;letter-spacing:-0.2px;">${ev.name}</div>
-              ${formattedCode ? `<div style="font-size:9px;font-weight:700;color:${col.code};margin-top:2px;line-height:1.15;word-break:break-word;">(${formattedCode})</div>` : ''}
-              ${ev.instructor ? `<div style="font-size:8px;font-weight:600;color:${col.text};opacity:0.85;margin-top:1px;">${ev.instructor}</div>` : ''}
-              ${ev.room ? `<div style="display:inline-block;font-size:8.5px;font-weight:800;color:${col.badgeText};background:${col.badgeBg};padding:2px 7px;border-radius:4px;margin-top:3px;width:fit-content;letter-spacing:0.2px;">Room ${ev.room}</div>` : ''}
+          <td colspan="${span}" style="height:${CELL_H}px;padding:3px;vertical-align:middle;">
+            <div style="background:${col.bg};border:1px solid ${col.border};box-shadow:0 4px 16px ${col.glow};border-radius:8px;padding:6px 8px;height:70px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:center;">
+              <div style="font-size:11.5px;font-weight:900;color:#ffffff;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${ev.name}</div>
+              ${formattedCode ? `<div style="font-size:9.5px;font-weight:700;color:rgba(255,255,255,0.8);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">(${formattedCode})</div>` : ''}
+              ${ev.instructor ? `<div style="font-size:8.5px;font-weight:600;color:rgba(255,255,255,0.7);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${ev.instructor}</div>` : ''}
+              ${ev.room ? `<div style="display:inline-block;font-size:9px;font-weight:800;color:#ffffff;background:rgba(255,255,255,0.22);border:1px solid rgba(255,255,255,0.35);padding:2px 6px;border-radius:4px;margin-top:3px;width:fit-content;letter-spacing:0.2px;">Room: ${ev.room}</div>` : ''}
             </div>
           </td>
         `;
@@ -257,8 +257,8 @@ export function exportTimetablePDF(subjects) {
       } else {
         const isLunch = slot.isLunch;
         cellsHtml += `
-          <td style="height:${CELL_H}px;background:${isLunch ? '#f8fafc' : '#ffffff'};border:1px ${isLunch ? 'dashed #cbd5e1' : 'solid #f1f5f9'};padding:4px;text-align:center;vertical-align:middle;border-radius:6px;">
-            ${isLunch ? '<div style="font-size:8.5px;font-weight:900;color:#94a3b8;letter-spacing:2px;text-transform:uppercase;">LUNCH</div>' : ''}
+          <td style="height:${CELL_H}px;background:${isLunch ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.01)'};border:1px ${isLunch ? 'dashed rgba(255,255,255,0.08)' : 'solid rgba(255,255,255,0.04)'};padding:4px;text-align:center;vertical-align:middle;border-radius:8px;">
+            ${isLunch ? '<div style="font-size:9.5px;font-weight:800;color:rgba(255,255,255,0.2);letter-spacing:3px;text-transform:uppercase;">LUNCH</div>' : ''}
           </td>
         `;
         sIdx++;
@@ -267,7 +267,7 @@ export function exportTimetablePDF(subjects) {
 
     rowsHtml += `
       <tr>
-        <td style="height:${CELL_H}px;background:${dayTheme.bg};border:1px solid ${dayTheme.border}55;border-left:5px solid ${dayTheme.border};color:${dayTheme.color};font-size:12px;font-weight:900;text-align:center;padding:8px 6px;border-radius:6px;vertical-align:middle;">
+        <td style="height:${CELL_H}px;background:#0f172a;border:1px solid ${dayTheme.color}44;color:${dayTheme.color};font-size:12px;font-weight:900;text-align:center;padding:0 6px;border-radius:8px;vertical-align:middle;letter-spacing:0.02em;">
           ${FULL_DAYS[day]}
         </td>
         ${cellsHtml}
@@ -275,47 +275,50 @@ export function exportTimetablePDF(subjects) {
   });
 
   const thsHtml = matrixSlots.map(slot =>
-    `<th style="background:${slot.isLunch ? '#f1f5f9' : '#f8fafc'};color:${slot.isLunch ? '#64748b' : '#0f172a'};border:1px solid #e2e8f0;border-top:${slot.isLunch ? '3px solid #cbd5e1' : '3px solid #6366f1'};padding:9px 3px;font-size:10px;font-weight:800;text-align:center;border-radius:6px;">${slot.label}</th>`
+    `<th style="background:${slot.isLunch ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.04)'};color:${slot.isLunch ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.75)'};border:1px ${slot.isLunch ? 'dashed rgba(255,255,255,0.08)' : 'solid rgba(255,255,255,0.1)'};padding:10px 3px;font-size:10px;font-weight:800;text-align:center;border-radius:8px;text-transform:uppercase;">${slot.label}</th>`
   ).join('');
 
   const legendHtml = subjects.map((s, i) => {
-    const col = PDF_PALETTE[i % PDF_PALETTE.length];
+    const col = WEB_PALETTE[i % WEB_PALETTE.length];
     const sessionCount = (s.schedule || []).length;
     return `
-      <span style="display:inline-flex;align-items:center;gap:6px;margin-right:16px;margin-bottom:4px;">
-        <span style="width:9px;height:9px;border-radius:50%;background:${col.left};display:inline-block;"></span>
-        <span style="font-size:10px;font-weight:800;color:${col.text};">${s.name}</span>
-        ${s.code ? `<span style="font-size:9px;font-weight:600;color:${col.code};">(${s.code})</span>` : ''}
-        <span style="font-size:8px;font-weight:700;color:#64748b;background:#f1f5f9;padding:1px 5px;border-radius:10px;">${sessionCount}x/wk</span>
+      <span style="display:inline-flex;align-items:center;gap:7px;margin-right:12px;margin-bottom:6px;padding:4px 10px 4px 6px;border-radius:8px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);">
+        <span style="width:10px;height:10px;border-radius:3px;background:${col.border};display:inline-block;"></span>
+        <span style="font-size:11px;font-weight:700;color:#f8fafc;">${s.name}</span>
+        ${s.code ? `<span style="font-size:9.5px;font-weight:600;color:#94a3b8;">(${s.code})</span>` : ''}
+        <span style="font-size:8.5px;font-weight:700;color:#818cf8;background:rgba(99,102,241,0.15);padding:1px 6px;border-radius:10px;margin-left:4px;">${sessionCount}x/wk</span>
       </span>
     `;
   }).join('');
 
   const pdfContainer = document.createElement('div');
-  pdfContainer.style.cssText = 'padding:20px;background:#ffffff;color:#0f172a;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI,Roboto,sans-serif;width:1100px;box-sizing:border-box;';
+  pdfContainer.style.cssText = 'padding:22px;background:#000000;color:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;width:1100px;box-sizing:border-box;border-radius:16px;';
 
   pdfContainer.innerHTML = `
+    <!-- Top Gradient Bar -->
+    <div style="height:2px;background:linear-gradient(90deg,#6366f1,#a855f7,#ec4899,#6366f1);margin:-22px -22px 18px;border-radius:16px 16px 0 0;"></div>
+
     <!-- Top Header Bar -->
-    <div style="border-bottom:3px solid #6366f1;padding-bottom:12px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:flex-start;">
+    <div style="border-bottom:1px solid rgba(255,255,255,0.08);padding-bottom:14px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:flex-start;">
       <div style="display:flex;align-items:center;gap:14px;">
-        <div style="width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,#6366f1 0%,#8b5cf6 50%,#d946ef 100%);color:#ffffff;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:22px;box-shadow:0 4px 12px rgba(99,102,241,0.3);">S</div>
+        <div style="width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,#6366f1 0%,#8b5cf6 50%,#d946ef 100%);color:#ffffff;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:22px;box-shadow:0 4px 16px rgba(99,102,241,0.4);">S</div>
         <div>
-          <div style="font-size:10px;font-weight:900;color:#6366f1;letter-spacing:2.5px;text-transform:uppercase;margin-bottom:2px;">STUDENT AI · ACADEMIC MANAGEMENT</div>
-          <h1 style="font-size:22px;font-weight:900;color:#0f172a;margin:0;letter-spacing:-0.5px;">Weekly Class Schedule</h1>
-          <p style="font-size:10px;color:#64748b;margin:3px 0 0;font-weight:500;">${subjects.length} Enrolled Subjects · ${totalSessions} Weekly Sessions · Generated ${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</p>
+          <div style="font-size:10px;font-weight:900;color:#818cf8;letter-spacing:2px;text-transform:uppercase;margin-bottom:2px;">STUDENT AI · ACADEMIC MANAGEMENT</div>
+          <h1 style="font-size:22px;font-weight:900;color:#ffffff;margin:0;letter-spacing:-0.5px;">Weekly Class Schedule</h1>
+          <p style="font-size:10px;color:#94a3b8;margin:3px 0 0;font-weight:500;">${subjects.length} Enrolled Subjects · ${totalSessions} Weekly Sessions · Generated ${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</p>
         </div>
       </div>
       <div style="text-align:right;">
-        <div style="background:#eef2ff;border:1.5px solid #c7d2fe;color:#4338ca;padding:4px 14px;border-radius:20px;font-size:9.5px;font-weight:900;display:inline-block;letter-spacing:0.5px;">STUDENT AI SCHEDULE</div>
-        <div style="font-size:9px;color:#94a3b8;margin-top:4px;font-weight:600;">CONFIDENTIAL & PERSONAL USE</div>
+        <div style="background:rgba(99,102,241,0.15);border:1.5px solid rgba(99,102,241,0.4);color:#a5b4fc;padding:4px 14px;border-radius:20px;font-size:9.5px;font-weight:900;display:inline-block;letter-spacing:0.5px;">STUDENT AI SCHEDULE</div>
+        <div style="font-size:9px;color:#64748b;margin-top:4px;font-weight:600;">CONFIDENTIAL & PERSONAL USE</div>
       </div>
     </div>
 
     <!-- Main Schedule Table -->
-    <table style="width:100%;border-collapse:separate;border-spacing:4px;table-layout:fixed;">
+    <table style="width:100%;border-collapse:separate;border-spacing:5px;table-layout:fixed;background:#000000;">
       <thead>
         <tr>
-          <th style="background:#f1f5f9;color:#334155;border:1px solid #e2e8f0;border-top:3px solid #6366f1;padding:9px 4px;font-size:10.5px;font-weight:900;width:95px;text-align:center;border-radius:6px;text-transform:uppercase;letter-spacing:1px;">DAY</th>
+          <th style="background:#0f172a;color:#a5b4fc;border:1px solid rgba(99,102,241,0.3);padding:10px 4px;font-size:11px;font-weight:900;width:105px;text-align:center;border-radius:8px;text-transform:uppercase;letter-spacing:1px;">DAY</th>
           ${thsHtml}
         </tr>
       </thead>
@@ -323,13 +326,13 @@ export function exportTimetablePDF(subjects) {
     </table>
 
     <!-- Subject Legend Box -->
-    <div style="margin-top:12px;padding:10px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;">
-      <div style="font-size:9px;font-weight:900;color:#475569;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Enrolled Subjects & Color Legend</div>
+    <div style="margin-top:14px;padding:12px 16px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:12px;">
+      <div style="font-size:9.5px;font-weight:900;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Enrolled Subjects & Color Legend</div>
       <div style="display:flex;flex-wrap:wrap;align-items:center;">${legendHtml}</div>
     </div>
 
     <!-- Footer Notes -->
-    <div style="margin-top:10px;display:flex;justify-content:space-between;font-size:8.5px;color:#94a3b8;padding:0 4px;font-weight:500;">
+    <div style="margin-top:12px;display:flex;justify-content:space-between;font-size:8.5px;color:#64748b;padding:0 4px;font-weight:500;">
       <span>StudentAI · Academic Schedule Document Export</span>
       <span>Official Personal Schedule — Generated by StudentAI</span>
     </div>`;
@@ -338,7 +341,7 @@ export function exportTimetablePDF(subjects) {
     margin: [6, 6, 6, 6],
     filename: 'Student_Timetable.pdf',
     image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true, logging: false, backgroundColor: '#ffffff' },
+    html2canvas: { scale: 2, useCORS: true, logging: false, backgroundColor: '#000000' },
     jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
   }).from(pdfContainer).save();
 }
