@@ -1,11 +1,11 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
 import { subjectService } from '../services/apiServices';
 import toast from '../context/ToastContext';
-import WeeklyGrid from '../components/WeeklyGrid';
+import WeeklyGrid, { exportTimetablePDF } from '../components/WeeklyGrid';
 import EmptyState from '../components/EmptyState';
 import Skeleton, { CardSkeleton, StatsSkeleton } from '../components/Skeleton';
 import TimetableImportPreview from '../components/TimetableImportPreview';
-import { LayoutGrid, List, Plus, Edit, Trash2, Calendar, Clock, BookOpen, X, ChevronRight, Upload, FileText, Loader2 } from 'lucide-react';
+import { LayoutGrid, List, Plus, Edit, Trash2, Calendar, Clock, BookOpen, X, ChevronRight, Upload, FileText, Loader2, Download } from 'lucide-react';
 
 const DAYS      = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 const EMPTY     = { name: '', code: '', instructor: '', credits: 4, schedule: [] };
@@ -24,24 +24,22 @@ const toMinutes = (t) => {
   return h * 60 + (m || 0);
 };
 
-/* ── palette (hardcoded so no CSS-var issues) ─────────────────────────────── */
+/* ── palette — pure black canvas, vibrant accents ─────────────────────────── */
 const C = {
-  bg:        '#0d0f17',
-  surface:   '#13161f',
-  surface2:  '#1a1d2a',
-  border:    'rgba(255,255,255,0.07)',
-  border2:   'rgba(255,255,255,0.12)',
+  bg:        '#000000',
+  surface:   '#0a0a0a',
+  surface2:  '#111111',
+  border:    'rgba(255,255,255,0.08)',
+  border2:   'rgba(255,255,255,0.14)',
   accent:    '#6366f1',
-  accentMid: 'rgba(99,102,241,0.15)',
+  accentMid: 'rgba(99,102,241,0.18)',
   accentLow: 'rgba(99,102,241,0.08)',
   success:   '#22c55e',
   warning:   '#f59e0b',
   danger:    '#ef4444',
-  text:      '#f1f5f9',
+  text:      '#f8fafc',
   textSub:   '#94a3b8',
-  // #475569 read at 2.53:1 on this canvas — below the 4.5:1 floor — and it is
-  // used as body copy (hints, room names, "No schedule set"), not just chrome.
-  textMuted: '#7c8ba1',
+  textMuted: '#64748b',
 };
 
 const card = (extra = {}) => ({
@@ -279,13 +277,37 @@ export default function Timetable() {
       `}</style>
 
       {/* ── Page header ───────────────────────────────────────────────────── */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
+      <div style={{
+        display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
+        flexWrap: 'wrap', gap: 16,
+        padding: '20px 22px', borderRadius: 16,
+        background: 'linear-gradient(135deg, #0a0a0a 0%, #111111 100%)',
+        border: `1px solid ${C.border2}`,
+        boxShadow: '0 0 0 1px rgba(255,255,255,0.03), 0 20px 50px rgba(0,0,0,0.5)',
+        position: 'relative', overflow: 'hidden',
+      }}>
+        <div style={{
+          position: 'absolute', top: 0, left: 0, right: 0, height: 2,
+          background: 'linear-gradient(90deg, #6366f1, #a855f7, #ec4899)',
+        }} />
         <div>
-          <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: C.text, display: 'flex', alignItems: 'center', gap: 8, letterSpacing: '-0.3px' }}>
-            <Calendar size={20} color={C.accent} />
+          <h1 style={{
+            margin: 0, fontSize: 22, fontWeight: 800, color: C.text,
+            display: 'flex', alignItems: 'center', gap: 10, letterSpacing: '-0.4px',
+          }}>
+            <span style={{
+              width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+              background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 4px 14px rgba(99,102,241,0.45)',
+            }}>
+              <Calendar size={18} color="#fff" />
+            </span>
             Timetable
           </h1>
-          <p style={{ margin: '4px 0 0', fontSize: 13, color: C.textMuted }}>Weekly schedule and subject management</p>
+          <p style={{ margin: '6px 0 0 46px', fontSize: 13, color: C.textMuted }}>
+            Your weekly class schedule — view, manage, and export
+          </p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           <input
@@ -296,29 +318,44 @@ export default function Timetable() {
             style={{ display: 'none' }}
           />
           <button
+            onClick={() => exportTimetablePDF(subjects)}
+            disabled={subjects.length === 0}
+            title="Download a clean white PDF — perfect for printing or viewing in light"
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 7,
+              padding: '9px 18px', borderRadius: 10, cursor: subjects.length === 0 ? 'not-allowed' : 'pointer',
+              background: subjects.length === 0 ? 'rgba(99,102,241,0.15)' : 'linear-gradient(135deg, #6366f1, #4f46e5)',
+              color: '#fff', fontWeight: 700, fontSize: 13.5, border: 'none',
+              boxShadow: subjects.length === 0 ? 'none' : '0 4px 14px rgba(99,102,241,0.4)',
+              opacity: subjects.length === 0 ? 0.5 : 1,
+            }}
+          >
+            <Download size={16} /> Download PDF
+          </button>
+          <button
             onClick={() => fileInputRef.current?.click()}
             disabled={parsing}
-            title="Upload your college timetable PDF — subjects and class times are read automatically, and you review everything before it's saved."
+            title="Upload your college timetable PDF — subjects and class times are read automatically"
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 7,
               padding: '9px 18px', borderRadius: 10, cursor: parsing ? 'wait' : 'pointer',
-              background: 'transparent', color: C.text, fontWeight: 600, fontSize: 13.5,
+              background: 'rgba(255,255,255,0.04)', color: C.text, fontWeight: 600, fontSize: 13.5,
               border: `1px solid ${C.border2}`, opacity: parsing ? 0.6 : 1,
             }}
           >
-            <Upload size={16} /> {parsing ? 'Reading PDF…' : 'Import from PDF'}
+            <Upload size={16} /> {parsing ? 'Reading PDF…' : 'Import PDF'}
           </button>
           <button
             onClick={() => { setShowForm(true); setEditing(null); setForm(EMPTY); }}
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 7,
-              padding: '9px 18px', borderRadius: 10, border: 'none', cursor: 'pointer',
-              background: C.accent, color: '#fff', fontWeight: 600, fontSize: 13.5,
-              transition: 'background 0.18s, transform 0.15s',
-              boxShadow: '0 2px 12px rgba(99,102,241,0.3)',
+              padding: '9px 18px', borderRadius: 10, cursor: 'pointer',
+              background: 'rgba(255,255,255,0.08)', color: C.text, fontWeight: 600, fontSize: 13.5,
+              border: `1px solid ${C.border2}`,
+              transition: 'background 0.18s',
             }}
-            onMouseEnter={e => { e.currentTarget.style.background = '#4f46e5'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
-            onMouseLeave={e => { e.currentTarget.style.background = C.accent;  e.currentTarget.style.transform = 'translateY(0)'; }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.12)'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; }}
           >
             <Plus size={16} /> Add Subject
           </button>
@@ -611,9 +648,7 @@ export default function Timetable() {
 
       {/* ── Weekly grid view ──────────────────────────────────────────────── */}
       {subjects.length > 0 && tab === 'grid' && (
-        <div style={{ ...card() }}>
-          <WeeklyGrid subjects={subjects} />
-        </div>
+        <WeeklyGrid subjects={subjects} />
       )}
 
       {/* ── Subject list — card grid ───────────────────────────────────────── */}
