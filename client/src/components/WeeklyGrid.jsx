@@ -118,10 +118,22 @@ const getConflicts = (subjects) => {
   return [...new Set(conflicts)];
 };
 
-const toHHMM = (min) => {
+const fmtShort = (min) => {
   const h = Math.floor(min / 60);
   const m = min % 60;
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const h12 = h % 12 || 12;
+  const mStr = m > 0 ? `:${String(m).padStart(2, '0')}` : '';
+  return { text: `${h12}${mStr}`, ampm };
+};
+
+const fmtSlotLabel = (startMin, endMin) => {
+  const s = fmtShort(startMin);
+  const e = fmtShort(endMin);
+  if (s.ampm === e.ampm) {
+    return `${s.text}–${e.text} ${e.ampm}`;
+  }
+  return `${s.text} ${s.ampm}–${e.text} ${e.ampm}`;
 };
 
 const getDynamicMatrixSlots = (subjects) => {
@@ -162,7 +174,7 @@ const getDynamicMatrixSlots = (subjects) => {
 
     const isBreak = !rawSlots.some(s => s.start < next && s.end > curr);
     slots.push({
-      label: `${fmt12(toHHMM(curr))}–${fmt12(toHHMM(next))}`,
+      label: fmtSlotLabel(curr, next),
       start: curr,
       end: next,
       isLunch: isBreak,
@@ -440,17 +452,18 @@ export default function WeeklyGrid({ subjects }) {
           border-radius: 16px 16px 0 0;
         }
 
-        .tt-matrix { width: 100%; min-width: 1040px; border-collapse: separate; border-spacing: 5px; table-layout: fixed; }
+        .tt-matrix { width: 100%; border-collapse: separate; border-spacing: 5px; table-layout: fixed; }
 
         .tt-matrix thead th {
-          padding: 11px 6px; font-size: 11px; font-weight: 800;
-          text-align: center; border-radius: 8px; letter-spacing: 0.03em;
+          padding: 10px 3px; font-size: 10px; font-weight: 800;
+          text-align: center; border-radius: 8px; letter-spacing: 0;
+          white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
           background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1);
           color: rgba(255,255,255,0.7); text-transform: uppercase;
         }
         .tt-matrix thead th.tt-th-day {
           color: #818cf8; background: rgba(99,102,241,0.12);
-          border-color: rgba(99,102,241,0.25); font-size: 11.5px;
+          border-color: rgba(99,102,241,0.25); font-size: 11px;
         }
         .tt-matrix thead th.tt-th-lunch {
           color: rgba(255,255,255,0.35); background: rgba(255,255,255,0.02);
@@ -480,7 +493,6 @@ export default function WeeklyGrid({ subjects }) {
           letter-spacing: 3px; font-size: 9.5px; font-weight: 800;
           color: rgba(255,255,255,0.2); margin: 0 auto; display: block;
         }
-
         .tt-subject-card {
           border-radius: 8px; border: 1px solid; padding: 6px 8px;
           height: 70px; width: 100%; box-sizing: border-box;
@@ -550,7 +562,7 @@ export default function WeeklyGrid({ subjects }) {
 
       {/* Grid */}
       <div className="tt-grid-wrap">
-        <table className="tt-matrix">
+        <table className="tt-matrix" style={{ minWidth: `${Math.max(1040, (matrixSlots.length + 1) * 95)}px` }}>
           <colgroup>
             <col style={{ width: '110px' }} />
             {matrixSlots.map((_, i) => <col key={i} />)}
