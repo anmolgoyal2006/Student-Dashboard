@@ -39,30 +39,31 @@ How to parse each cell item:
 function extractStructuredTableFromPDF(buffer) {
   return new Promise((resolve, reject) => {
     const scriptPath = path.join(__dirname, '../scripts/extractTable.py');
-    const py = spawn('python', [scriptPath]);
-    
-    let stdout = '';
-    let stderr = '';
-    
-    py.stdout.on('data', data => stdout += data);
-    py.stderr.on('data', data => stderr += data);
-    
-    py.on('close', code => {
-      if (code !== 0) {
-        reject(new Error(stderr || `Python script exited with code ${code}`));
-      } else {
-        try {
-          resolve(JSON.parse(stdout));
-        } catch (err) {
-          reject(err);
+    const trySpawn = (cmd) => new Promise((res, rej) => {
+      const py = spawn(cmd, [scriptPath]);
+      let stdout = '';
+      let stderr = '';
+      py.stdout.on('data', data => stdout += data);
+      py.stderr.on('data', data => stderr += data);
+      py.on('error', rej);
+      py.on('close', code => {
+        if (code !== 0) {
+          rej(new Error(stderr || `Python script exited with code ${code}`));
+        } else {
+          try {
+            res(JSON.parse(stdout));
+          } catch (err) {
+            rej(err);
+          }
         }
-      }
+      });
+      py.stdin.write(buffer);
+      py.stdin.end();
     });
-    
-    py.on('error', err => reject(err));
-    
-    py.stdin.write(buffer);
-    py.stdin.end();
+
+    trySpawn('python3')
+      .then(resolve)
+      .catch(() => trySpawn('python').then(resolve).catch(reject));
   });
 }
 
@@ -393,7 +394,7 @@ async function parseTimetablePDF(buffer) {
       }
     }
 
-    hasText = text && text.trim().length > 100;
+    hasText = text && text.trim().length > 15;
     if (hasText) {
       try {
         const rawText = await generateContent([
