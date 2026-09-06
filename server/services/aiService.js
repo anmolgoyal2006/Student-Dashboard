@@ -14,21 +14,16 @@ const geminiBreaker = getBreaker('gemini', {
 function sanitizeModel(envVal, fallback) {
   if (!envVal || typeof envVal !== 'string') return fallback;
   const v = envVal.trim();
-  // Filter out invalid/non-existent model names like gemini-3.1 or gemini-3.5 or gemini-2.5
-  if (/gemini-[23]\.[15]/i.test(v) || /3\.5|3\.1|2\.5/i.test(v)) {
-    console.warn(`[AI Service] Environment model "${v}" is invalid/deprecated. Falling back to "${fallback}".`);
-    return fallback;
-  }
   return v;
 }
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 // Heavy model: used for quality-critical analysis (resume, predictions)
-const HEAVY_MODEL = sanitizeModel(process.env.GEMINI_HEAVY_MODEL, 'gemini-1.5-pro');
+const HEAVY_MODEL = sanitizeModel(process.env.GEMINI_HEAVY_MODEL, 'gemini-3.8-flash');
 // Light model: used for general AI tasks (chat, DSA coach, timetable, etc.)
-const LIGHT_MODEL = sanitizeModel(process.env.GEMINI_LIGHT_MODEL, 'gemini-1.5-flash');
+const LIGHT_MODEL = sanitizeModel(process.env.GEMINI_LIGHT_MODEL, 'gemini-3.8-flash');
 // Nano model: used for small fast tasks (transcription, study planner)
-const NANO_MODEL = sanitizeModel(process.env.GEMINI_NANO_MODEL, 'gemini-1.5-flash');
+const NANO_MODEL = sanitizeModel(process.env.GEMINI_NANO_MODEL, 'gemini-3.8-flash');
 // GEMINI_MODEL kept for backward compat — any code importing it gets the light model
 const GEMINI_MODEL = LIGHT_MODEL;
 // Embedding model: used for RAG (semantic search over uploaded notes)
