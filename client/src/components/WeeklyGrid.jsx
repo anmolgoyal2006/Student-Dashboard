@@ -490,9 +490,10 @@ export default function WeeklyGrid({ subjects }) {
           color: rgba(255,255,255,0.7); text-transform: uppercase;
         }
         .tt-matrix thead th.tt-th-day {
-          color: #818cf8; background: rgba(99,102,241,0.12);
-          border-color: rgba(99,102,241,0.25); font-size: 11px;
-          position: sticky; left: 0; z-index: 10;
+          color: #a5b4fc; background: #0f172a;
+          border: 1px solid rgba(99,102,241,0.3); font-size: 11px;
+          position: sticky; left: 0; z-index: 20;
+          box-shadow: 4px 0 12px rgba(0,0,0,0.7);
         }
         .tt-matrix thead th.tt-th-lunch {
           color: rgba(255,255,255,0.35); background: rgba(255,255,255,0.02);
@@ -502,9 +503,9 @@ export default function WeeklyGrid({ subjects }) {
         .tt-day-cell {
           height: 76px; padding: 0 8px; border-radius: 8px; text-align: center;
           font-size: 12px; font-weight: 900; vertical-align: middle;
-          letter-spacing: 0.02em; border: 1px solid;
+          letter-spacing: 0.02em;
           position: sticky; left: 0; z-index: 10;
-          box-shadow: 4px 0 12px rgba(0,0,0,0.5);
+          box-shadow: 4px 0 12px rgba(0,0,0,0.7);
         }
 
         .tt-matrix tbody td { height: 76px; vertical-align: middle; }
@@ -620,7 +621,15 @@ export default function WeeklyGrid({ subjects }) {
               const accent = DAY_WEB[day] || DAY_WEB.Mon;
               return (
                 <tr key={day}>
-                  <td className="tt-day-cell" style={{ color: accent.color, background: accent.bg, borderColor: `${accent.color}33` }}>
+                  <td
+                    className="tt-day-cell"
+                    style={{
+                      color: accent.color,
+                      background: '#0f172a',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      borderLeft: `4px solid ${accent.color}`,
+                    }}
+                  >
                     {FULL_DAYS[day]}
                   </td>
                   {renderMatrixRowCells(day)}
