@@ -129,8 +129,9 @@ function buildGeminiContents(messages) {
 
 async function generateContent(contents, options = {}) {
   const model = options.model || LIGHT_MODEL;
+  const modelCascade = [model, 'gemini-3.8-flash', 'gemini-3.1-flash-lite', 'gemini-2.5-flash'];
   return withRetry(async (attempt) => {
-    const targetModel = attempt > 0 ? 'gemini-1.5-flash' : model;
+    const targetModel = modelCascade[attempt] || 'gemini-3.8-flash';
     const body = { contents };
 
     if (options.systemInstruction) {
@@ -206,8 +207,9 @@ async function transcribeAudio(audioBuffer, mimetype) {
 
 async function generateContentWithInlineData(parts, options = {}) {
   const model = options.model || LIGHT_MODEL;
+  const modelCascade = [model, 'gemini-3.8-flash', 'gemini-3.1-flash-lite', 'gemini-2.5-flash'];
   return withRetry(async (attempt) => {
-    const targetModel = attempt > 0 ? 'gemini-1.5-flash' : model;
+    const targetModel = modelCascade[attempt] || 'gemini-3.8-flash';
     const body = {
       contents: [{ role: 'user', parts }],
     };
