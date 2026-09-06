@@ -122,6 +122,7 @@ function spawnPdf2Image(buffer, maxPages, dpi) {
       py.stdout.on('data', (d) => { stdout += d; });
       py.stderr.on('data', (d) => { stderr += d; });
       py.on('error', rej);
+      py.stdin.on('error', () => { /* ignore stdin EPIPE/EOF errors if child exits early */ });
       py.on('close', () => {
         try {
           const result = JSON.parse(stdout);
@@ -133,14 +134,18 @@ function spawnPdf2Image(buffer, maxPages, dpi) {
           rej(new Error(`pdf2image parse error: ${e.message}. stderr: ${stderr.slice(0, 300)}`));
         }
       });
-      py.stdin.write(buffer);
-      py.stdin.end();
+      if (py.stdin.writable) {
+        py.stdin.write(buffer);
+        py.stdin.end();
+      }
     });
 
-    // Try python3 first, fall back to python
-    trySpawn('python3')
+    const primaryCmd = process.platform === 'win32' ? 'python' : 'python3';
+    const fallbackCmd = process.platform === 'win32' ? 'python3' : 'python';
+
+    trySpawn(primaryCmd)
       .then(resolve)
-      .catch(() => trySpawn('python').then(resolve).catch(reject));
+      .catch(() => trySpawn(fallbackCmd).then(resolve).catch(reject));
   });
 }
 

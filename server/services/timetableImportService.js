@@ -46,6 +46,7 @@ function extractStructuredTableFromPDF(buffer) {
       py.stdout.on('data', data => stdout += data);
       py.stderr.on('data', data => stderr += data);
       py.on('error', rej);
+      py.stdin.on('error', () => { /* ignore stdin EPIPE/EOF errors if child exits early */ });
       py.on('close', code => {
         if (code !== 0) {
           rej(new Error(stderr || `Python script exited with code ${code}`));
@@ -57,13 +58,18 @@ function extractStructuredTableFromPDF(buffer) {
           }
         }
       });
-      py.stdin.write(buffer);
-      py.stdin.end();
+      if (py.stdin.writable) {
+        py.stdin.write(buffer);
+        py.stdin.end();
+      }
     });
 
-    trySpawn('python3')
+    const primaryCmd = process.platform === 'win32' ? 'python' : 'python3';
+    const fallbackCmd = process.platform === 'win32' ? 'python3' : 'python';
+
+    trySpawn(primaryCmd)
       .then(resolve)
-      .catch(() => trySpawn('python').then(resolve).catch(reject));
+      .catch(() => trySpawn(fallbackCmd).then(resolve).catch(reject));
   });
 }
 
