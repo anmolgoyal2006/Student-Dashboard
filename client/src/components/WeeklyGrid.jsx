@@ -170,15 +170,8 @@ const getDynamicMatrixSlots = (subjects) => {
   if (boundaries.size < 2) return MATRIX_SLOTS;
 
   const sortedBounds = [...boundaries].sort((a, b) => a - b);
-  let minStart = sortedBounds[0];
-  let maxEnd = sortedBounds[sortedBounds.length - 1];
-
-  // Include 8:30 AM morning slot if schedule starts around 8:30 AM or 9:30 AM
-  if (minStart >= 8 * 60 + 30 && minStart <= 9 * 60 + 30) {
-    minStart = 8 * 60 + 30; // 8:30 AM
-  } else if (minStart > 8 * 60 && minStart < 8 * 60 + 30) {
-    minStart = 8 * 60; // 8:00 AM
-  }
+  const minStart = sortedBounds[0];
+  const maxEnd = sortedBounds[sortedBounds.length - 1];
 
   const step = 60;
   const slots = [];
@@ -191,12 +184,13 @@ const getDynamicMatrixSlots = (subjects) => {
       next = nextBound;
     }
 
-    const isBreak = !rawSlots.some(s => s.start < next && s.end > curr);
+    // Only mark as lunch break if it falls during midday lunch hours (12:00 PM to 2:30 PM) with no classes
+    const isLunchBreak = (curr >= 12 * 60 && curr < 14 * 60 + 30) && !rawSlots.some(s => s.start < next && s.end > curr);
     slots.push({
       label: fmtSlotLabel(curr, next),
       start: curr,
       end: next,
-      isLunch: isBreak,
+      isLunch: isLunchBreak,
     });
     curr = next;
   }
@@ -542,7 +536,7 @@ export default function WeeklyGrid({ subjects }) {
         .tt-matrix thead th.tt-th-day::after,
         .tt-matrix tbody td.tt-day-cell::after {
           content: ''; position: absolute;
-          top: -6px; bottom: -6px; left: -6px; right: -6px;
+          top: -3px; bottom: -3px; left: -3px; right: -3px;
           background: var(--tt-black); z-index: -1;
         }
 
