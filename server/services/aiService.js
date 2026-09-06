@@ -12,12 +12,12 @@ const geminiBreaker = getBreaker('gemini', {
 });
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-// Heavy model: used for resume analysis and grade prediction (quality-critical)
-const HEAVY_MODEL = process.env.GEMINI_HEAVY_MODEL || 'gemini-2.0-flash';
-// Light model: used for mid-complexity tasks (DSA coach, chat, AI commands, etc.)
-const LIGHT_MODEL = process.env.GEMINI_LIGHT_MODEL || 'gemini-2.0-flash-lite';
-// Nano model: used for small, fast tasks (transcription, OCR cells, study planner, interview Qs)
-const NANO_MODEL = process.env.GEMINI_NANO_MODEL || 'gemini-2.0-flash-lite';
+// Heavy model: used for quality-critical analysis (resume, predictions)
+const HEAVY_MODEL = process.env.GEMINI_HEAVY_MODEL || 'gemini-1.5-pro';
+// Light model: used for general AI tasks (chat, DSA coach, timetable, etc.)
+const LIGHT_MODEL = process.env.GEMINI_LIGHT_MODEL || 'gemini-1.5-flash';
+// Nano model: used for small fast tasks (transcription, study planner)
+const NANO_MODEL = process.env.GEMINI_NANO_MODEL || 'gemini-1.5-flash';
 // GEMINI_MODEL kept for backward compat — any code importing it gets the light model
 const GEMINI_MODEL = LIGHT_MODEL;
 // Embedding model: used for RAG (semantic search over uploaded notes)
@@ -97,10 +97,11 @@ async function withRetry(fn, maxRetries = 3, baseDelay = 1000) {
       // A tripped breaker means the dependency is known-down — retrying just
       // burns the request's time budget, so fail fast straight through.
       if (err.code === 'CIRCUIT_OPEN') break;
-      const nonRetryable = err.statusCode >= 400 && err.statusCode < 500 && err.statusCode !== 429;
+      const isModelNotFound = err.statusCode === 404 || (err.message && /not found|not available|models\//i.test(err.message));
+      const nonRetryable = err.statusCode >= 400 && err.statusCode < 500 && err.statusCode !== 429 && !isModelNotFound;
       if (nonRetryable || attempt === maxRetries - 1) break;
       const delay = baseDelay * Math.pow(2, attempt);
-      console.warn(`[AI Service] Attempt ${attempt + 1} failed, retrying in ${delay}ms:`, err.message);
+      console.warn(`[AI Service] Attempt ${attempt + 1} failed (${err.message}), retrying in ${delay}ms...`);
       await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
@@ -123,7 +124,7 @@ function buildGeminiContents(messages) {
 async function generateContent(contents, options = {}) {
   const model = options.model || LIGHT_MODEL;
   return withRetry(async (attempt) => {
-    const targetModel = (attempt > 0 && model === HEAVY_MODEL) ? LIGHT_MODEL : model;
+    const targetModel = attempt > 0 ? 'gemini-1.5-flash' : model;
     const body = { contents };
 
     if (options.systemInstruction) {
@@ -200,7 +201,7 @@ async function transcribeAudio(audioBuffer, mimetype) {
 async function generateContentWithInlineData(parts, options = {}) {
   const model = options.model || LIGHT_MODEL;
   return withRetry(async (attempt) => {
-    const targetModel = (attempt > 0 && model === HEAVY_MODEL) ? LIGHT_MODEL : model;
+    const targetModel = attempt > 0 ? 'gemini-1.5-flash' : model;
     const body = {
       contents: [{ role: 'user', parts }],
     };
