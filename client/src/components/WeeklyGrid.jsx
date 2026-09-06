@@ -465,7 +465,15 @@ export default function WeeklyGrid({ subjects }) {
           border: 1px solid rgba(255,255,255,0.1);
           box-shadow: 0 0 0 1px rgba(255,255,255,0.04), 0 24px 60px rgba(0,0,0,0.6);
           padding: 14px;
+          -webkit-overflow-scrolling: touch;
+          scrollbar-width: thin;
+          scrollbar-color: rgba(99,102,241,0.4) rgba(255,255,255,0.02);
         }
+        .tt-grid-wrap::-webkit-scrollbar { height: 6px; }
+        .tt-grid-wrap::-webkit-scrollbar-track { background: rgba(255,255,255,0.02); border-radius: 3px; }
+        .tt-grid-wrap::-webkit-scrollbar-thumb { background: rgba(99,102,241,0.4); border-radius: 3px; }
+        .tt-grid-wrap::-webkit-scrollbar-thumb:hover { background: rgba(99,102,241,0.7); }
+
         .tt-grid-wrap::before {
           content: ''; display: block; height: 2px; margin: -14px -14px 12px;
           background: linear-gradient(90deg, #6366f1, #a855f7, #ec4899, #6366f1);
@@ -484,6 +492,7 @@ export default function WeeklyGrid({ subjects }) {
         .tt-matrix thead th.tt-th-day {
           color: #818cf8; background: rgba(99,102,241,0.12);
           border-color: rgba(99,102,241,0.25); font-size: 11px;
+          position: sticky; left: 0; z-index: 10;
         }
         .tt-matrix thead th.tt-th-lunch {
           color: rgba(255,255,255,0.35); background: rgba(255,255,255,0.02);
@@ -494,6 +503,8 @@ export default function WeeklyGrid({ subjects }) {
           height: 76px; padding: 0 8px; border-radius: 8px; text-align: center;
           font-size: 12px; font-weight: 900; vertical-align: middle;
           letter-spacing: 0.02em; border: 1px solid;
+          position: sticky; left: 0; z-index: 10;
+          box-shadow: 4px 0 12px rgba(0,0,0,0.5);
         }
 
         .tt-matrix tbody td { height: 76px; vertical-align: middle; }
@@ -535,6 +546,15 @@ export default function WeeklyGrid({ subjects }) {
           padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(255, 255, 255, 0.35);
           white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;
           letter-spacing: 0.2px;
+        }
+
+        @media (max-width: 768px) {
+          .tt-toolbar { flex-direction: column; align-items: stretch; }
+          .tt-pdf-btn { width: 100%; justify-content: center; padding: 10px 16px; }
+          .tt-grid-wrap { padding: 10px; border-radius: 12px; }
+          .tt-matrix { border-spacing: 3px; }
+          .tt-subject-card { padding: 4px 6px; }
+          .tt-stat-pill { font-size: 10.5px; padding: 3px 8px; }
         }
       `}</style>
 
