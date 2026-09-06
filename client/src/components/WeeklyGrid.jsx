@@ -503,8 +503,7 @@ export default function WeeklyGrid({ subjects }) {
           color: rgba(255,255,255,0.7); text-transform: uppercase;
         }
         .tt-matrix thead th.tt-th-day {
-          position: sticky; left: 0; z-index: 20;
-          background: var(--tt-black); padding: 0; border: none;
+          padding: 0; border: none;
         }
         .tt-day-header-card {
           height: 34px; padding: 0 8px; border-radius: 8px;
@@ -520,8 +519,7 @@ export default function WeeklyGrid({ subjects }) {
         }
 
         .tt-day-cell {
-          position: sticky; left: 0; z-index: 10;
-          background: var(--tt-black); padding: 0; border: none;
+          padding: 0; border: none;
           height: 76px; vertical-align: middle;
         }
         .tt-day-card {
@@ -530,14 +528,6 @@ export default function WeeklyGrid({ subjects }) {
           display: flex; align-items: center; justify-content: center;
           background: #0f172a; border: 1px solid rgba(255,255,255,0.1);
           box-sizing: border-box;
-        }
-
-        /* Continuous opaque mask behind column 0 to prevent all horizontal scrolling bleed */
-        .tt-matrix thead th.tt-th-day::after,
-        .tt-matrix tbody td.tt-day-cell::after {
-          content: ''; position: absolute;
-          top: -3px; bottom: -3px; left: -3px; right: -3px;
-          background: var(--tt-black); z-index: -1;
         }
 
         .tt-matrix tbody td { height: 76px; vertical-align: middle; }
