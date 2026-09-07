@@ -18,10 +18,12 @@ function getISTInfo() {
 
 function startDailyNotificationJob() {
   // Every minute: check for classes ending NOW and send "Did you attend?" prompt
+  // jobTimeoutMs = 25 s — well under the 60 s interval so a slow DB round-trip
+  // can never bleed into the next cron tick and cause "missed execution" cascades.
   cron.schedule('* * * * *', lockedJob('sendEndOfClassNotifications', async () => {
     console.log(`[CRON] sendEndOfClassNotifications started (IST Time: ${getISTInfo()})`);
     await sendEndOfClassNotifications();
-  }), {
+  }, undefined, 25_000), {
     scheduled: true,
     timezone: 'Asia/Kolkata',
   });
