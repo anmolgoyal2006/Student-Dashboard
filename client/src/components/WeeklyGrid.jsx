@@ -428,7 +428,7 @@ export async function exportTimetableImage(subjects, filename = 'Student_Timetab
   }
 }
 
-/* ── PDF export — perfectly scaled to A4 landscape, 0 clipping ──────────── */
+/* ── PDF export — matched to timetable aspect ratio (zero empty bars, fully zoomed in) ── */
 export async function exportTimetablePDF(subjects) {
   if (!subjects?.length) return;
   const container = buildTimetableExportElement(subjects);
@@ -449,36 +449,17 @@ export async function exportTimetablePDF(subjects) {
     });
 
     const imgData = canvas.toDataURL('image/jpeg', 0.98);
+    const imgRatio = canvas.width / canvas.height;
+    const pdfWidth = 297; // mm
+    const pdfHeight = pdfWidth / imgRatio; // exact matching height so timetable fills 100% without letterboxing
+
     const pdf = new jsPDF({
       orientation: 'landscape',
       unit: 'mm',
-      format: 'a4',
+      format: [pdfWidth, pdfHeight],
     });
 
-    const pdfWidth = pdf.internal.pageSize.getWidth();   // 297 mm
-    const pdfHeight = pdf.internal.pageSize.getHeight(); // 210 mm
-
-    const margin = 6;
-    const maxW = pdfWidth - margin * 2;   // 285 mm
-    const maxH = pdfHeight - margin * 2;  // 198 mm
-
-    const imgRatio = canvas.width / canvas.height;
-    let renderW = maxW;
-    let renderH = renderW / imgRatio;
-
-    if (renderH > maxH) {
-      renderH = maxH;
-      renderW = renderH * imgRatio;
-    }
-
-    const posX = (pdfWidth - renderW) / 2;
-    const posY = (pdfHeight - renderH) / 2;
-
-    // Fill PDF canvas with #000000 background
-    pdf.setFillColor(0, 0, 0);
-    pdf.rect(0, 0, pdfWidth, pdfHeight, 'F');
-
-    pdf.addImage(imgData, 'JPEG', posX, posY, renderW, renderH);
+    pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
     pdf.save('Student_Timetable.pdf');
   } finally {
     if (document.body.contains(container)) {
