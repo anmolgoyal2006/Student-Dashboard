@@ -22,16 +22,16 @@ const MATRIX_SLOTS = [
   { label: '5–7 PM',   start: 17 * 60, end: 19 * 60 },
 ];
 
-/* Web — rich dark saturated cards on black canvas */
+/* Web & Export — prominent, vivid, saturated colors matching the reference timetable */
 const WEB_PALETTE = [
-  { bg: 'linear-gradient(135deg, #312e81 0%, #4338ca 100%)', border: '#818cf8', glow: 'rgba(99,102,241,0.35)' },
-  { bg: 'linear-gradient(135deg, #064e3b 0%, #059669 100%)', border: '#34d399', glow: 'rgba(16,185,129,0.35)' },
-  { bg: 'linear-gradient(135deg, #78350f 0%, #d97706 100%)', border: '#fbbf24', glow: 'rgba(245,158,11,0.35)' },
-  { bg: 'linear-gradient(135deg, #7f1d1d 0%, #dc2626 100%)', border: '#f87171', glow: 'rgba(239,68,68,0.35)' },
-  { bg: 'linear-gradient(135deg, #581c87 0%, #9333ea 100%)', border: '#c084fc', glow: 'rgba(168,85,247,0.35)' },
-  { bg: 'linear-gradient(135deg, #0c4a6e 0%, #0284c7 100%)', border: '#38bdf8', glow: 'rgba(6,182,212,0.35)' },
-  { bg: 'linear-gradient(135deg, #831843 0%, #db2777 100%)', border: '#f472b6', glow: 'rgba(236,72,153,0.35)' },
-  { bg: 'linear-gradient(135deg, #134e4a 0%, #0d9488 100%)', border: '#2dd4bf', glow: 'rgba(20,184,166,0.35)' },
+  { bg: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)', border: '#60a5fa', glow: 'rgba(59,130,246,0.5)', dot: '#3b82f6' }, // DBMS Electric Blue
+  { bg: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', border: '#34d399', glow: 'rgba(16,185,129,0.5)', dot: '#10b981' }, // SC Emerald Green
+  { bg: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', border: '#fbbf24', glow: 'rgba(245,158,11,0.5)', dot: '#f59e0b' }, // SE Warm Amber
+  { bg: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', border: '#f87171', glow: 'rgba(239,68,68,0.5)', dot: '#ef4444' }, // TOC Scarlet Red
+  { bg: 'linear-gradient(135deg, #a855f7 0%, #7e22ce 100%)', border: '#c084fc', glow: 'rgba(168,85,247,0.5)', dot: '#a855f7' }, // Purple
+  { bg: 'linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)', border: '#38bdf8', glow: 'rgba(14,165,233,0.5)', dot: '#0ea5e9' }, // Cyan
+  { bg: 'linear-gradient(135deg, #ec4899 0%, #be185d 100%)', border: '#f472b6', glow: 'rgba(236,72,153,0.5)', dot: '#ec4899' }, // Magenta Pink
+  { bg: 'linear-gradient(135deg, #14b8a6 0%, #0d9488 100%)', border: '#2dd4bf', glow: 'rgba(20,184,166,0.5)', dot: '#14b8a6' }, // Teal
 ];
 
 /* PDF — white canvas, high-contrast saturated pastel fills, readable dark text */
@@ -233,22 +233,22 @@ export function buildTimetableExportElement(subjects) {
   let totalSessions = 0;
   subjects.forEach(s => { totalSessions += (s.schedule || []).length; });
 
-  const CELL_H = 92; // Maximised cell height for large, bold, comfortable reading
+  const CELL_H = 80; // Optimized height for high visibility
 
   const thsHtml = matrixSlots.map(slot => `
     <th style="
-      background: #080d1a;
-      color: #ffffff;
-      border: 1.5px solid rgba(255,255,255,0.22);
-      padding: 12px 6px;
-      font-size: 13px;
-      font-weight: 900;
+      background: #0c1322;
+      color: rgba(255, 255, 255, 0.75);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 9px 3px;
+      font-size: 10.5px;
+      font-weight: 800;
       text-align: center;
-      border-radius: 10px;
+      border-radius: 8px;
       text-transform: uppercase;
       white-space: nowrap;
-      letter-spacing: 0.3px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+      letter-spacing: 0.2px;
+      box-sizing: border-box;
     ">${slot.label}</th>
   `).join('');
 
@@ -276,11 +276,10 @@ export function buildTimetableExportElement(subjects) {
           <td colspan="${span}" style="height: ${CELL_H}px; padding: 3px; vertical-align: middle;">
             <div style="
               background: ${col.bg};
-              border: 2px solid ${col.border};
-              border-left: 7px solid ${col.border};
-              box-shadow: 0 4px 22px ${col.glow};
-              border-radius: 10px;
-              padding: 8px 12px;
+              border: 1px solid ${col.border};
+              box-shadow: 0 4px 18px ${col.glow};
+              border-radius: 8px;
+              padding: 6px 9px;
               height: ${CELL_H - 6}px;
               width: 100%;
               box-sizing: border-box;
@@ -289,18 +288,19 @@ export function buildTimetableExportElement(subjects) {
               justify-content: center;
               overflow: hidden;
             ">
-              <div style="font-size: 15px; font-weight: 900; color: #ffffff; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: -0.2px;">
+              <div style="font-size: 14.5px; font-weight: 900; color: #ffffff; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: 0.1px; text-shadow: 0 1px 3px rgba(0,0,0,0.7), 0 0 1px rgba(0,0,0,0.9);">
                 ${ev.name}
               </div>
               ${formattedCode ? `
-                <div style="font-size: 12px; font-weight: 700; color: rgba(255,255,255,0.88); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                <div style="font-size: 10.5px; font-weight: 700; color: #ffffff; opacity: 0.92; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 2px rgba(0,0,0,0.6);">
                   (${formattedCode})
                 </div>
               ` : ''}
               ${ev.room ? `
                 <div style="margin-top: 4px;">
-                  <span style="display: inline-block; font-size: 11.5px; font-weight: 800; color: #ffffff; background: rgba(255, 255, 255, 0.25); border: 1.5px solid rgba(255, 255, 255, 0.5); padding: 2px 8px; border-radius: 5px; letter-spacing: 0.3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; box-sizing: border-box;">
-                    Room: ${ev.room}
+                  <span style="display: inline-flex; align-items: center; gap: 3.5px; font-size: 11.5px; font-weight: 900; color: #ffffff; background: rgba(0, 0, 0, 0.68); border: 1.5px solid rgba(255, 255, 255, 0.55); padding: 2.5px 8px; border-radius: 5px; letter-spacing: 0.3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; box-sizing: border-box; box-shadow: 0 2px 5px rgba(0,0,0,0.4);">
+                    <span style="opacity: 0.85; font-size: 10px; font-weight: 700;">Room:</span>
+                    <strong style="font-size: 11.5px; font-weight: 900; color: #ffffff;">${ev.room}</strong>
                   </span>
                 </div>
               ` : ''}
@@ -314,9 +314,9 @@ export function buildTimetableExportElement(subjects) {
               height: ${CELL_H - 6}px;
               width: 100%;
               box-sizing: border-box;
-              border-radius: 10px;
-              border: 1.5px solid rgba(255,255,255,0.06);
-              background: #050811;
+              border-radius: 8px;
+              border: 1px solid rgba(255,255,255,0.04);
+              background: #080d18;
             "></div>
           </td>`;
         sIdx++;
@@ -329,19 +329,17 @@ export function buildTimetableExportElement(subjects) {
           <div style="
             height: ${CELL_H - 6}px;
             width: 100%;
-            border-radius: 10px;
-            background: #080d1a;
-            border: 2px solid ${accent.color};
+            border-radius: 8px;
+            background: #0c1322;
+            border: 1px solid rgba(255,255,255,0.08);
             color: ${accent.color};
-            font-size: 14.5px;
-            font-weight: 900;
-            letter-spacing: 0.05em;
+            font-size: 12px;
+            font-weight: 800;
+            letter-spacing: 0.02em;
             display: flex;
             align-items: center;
             justify-content: center;
             text-align: center;
-            text-transform: uppercase;
-            box-shadow: 0 4px 16px ${accent.color}35;
             box-sizing: border-box;
           ">${FULL_DAYS[day]}</div>
         </td>
@@ -351,22 +349,23 @@ export function buildTimetableExportElement(subjects) {
 
   const legendHtml = subjects.map((s, i) => {
     const col = WEB_PALETTE[i % WEB_PALETTE.length];
+    const count = (s.schedule || []).length;
     return `
       <span style="
-        display: inline-flex; align-items: center; gap: 8px;
-        padding: 6px 12px; border-radius: 9px;
-        background: #080d1a; border: 1.5px solid rgba(255,255,255,0.12);
-        font-size: 13px; font-weight: 700; color: #cbd5e1;
+        display: inline-flex; align-items: center; gap: 7px;
+        padding: 4px 10px 4px 8px; border-radius: 20px;
+        background: #0d1424; border: 1px solid rgba(255,255,255,0.10);
+        font-size: 11.5px; font-weight: 600; color: #cbd5e1;
       ">
-        <span style="width: 12px; height: 12px; border-radius: 4px; background: ${col.border}; display: inline-block; flex-shrink: 0; box-shadow: 0 0 8px ${col.glow};"></span>
+        <span style="width: 8px; height: 8px; border-radius: 50%; background: ${col.border}; display: inline-block; flex-shrink: 0; box-shadow: 0 0 8px ${col.glow};"></span>
         <span style="color: #ffffff; font-weight: 800;">${s.name}</span>
-        ${s.code ? `<span style="color: #94a3b8; font-weight: 600;">(${s.code})</span>` : ''}
+        ${s.code ? `<span style="color: #94a3b8; font-weight: 500;">(${s.code})</span>` : ''}
+        <span style="font-size: 10px; font-weight: 700; color: #818cf8; background: rgba(99,102,241,0.22); padding: 1px 6px; border-radius: 10px;">${count}x/wk</span>
       </span>`;
   }).join('');
 
-  const slotColWidth = 160;
-  const dayColWidth = 125;
-  const exportWidth = Math.max(1600, dayColWidth + matrixSlots.length * slotColWidth + 40);
+  const dayColWidth = 110;
+  const exportWidth = Math.max(1440, dayColWidth + matrixSlots.length * 132 + 44);
 
   const container = document.createElement('div');
   container.id = 'timetable-export-container';
@@ -375,40 +374,45 @@ export function buildTimetableExportElement(subjects) {
     background: #000000;
     color: #f8fafc;
     font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    padding: 16px;
+    padding: 24px 28px;
     box-sizing: border-box;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   `;
 
   container.innerHTML = `
-    <!-- Top toolbar — maximised, dark, high contrast -->
-    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
-      <div style="display: flex; align-items: center; gap: 14px;">
-        <div style="font-size: 20px; font-weight: 900; color: #ffffff; display: flex; align-items: center; gap: 10px; letter-spacing: -0.3px;">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#818cf8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-          Weekly Class Schedule
+    <!-- Top toolbar — exactly matching reference screenshot -->
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <div style="width: 38px; height: 38px; border-radius: 10px; background: linear-gradient(135deg, #6366f1, #4f46e5); display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 14px rgba(99,102,241,0.35);">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
         </div>
-        <span style="display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 20px; font-size: 13px; font-weight: 700; background: #080d1a; border: 1.5px solid rgba(255,255,255,0.15); color: #cbd5e1;">
-          <strong style="color: #38bdf8; font-weight: 800;">${subjects.length}</strong> subjects
+        <div>
+          <div style="font-size: 19px; font-weight: 900; color: #ffffff; letter-spacing: -0.2px;">StudentAI Timetable</div>
+          <div style="font-size: 12px; font-weight: 500; color: #94a3b8; margin-top: 1px;">Your weekly class schedule — view, manage, and export</div>
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span style="display: inline-flex; align-items: center; gap: 5px; padding: 4px 11px; border-radius: 20px; font-size: 11.5px; font-weight: 600; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); color: #94a3b8;">
+          <strong style="color: #e2e8f0; font-weight: 700;">${subjects.length}</strong>&nbsp;subjects
         </span>
-        <span style="display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 20px; font-size: 13px; font-weight: 700; background: #080d1a; border: 1.5px solid rgba(255,255,255,0.15); color: #cbd5e1;">
-          <strong style="color: #34d399; font-weight: 800;">${totalSessions}</strong> sessions/week
+        <span style="display: inline-flex; align-items: center; gap: 5px; padding: 4px 11px; border-radius: 20px; font-size: 11.5px; font-weight: 600; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); color: #94a3b8;">
+          <strong style="color: #e2e8f0; font-weight: 700;">${totalSessions}</strong>&nbsp;sessions/week
         </span>
-        <span style="display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 20px; font-size: 13px; font-weight: 700; background: #080d1a; border: 1.5px solid rgba(255,255,255,0.15); color: #cbd5e1;">
-          <strong style="color: #fbbf24; font-weight: 800;">${displayDays.length}</strong> active days
+        <span style="display: inline-flex; align-items: center; gap: 5px; padding: 4px 11px; border-radius: 20px; font-size: 11.5px; font-weight: 600; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); color: #94a3b8;">
+          <strong style="color: #e2e8f0; font-weight: 700;">${displayDays.length}</strong>&nbsp;active days
         </span>
       </div>
     </div>
 
     <!-- Subject legend -->
-    <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; padding: 12px 14px; border-radius: 12px; background: #050811; border: 1.5px solid rgba(255,255,255,0.12);">
+    <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; padding: 10px 14px; border-radius: 12px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06);">
       ${legendHtml}
     </div>
 
-    <!-- Grid wrap with rainbow accent top stripe — maximized to borders -->
-    <div style="border-radius: 16px; background: #000000; border: 1.5px solid rgba(255,255,255,0.16); box-shadow: 0 0 0 1px rgba(255,255,255,0.06), 0 24px 60px rgba(0,0,0,0.85); padding: 10px; box-sizing: border-box; width: 100%;">
-      <div style="height: 3px; margin: -10px -10px 10px; background: linear-gradient(90deg, #6366f1, #a855f7, #ec4899, #6366f1); border-radius: 16px 16px 0 0;"></div>
+    <!-- Grid wrap with rainbow accent top stripe — perfectly fills width -->
+    <div style="border-radius: 16px; background: #080d1a; border: 1px solid rgba(255,255,255,0.10); box-shadow: 0 0 0 1px rgba(255,255,255,0.04), 0 24px 60px rgba(0,0,0,0.6); padding: 12px; box-sizing: border-box; width: 100%;">
+      <div style="height: 2px; margin: -12px -12px 12px; background: linear-gradient(90deg, #6366f1, #a855f7, #ec4899, #6366f1); border-radius: 16px 16px 0 0;"></div>
       <table style="width: 100%; border-collapse: separate; border-spacing: 5px; table-layout: fixed; box-sizing: border-box;">
         <colgroup>
           <col style="width: ${dayColWidth}px;" />
@@ -417,14 +421,21 @@ export function buildTimetableExportElement(subjects) {
         <thead>
           <tr>
             <th style="padding: 0; border: none; width: ${dayColWidth}px;">
-              <div style="height: 44px; width: 100%; padding: 0 8px; border-radius: 10px; background: #080d1a; border: 2px solid rgba(99,102,241,0.55); color: #a5b4fc; font-size: 13px; font-weight: 900; display: flex; align-items: center; justify-content: center; letter-spacing: 0.08em; text-transform: uppercase; box-sizing: border-box;">DAY</div>
+              <div style="height: 34px; width: 100%; padding: 0 8px; border-radius: 8px; background: #0d1424; border: 1px solid rgba(99,102,241,0.30); color: #818cf8; font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center; letter-spacing: 0.05em; text-transform: uppercase; box-sizing: border-box;">DAY</div>
             </th>
             ${thsHtml}
           </tr>
         </thead>
         <tbody>${rowsHtml}</tbody>
       </table>
-    </div>`;
+    </div>
+
+    <!-- Footer -->
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 14px; padding: 0 4px; font-size: 10.5px; font-weight: 600; color: #475569;">
+      <div>StudentAI • Academic Schedule Export</div>
+      <div>Generated ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</div>
+    </div>
+  `;
 
   return container;
 }
@@ -559,7 +570,14 @@ export default function WeeklyGrid({ subjects }) {
             >
               <div className="tt-subject-name">{ev.name}</div>
               {code && <div className="tt-subject-code">({code})</div>}
-              {ev.room && <span className="tt-subject-room">Room: {ev.room}</span>}
+              {ev.room && (
+                <div style={{ marginTop: '3px' }}>
+                  <span className="tt-subject-room">
+                    <span style={{ opacity: 0.85, fontSize: '9.5px', fontWeight: 700 }}>Room:</span>
+                    <strong style={{ fontSize: '11px', fontWeight: 900, color: '#ffffff' }}>{ev.room}</strong>
+                  </span>
+                </div>
+              )}
             </div>
           </td>
         );
@@ -706,19 +724,22 @@ export default function WeeklyGrid({ subjects }) {
         .tt-subject-card:hover { box-shadow: 0 0 0 2px rgba(255,255,255,0.15); z-index: 2; position: relative; }
 
         .tt-subject-name {
-          font-size: 11px; font-weight: 800; color: #ffffff;
+          font-size: 13px; font-weight: 900; color: #ffffff;
           line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+          text-shadow: 0 1px 3px rgba(0,0,0,0.7), 0 0 1px rgba(0,0,0,0.9);
+          letter-spacing: 0.1px;
         }
         .tt-subject-code {
-          font-size: 9.5px; font-weight: 600; color: rgba(255,255,255,0.75); margin-top: 2px;
+          font-size: 10.5px; font-weight: 700; color: rgba(255,255,255,0.92); margin-top: 2px;
           white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+          text-shadow: 0 1px 2px rgba(0,0,0,0.6);
         }
         .tt-subject-room {
-          display: inline-block; margin-top: 3px; font-size: 9px; font-weight: 800;
-          color: #ffffff; background: rgba(255, 255, 255, 0.22);
-          padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(255, 255, 255, 0.35);
+          display: inline-flex; align-items: center; gap: 3.5px; margin-top: 3px; font-size: 11px; font-weight: 900;
+          color: #ffffff; background: rgba(0, 0, 0, 0.68);
+          padding: 2px 7px; border-radius: 5px; border: 1.5px solid rgba(255, 255, 255, 0.55);
           white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;
-          letter-spacing: 0.2px;
+          letter-spacing: 0.2px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.35);
         }
 
         @media (max-width: 768px) {
