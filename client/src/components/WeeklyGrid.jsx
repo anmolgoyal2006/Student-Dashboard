@@ -24,14 +24,14 @@ const MATRIX_SLOTS = [
 
 /* Web & Export — vibrant, high-contrast modern palette */
 const WEB_PALETTE = [
-  { bg: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)', border: '#60a5fa', glow: 'rgba(59,130,246,0.3)', dot: '#3b82f6' }, // DBMS Electric Blue
-  { bg: 'linear-gradient(135deg, #10b981 0%, #047857 100%)', border: '#34d399', glow: 'rgba(16,185,129,0.3)', dot: '#10b981' }, // SC Emerald Green
-  { bg: 'linear-gradient(135deg, #f59e0b 0%, #b45309 100%)', border: '#fbbf24', glow: 'rgba(245,158,11,0.3)', dot: '#f59e0b' }, // SE Warm Amber
-  { bg: 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)', border: '#f87171', glow: 'rgba(239,68,68,0.3)', dot: '#ef4444' }, // TOC Scarlet Red
-  { bg: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)', border: '#c084fc', glow: 'rgba(139,92,246,0.3)', dot: '#8b5cf6' }, // Violet
-  { bg: 'linear-gradient(135deg, #0ea5e9 0%, #0369a1 100%)', border: '#38bdf8', glow: 'rgba(14,165,233,0.3)', dot: '#0ea5e9' }, // Cyan
-  { bg: 'linear-gradient(135deg, #ec4899 0%, #be185d 100%)', border: '#f472b6', glow: 'rgba(236,72,153,0.3)', dot: '#ec4899' }, // Rose Pink
-  { bg: 'linear-gradient(135deg, #14b8a6 0%, #0f766e 100%)', border: '#2dd4bf', glow: 'rgba(20,184,166,0.3)', dot: '#14b8a6' }, // Teal
+  { bg: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)', border: '#60a5fa', glow: 'rgba(59,130,246,0.3)', dot: '#3b82f6', accent: '#93c5fd', text: '#ffffff', codeFg: 'rgba(255,255,255,0.78)', roomBg: 'rgba(255,255,255,0.18)', roomText: '#ffffff' }, // DBMS Blue
+  { bg: 'linear-gradient(135deg, #10b981 0%, #047857 100%)', border: '#34d399', glow: 'rgba(16,185,129,0.3)', dot: '#10b981', accent: '#6ee7b7', text: '#ffffff', codeFg: 'rgba(255,255,255,0.78)', roomBg: 'rgba(255,255,255,0.18)', roomText: '#ffffff' }, // SC Green
+  { bg: 'linear-gradient(135deg, #f59e0b 0%, #b45309 100%)', border: '#fbbf24', glow: 'rgba(245,158,11,0.3)', dot: '#f59e0b', accent: '#fde68a', text: '#ffffff', codeFg: 'rgba(255,255,255,0.78)', roomBg: 'rgba(255,255,255,0.18)', roomText: '#ffffff' }, // SE Amber
+  { bg: 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)', border: '#f87171', glow: 'rgba(239,68,68,0.3)', dot: '#ef4444', accent: '#fca5a5', text: '#ffffff', codeFg: 'rgba(255,255,255,0.78)', roomBg: 'rgba(255,255,255,0.18)', roomText: '#ffffff' }, // TOC Red
+  { bg: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)', border: '#c084fc', glow: 'rgba(139,92,246,0.3)', dot: '#8b5cf6', accent: '#d8b4fe', text: '#ffffff', codeFg: 'rgba(255,255,255,0.78)', roomBg: 'rgba(255,255,255,0.18)', roomText: '#ffffff' }, // Violet
+  { bg: 'linear-gradient(135deg, #0ea5e9 0%, #0369a1 100%)', border: '#38bdf8', glow: 'rgba(14,165,233,0.3)', dot: '#0ea5e9', accent: '#7dd3fc', text: '#ffffff', codeFg: 'rgba(255,255,255,0.78)', roomBg: 'rgba(255,255,255,0.18)', roomText: '#ffffff' }, // Cyan
+  { bg: 'linear-gradient(135deg, #ec4899 0%, #be185d 100%)', border: '#f472b6', glow: 'rgba(236,72,153,0.3)', dot: '#ec4899', accent: '#f9a8d4', text: '#ffffff', codeFg: 'rgba(255,255,255,0.78)', roomBg: 'rgba(255,255,255,0.18)', roomText: '#ffffff' }, // Rose
+  { bg: 'linear-gradient(135deg, #14b8a6 0%, #0f766e 100%)', border: '#2dd4bf', glow: 'rgba(20,184,166,0.3)', dot: '#14b8a6', accent: '#5eead4', text: '#ffffff', codeFg: 'rgba(255,255,255,0.78)', roomBg: 'rgba(255,255,255,0.18)', roomText: '#ffffff' }, // Teal
 ];
 
 /* PDF — white canvas, high-contrast saturated pastel fills, readable dark text */
@@ -233,15 +233,27 @@ export function buildTimetableExportElement(subjects) {
   let totalSessions = 0;
   subjects.forEach(s => { totalSessions += (s.schedule || []).length; });
 
-  const CELL_H = 88; // Ample height ensuring zero vertical clipping across all cells
+  // Generous fixed dimensions — enough for 4 lines of text with no clipping
+  const DAY_COL_W = 130;   // px — day label column
+  const SLOT_COL_W = 160;  // px — each time-slot column
+  const CELL_H = 110;      // px — row height (name + code + room + teacher/time)
+  const HEADER_H = 38;     // px — time-slot header row height
+  const SPACING = 5;       // px — border-spacing between cells
+  const PAD = 20;          // px — outer container padding (each side)
 
+  const totalCols = 1 + matrixSlots.length; // day col + N slot cols
+  const exportWidth = DAY_COL_W + matrixSlots.length * SLOT_COL_W + (totalCols + 1) * SPACING + PAD * 2 + 32;
+
+  // ── Header cells ────────────────────────────────────────────────────────────
   const thsHtml = matrixSlots.map(slot => `
     <th style="
-      background: #0c1322;
-      color: rgba(255, 255, 255, 0.75);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      padding: 9px 3px;
-      font-size: 10.5px;
+      width: ${SLOT_COL_W}px;
+      background: rgba(255,255,255,0.04);
+      color: rgba(255,255,255,0.75);
+      border: 1px solid rgba(255,255,255,0.10);
+      padding: 0 4px;
+      height: ${HEADER_H}px;
+      font-size: 11px;
       font-weight: 800;
       text-align: center;
       border-radius: 8px;
@@ -249,19 +261,24 @@ export function buildTimetableExportElement(subjects) {
       white-space: nowrap;
       letter-spacing: 0.2px;
       box-sizing: border-box;
+      vertical-align: middle;
     ">${slot.label}</th>
   `).join('');
 
+  // ── Body rows ────────────────────────────────────────────────────────────────
   let rowsHtml = '';
   displayDays.forEach(day => {
     const accent = DAY_WEB[day] || DAY_WEB.Mon;
     const dayEvents = eventsByDay[day] || [];
     let cellsHtml = '';
     let sIdx = 0;
+
     while (sIdx < matrixSlots.length) {
       const slot = matrixSlots[sIdx];
       const matchingEvents = dayEvents.filter(ev => ev.startMin < slot.end && ev.endMin > slot.start);
-      if (dayEvents.some(ev => ev.startMin < slot.start && ev.endMin > slot.start)) { sIdx++; continue; }
+      const startedEarlier  = dayEvents.some(ev => ev.startMin < slot.start && ev.endMin > slot.start);
+
+      if (startedEarlier) { sIdx++; continue; }
 
       if (matchingEvents.length > 0) {
         const maxEndMin = Math.max(...matchingEvents.map(ev => ev.endMin));
@@ -272,47 +289,96 @@ export function buildTimetableExportElement(subjects) {
         const col = ev.color || WEB_PALETTE[0];
         const formattedCode = ev.code ? ev.code.replace(/\+/g, ' + ') : '';
 
+        // Card width = span columns + (span-1) spacers
+        const cardW = span * SLOT_COL_W + (span - 1) * SPACING;
+
         cellsHtml += `
-          <td colspan="${span}" style="height: ${CELL_H}px; padding: 3px; vertical-align: middle;">
+          <td colspan="${span}" style="
+            height: ${CELL_H}px;
+            padding: ${SPACING / 2}px;
+            vertical-align: middle;
+            box-sizing: border-box;
+          ">
             <div style="
               background: ${col.bg};
-              border: 1px solid rgba(255, 255, 255, 0.25);
+              border: 1px solid rgba(255,255,255,0.22);
               box-shadow: 0 2px 10px ${col.glow};
-              border-radius: 8px;
-              padding: 7px 9px;
-              height: ${CELL_H - 6}px;
-              width: 100%;
+              border-radius: 9px;
+              padding: 8px 10px;
+              width: ${cardW}px;
+              min-height: ${CELL_H - SPACING}px;
               box-sizing: border-box;
               display: flex;
               flex-direction: column;
               justify-content: flex-start;
+              gap: 2px;
               overflow: hidden;
             ">
-              <!-- 1. Subject (Primary — prominent, bold, 15px, high contrast) -->
-              <div style="font-size: 15px; font-weight: 900; color: #ffffff; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: -0.1px; text-shadow: 0 1px 2px rgba(0,0,0,0.5);">
-                ${ev.name}
-              </div>
+              <!-- Subject name — wraps freely, no ellipsis -->
+              <div style="
+                font-size: 14px;
+                font-weight: 900;
+                color: #ffffff;
+                line-height: 1.25;
+                word-break: break-word;
+                white-space: normal;
+                letter-spacing: -0.1px;
+                text-shadow: 0 1px 3px rgba(0,0,0,0.55);
+              ">${ev.name}</div>
+
+              <!-- Subject code -->
               ${formattedCode ? `
-                <div style="font-size: 9.5px; font-weight: 600; color: rgba(255, 255, 255, 0.82); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                  ${formattedCode}
-                </div>
+                <div style="
+                  font-size: 10px;
+                  font-weight: 600;
+                  color: rgba(255,255,255,0.82);
+                  white-space: nowrap;
+                  overflow: hidden;
+                  text-overflow: ellipsis;
+                ">${formattedCode}</div>
               ` : ''}
 
-              <!-- 2. Classroom (Secondary — clearly visible subtle chip) -->
+              <!-- Room chip -->
               ${ev.room ? `
-                <div style="margin-top: 4px;">
-                  <span style="display: inline-flex; align-items: center; gap: 3.5px; font-size: 11px; font-weight: 700; color: #ffffff; background: rgba(0, 0, 0, 0.42); border: 1px solid rgba(255, 255, 255, 0.32); padding: 2px 7px; border-radius: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; box-sizing: border-box;">
-                    <span style="opacity: 0.8; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px;">Room</span>
-                    <strong style="font-size: 11.5px; font-weight: 900; color: #ffffff;">${ev.room}</strong>
+                <div style="margin-top: 2px;">
+                  <span style="
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 4px;
+                    font-size: 11px;
+                    font-weight: 700;
+                    color: #ffffff;
+                    background: rgba(255,255,255,0.18);
+                    border: 1px solid rgba(255,255,255,0.55);
+                    padding: 2px 8px;
+                    border-radius: 5px;
+                    white-space: nowrap;
+                  ">
+                    <span style="font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; opacity: 0.8;">ROOM</span>
+                    <strong style="font-size: 11.5px; font-weight: 900;">${ev.room}</strong>
                   </span>
                 </div>
               ` : ''}
 
-              <!-- 3. Teacher & Time (Tertiary & Quaternary — smaller, muted) -->
-              ${(ev.instructor || (span > 1 && ev.startTime && ev.endTime)) ? `
-                <div style="margin-top: 4px; display: flex; align-items: center; justify-content: space-between; gap: 6px; font-size: 9.5px; font-weight: 500; color: rgba(255, 255, 255, 0.78); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                  ${ev.instructor ? `<span style="overflow: hidden; text-overflow: ellipsis;">${ev.instructor}</span>` : '<span></span>'}
-                  ${(span > 1 && ev.startTime && ev.endTime) ? `<span style="font-size: 9px; opacity: 0.85; flex-shrink: 0;">${fmt12(ev.startTime)} – ${fmt12(ev.endTime)}</span>` : ''}
+              <!-- Teacher & time on one line -->
+              ${(ev.instructor || (ev.startTime && ev.endTime)) ? `
+                <div style="
+                  margin-top: 2px;
+                  display: flex;
+                  align-items: center;
+                  justify-content: space-between;
+                  gap: 6px;
+                  font-size: 10px;
+                  font-weight: 500;
+                  color: rgba(255,255,255,0.80);
+                  overflow: hidden;
+                ">
+                  ${ev.instructor ? `
+                    <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1 1 auto;">${ev.instructor}</span>
+                  ` : '<span></span>'}
+                  ${(ev.startTime && ev.endTime) ? `
+                    <span style="white-space: nowrap; flex-shrink: 0; font-size: 9.5px; opacity: 0.88;">${fmt12(ev.startTime)} – ${fmt12(ev.endTime)}</span>
+                  ` : ''}
                 </div>
               ` : ''}
             </div>
@@ -320,14 +386,19 @@ export function buildTimetableExportElement(subjects) {
         sIdx += span;
       } else {
         cellsHtml += `
-          <td style="height: ${CELL_H}px; padding: 3px; vertical-align: middle;">
+          <td style="
+            height: ${CELL_H}px;
+            padding: ${SPACING / 2}px;
+            vertical-align: middle;
+            box-sizing: border-box;
+          ">
             <div style="
-              height: ${CELL_H - 6}px;
+              height: ${CELL_H - SPACING}px;
               width: 100%;
-              box-sizing: border-box;
               border-radius: 8px;
               border: 1px solid rgba(255,255,255,0.04);
               background: #080d18;
+              box-sizing: border-box;
             "></div>
           </td>`;
         sIdx++;
@@ -336,15 +407,20 @@ export function buildTimetableExportElement(subjects) {
 
     rowsHtml += `
       <tr>
-        <td style="height: ${CELL_H}px; padding: 3px; vertical-align: middle;">
+        <td style="
+          height: ${CELL_H}px;
+          padding: ${SPACING / 2}px;
+          vertical-align: middle;
+          box-sizing: border-box;
+        ">
           <div style="
-            height: ${CELL_H - 6}px;
-            width: 100%;
+            height: ${CELL_H - SPACING}px;
+            width: ${DAY_COL_W}px;
             border-radius: 8px;
             background: #0c1322;
             border: 1px solid rgba(255,255,255,0.08);
             color: ${accent.color};
-            font-size: 12px;
+            font-size: 13px;
             font-weight: 800;
             letter-spacing: 0.02em;
             display: flex;
@@ -358,26 +434,33 @@ export function buildTimetableExportElement(subjects) {
       </tr>`;
   });
 
+  // ── Legend ────────────────────────────────────────────────────────────────────
   const legendHtml = subjects.map((s, i) => {
     const col = WEB_PALETTE[i % WEB_PALETTE.length];
     const count = (s.schedule || []).length;
     return `
       <span style="
         display: inline-flex; align-items: center; gap: 7px;
-        padding: 4px 10px 4px 8px; border-radius: 20px;
+        padding: 4px 12px 4px 8px; border-radius: 20px;
         background: #0d1424; border: 1px solid rgba(255,255,255,0.10);
-        font-size: 11.5px; font-weight: 600; color: #cbd5e1;
+        font-size: 12px; font-weight: 600; color: #cbd5e1;
+        white-space: nowrap;
       ">
-        <span style="width: 8px; height: 8px; border-radius: 50%; background: ${col.border}; display: inline-block; flex-shrink: 0; box-shadow: 0 0 8px ${col.glow};"></span>
+        <span style="
+          width: 10px; height: 10px; border-radius: 50%;
+          background: ${col.border}; display: inline-block; flex-shrink: 0;
+          box-shadow: 0 0 8px ${col.glow};
+        "></span>
         <span style="color: #ffffff; font-weight: 800;">${s.name}</span>
         ${s.code ? `<span style="color: #94a3b8; font-weight: 500;">(${s.code})</span>` : ''}
-        <span style="font-size: 10px; font-weight: 700; color: #818cf8; background: rgba(99,102,241,0.22); padding: 1px 6px; border-radius: 10px;">${count}x/wk</span>
+        <span style="
+          font-size: 10px; font-weight: 700; color: #818cf8;
+          background: rgba(99,102,241,0.22); padding: 1px 7px; border-radius: 10px;
+        ">${count}x/wk</span>
       </span>`;
   }).join('');
 
-  const dayColWidth = 110;
-  const exportWidth = Math.max(1440, dayColWidth + matrixSlots.length * 132 + 44);
-
+  // ── Container ────────────────────────────────────────────────────────────────
   const container = document.createElement('div');
   container.id = 'timetable-export-container';
   container.style.cssText = `
@@ -385,54 +468,112 @@ export function buildTimetableExportElement(subjects) {
     background: #000000;
     color: #f8fafc;
     font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    padding: 24px 28px;
+    padding: ${PAD}px ${PAD + 8}px;
     box-sizing: border-box;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   `;
 
   container.innerHTML = `
-    <!-- Top toolbar — exactly matching reference screenshot -->
+    <!-- Header bar -->
     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
       <div style="display: flex; align-items: center; gap: 12px;">
-        <div style="width: 38px; height: 38px; border-radius: 10px; background: linear-gradient(135deg, #6366f1, #4f46e5); display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 14px rgba(99,102,241,0.35);">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+        <div style="
+          width: 40px; height: 40px; border-radius: 10px;
+          background: linear-gradient(135deg, #6366f1, #4f46e5);
+          display: flex; align-items: center; justify-content: center;
+          box-shadow: 0 4px 14px rgba(99,102,241,0.35);
+          flex-shrink: 0;
+        ">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="16" y1="2" x2="16" y2="6"></line>
+            <line x1="8" y1="2" x2="8" y2="6"></line>
+            <line x1="3" y1="10" x2="21" y2="10"></line>
+          </svg>
         </div>
         <div>
-          <div style="font-size: 19px; font-weight: 900; color: #ffffff; letter-spacing: -0.2px;">StudentAI Timetable</div>
-          <div style="font-size: 12px; font-weight: 500; color: #94a3b8; margin-top: 1px;">Your weekly class schedule — view, manage, and export</div>
+          <div style="font-size: 20px; font-weight: 900; color: #ffffff; letter-spacing: -0.3px;">Weekly Schedule</div>
+          <div style="font-size: 12px; font-weight: 500; color: #94a3b8; margin-top: 2px;">StudentAI · Academic Timetable Export</div>
         </div>
       </div>
-      <div style="display: flex; align-items: center; gap: 8px;">
-        <span style="display: inline-flex; align-items: center; gap: 5px; padding: 4px 11px; border-radius: 20px; font-size: 11.5px; font-weight: 600; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); color: #94a3b8;">
-          <strong style="color: #e2e8f0; font-weight: 700;">${subjects.length}</strong>&nbsp;subjects
-        </span>
-        <span style="display: inline-flex; align-items: center; gap: 5px; padding: 4px 11px; border-radius: 20px; font-size: 11.5px; font-weight: 600; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); color: #94a3b8;">
-          <strong style="color: #e2e8f0; font-weight: 700;">${totalSessions}</strong>&nbsp;sessions/week
-        </span>
-        <span style="display: inline-flex; align-items: center; gap: 5px; padding: 4px 11px; border-radius: 20px; font-size: 11.5px; font-weight: 600; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); color: #94a3b8;">
-          <strong style="color: #e2e8f0; font-weight: 700;">${displayDays.length}</strong>&nbsp;active days
-        </span>
+      <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+        <span style="
+          display: inline-flex; align-items: center; gap: 5px;
+          padding: 5px 13px; border-radius: 20px; font-size: 12px; font-weight: 600;
+          background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); color: #94a3b8;
+        "><strong style="color: #e2e8f0; font-weight: 700;">${subjects.length}</strong>&nbsp;subjects</span>
+        <span style="
+          display: inline-flex; align-items: center; gap: 5px;
+          padding: 5px 13px; border-radius: 20px; font-size: 12px; font-weight: 600;
+          background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); color: #94a3b8;
+        "><strong style="color: #e2e8f0; font-weight: 700;">${totalSessions}</strong>&nbsp;sessions/week</span>
+        <span style="
+          display: inline-flex; align-items: center; gap: 5px;
+          padding: 5px 13px; border-radius: 20px; font-size: 12px; font-weight: 600;
+          background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); color: #94a3b8;
+        "><strong style="color: #e2e8f0; font-weight: 700;">${displayDays.length}</strong>&nbsp;active days</span>
       </div>
     </div>
 
-    <!-- Subject legend -->
-    <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; padding: 10px 14px; border-radius: 12px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06);">
-      ${legendHtml}
-    </div>
+    <!-- Legend -->
+    <div style="
+      display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px;
+      padding: 12px 16px; border-radius: 12px;
+      background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.07);
+    ">${legendHtml}</div>
 
-    <!-- Grid wrap with rainbow accent top stripe — perfectly fills width -->
-    <div style="border-radius: 16px; background: #080d1a; border: 1px solid rgba(255,255,255,0.10); box-shadow: 0 0 0 1px rgba(255,255,255,0.04), 0 24px 60px rgba(0,0,0,0.6); padding: 12px; box-sizing: border-box; width: 100%;">
-      <div style="height: 2px; margin: -12px -12px 12px; background: linear-gradient(90deg, #6366f1, #a855f7, #ec4899, #6366f1); border-radius: 16px 16px 0 0;"></div>
-      <table style="width: 100%; border-collapse: separate; border-spacing: 5px; table-layout: fixed; box-sizing: border-box;">
+    <!-- Grid -->
+    <div style="
+      border-radius: 16px;
+      background: #080d1a;
+      border: 1px solid rgba(255,255,255,0.10);
+      box-shadow: 0 0 0 1px rgba(255,255,255,0.04), 0 24px 60px rgba(0,0,0,0.6);
+      padding: 14px;
+      box-sizing: border-box;
+      width: 100%;
+      overflow: visible;
+    ">
+      <!-- Rainbow stripe -->
+      <div style="height: 3px; margin: -14px -14px 12px; background: linear-gradient(90deg, #6366f1, #a855f7, #ec4899, #f59e0b, #6366f1); border-radius: 16px 16px 0 0;"></div>
+
+      <table style="
+        border-collapse: separate;
+        border-spacing: ${SPACING}px;
+        table-layout: fixed;
+        width: 100%;
+        box-sizing: border-box;
+      ">
         <colgroup>
-          <col style="width: ${dayColWidth}px;" />
-          ${matrixSlots.map(() => '<col />').join('')}
+          <col style="width: ${DAY_COL_W}px;" />
+          ${matrixSlots.map(() => `<col style="width: ${SLOT_COL_W}px;" />`).join('')}
         </colgroup>
         <thead>
           <tr>
-            <th style="padding: 0; border: none; width: ${dayColWidth}px;">
-              <div style="height: 34px; width: 100%; padding: 0 8px; border-radius: 8px; background: #0d1424; border: 1px solid rgba(99,102,241,0.30); color: #818cf8; font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center; letter-spacing: 0.05em; text-transform: uppercase; box-sizing: border-box;">DAY</div>
+            <th style="
+              padding: 0;
+              border: none;
+              width: ${DAY_COL_W}px;
+              height: ${HEADER_H}px;
+              vertical-align: middle;
+            ">
+              <div style="
+                height: ${HEADER_H}px;
+                width: ${DAY_COL_W}px;
+                padding: 0 8px;
+                border-radius: 8px;
+                background: #0f172a;
+                border: 1px solid rgba(99,102,241,0.35);
+                color: #a5b4fc;
+                font-size: 12px;
+                font-weight: 800;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                letter-spacing: 0.05em;
+                text-transform: uppercase;
+                box-sizing: border-box;
+              ">DAY</div>
             </th>
             ${thsHtml}
           </tr>
@@ -442,7 +583,11 @@ export function buildTimetableExportElement(subjects) {
     </div>
 
     <!-- Footer -->
-    <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 14px; padding: 0 4px; font-size: 10.5px; font-weight: 600; color: #475569;">
+    <div style="
+      display: flex; align-items: center; justify-content: space-between;
+      margin-top: 14px; padding: 0 4px;
+      font-size: 11px; font-weight: 600; color: #475569;
+    ">
       <div>StudentAI • Academic Schedule Export</div>
       <div>Generated ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</div>
     </div>
@@ -464,6 +609,9 @@ export async function exportTimetableImage(subjects, filename = 'Student_Timetab
   document.body.appendChild(container);
 
   try {
+    if (document.fonts) {
+      await document.fonts.ready;
+    }
     const canvas = await html2canvas(container, {
       scale: 2.5, // Ultra-sharp 2.5x retina rendering
       useCORS: true,
@@ -494,6 +642,9 @@ export async function exportTimetablePDF(subjects, filename = 'Student_Timetable
   document.body.appendChild(container);
 
   try {
+    if (document.fonts) {
+      await document.fonts.ready;
+    }
     const canvas = await html2canvas(container, {
       scale: 2.5, // Ultra-sharp 2.5x retina rendering
       useCORS: true,
@@ -574,31 +725,34 @@ export default function WeeklyGrid({ subjects }) {
               className="tt-subject-card"
               style={{
                 background: col.bg,
-                borderColor: 'rgba(255, 255, 255, 0.25)',
-                boxShadow: `0 2px 10px ${col.glow}`,
+                borderLeft: `4px solid ${col.accent}`,
+                borderTop: `1px solid ${col.accent}22`,
+                borderRight: `1px solid ${col.accent}22`,
+                borderBottom: `1px solid ${col.accent}22`,
+                boxShadow: `0 2px 8px ${col.glow}`,
               }}
               title={`${ev.name}${code ? ` (${code})` : ''}${ev.instructor ? ` · ${ev.instructor}` : ''}${ev.room ? ` · Room ${ev.room}` : ''}`}
             >
-              {/* 1. Subject (Primary — large, bold, high contrast) */}
-              <div className="tt-subject-name">{ev.name}</div>
-              {code && <div className="tt-subject-code">{code}</div>}
+              {/* Subject name */}
+              <div className="tt-subject-name" style={{ color: col.text }}>{ev.name}</div>
+              {code && <div className="tt-subject-code" style={{ color: col.codeFg }}>{code}</div>}
 
-              {/* 2. Classroom (Secondary — subtle chip) */}
+              {/* Room chip */}
               {ev.room && (
                 <div className="tt-room-wrap">
-                  <span className="tt-subject-room">
+                  <span className="tt-subject-room" style={{ background: col.roomBg, color: col.roomText }}>
                     <span className="tt-room-lbl">Room</span>
                     <strong>{ev.room}</strong>
                   </span>
                 </div>
               )}
 
-              {/* 3. Teacher & Time (Tertiary & Quaternary — smaller, muted, single row) */}
-              {(ev.instructor || (span > 1 && ev.startTime && ev.endTime)) && (
+              {/* Teacher & Time */}
+              {(ev.instructor || (ev.startTime && ev.endTime)) && (
                 <div className="tt-meta-row">
-                  {ev.instructor ? <span className="tt-subject-teacher">{ev.instructor}</span> : <span />}
-                  {span > 1 && ev.startTime && ev.endTime && (
-                    <span className="tt-subject-time">{fmt12(ev.startTime)} – {fmt12(ev.endTime)}</span>
+                  {ev.instructor ? <span className="tt-subject-teacher" style={{ color: col.text }}>{ev.instructor}</span> : <span />}
+                  {ev.startTime && ev.endTime && (
+                    <span className="tt-subject-time" style={{ color: col.accent }}>{fmt12(ev.startTime)} – {fmt12(ev.endTime)}</span>
                   )}
                 </div>
               )}
@@ -723,78 +877,99 @@ export default function WeeklyGrid({ subjects }) {
 
         .tt-day-cell {
           padding: 0; border: none;
-          height: 88px; vertical-align: middle;
+          height: 96px; vertical-align: middle;
         }
         .tt-day-card {
-          height: 82px; border-radius: 8px; text-align: center;
-          font-size: 12px; font-weight: 800; letter-spacing: 0.02em;
-          display: flex; align-items: center; justify-content: center;
+          height: 90px; border-radius: 10px; text-align: center;
+          font-size: 11.5px; font-weight: 800; letter-spacing: 0.06em;
+          display: flex; flex-direction: column; align-items: center; justify-content: center;
           background: #0c1322; border: 1px solid rgba(255,255,255,0.08);
-          box-sizing: border-box;
+          box-sizing: border-box; text-transform: uppercase; gap: 2px;
         }
 
-        .tt-matrix tbody td { height: 88px; vertical-align: middle; }
+        .tt-matrix tbody td { height: 96px; vertical-align: middle; }
 
         .tt-cell-filled { padding: 3px; }
-        .tt-cell-empty { padding: 3px; text-align: center; }
+        .tt-cell-empty { padding: 3px; }
         .tt-cell-empty-inner {
-          height: 82px; width: 100%; box-sizing: border-box;
-          border-radius: 8px; border: 1px solid rgba(255,255,255,0.04);
+          height: 90px; width: 100%; box-sizing: border-box;
+          border-radius: 10px; border: 1px solid rgba(255,255,255,0.04);
           background: #080d18;
         }
 
+        /* ── Subject card ── */
         .tt-subject-card {
-          border-radius: 8px; border: 1px solid; padding: 7px 9px;
-          height: 82px; width: 100%; box-sizing: border-box;
-          display: flex; flex-direction: column; justify-content: flex-start;
-          overflow: hidden; transition: transform 0.1s, box-shadow 0.15s;
+          border-radius: 10px;
+          padding: 8px 9px;
+          height: 90px; width: 100%; box-sizing: border-box;
+          display: flex; flex-direction: column; justify-content: flex-start; gap: 0;
+          overflow: hidden; transition: transform 0.12s, box-shadow 0.15s;
+          cursor: default;
         }
         .tt-subject-card:hover {
-          transform: translateY(-1px);
-          box-shadow: 0 4px 14px rgba(0,0,0,0.4);
+          transform: translateY(-2px);
           z-index: 2; position: relative;
         }
 
+        /* 1 — Subject name: maximum size, always visible */
         .tt-subject-name {
-          font-size: 14.5px; font-weight: 900; color: #ffffff;
-          line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-          letter-spacing: -0.1px; text-shadow: 0 1px 2px rgba(0,0,0,0.5);
-        }
-        .tt-subject-code {
-          font-size: 9.5px; font-weight: 600; color: rgba(255,255,255,0.78); margin-top: 1px;
-          white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-        }
-        .tt-room-wrap { margin-top: 4px; }
-        .tt-subject-room {
-          display: inline-flex; align-items: center; gap: 3.5px;
-          font-size: 11px; font-weight: 700; color: #ffffff;
-          background: rgba(0, 0, 0, 0.42); border: 1px solid rgba(255, 255, 255, 0.32);
-          padding: 2px 7px; border-radius: 5px;
-          white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;
-          box-sizing: border-box;
-        }
-        .tt-room-lbl {
-          opacity: 0.8; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px;
-        }
-        .tt-meta-row {
-          margin-top: 4px; display: flex; align-items: center; justify-content: space-between;
-          gap: 6px; overflow: hidden;
-        }
-        .tt-subject-teacher {
-          font-size: 9.5px; font-weight: 500; color: rgba(255,255,255,0.78);
-          white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-        }
-        .tt-subject-time {
-          font-size: 9px; font-weight: 500; color: rgba(255,255,255,0.7);
-          white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0;
+          font-size: 13.5px; font-weight: 900; color: #ffffff;
+          line-height: 1.22;
+          white-space: normal; word-break: break-word;
+          letter-spacing: -0.1px;
+          text-shadow: 0 1px 3px rgba(0,0,0,0.6);
+          max-height: 2.5em; overflow: hidden;
         }
 
+        /* 2 — Subject code: compact, muted */
+        .tt-subject-code {
+          font-size: 9px; font-weight: 600; color: rgba(255,255,255,0.72);
+          margin-top: 1px;
+          white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+
+        /* 3 — Room chip: prominent, high-contrast badge */
+        .tt-room-wrap { margin-top: 4px; }
+        .tt-subject-room {
+          display: inline-flex; align-items: center; gap: 3px;
+          font-size: 11.5px; font-weight: 800; color: #ffffff;
+          background: rgba(0, 0, 0, 0.45); border: 1.5px solid rgba(255, 255, 255, 0.5);
+          padding: 2px 8px; border-radius: 6px;
+          white-space: nowrap; max-width: 100%; box-sizing: border-box;
+          letter-spacing: 0.2px;
+        }
+        .tt-room-lbl {
+          font-size: 8.5px; font-weight: 700; text-transform: uppercase;
+          letter-spacing: 0.5px; opacity: 0.78;
+        }
+
+        /* 4 — Teacher & time row: subtle, small */
+        .tt-meta-row {
+          margin-top: 4px; display: flex; align-items: center;
+          justify-content: space-between; gap: 4px; overflow: hidden;
+        }
+        .tt-subject-teacher {
+          font-size: 9px; font-weight: 500; color: rgba(255,255,255,0.72);
+          white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1;
+        }
+        .tt-subject-time {
+          font-size: 8.5px; font-weight: 600; color: rgba(255,255,255,0.72);
+          white-space: nowrap; flex-shrink: 0;
+        }
+
+        /* ── Mobile overrides ── */
         @media (max-width: 768px) {
           .tt-toolbar { flex-direction: column; align-items: stretch; }
           .tt-photo-btn, .tt-pdf-btn { width: 100%; justify-content: center; padding: 10px 16px; }
-          .tt-grid-wrap { padding: 10px; border-radius: 12px; }
+          .tt-grid-wrap { padding: 8px; border-radius: 12px; }
           .tt-matrix { border-spacing: 3px; }
-          .tt-subject-card { padding: 4px 6px; }
+          .tt-day-cell { height: 90px; }
+          .tt-matrix tbody td { height: 90px; }
+          .tt-subject-card { height: 84px; padding: 6px 7px; }
+          .tt-cell-empty-inner { height: 84px; }
+          .tt-day-card { height: 84px; font-size: 10.5px; }
+          .tt-subject-name { font-size: 12px; }
+          .tt-subject-room { font-size: 10.5px; padding: 1.5px 6px; }
           .tt-stat-pill { font-size: 10.5px; padding: 3px 8px; }
         }
       `}</style>
@@ -858,10 +1033,10 @@ export default function WeeklyGrid({ subjects }) {
 
       {/* Grid */}
       <div className="tt-grid-wrap">
-        <table className="tt-matrix" style={{ minWidth: `${Math.max(1040, (matrixSlots.length + 1) * 95)}px` }}>
+        <table className="tt-matrix" style={{ minWidth: `${Math.max(900, 120 + matrixSlots.length * 140)}px` }}>
           <colgroup>
-            <col style={{ width: '110px' }} />
-            {matrixSlots.map((_, i) => <col key={i} />)}
+            <col style={{ width: '120px' }} />
+            {matrixSlots.map((_, i) => <col key={i} style={{ minWidth: '140px' }} />)}
           </colgroup>
           <thead>
             <tr>
