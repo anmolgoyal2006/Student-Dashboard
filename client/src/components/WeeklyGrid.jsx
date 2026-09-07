@@ -776,13 +776,14 @@ export default function WeeklyGrid({ subjects }) {
   return (
     <div className="tt-root">
       <style>{`
-        .tt-root { --tt-black: #000000; --tt-surface: #0a0a0a; --tt-border: rgba(255,255,255,0.08); }
+        /* ── Root & toolbar ── */
+        .tt-root { --tt-surface: #080d18; }
 
         .tt-toolbar {
           display: flex; align-items: center; justify-content: space-between;
-          flex-wrap: wrap; gap: 12px; margin-bottom: 18px;
+          flex-wrap: wrap; gap: 10px; margin-bottom: 16px;
         }
-        .tt-toolbar-left { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+        .tt-toolbar-left { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
         .tt-toolbar-title {
           font-size: 15px; font-weight: 700; color: #f8fafc;
           display: flex; align-items: center; gap: 8px; letter-spacing: -0.2px;
@@ -821,9 +822,10 @@ export default function WeeklyGrid({ subjects }) {
           color: #fca5a5; font-size: 12.5px; font-weight: 500;
         }
 
+        /* ── Legend ── */
         .tt-legend {
-          display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px;
-          padding: 12px 14px; border-radius: 12px;
+          display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px;
+          padding: 10px 14px; border-radius: 12px;
           background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06);
         }
         .tt-legend-item {
@@ -834,11 +836,12 @@ export default function WeeklyGrid({ subjects }) {
         }
         .tt-legend-dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
 
+        /* ── Grid wrapper ── */
         .tt-grid-wrap {
           overflow-x: auto; border-radius: 16px;
-          background: var(--tt-black);
+          background: var(--tt-surface);
           border: 1px solid rgba(255,255,255,0.1);
-          box-shadow: 0 0 0 1px rgba(255,255,255,0.04), 0 24px 60px rgba(0,0,0,0.6);
+          box-shadow: 0 0 0 1px rgba(255,255,255,0.04), 0 20px 50px rgba(0,0,0,0.55);
           padding: 14px;
           -webkit-overflow-scrolling: touch;
           scrollbar-width: thin;
@@ -848,62 +851,63 @@ export default function WeeklyGrid({ subjects }) {
         .tt-grid-wrap::-webkit-scrollbar-track { background: rgba(255,255,255,0.02); border-radius: 3px; }
         .tt-grid-wrap::-webkit-scrollbar-thumb { background: rgba(99,102,241,0.4); border-radius: 3px; }
         .tt-grid-wrap::-webkit-scrollbar-thumb:hover { background: rgba(99,102,241,0.7); }
-
         .tt-grid-wrap::before {
-          content: ''; display: block; height: 2px; margin: -14px -14px 12px;
-          background: linear-gradient(90deg, #6366f1, #a855f7, #ec4899, #6366f1);
+          content: ''; display: block; height: 3px; margin: -14px -14px 12px;
+          background: linear-gradient(90deg, #6366f1, #a855f7, #ec4899, #f59e0b, #6366f1);
           border-radius: 16px 16px 0 0;
         }
 
-        .tt-matrix { width: 100%; border-collapse: separate; border-spacing: 5px; table-layout: fixed; }
-
+        /* ── Table ── */
+        .tt-matrix {
+          width: 100%; border-collapse: separate; border-spacing: 5px; table-layout: fixed;
+        }
         .tt-matrix thead th {
-          padding: 10px 3px; font-size: 10px; font-weight: 800;
-          text-align: center; border-radius: 8px; letter-spacing: 0;
+          padding: 9px 4px; font-size: 10.5px; font-weight: 800;
+          text-align: center; border-radius: 8px;
           white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-          background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1);
-          color: rgba(255,255,255,0.7); text-transform: uppercase;
+          background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+          color: rgba(255,255,255,0.75); text-transform: uppercase; letter-spacing: 0.2px;
         }
-        .tt-matrix thead th.tt-th-day {
-          padding: 0; border: none;
-        }
+        .tt-matrix thead th.tt-th-day { padding: 0; border: none; }
         .tt-day-header-card {
-          height: 34px; padding: 0 8px; border-radius: 8px;
-          background: #0f172a; border: 1px solid rgba(99,102,241,0.3);
+          height: 36px; padding: 0 8px; border-radius: 8px;
+          background: #0f172a; border: 1px solid rgba(99,102,241,0.35);
           color: #a5b4fc; font-size: 11px; font-weight: 800;
           display: flex; align-items: center; justify-content: center;
           letter-spacing: 0.05em; text-transform: uppercase;
         }
 
-        .tt-day-cell {
-          padding: 0; border: none;
-          height: 96px; vertical-align: middle;
-        }
+        /* ── Day label cells ── */
+        .tt-day-cell { padding: 3px; border: none; vertical-align: middle; }
         .tt-day-card {
-          height: 90px; border-radius: 10px; text-align: center;
-          font-size: 11.5px; font-weight: 800; letter-spacing: 0.06em;
-          display: flex; flex-direction: column; align-items: center; justify-content: center;
-          background: #0c1322; border: 1px solid rgba(255,255,255,0.08);
-          box-sizing: border-box; text-transform: uppercase; gap: 2px;
+          height: 100%; min-height: 96px; border-radius: 10px; text-align: center;
+          font-size: 12px; font-weight: 800; letter-spacing: 0.03em;
+          display: flex; align-items: center; justify-content: center;
+          background: #0c1322; border: 1px solid rgba(255,255,255,0.09);
+          box-sizing: border-box;
         }
 
-        .tt-matrix tbody td { height: 96px; vertical-align: middle; }
+        .tt-matrix tbody td { vertical-align: top; }
 
-        .tt-cell-filled { padding: 3px; }
-        .tt-cell-empty { padding: 3px; }
+        /* ── Empty cell ── */
+        .tt-cell-filled { padding: 3px; vertical-align: top; }
+        .tt-cell-empty  { padding: 3px; vertical-align: top; }
         .tt-cell-empty-inner {
-          height: 90px; width: 100%; box-sizing: border-box;
+          min-height: 96px; width: 100%; box-sizing: border-box;
           border-radius: 10px; border: 1px solid rgba(255,255,255,0.04);
-          background: #080d18;
+          background: rgba(255,255,255,0.015);
         }
 
-        /* ── Subject card ── */
+        /* ── Subject card — LIGHT theme ── */
         .tt-subject-card {
           border-radius: 10px;
-          padding: 8px 9px;
-          height: 90px; width: 100%; box-sizing: border-box;
-          display: flex; flex-direction: column; justify-content: flex-start; gap: 0;
-          overflow: hidden; transition: transform 0.12s, box-shadow 0.15s;
+          border-left-width: 4px !important;
+          border-left-style: solid !important;
+          padding: 8px 10px;
+          min-height: 96px; width: 100%; box-sizing: border-box;
+          display: flex; flex-direction: column; justify-content: flex-start; gap: 2px;
+          overflow: hidden;
+          transition: transform 0.12s ease, box-shadow 0.15s ease;
           cursor: default;
         }
         .tt-subject-card:hover {
@@ -911,63 +915,56 @@ export default function WeeklyGrid({ subjects }) {
           z-index: 2; position: relative;
         }
 
-        /* 1 — Subject name: maximum size, always visible */
+        /* Subject name: large, dark, wraps freely */
         .tt-subject-name {
-          font-size: 13.5px; font-weight: 900; color: #ffffff;
-          line-height: 1.22;
+          font-size: 13px; font-weight: 800;
+          line-height: 1.25;
           white-space: normal; word-break: break-word;
           letter-spacing: -0.1px;
-          text-shadow: 0 1px 3px rgba(0,0,0,0.6);
-          max-height: 2.5em; overflow: hidden;
         }
 
-        /* 2 — Subject code: compact, muted */
+        /* Code: slightly smaller, accent color */
         .tt-subject-code {
-          font-size: 9px; font-weight: 600; color: rgba(255,255,255,0.72);
-          margin-top: 1px;
+          font-size: 10px; font-weight: 600;
           white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+          opacity: 0.8;
         }
 
-        /* 3 — Room chip: prominent, high-contrast badge */
+        /* Room chip: solid color badge, very readable */
         .tt-room-wrap { margin-top: 4px; }
         .tt-subject-room {
-          display: inline-flex; align-items: center; gap: 3px;
-          font-size: 11.5px; font-weight: 800; color: #ffffff;
-          background: rgba(0, 0, 0, 0.45); border: 1.5px solid rgba(255, 255, 255, 0.5);
-          padding: 2px 8px; border-radius: 6px;
-          white-space: nowrap; max-width: 100%; box-sizing: border-box;
-          letter-spacing: 0.2px;
+          display: inline-flex; align-items: center; gap: 4px;
+          font-size: 11.5px; font-weight: 700;
+          padding: 2px 9px 2px 7px; border-radius: 6px;
+          white-space: nowrap; box-sizing: border-box;
+          letter-spacing: 0.1px;
         }
         .tt-room-lbl {
           font-size: 8.5px; font-weight: 700; text-transform: uppercase;
-          letter-spacing: 0.5px; opacity: 0.78;
+          letter-spacing: 0.5px; opacity: 0.80;
         }
 
-        /* 4 — Teacher & time row: subtle, small */
+        /* Teacher & time row */
         .tt-meta-row {
-          margin-top: 4px; display: flex; align-items: center;
+          margin-top: 3px; display: flex; align-items: center;
           justify-content: space-between; gap: 4px; overflow: hidden;
         }
         .tt-subject-teacher {
-          font-size: 9px; font-weight: 500; color: rgba(255,255,255,0.72);
+          font-size: 9px; font-weight: 500;
           white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1;
+          opacity: 0.70;
         }
         .tt-subject-time {
-          font-size: 8.5px; font-weight: 600; color: rgba(255,255,255,0.72);
-          white-space: nowrap; flex-shrink: 0;
+          font-size: 8.5px; font-weight: 600;
+          white-space: nowrap; flex-shrink: 0; opacity: 0.85;
         }
 
-        /* ── Mobile overrides ── */
+        /* ── Responsive ── */
         @media (max-width: 768px) {
           .tt-toolbar { flex-direction: column; align-items: stretch; }
           .tt-photo-btn, .tt-pdf-btn { width: 100%; justify-content: center; padding: 10px 16px; }
           .tt-grid-wrap { padding: 8px; border-radius: 12px; }
           .tt-matrix { border-spacing: 3px; }
-          .tt-day-cell { height: 90px; }
-          .tt-matrix tbody td { height: 90px; }
-          .tt-subject-card { height: 84px; padding: 6px 7px; }
-          .tt-cell-empty-inner { height: 84px; }
-          .tt-day-card { height: 84px; font-size: 10.5px; }
           .tt-subject-name { font-size: 12px; }
           .tt-subject-room { font-size: 10.5px; padding: 1.5px 6px; }
           .tt-stat-pill { font-size: 10.5px; padding: 3px 8px; }
