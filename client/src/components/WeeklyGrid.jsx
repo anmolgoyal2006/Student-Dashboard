@@ -4,7 +4,7 @@ import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 
 /* ── Shared constants ─────────────────────────────────────────────────────── */
-const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const FULL_DAYS = {
   Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday',
   Thu: 'Thursday', Fri: 'Friday', Sat: 'Saturday', Sun: 'Sunday',
@@ -53,6 +53,7 @@ const DAY_WEB = {
   Thu: { color: '#f472b6', bg: 'rgba(244,114,182,0.08)' },
   Fri: { color: '#c084fc', bg: 'rgba(192,132,252,0.08)' },
   Sat: { color: '#2dd4bf', bg: 'rgba(45,212,191,0.08)' },
+  Sun: { color: '#f87171', bg: 'rgba(248,113,113,0.08)' },
 };
 
 const DAY_PDF = {
@@ -98,12 +99,22 @@ const buildEventsByDay = (subjects, colorMap) => {
     (s.schedule || []).forEach(slot => {
       if (!slot.day || !slot.startTime || !byDay[slot.day]) return;
       const startMin = toMinutes(slot.startTime);
-      const endMin = toMinutes(slot.endTime) || startMin + 60;
+      const endMin = toMinutes(slot.endTime) || (startMin + 60);
       byDay[slot.day].push({
-        name: s.name, code: s.code, instructor: s.instructor,
-        room: slot.room, color, startMin, endMin,
+        name: s.name,
+        code: s.code,
+        instructor: s.instructor,
+        room: slot.room,
+        startTime: slot.startTime,
+        endTime: slot.endTime,
+        color,
+        startMin,
+        endMin,
       });
     });
+  });
+  DAYS.forEach(d => {
+    byDay[d].sort((a, b) => a.startMin - b.startMin);
   });
   return byDay;
 };
@@ -222,21 +233,22 @@ export function buildTimetableExportElement(subjects) {
   let totalSessions = 0;
   subjects.forEach(s => { totalSessions += (s.schedule || []).length; });
 
-  const CELL_H = 76; // matches .tt-matrix tbody td height
+  const CELL_H = 92; // Maximised cell height for large, bold, comfortable reading
 
   const thsHtml = matrixSlots.map(slot => `
     <th style="
-      background: rgba(255,255,255,0.04);
-      color: rgba(255,255,255,0.70);
-      border: 1px solid rgba(255,255,255,0.10);
-      padding: 10px 3px;
-      font-size: 10px;
-      font-weight: 800;
+      background: #080d1a;
+      color: #ffffff;
+      border: 1.5px solid rgba(255,255,255,0.22);
+      padding: 12px 6px;
+      font-size: 13px;
+      font-weight: 900;
       text-align: center;
-      border-radius: 8px;
+      border-radius: 10px;
       text-transform: uppercase;
       white-space: nowrap;
-      letter-spacing: 0;
+      letter-spacing: 0.3px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.5);
     ">${slot.label}</th>
   `).join('');
 
@@ -264,20 +276,34 @@ export function buildTimetableExportElement(subjects) {
           <td colspan="${span}" style="height: ${CELL_H}px; padding: 3px; vertical-align: middle;">
             <div style="
               background: ${col.bg};
-              border: 1px solid ${col.border};
-              box-shadow: 0 4px 18px ${col.glow};
-              border-radius: 8px;
-              padding: 6px 8px;
-              height: 70px;
+              border: 2px solid ${col.border};
+              border-left: 7px solid ${col.border};
+              box-shadow: 0 4px 22px ${col.glow};
+              border-radius: 10px;
+              padding: 8px 12px;
+              height: ${CELL_H - 6}px;
+              width: 100%;
               box-sizing: border-box;
               display: flex;
               flex-direction: column;
               justify-content: center;
               overflow: hidden;
             ">
-              <div style="font-size: 11px; font-weight: 800; color: #ffffff; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${ev.name}</div>
-              ${formattedCode ? `<div style="font-size: 9.5px; font-weight: 600; color: rgba(255,255,255,0.75); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">(${formattedCode})</div>` : ''}
-              ${ev.room ? `<div style="display: inline-block; margin-top: 3px; font-size: 9px; font-weight: 800; color: #ffffff; background: rgba(255, 255, 255, 0.22); border: 1px solid rgba(255, 255, 255, 0.35); padding: 2px 6px; border-radius: 4px; letter-spacing: 0.2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; box-sizing: border-box;">Room: ${ev.room}</div>` : ''}
+              <div style="font-size: 15px; font-weight: 900; color: #ffffff; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: -0.2px;">
+                ${ev.name}
+              </div>
+              ${formattedCode ? `
+                <div style="font-size: 12px; font-weight: 700; color: rgba(255,255,255,0.88); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                  (${formattedCode})
+                </div>
+              ` : ''}
+              ${ev.room ? `
+                <div style="margin-top: 4px;">
+                  <span style="display: inline-block; font-size: 11.5px; font-weight: 800; color: #ffffff; background: rgba(255, 255, 255, 0.25); border: 1.5px solid rgba(255, 255, 255, 0.5); padding: 2px 8px; border-radius: 5px; letter-spacing: 0.3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; box-sizing: border-box;">
+                    Room: ${ev.room}
+                  </span>
+                </div>
+              ` : ''}
             </div>
           </td>`;
         sIdx += span;
@@ -285,11 +311,12 @@ export function buildTimetableExportElement(subjects) {
         cellsHtml += `
           <td style="height: ${CELL_H}px; padding: 3px; vertical-align: middle;">
             <div style="
-              height: 70px;
+              height: ${CELL_H - 6}px;
+              width: 100%;
               box-sizing: border-box;
-              border-radius: 8px;
-              border: 1px solid rgba(255,255,255,0.04);
-              background: rgba(255,255,255,0.01);
+              border-radius: 10px;
+              border: 1.5px solid rgba(255,255,255,0.06);
+              background: #050811;
             "></div>
           </td>`;
         sIdx++;
@@ -298,20 +325,23 @@ export function buildTimetableExportElement(subjects) {
 
     rowsHtml += `
       <tr>
-        <td style="height: ${CELL_H}px; padding: 0; vertical-align: middle;">
+        <td style="height: ${CELL_H}px; padding: 3px; vertical-align: middle;">
           <div style="
-            height: 70px;
-            border-radius: 8px;
-            background: #0f172a;
-            border: 1px solid ${accent.color}44;
+            height: ${CELL_H - 6}px;
+            width: 100%;
+            border-radius: 10px;
+            background: #080d1a;
+            border: 2px solid ${accent.color};
             color: ${accent.color};
-            font-size: 12px;
+            font-size: 14.5px;
             font-weight: 900;
-            letter-spacing: 0.02em;
+            letter-spacing: 0.05em;
             display: flex;
             align-items: center;
             justify-content: center;
             text-align: center;
+            text-transform: uppercase;
+            box-shadow: 0 4px 16px ${accent.color}35;
             box-sizing: border-box;
           ">${FULL_DAYS[day]}</div>
         </td>
@@ -323,18 +353,20 @@ export function buildTimetableExportElement(subjects) {
     const col = WEB_PALETTE[i % WEB_PALETTE.length];
     return `
       <span style="
-        display: inline-flex; align-items: center; gap: 7px;
-        padding: 4px 10px 4px 6px; border-radius: 8px;
-        background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07);
-        font-size: 11.5px; font-weight: 600; color: #cbd5e1;
+        display: inline-flex; align-items: center; gap: 8px;
+        padding: 6px 12px; border-radius: 9px;
+        background: #080d1a; border: 1.5px solid rgba(255,255,255,0.12);
+        font-size: 13px; font-weight: 700; color: #cbd5e1;
       ">
-        <span style="width: 10px; height: 10px; border-radius: 3px; background: ${col.border}; display: inline-block; flex-shrink: 0;"></span>
-        <span style="color: #f8fafc; font-weight: 700;">${s.name}</span>
-        ${s.code ? `<span style="color: #64748b; font-weight: 500;">(${s.code})</span>` : ''}
+        <span style="width: 12px; height: 12px; border-radius: 4px; background: ${col.border}; display: inline-block; flex-shrink: 0; box-shadow: 0 0 8px ${col.glow};"></span>
+        <span style="color: #ffffff; font-weight: 800;">${s.name}</span>
+        ${s.code ? `<span style="color: #94a3b8; font-weight: 600;">(${s.code})</span>` : ''}
       </span>`;
   }).join('');
 
-  const exportWidth = Math.max(1420, 110 + matrixSlots.length * 130 + 60);
+  const slotColWidth = 160;
+  const dayColWidth = 125;
+  const exportWidth = Math.max(1600, dayColWidth + matrixSlots.length * slotColWidth + 40);
 
   const container = document.createElement('div');
   container.id = 'timetable-export-container';
@@ -343,51 +375,49 @@ export function buildTimetableExportElement(subjects) {
     background: #000000;
     color: #f8fafc;
     font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    padding: 24px 28px;
+    padding: 16px;
     box-sizing: border-box;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   `;
 
   container.innerHTML = `
-    <!-- Top toolbar — identical to the website -->
-    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
-      <div style="display: flex; align-items: center; gap: 10px;">
-        <div style="font-size: 16px; font-weight: 800; color: #ffffff; display: flex; align-items: center; gap: 8px; letter-spacing: -0.2px;">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#818cf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-          Weekly Schedule
+    <!-- Top toolbar — maximised, dark, high contrast -->
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+      <div style="display: flex; align-items: center; gap: 14px;">
+        <div style="font-size: 20px; font-weight: 900; color: #ffffff; display: flex; align-items: center; gap: 10px; letter-spacing: -0.3px;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#818cf8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+          Weekly Class Schedule
         </div>
-        <span style="display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 20px; font-size: 11.5px; font-weight: 600; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); color: #94a3b8;">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
-          <strong style="color: #e2e8f0; font-weight: 700;">${subjects.length}</strong>&nbsp;subjects
+        <span style="display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 20px; font-size: 13px; font-weight: 700; background: #080d1a; border: 1.5px solid rgba(255,255,255,0.15); color: #cbd5e1;">
+          <strong style="color: #38bdf8; font-weight: 800;">${subjects.length}</strong> subjects
         </span>
-        <span style="display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 20px; font-size: 11.5px; font-weight: 600; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); color: #94a3b8;">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-          <strong style="color: #e2e8f0; font-weight: 700;">${totalSessions}</strong>&nbsp;sessions/week
+        <span style="display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 20px; font-size: 13px; font-weight: 700; background: #080d1a; border: 1.5px solid rgba(255,255,255,0.15); color: #cbd5e1;">
+          <strong style="color: #34d399; font-weight: 800;">${totalSessions}</strong> sessions/week
         </span>
-        <span style="display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 20px; font-size: 11.5px; font-weight: 600; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); color: #94a3b8;">
-          <strong style="color: #e2e8f0; font-weight: 700;">${displayDays.length}</strong>&nbsp;active days
+        <span style="display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 20px; font-size: 13px; font-weight: 700; background: #080d1a; border: 1.5px solid rgba(255,255,255,0.15); color: #cbd5e1;">
+          <strong style="color: #fbbf24; font-weight: 800;">${displayDays.length}</strong> active days
         </span>
       </div>
     </div>
 
-    <!-- Subject legend — identical to the website -->
-    <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; padding: 12px 14px; border-radius: 12px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06);">
+    <!-- Subject legend -->
+    <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; padding: 12px 14px; border-radius: 12px; background: #050811; border: 1.5px solid rgba(255,255,255,0.12);">
       ${legendHtml}
     </div>
 
-    <!-- Grid wrap with rainbow accent top stripe — identical to .tt-grid-wrap -->
-    <div style="border-radius: 16px; background: #000000; border: 1px solid rgba(255,255,255,0.10); box-shadow: 0 0 0 1px rgba(255,255,255,0.04), 0 24px 60px rgba(0,0,0,0.6); padding: 14px; box-sizing: border-box;">
-      <div style="height: 2px; margin: -14px -14px 12px; background: linear-gradient(90deg, #6366f1, #a855f7, #ec4899, #6366f1); border-radius: 16px 16px 0 0;"></div>
-      <table style="width: 100%; border-collapse: separate; border-spacing: 5px; table-layout: fixed;">
+    <!-- Grid wrap with rainbow accent top stripe — maximized to borders -->
+    <div style="border-radius: 16px; background: #000000; border: 1.5px solid rgba(255,255,255,0.16); box-shadow: 0 0 0 1px rgba(255,255,255,0.06), 0 24px 60px rgba(0,0,0,0.85); padding: 10px; box-sizing: border-box; width: 100%;">
+      <div style="height: 3px; margin: -10px -10px 10px; background: linear-gradient(90deg, #6366f1, #a855f7, #ec4899, #6366f1); border-radius: 16px 16px 0 0;"></div>
+      <table style="width: 100%; border-collapse: separate; border-spacing: 5px; table-layout: fixed; box-sizing: border-box;">
         <colgroup>
-          <col style="width: 110px;" />
+          <col style="width: ${dayColWidth}px;" />
           ${matrixSlots.map(() => '<col />').join('')}
         </colgroup>
         <thead>
           <tr>
-            <th style="padding: 0; border: none;">
-              <div style="height: 34px; padding: 0 8px; border-radius: 8px; background: #0f172a; border: 1px solid rgba(99,102,241,0.30); color: #a5b4fc; font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center; letter-spacing: 0.05em; text-transform: uppercase;">DAY</div>
+            <th style="padding: 0; border: none; width: ${dayColWidth}px;">
+              <div style="height: 44px; width: 100%; padding: 0 8px; border-radius: 10px; background: #080d1a; border: 2px solid rgba(99,102,241,0.55); color: #a5b4fc; font-size: 13px; font-weight: 900; display: flex; align-items: center; justify-content: center; letter-spacing: 0.08em; text-transform: uppercase; box-sizing: border-box;">DAY</div>
             </th>
             ${thsHtml}
           </tr>
@@ -399,37 +429,8 @@ export function buildTimetableExportElement(subjects) {
   return container;
 }
 
-/* ── Photo Export (PNG image download) ─────────────────────────────────── */
+/* ── Photo Export (PNG image download) — Maximised High-Res Full Grid ─── */
 export async function exportTimetableImage(subjects, filename = 'Student_Timetable.png') {
-  if (!subjects?.length) return;
-  const container = buildTimetableExportElement(subjects);
-  if (!container) return;
-
-  container.style.position = 'fixed';
-  container.style.top = '-9999px';
-  container.style.left = '0';
-  document.body.appendChild(container);
-
-  try {
-    const canvas = await html2canvas(container, {
-      scale: 2,
-      useCORS: true,
-      logging: false,
-      backgroundColor: '#000000',
-    });
-    const link = document.createElement('a');
-    link.download = filename;
-    link.href = canvas.toDataURL('image/png');
-    link.click();
-  } finally {
-    if (document.body.contains(container)) {
-      document.body.removeChild(container);
-    }
-  }
-}
-
-/* ── PDF export — matched to timetable aspect ratio (zero empty bars, fully zoomed in) ── */
-export async function exportTimetablePDF(subjects) {
   if (!subjects?.length) return;
   const container = buildTimetableExportElement(subjects);
   if (!container) return;
@@ -442,7 +443,37 @@ export async function exportTimetablePDF(subjects) {
 
   try {
     const canvas = await html2canvas(container, {
-      scale: 2,
+      scale: 2.5, // Ultra-sharp 2.5x retina rendering
+      useCORS: true,
+      logging: false,
+      backgroundColor: '#000000',
+    });
+    const link = document.createElement('a');
+    link.download = typeof filename === 'string' ? filename : 'Student_Timetable.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  } finally {
+    if (document.body.contains(container)) {
+      document.body.removeChild(container);
+    }
+  }
+}
+
+/* ── PDF export — matched to timetable aspect ratio (zero empty bars, fully maximised) ── */
+export async function exportTimetablePDF(subjects, filename = 'Student_Timetable.pdf') {
+  if (!subjects?.length) return;
+  const container = buildTimetableExportElement(subjects);
+  if (!container) return;
+
+  container.style.position = 'fixed';
+  container.style.top = '-9999px';
+  container.style.left = '0';
+  container.style.zIndex = '-9999';
+  document.body.appendChild(container);
+
+  try {
+    const canvas = await html2canvas(container, {
+      scale: 2.5, // Ultra-sharp 2.5x retina rendering
       useCORS: true,
       logging: false,
       backgroundColor: '#000000',
@@ -450,8 +481,8 @@ export async function exportTimetablePDF(subjects) {
 
     const imgData = canvas.toDataURL('image/jpeg', 0.98);
     const imgRatio = canvas.width / canvas.height;
-    const pdfWidth = 297; // mm
-    const pdfHeight = pdfWidth / imgRatio; // exact matching height so timetable fills 100% without letterboxing
+    const pdfWidth = 297; // mm (A4 landscape)
+    const pdfHeight = pdfWidth / imgRatio; // Exact matching height so timetable fills 100% without letterboxing
 
     const pdf = new jsPDF({
       orientation: 'landscape',
@@ -460,7 +491,7 @@ export async function exportTimetablePDF(subjects) {
     });
 
     pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
-    pdf.save('Student_Timetable.pdf');
+    pdf.save(typeof filename === 'string' ? filename : 'Student_Timetable.pdf');
   } finally {
     if (document.body.contains(container)) {
       document.body.removeChild(container);
