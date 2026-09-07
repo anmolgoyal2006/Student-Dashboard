@@ -22,16 +22,16 @@ const MATRIX_SLOTS = [
   { label: '5–7 PM',   start: 17 * 60, end: 19 * 60 },
 ];
 
-/* Web & Export — prominent, vivid, saturated colors matching the reference timetable */
+/* Web & Export — vibrant, high-contrast modern palette */
 const WEB_PALETTE = [
-  { bg: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)', border: '#60a5fa', glow: 'rgba(59,130,246,0.5)', dot: '#3b82f6' }, // DBMS Electric Blue
-  { bg: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', border: '#34d399', glow: 'rgba(16,185,129,0.5)', dot: '#10b981' }, // SC Emerald Green
-  { bg: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', border: '#fbbf24', glow: 'rgba(245,158,11,0.5)', dot: '#f59e0b' }, // SE Warm Amber
-  { bg: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', border: '#f87171', glow: 'rgba(239,68,68,0.5)', dot: '#ef4444' }, // TOC Scarlet Red
-  { bg: 'linear-gradient(135deg, #a855f7 0%, #7e22ce 100%)', border: '#c084fc', glow: 'rgba(168,85,247,0.5)', dot: '#a855f7' }, // Purple
-  { bg: 'linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)', border: '#38bdf8', glow: 'rgba(14,165,233,0.5)', dot: '#0ea5e9' }, // Cyan
-  { bg: 'linear-gradient(135deg, #ec4899 0%, #be185d 100%)', border: '#f472b6', glow: 'rgba(236,72,153,0.5)', dot: '#ec4899' }, // Magenta Pink
-  { bg: 'linear-gradient(135deg, #14b8a6 0%, #0d9488 100%)', border: '#2dd4bf', glow: 'rgba(20,184,166,0.5)', dot: '#14b8a6' }, // Teal
+  { bg: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)', border: '#60a5fa', glow: 'rgba(59,130,246,0.3)', dot: '#3b82f6' }, // DBMS Electric Blue
+  { bg: 'linear-gradient(135deg, #10b981 0%, #047857 100%)', border: '#34d399', glow: 'rgba(16,185,129,0.3)', dot: '#10b981' }, // SC Emerald Green
+  { bg: 'linear-gradient(135deg, #f59e0b 0%, #b45309 100%)', border: '#fbbf24', glow: 'rgba(245,158,11,0.3)', dot: '#f59e0b' }, // SE Warm Amber
+  { bg: 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)', border: '#f87171', glow: 'rgba(239,68,68,0.3)', dot: '#ef4444' }, // TOC Scarlet Red
+  { bg: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)', border: '#c084fc', glow: 'rgba(139,92,246,0.3)', dot: '#8b5cf6' }, // Violet
+  { bg: 'linear-gradient(135deg, #0ea5e9 0%, #0369a1 100%)', border: '#38bdf8', glow: 'rgba(14,165,233,0.3)', dot: '#0ea5e9' }, // Cyan
+  { bg: 'linear-gradient(135deg, #ec4899 0%, #be185d 100%)', border: '#f472b6', glow: 'rgba(236,72,153,0.3)', dot: '#ec4899' }, // Rose Pink
+  { bg: 'linear-gradient(135deg, #14b8a6 0%, #0f766e 100%)', border: '#2dd4bf', glow: 'rgba(20,184,166,0.3)', dot: '#14b8a6' }, // Teal
 ];
 
 /* PDF — white canvas, high-contrast saturated pastel fills, readable dark text */
@@ -233,7 +233,7 @@ export function buildTimetableExportElement(subjects) {
   let totalSessions = 0;
   subjects.forEach(s => { totalSessions += (s.schedule || []).length; });
 
-  const CELL_H = 80; // Optimized height for high visibility
+  const CELL_H = 88; // Ample height ensuring zero vertical clipping across all cells
 
   const thsHtml = matrixSlots.map(slot => `
     <th style="
@@ -276,32 +276,43 @@ export function buildTimetableExportElement(subjects) {
           <td colspan="${span}" style="height: ${CELL_H}px; padding: 3px; vertical-align: middle;">
             <div style="
               background: ${col.bg};
-              border: 1px solid ${col.border};
-              box-shadow: 0 4px 18px ${col.glow};
+              border: 1px solid rgba(255, 255, 255, 0.25);
+              box-shadow: 0 2px 10px ${col.glow};
               border-radius: 8px;
-              padding: 6px 9px;
+              padding: 7px 9px;
               height: ${CELL_H - 6}px;
               width: 100%;
               box-sizing: border-box;
               display: flex;
               flex-direction: column;
-              justify-content: center;
+              justify-content: flex-start;
               overflow: hidden;
             ">
-              <div style="font-size: 14.5px; font-weight: 900; color: #ffffff; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: 0.1px; text-shadow: 0 1px 3px rgba(0,0,0,0.7), 0 0 1px rgba(0,0,0,0.9);">
+              <!-- 1. Subject (Primary — prominent, bold, 15px, high contrast) -->
+              <div style="font-size: 15px; font-weight: 900; color: #ffffff; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: -0.1px; text-shadow: 0 1px 2px rgba(0,0,0,0.5);">
                 ${ev.name}
               </div>
               ${formattedCode ? `
-                <div style="font-size: 10.5px; font-weight: 700; color: #ffffff; opacity: 0.92; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 2px rgba(0,0,0,0.6);">
-                  (${formattedCode})
+                <div style="font-size: 9.5px; font-weight: 600; color: rgba(255, 255, 255, 0.82); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                  ${formattedCode}
                 </div>
               ` : ''}
+
+              <!-- 2. Classroom (Secondary — clearly visible subtle chip) -->
               ${ev.room ? `
                 <div style="margin-top: 4px;">
-                  <span style="display: inline-flex; align-items: center; gap: 3.5px; font-size: 11.5px; font-weight: 900; color: #ffffff; background: rgba(0, 0, 0, 0.68); border: 1.5px solid rgba(255, 255, 255, 0.55); padding: 2.5px 8px; border-radius: 5px; letter-spacing: 0.3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; box-sizing: border-box; box-shadow: 0 2px 5px rgba(0,0,0,0.4);">
-                    <span style="opacity: 0.85; font-size: 10px; font-weight: 700;">Room:</span>
+                  <span style="display: inline-flex; align-items: center; gap: 3.5px; font-size: 11px; font-weight: 700; color: #ffffff; background: rgba(0, 0, 0, 0.42); border: 1px solid rgba(255, 255, 255, 0.32); padding: 2px 7px; border-radius: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; box-sizing: border-box;">
+                    <span style="opacity: 0.8; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px;">Room</span>
                     <strong style="font-size: 11.5px; font-weight: 900; color: #ffffff;">${ev.room}</strong>
                   </span>
+                </div>
+              ` : ''}
+
+              <!-- 3. Teacher & Time (Tertiary & Quaternary — smaller, muted) -->
+              ${(ev.instructor || (span > 1 && ev.startTime && ev.endTime)) ? `
+                <div style="margin-top: 4px; display: flex; align-items: center; justify-content: space-between; gap: 6px; font-size: 9.5px; font-weight: 500; color: rgba(255, 255, 255, 0.78); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                  ${ev.instructor ? `<span style="overflow: hidden; text-overflow: ellipsis;">${ev.instructor}</span>` : '<span></span>'}
+                  ${(span > 1 && ev.startTime && ev.endTime) ? `<span style="font-size: 9px; opacity: 0.85; flex-shrink: 0;">${fmt12(ev.startTime)} – ${fmt12(ev.endTime)}</span>` : ''}
                 </div>
               ` : ''}
             </div>
@@ -563,19 +574,32 @@ export default function WeeklyGrid({ subjects }) {
               className="tt-subject-card"
               style={{
                 background: col.bg,
-                borderColor: col.border,
-                boxShadow: `0 4px 20px ${col.glow}, inset 0 1px 0 rgba(255,255,255,0.12)`,
+                borderColor: 'rgba(255, 255, 255, 0.25)',
+                boxShadow: `0 2px 10px ${col.glow}`,
               }}
               title={`${ev.name}${code ? ` (${code})` : ''}${ev.instructor ? ` · ${ev.instructor}` : ''}${ev.room ? ` · Room ${ev.room}` : ''}`}
             >
+              {/* 1. Subject (Primary — large, bold, high contrast) */}
               <div className="tt-subject-name">{ev.name}</div>
-              {code && <div className="tt-subject-code">({code})</div>}
+              {code && <div className="tt-subject-code">{code}</div>}
+
+              {/* 2. Classroom (Secondary — subtle chip) */}
               {ev.room && (
-                <div style={{ marginTop: '3px' }}>
+                <div className="tt-room-wrap">
                   <span className="tt-subject-room">
-                    <span style={{ opacity: 0.85, fontSize: '9.5px', fontWeight: 700 }}>Room:</span>
-                    <strong style={{ fontSize: '11px', fontWeight: 900, color: '#ffffff' }}>{ev.room}</strong>
+                    <span className="tt-room-lbl">Room</span>
+                    <strong>{ev.room}</strong>
                   </span>
+                </div>
+              )}
+
+              {/* 3. Teacher & Time (Tertiary & Quaternary — smaller, muted, single row) */}
+              {(ev.instructor || (span > 1 && ev.startTime && ev.endTime)) && (
+                <div className="tt-meta-row">
+                  {ev.instructor ? <span className="tt-subject-teacher">{ev.instructor}</span> : <span />}
+                  {span > 1 && ev.startTime && ev.endTime && (
+                    <span className="tt-subject-time">{fmt12(ev.startTime)} – {fmt12(ev.endTime)}</span>
+                  )}
                 </div>
               )}
             </div>
@@ -584,7 +608,9 @@ export default function WeeklyGrid({ subjects }) {
         sIdx += span;
       } else {
         cells.push(
-          <td key={sIdx} className="tt-cell-empty" />
+          <td key={sIdx} className="tt-cell-empty">
+            <div className="tt-cell-empty-inner" />
+          </td>
         );
         sIdx++;
       }
@@ -697,49 +723,70 @@ export default function WeeklyGrid({ subjects }) {
 
         .tt-day-cell {
           padding: 0; border: none;
-          height: 76px; vertical-align: middle;
+          height: 88px; vertical-align: middle;
         }
         .tt-day-card {
-          height: 70px; border-radius: 8px; text-align: center;
-          font-size: 12px; font-weight: 900; letter-spacing: 0.02em;
+          height: 82px; border-radius: 8px; text-align: center;
+          font-size: 12px; font-weight: 800; letter-spacing: 0.02em;
           display: flex; align-items: center; justify-content: center;
-          background: #0f172a; border: 1px solid rgba(255,255,255,0.1);
+          background: #0c1322; border: 1px solid rgba(255,255,255,0.08);
           box-sizing: border-box;
         }
 
-        .tt-matrix tbody td { height: 76px; vertical-align: middle; }
+        .tt-matrix tbody td { height: 88px; vertical-align: middle; }
 
         .tt-cell-filled { padding: 3px; }
-        .tt-cell-empty {
-          padding: 3px; text-align: center;
+        .tt-cell-empty { padding: 3px; text-align: center; }
+        .tt-cell-empty-inner {
+          height: 82px; width: 100%; box-sizing: border-box;
           border-radius: 8px; border: 1px solid rgba(255,255,255,0.04);
-          background: rgba(255,255,255,0.01);
+          background: #080d18;
         }
+
         .tt-subject-card {
-          border-radius: 8px; border: 1px solid; padding: 6px 8px;
-          height: 70px; width: 100%; box-sizing: border-box;
-          display: flex; flex-direction: column; justify-content: center;
-          overflow: hidden; transition: box-shadow 0.15s;
+          border-radius: 8px; border: 1px solid; padding: 7px 9px;
+          height: 82px; width: 100%; box-sizing: border-box;
+          display: flex; flex-direction: column; justify-content: flex-start;
+          overflow: hidden; transition: transform 0.1s, box-shadow 0.15s;
         }
-        .tt-subject-card:hover { box-shadow: 0 0 0 2px rgba(255,255,255,0.15); z-index: 2; position: relative; }
+        .tt-subject-card:hover {
+          transform: translateY(-1px);
+          box-shadow: 0 4px 14px rgba(0,0,0,0.4);
+          z-index: 2; position: relative;
+        }
 
         .tt-subject-name {
-          font-size: 13px; font-weight: 900; color: #ffffff;
+          font-size: 14.5px; font-weight: 900; color: #ffffff;
           line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-          text-shadow: 0 1px 3px rgba(0,0,0,0.7), 0 0 1px rgba(0,0,0,0.9);
-          letter-spacing: 0.1px;
+          letter-spacing: -0.1px; text-shadow: 0 1px 2px rgba(0,0,0,0.5);
         }
         .tt-subject-code {
-          font-size: 10.5px; font-weight: 700; color: rgba(255,255,255,0.92); margin-top: 2px;
+          font-size: 9.5px; font-weight: 600; color: rgba(255,255,255,0.78); margin-top: 1px;
           white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-          text-shadow: 0 1px 2px rgba(0,0,0,0.6);
         }
+        .tt-room-wrap { margin-top: 4px; }
         .tt-subject-room {
-          display: inline-flex; align-items: center; gap: 3.5px; margin-top: 3px; font-size: 11px; font-weight: 900;
-          color: #ffffff; background: rgba(0, 0, 0, 0.68);
-          padding: 2px 7px; border-radius: 5px; border: 1.5px solid rgba(255, 255, 255, 0.55);
+          display: inline-flex; align-items: center; gap: 3.5px;
+          font-size: 11px; font-weight: 700; color: #ffffff;
+          background: rgba(0, 0, 0, 0.42); border: 1px solid rgba(255, 255, 255, 0.32);
+          padding: 2px 7px; border-radius: 5px;
           white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;
-          letter-spacing: 0.2px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.35);
+          box-sizing: border-box;
+        }
+        .tt-room-lbl {
+          opacity: 0.8; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px;
+        }
+        .tt-meta-row {
+          margin-top: 4px; display: flex; align-items: center; justify-content: space-between;
+          gap: 6px; overflow: hidden;
+        }
+        .tt-subject-teacher {
+          font-size: 9.5px; font-weight: 500; color: rgba(255,255,255,0.78);
+          white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .tt-subject-time {
+          font-size: 9px; font-weight: 500; color: rgba(255,255,255,0.7);
+          white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0;
         }
 
         @media (max-width: 768px) {
