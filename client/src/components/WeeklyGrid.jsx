@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
-import { Download, Clock, BookOpen, AlertTriangle } from 'lucide-react';
+import { Download, Clock, BookOpen, AlertTriangle, Camera } from 'lucide-react';
 import html2pdf from 'html2pdf.js';
+import html2canvas from 'html2canvas';
 
 /* ── Shared constants ─────────────────────────────────────────────────────── */
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -207,9 +208,9 @@ const getDynamicMatrixSlots = (subjects) => {
   return slots.length > 0 ? slots : MATRIX_SLOTS;
 };
 
-/* ── PDF export — pixel-perfect replica of the web dark grid ───────────── */
-export function exportTimetablePDF(subjects) {
-  if (!subjects?.length) return;
+/* ── Timetable export builder (used for both Photo and PDF) ──────────────── */
+export function buildTimetableExportElement(subjects) {
+  if (!subjects?.length) return null;
 
   const matrixSlots = getDynamicMatrixSlots(subjects);
   const colorMap = {};
@@ -221,54 +222,24 @@ export function exportTimetablePDF(subjects) {
   let totalSessions = 0;
   subjects.forEach(s => { totalSessions += (s.schedule || []).length; });
 
-  // ── Solid fallback colours for each WEB_PALETTE gradient
-  // html2canvas cannot render CSS gradients reliably; we use the richer end-stop
-  const SOLID_COLORS = [
-    { bg: '#4338ca', border: '#818cf8', glow: 'rgba(99,102,241,0.35)'  },
-    { bg: '#059669', border: '#34d399', glow: 'rgba(16,185,129,0.35)'  },
-    { bg: '#d97706', border: '#fbbf24', glow: 'rgba(245,158,11,0.35)'  },
-    { bg: '#dc2626', border: '#f87171', glow: 'rgba(239,68,68,0.35)'   },
-    { bg: '#9333ea', border: '#c084fc', glow: 'rgba(168,85,247,0.35)'  },
-    { bg: '#0284c7', border: '#38bdf8', glow: 'rgba(6,182,212,0.35)'   },
-    { bg: '#db2777', border: '#f472b6', glow: 'rgba(236,72,153,0.35)'  },
-    { bg: '#0d9488', border: '#2dd4bf', glow: 'rgba(20,184,166,0.35)'  },
-  ];
-  // Remap eventsByDay colours to solid equivalents
-  const solidColorMap = {};
-  subjects.forEach((s, i) => { solidColorMap[s._id] = SOLID_COLORS[i % SOLID_COLORS.length]; });
-  const solidEventsByDay = buildEventsByDay(subjects, solidColorMap);
-
   const CELL_H = 76; // matches .tt-matrix tbody td height in the web component
 
-  // ── Build time-header cells (mirrors tt-matrix thead th styles) ─────────
-  const thsHtml = matrixSlots.map(slot => {
-    return `<th style="
-      background:rgba(255,255,255,0.04);
-      color:rgba(255,255,255,0.75);
-      border:1px solid rgba(255,255,255,0.10);
-      padding:10px 3px;
-      font-size:10px;font-weight:800;
-      text-align:center;border-radius:8px;
-      text-transform:uppercase;letter-spacing:0;
-      white-space:nowrap;
-    ">${slot.label}</th>`;
-  }).join('');
+  const colorMap = {};
+  subjects.forEach((s, i) => { colorMap[s._id] = WEB_PALETTE[i % WEB_PALETTE.length]; });
+  const eventsByDay = buildEventsByDay(subjects, colorMap);
 
-  // ── Build data rows (mirrors renderMatrixRowCells logic) ────────────────
+  const thsHtml = matrixSlots.map(slot => `<th style="background:rgba(255,255,255,0.04);color:rgba(255,255,255,0.75);border:1px solid rgba(255,255,255,0.10);padding:10px 3px;font-size:10px;font-weight:800;text-align:center;border-radius:8px;text-transform:uppercase;white-space:nowrap;">${slot.label}</th>`).join('');
+
   let rowsHtml = '';
   displayDays.forEach(day => {
-    const accent    = DAY_WEB[day] || DAY_WEB.Mon;
-    const dayEvents = solidEventsByDay[day] || [];
-
+    const accent = DAY_WEB[day] || DAY_WEB.Mon;
+    const dayEvents = eventsByDay[day] || [];
     let cellsHtml = '';
     let sIdx = 0;
-
     while (sIdx < matrixSlots.length) {
       const slot = matrixSlots[sIdx];
       const matchingEvents = dayEvents.filter(ev => ev.startMin < slot.end && ev.endMin > slot.start);
-      const startedEarlier = dayEvents.some(ev => ev.startMin < slot.start && ev.endMin > slot.start);
-
-      if (startedEarlier) { sIdx++; continue; }
+      if (dayEvents.some(ev => ev.startMin < slot.start && ev.endMin > slot.start)) { sIdx++; continue; }
 
       if (matchingEvents.length > 0) {
         const maxEndMin = Math.max(...matchingEvents.map(ev => ev.endMin));
@@ -276,7 +247,7 @@ export function exportTimetablePDF(subjects) {
         while (sIdx + span < matrixSlots.length && matrixSlots[sIdx + span].start < maxEndMin) span++;
 
         const ev  = matchingEvents[0];
-        const col = ev.color || SOLID_COLORS[0];
+        const col = ev.color || WEB_PALETTE[0];
         const formattedCode = ev.code ? ev.code.replace(/\+/g, ' + ') : '';
 
         // Card mirrors .tt-subject-card + .tt-subject-name/code/room
@@ -285,7 +256,7 @@ export function exportTimetablePDF(subjects) {
             <div style="
               background:${col.bg};
               border:1px solid ${col.border};
-              box-shadow:0 4px 16px ${col.glow};
+              box-shadow:0 4px 18px ${col.glow}, inset 0 1px 0 rgba(255,255,255,0.18);
               border-radius:8px;
               padding:6px 8px;
               height:70px;
@@ -294,7 +265,7 @@ export function exportTimetablePDF(subjects) {
               overflow:hidden;
             ">
               <div style="font-size:11px;font-weight:800;color:#ffffff;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${ev.name}</div>
-              ${formattedCode ? `<div style="font-size:9.5px;font-weight:600;color:rgba(255,255,255,0.75);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">(${formattedCode})</div>` : ''}
+              ${formattedCode ? `<div style="font-size:9.5px;font-weight:600;color:rgba(255,255,255,0.80);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">(${formattedCode})</div>` : ''}
               ${ev.room ? `<div style="display:inline-block;margin-top:3px;font-size:9px;font-weight:800;color:#ffffff;background:rgba(255,255,255,0.22);border:1px solid rgba(255,255,255,0.35);padding:2px 6px;border-radius:4px;letter-spacing:0.2px;white-space:nowrap;max-width:100%;">Room: ${ev.room}</div>` : ''}
             </div>
           </td>`;
@@ -329,7 +300,6 @@ export function exportTimetablePDF(subjects) {
       </tr>`;
   });
 
-  // ── Legend — mirrors .tt-legend + .tt-legend-item ───────────────────────
   const legendHtml = subjects.map((s, i) => {
     const col          = SOLID_COLORS[i % SOLID_COLORS.length];
     const sessionCount = (s.schedule || []).length;
@@ -348,123 +318,91 @@ export function exportTimetablePDF(subjects) {
       </span>`;
   }).join('');
 
-  // ── Stats pills — mirrors .tt-stat-pill ─────────────────────────────────
   const statPill = (text) => `
     <span style="
       display:inline-flex;align-items:center;gap:5px;
       padding:4px 10px;border-radius:20px;
       font-size:11.5px;font-weight:600;
       background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);
-      color:#94a3b8;margin-right:8px;
+      color:#94a3b8;
     ">${text}</span>`;
 
-  // ── Assemble the full PDF container ─────────────────────────────────────
   const pdfContainer = document.createElement('div');
-  pdfContainer.style.cssText = [
-    'padding:22px',
-    'background:#000000',
-    'color:#f8fafc',
-    'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif',
-    'width:1120px',
-    'box-sizing:border-box',
-    'position:relative',
-  ].join(';');
+  pdfContainer.id = 'pdf-timetable-container';
+  pdfContainer.style.cssText = `
+    width: 1120px;
+    background: #000000;
+    color: #f8fafc;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    padding: 22px 24px 16px;
+    box-sizing: border-box;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  `;
 
   pdfContainer.innerHTML = `
-    <!-- Rainbow top bar (solid segments — gradients may not render in html2canvas) -->
-    <div style="height:3px;background:#6366f1;margin:-22px -22px 18px;border-radius:4px 4px 0 0;"></div>
-
-    <!-- Header — mirrors page header section in Timetable.jsx -->
-    <div style="
-      display:flex;justify-content:space-between;align-items:flex-start;
-      padding:20px 22px;border-radius:16px;
-      background:#0a0a0a;
-      border:1px solid rgba(255,255,255,0.14);
-      margin-bottom:16px;
-      position:relative;overflow:hidden;
-    ">
-      <!-- Left side -->
-      <div style="display:flex;align-items:center;gap:14px;">
-        <div style="
-          width:36px;height:36px;border-radius:10px;flex-shrink:0;
-          background:#6366f1;
-          display:flex;align-items:center;justify-content:center;
-        ">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
-          </svg>
-        </div>
-        <div>
-          <div style="font-size:22px;font-weight:800;color:#f8fafc;letter-spacing:-0.4px;line-height:1;"><span style="color:#818cf8;">StudentAI</span> Timetable</div>
-          <div style="font-size:13px;color:#64748b;margin-top:5px;">Your weekly class schedule — view, manage, and export</div>
-        </div>
+    <div style="height:3px;background:linear-gradient(90deg,#6366f1,#a855f7,#ec4899,#6366f1);border-radius:2px;margin-bottom:16px;"></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+      <div>
+        <div style="font-size:18px;font-weight:900;color:#ffffff;letter-spacing:-0.3px;display:flex;align-items:center;gap:8px;">StudentAI Timetable</div>
+        <div style="font-size:11px;color:#64748b;margin-top:2px;">Weekly Class & Lecture Schedule</div>
       </div>
-      <!-- Right: stats pills matching toolbar -->
-      <div style="display:flex;align-items:center;gap:0;flex-wrap:wrap;padding-top:4px;">
+      <div style="display:flex;gap:8px;">
         ${statPill(`<strong style="color:#e2e8f0;">${subjects.length}</strong>&nbsp;subjects`)}
-        ${statPill(`<strong style="color:#e2e8f0;">${totalSessions}</strong>&nbsp;sessions/week`)}
-        ${statPill(`<strong style="color:#e2e8f0;">${displayDays.length}</strong>&nbsp;active days`)}
+        ${statPill(`<strong style="color:#e2e8f0;">${totalSessions}</strong>&nbsp;sessions/wk`)}
+        ${statPill(`<strong style="color:#e2e8f0;">${displayDays.length}</strong>&nbsp;days`)}
       </div>
     </div>
-
-    <!-- Legend box — mirrors .tt-legend -->
-    <div style="
-      display:flex;flex-wrap:wrap;gap:0;
-      margin-bottom:14px;padding:12px 14px;
-      border-radius:12px;
-      background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);
-    ">
-      ${legendHtml}
-    </div>
-
-    <!-- Grid wrapper — mirrors .tt-grid-wrap -->
-    <div style="
-      border-radius:16px;
-      background:#000000;
-      border:1px solid rgba(255,255,255,0.10);
-      padding:14px;
-    ">
-      <!-- Accent top stripe inside grid -->
-      <div style="height:2px;background:#6366f1;margin:-14px -14px 12px;border-radius:4px 4px 0 0;"></div>
-
-      <!-- Schedule table — mirrors .tt-matrix -->
-      <table style="
-        width:100%;
-        border-collapse:separate;border-spacing:5px;
-        table-layout:fixed;
-        background:#000000;
-      ">
-        <colgroup>
-          <col style="width:110px;">
-          ${matrixSlots.map(() => '<col>').join('')}
-        </colgroup>
-        <thead>
-          <tr>
-            <!-- DAY header — mirrors .tt-day-header-card -->
-            <th style="padding:0;border:none;">
-              <div style="
-                height:34px;padding:0 8px;border-radius:8px;
-                background:#0f172a;border:1px solid rgba(99,102,241,0.30);
-                color:#a5b4fc;font-size:11px;font-weight:800;
-                display:flex;align-items:center;justify-content:center;
-                letter-spacing:0.05em;text-transform:uppercase;
-              ">DAY</div>
-            </th>
-            ${thsHtml}
-          </tr>
-        </thead>
+    <div style="padding:10px 14px 4px;margin-bottom:14px;border-radius:10px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);display:flex;flex-wrap:wrap;">${legendHtml}</div>
+    <div style="border-radius:12px;background:#000000;border:1px solid rgba(255,255,255,0.10);padding:8px;box-sizing:border-box;">
+      <table style="width:100%;border-collapse:separate;border-spacing:5px;table-layout:fixed;">
+        <colgroup><col style="width:110px;" />${matrixSlots.map(() => '<col />').join('')}</colgroup>
+        <thead><tr><th style="padding:0;border:none;"><div style="height:34px;border-radius:8px;background:#0f172a;border:1px solid rgba(99,102,241,0.3);color:#a5b4fc;font-size:10px;display:flex;align-items:center;justify-content:center;text-transform:uppercase;">DAY</div></th>${thsHtml}</tr></thead>
         <tbody>${rowsHtml}</tbody>
       </table>
     </div>
-
-    <!-- Footer -->
-    <div style="
-      margin-top:12px;display:flex;justify-content:space-between;
-      font-size:8.5px;color:#64748b;padding:0 4px;font-weight:500;
-    ">
+    <div style="margin-top:12px;display:flex;justify-content:space-between;font-size:8.5px;color:#64748b;font-weight:500;">
       <span>StudentAI · Academic Schedule Export</span>
       <span>Generated ${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</span>
     </div>`;
+
+  return pdfContainer;
+}
+
+/* ── Photo Export (PNG image download) ─────────────────────────────────── */
+export async function exportTimetableImage(subjects, filename = 'Student_Timetable.png') {
+  if (!subjects?.length) return;
+  const container = buildTimetableExportElement(subjects);
+  if (!container) return;
+
+  container.style.position = 'fixed';
+  container.style.top = '-9999px';
+  container.style.left = '0';
+  document.body.appendChild(container);
+
+  try {
+    const canvas = await html2canvas(container, {
+      scale: 2,
+      useCORS: true,
+      logging: false,
+      backgroundColor: '#000000',
+    });
+    const link = document.createElement('a');
+    link.download = filename;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  } finally {
+    if (document.body.contains(container)) {
+      document.body.removeChild(container);
+    }
+  }
+}
+
+/* ── PDF export — pixel-perfect replica of the web dark grid ───────────── */
+export function exportTimetablePDF(subjects) {
+  if (!subjects?.length) return;
+  const container = buildTimetableExportElement(subjects);
+  if (!container) return;
 
   html2pdf().set({
     margin:     [4, 4, 4, 4],
@@ -472,7 +410,7 @@ export function exportTimetablePDF(subjects) {
     image:      { type: 'jpeg', quality: 0.99 },
     html2canvas: { scale: 2, useCORS: true, logging: false, backgroundColor: '#000000' },
     jsPDF:       { unit: 'mm', format: 'a4', orientation: 'landscape' },
-  }).from(pdfContainer).save();
+  }).from(container).save();
 }
 
 /* ── Web component — black canvas, vibrant grid ──────────────────────────── */
@@ -582,6 +520,16 @@ export default function WeeklyGrid({ subjects }) {
         }
         .tt-pdf-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 22px rgba(99,102,241,0.55); }
 
+        .tt-photo-btn {
+          display: inline-flex; align-items: center; gap: 7px;
+          padding: 8px 16px; border-radius: 10px; cursor: pointer;
+          background: linear-gradient(135deg, #10b981, #059669);
+          border: none; color: #fff; font-size: 13px; font-weight: 700;
+          box-shadow: 0 4px 16px rgba(16,185,129,0.35);
+          transition: transform 0.15s, box-shadow 0.15s;
+        }
+        .tt-photo-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 22px rgba(16,185,129,0.5); }
+
         .tt-conflict {
           display: flex; align-items: flex-start; gap: 8px;
           padding: 10px 14px; border-radius: 10px; margin-bottom: 12px;
@@ -689,7 +637,7 @@ export default function WeeklyGrid({ subjects }) {
 
         @media (max-width: 768px) {
           .tt-toolbar { flex-direction: column; align-items: stretch; }
-          .tt-pdf-btn { width: 100%; justify-content: center; padding: 10px 16px; }
+          .tt-photo-btn, .tt-pdf-btn { width: 100%; justify-content: center; padding: 10px 16px; }
           .tt-grid-wrap { padding: 10px; border-radius: 12px; }
           .tt-matrix { border-spacing: 3px; }
           .tt-subject-card { padding: 4px 6px; }
@@ -708,11 +656,26 @@ export default function WeeklyGrid({ subjects }) {
           <span className="tt-stat-pill"><Clock size={12} /><strong>{totalSlots}</strong> sessions/week</span>
           <span className="tt-stat-pill"><strong>{displayDays.length}</strong> active days</span>
         </div>
-        <button type="button" className="tt-pdf-btn" onClick={() => exportTimetablePDF(subjects)}
-          title="Download a clean white PDF — perfect for printing or viewing in light">
-          <Download size={15} />
-          Download PDF
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className="tt-photo-btn"
+            onClick={() => exportTimetableImage(subjects)}
+            title="Download timetable as a high-resolution photo (PNG)"
+          >
+            <Camera size={15} />
+            Download Photo
+          </button>
+          <button
+            type="button"
+            className="tt-pdf-btn"
+            onClick={() => exportTimetablePDF(subjects)}
+            title="Download timetable as PDF"
+          >
+            <Download size={15} />
+            Download PDF
+          </button>
+        </div>
       </div>
 
       {/* Subject legend */}

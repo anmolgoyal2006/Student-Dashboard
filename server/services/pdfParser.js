@@ -43,15 +43,21 @@ function canvasAvailable() {
  * Render PDF pages to JPEG images.
  *
  * Strategy (tried in order):
- *  1. canvas + pdfjs-dist  — pure-Node. pdfjs v3 requires a custom
- *                             NodeCanvasFactory injected explicitly.
- *                             Skipped if the `canvas` native module isn't built
- *                             (e.g. Render Node runtime without Cairo libs).
- *  2. Python pdf2image      — uses poppler-utils (installed via the Render build
- *                             command or the Dockerfile). Primary path on Render.
+ *  1. Python PyMuPDF (fast, native rendering, standalone)
+ *  2. canvas + pdfjs-dist fallback
  */
 async function renderPDFPagesToImages(buffer, { maxPages = 5, scale = 2.2 } = {}) {
-  // ── Strategy 1: canvas + pdfjs (with explicit NodeCanvasFactory for v3) ──
+  const dpi = Math.round(scale * 72);
+
+  // ── Strategy 1: Python PyMuPDF (fast, native rendering, standalone) ───────
+  try {
+    const images = await spawnPdf2Image(buffer, maxPages, dpi);
+    if (images && images.length > 0) return images;
+  } catch (pyErr) {
+    console.warn('[pdfParser] PyMuPDF render failed, attempting canvas/pdfjs fallback:', pyErr.message);
+  }
+
+  // ── Strategy 2: canvas + pdfjs fallback ──────────────────────────────────
   if (canvasAvailable()) {
     try {
       const { createCanvas } = require('canvas');
@@ -100,14 +106,12 @@ async function renderPDFPagesToImages(buffer, { maxPages = 5, scale = 2.2 } = {}
       }
 
       if (images.length > 0) return images;
-      throw new Error('pdfjs rendered 0 pages');
     } catch (canvasErr) {
-      console.warn('[pdfParser] canvas/pdfjs render failed, trying pdf2image fallback:', canvasErr.message);
+      console.warn('[pdfParser] canvas/pdfjs fallback also failed:', canvasErr.message);
     }
   }
 
-  // ── Strategy 2: Python pdf2image (poppler) ──────────────────────────────
-  return spawnPdf2Image(buffer, maxPages, Math.round(scale * 72));
+  throw new Error('All PDF-to-image renderers failed.');
 }
 
 function spawnPdf2Image(buffer, maxPages, dpi) {

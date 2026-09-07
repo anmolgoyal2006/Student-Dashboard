@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
 import { subjectService } from '../services/apiServices';
 import toast from '../context/ToastContext';
-import WeeklyGrid, { exportTimetablePDF } from '../components/WeeklyGrid';
+import WeeklyGrid, { exportTimetablePDF, exportTimetableImage } from '../components/WeeklyGrid';
 import EmptyState from '../components/EmptyState';
 import Skeleton, { CardSkeleton, StatsSkeleton } from '../components/Skeleton';
 import TimetableImportPreview from '../components/TimetableImportPreview';

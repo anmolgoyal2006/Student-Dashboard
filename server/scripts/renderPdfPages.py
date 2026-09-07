@@ -23,32 +23,54 @@ def main():
             sys.exit(1)
 
         pages = []
-        # Strategy A: pdf2image (requires poppler backend)
+        errors = []
+
+        # Strategy A: PyMuPDF (fastest, standalone, zero external dependencies)
         try:
-            from pdf2image import convert_from_bytes
-            images = convert_from_bytes(
-                pdf_bytes,
-                dpi=dpi,
-                first_page=1,
-                last_page=max_pages,
-                fmt="jpeg",
-            )
-            for img in images:
-                buf = io.BytesIO()
-                img.save(buf, format="JPEG", quality=90)
-                pages.append(base64.b64encode(buf.getvalue()).decode("ascii"))
-        except Exception as pdf2img_err:
-            # Strategy B: pdfplumber fallback (pure python, does not require poppler)
             try:
-                import pdfplumber
-                with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
-                    for i, page in enumerate(pdf.pages[:max_pages]):
-                        im = page.to_image(resolution=dpi)
-                        buf = io.BytesIO()
-                        im.original.save(buf, format="JPEG", quality=90)
-                        pages.append(base64.b64encode(buf.getvalue()).decode("ascii"))
-            except Exception as plumber_err:
-                raise Exception(f"pdf2image failed ({pdf2img_err}); pdfplumber fallback failed ({plumber_err})")
+                import pymupdf as fitz
+            except ImportError:
+                import fitz
+
+            doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+            for i, page in enumerate(doc):
+                if i >= max_pages:
+                    break
+                pix = page.get_pixmap(dpi=dpi)
+                jpeg_bytes = pix.tobytes("jpeg")
+                pages.append(base64.b64encode(jpeg_bytes).decode("ascii"))
+        except Exception as pymupdf_err:
+            errors.append(f"pymupdf: {pymupdf_err}")
+
+            # Strategy B: pdf2image (requires poppler backend)
+            try:
+                from pdf2image import convert_from_bytes
+                images = convert_from_bytes(
+                    pdf_bytes,
+                    dpi=dpi,
+                    first_page=1,
+                    last_page=max_pages,
+                    fmt="jpeg",
+                )
+                for img in images:
+                    buf = io.BytesIO()
+                    img.save(buf, format="JPEG", quality=90)
+                    pages.append(base64.b64encode(buf.getvalue()).decode("ascii"))
+            except Exception as pdf2img_err:
+                errors.append(f"pdf2image: {pdf2img_err}")
+
+                # Strategy C: pdfplumber fallback
+                try:
+                    import pdfplumber
+                    with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+                        for i, page in enumerate(pdf.pages[:max_pages]):
+                            im = page.to_image(resolution=dpi)
+                            buf = io.BytesIO()
+                            im.original.save(buf, format="JPEG", quality=90)
+                            pages.append(base64.b64encode(buf.getvalue()).decode("ascii"))
+                except Exception as plumber_err:
+                    errors.append(f"pdfplumber: {plumber_err}")
+                    raise Exception("; ".join(errors))
 
         if not pages:
             raise Exception("No pages rendered from PDF.")
