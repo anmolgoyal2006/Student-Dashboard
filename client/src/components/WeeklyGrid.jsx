@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { Download, Clock, BookOpen, AlertTriangle, Camera } from 'lucide-react';
-import html2pdf from 'html2pdf.js';
 import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
 
 /* ── Shared constants ─────────────────────────────────────────────────────── */
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -428,19 +428,63 @@ export async function exportTimetableImage(subjects, filename = 'Student_Timetab
   }
 }
 
-/* ── PDF export — pixel-perfect replica of the web dark grid ───────────── */
-export function exportTimetablePDF(subjects) {
+/* ── PDF export — perfectly scaled to A4 landscape, 0 clipping ──────────── */
+export async function exportTimetablePDF(subjects) {
   if (!subjects?.length) return;
   const container = buildTimetableExportElement(subjects);
   if (!container) return;
 
-  html2pdf().set({
-    margin:     [4, 4, 4, 4],
-    filename:   'Student_Timetable.pdf',
-    image:      { type: 'jpeg', quality: 0.99 },
-    html2canvas: { scale: 2, useCORS: true, logging: false, backgroundColor: '#000000' },
-    jsPDF:       { unit: 'mm', format: 'a4', orientation: 'landscape' },
-  }).from(container).save();
+  container.style.position = 'fixed';
+  container.style.top = '-9999px';
+  container.style.left = '0';
+  container.style.zIndex = '-9999';
+  document.body.appendChild(container);
+
+  try {
+    const canvas = await html2canvas(container, {
+      scale: 2,
+      useCORS: true,
+      logging: false,
+      backgroundColor: '#000000',
+    });
+
+    const imgData = canvas.toDataURL('image/jpeg', 0.98);
+    const pdf = new jsPDF({
+      orientation: 'landscape',
+      unit: 'mm',
+      format: 'a4',
+    });
+
+    const pdfWidth = pdf.internal.pageSize.getWidth();   // 297 mm
+    const pdfHeight = pdf.internal.pageSize.getHeight(); // 210 mm
+
+    const margin = 6;
+    const maxW = pdfWidth - margin * 2;   // 285 mm
+    const maxH = pdfHeight - margin * 2;  // 198 mm
+
+    const imgRatio = canvas.width / canvas.height;
+    let renderW = maxW;
+    let renderH = renderW / imgRatio;
+
+    if (renderH > maxH) {
+      renderH = maxH;
+      renderW = renderH * imgRatio;
+    }
+
+    const posX = (pdfWidth - renderW) / 2;
+    const posY = (pdfHeight - renderH) / 2;
+
+    // Fill PDF canvas with #000000 background
+    pdf.setFillColor(0, 0, 0);
+    pdf.rect(0, 0, pdfWidth, pdfHeight, 'F');
+
+    pdf.addImage(imgData, 'JPEG', posX, posY, renderW, renderH);
+    pdf.save('Student_Timetable.pdf');
+  } finally {
+    if (document.body.contains(container)) {
+      document.body.removeChild(container);
+    }
+  }
 }
 
 /* ── Web component — black canvas, vibrant grid ──────────────────────────── */
