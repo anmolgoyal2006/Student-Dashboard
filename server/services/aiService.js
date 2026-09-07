@@ -18,6 +18,8 @@ function sanitizeModel(envVal, fallback) {
 }
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const GEMINI_API_KEY_BACKUP = process.env.GEMINI_API_KEY_BACKUP || null;
+
 // Heavy model: used for quality-critical analysis (resume, predictions)
 const HEAVY_MODEL = sanitizeModel(process.env.GEMINI_HEAVY_MODEL, 'gemini-3.8-flash');
 // Light model: used for general AI tasks (chat, DSA coach, timetable, etc.)
@@ -33,13 +35,16 @@ const BASE_URL = 'generativelanguage.googleapis.com';
 if (!GEMINI_API_KEY) {
   console.warn('[AI Service] GEMINI_API_KEY is not set. AI features will fail.');
 }
+if (GEMINI_API_KEY_BACKUP) {
+  console.log('[AI Service] Backup Gemini API key loaded — will activate on primary key quota/errors.');
+}
 
-function geminiFetchRaw(path, body, model = LIGHT_MODEL) {
+function geminiFetchRaw(path, body, model = LIGHT_MODEL, apiKey = GEMINI_API_KEY) {
   return new Promise((resolve, reject) => {
     const data = JSON.stringify(body);
     const options = {
       hostname: BASE_URL,
-      path: `/v1beta/models/${model}:${path}?key=${GEMINI_API_KEY}`,
+      path: `/v1beta/models/${model}:${path}?key=${apiKey}`,
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -75,10 +80,29 @@ function geminiFetchRaw(path, body, model = LIGHT_MODEL) {
   });
 }
 
-// Breaker-gated entry point. All callers go through this; if Gemini is tripped
-// the call fails fast with a CircuitOpenError instead of hanging.
-function geminiFetch(path, body, model = LIGHT_MODEL) {
-  return geminiBreaker.exec(() => geminiFetchRaw(path, body, model));
+// Returns true for errors where switching to the backup key makes sense:
+// quota exhaustion (429) or server-side errors (5xx).
+function shouldTryBackupKey(err) {
+  if (!GEMINI_API_KEY_BACKUP) return false;
+  const status = err.statusCode;
+  return status === 429 || (status >= 500 && status < 600);
+}
+
+// Breaker-gated entry point. Tries the primary key first; on 429 or 5xx
+// automatically retries once with the backup key before giving up.
+async function geminiFetch(path, body, model = LIGHT_MODEL) {
+  const primaryCall = () => geminiFetchRaw(path, body, model, GEMINI_API_KEY);
+  try {
+    return await geminiBreaker.exec(primaryCall);
+  } catch (err) {
+    if (shouldTryBackupKey(err)) {
+      console.warn(`[AI Service] Primary key failed (${err.statusCode}) — retrying with backup key...`);
+      // Bypass the breaker for the backup attempt so a tripped primary breaker
+      // doesn't also block the backup key.
+      return geminiFetchRaw(path, body, model, GEMINI_API_KEY_BACKUP);
+    }
+    throw err;
+  }
 }
 
 function extractTextFromResponse(json) {
