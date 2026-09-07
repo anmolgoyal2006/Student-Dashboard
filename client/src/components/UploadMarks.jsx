@@ -8,7 +8,7 @@
  */
 import { useState, useMemo } from 'react';
 import { Upload, Trophy, TrendingDown, TrendingUp, BarChart2, FolderOpen, Settings, FileText, GraduationCap, Target, Save, Trash2, FileEdit, Search, Folder, FileText as FileIcon } from 'lucide-react';
-import * as XLSX from 'xlsx';
+// xlsx (~200 KB) is dynamically imported only inside export handler functions
 import toast from '../context/ToastContext';
 import Leaderboard from './Leaderboard';
 import MarksFilter from './MarksFilter';
@@ -512,7 +512,7 @@ export default function UploadMarks({ onResult }) {
     setShowSavePromptModal(false);
   };
 
-  const handleDownloadExcel = () => {
+  const handleDownloadExcel = async () => {
     if (!gradedStudents.length) {
       alert('No leaderboard data to export.');
       return;
@@ -547,6 +547,8 @@ export default function UploadMarks({ onResult }) {
       return row;
     });
 
+    // Dynamic import — xlsx (~200 KB) only fetched when user clicks download
+    const XLSX = await import('xlsx');
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Leaderboard');
@@ -650,7 +652,7 @@ export default function UploadMarks({ onResult }) {
     await runGenerateSgpaDirect();
   };
 
-  const handleSgpaDownloadExcel = () => {
+  const handleSgpaDownloadExcel = async () => {
     if (!sgpaLeaderboard?.rankedStudents?.length) return;
     const rows = sgpaLeaderboard.rankedStudents.map((s) => ({
       Rank: s.rank,
@@ -661,6 +663,8 @@ export default function UploadMarks({ onResult }) {
       'Total Credits': s.totalCredits,
       'Subjects Count': s.subjectsCount,
     }));
+    // Dynamic import — xlsx (~200 KB) only fetched when user clicks download
+    const XLSX = await import('xlsx');
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'SGPA Leaderboard');

@@ -1,6 +1,6 @@
 // components/BulkAttendanceUpload.jsx
 import React, { useState, useRef } from 'react';
-import * as XLSX from 'xlsx';
+// xlsx (~200 KB) is dynamically imported only when a file is parsed/uploaded
 import axios from 'axios';
 import { FileSpreadsheet, Download, Upload, Link2, AlertCircle, CheckCircle } from 'lucide-react';
 import toast from '../context/ToastContext';
@@ -28,8 +28,10 @@ export default function BulkAttendanceUpload({ onUploadSuccess }) {
     setError('');
 
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
+        // Dynamic import — xlsx (~200 KB) only fetched when a file is selected
+        const XLSX = await import('xlsx');
         const wb = XLSX.read(e.target.result, { type: 'binary' });
         const ws = wb.Sheets[wb.SheetNames[0]];
         const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });

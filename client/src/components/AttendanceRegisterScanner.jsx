@@ -1,8 +1,8 @@
 // src/components/AttendanceRegisterScanner.jsx
 import { useState, useRef, useCallback } from "react";
 import { Camera } from 'lucide-react';
-import Tesseract from "tesseract.js";
-import * as XLSX from "xlsx";
+// Tesseract.js (~800 KB WASM) and xlsx (~200 KB) are dynamically imported
+// only when the user triggers OCR / downloads — never on initial page load.
 
 // ─── Enhanced Parser ──────────────────────────────────────────────────────────
 function parseOcrText(rawText, fallbackSubject = "", fallbackDate = "") {
@@ -127,7 +127,9 @@ function preprocessImage(file) {
 }
 
 // ─── Excel builder ────────────────────────────────────────────────────────────
-function buildExcelBlob(rows) {
+async function buildExcelBlob(rows) {
+  // Dynamic import — xlsx (~200 KB) is only fetched when the user downloads
+  const XLSX = await import("xlsx");
   const wsData = [
     ["SID", "Date", "Status", "Subject"],
     ...rows.map((r) => [r.sid, r.date, r.status, r.subject]),
@@ -181,6 +183,8 @@ export default function AttendanceRegisterScanner({
 
       setOcrLog("Running OCR…");
 
+      // Dynamic import — Tesseract.js (~800 KB WASM) only fetched when OCR runs
+      const Tesseract = (await import("tesseract.js")).default;
       const result = await Tesseract.recognize(processedBlob, "eng", {
         logger: (m) => {
           if (m.status === "recognizing text") {
@@ -239,8 +243,8 @@ export default function AttendanceRegisterScanner({
     );
 
   // ── Download Excel ───────────────────────────────────────────────────────
-  const downloadExcel = () => {
-    const blob = buildExcelBlob(rows);
+  const downloadExcel = async () => {
+    const blob = await buildExcelBlob(rows);
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement("a");
     a.href     = url;
@@ -261,7 +265,7 @@ export default function AttendanceRegisterScanner({
     setErrorMsg("");
 
     try {
-      const blob     = buildExcelBlob(rows);
+      const blob     = await buildExcelBlob(rows);
       const formData = new FormData();
       formData.append("file", blob, "attendance_scan.xlsx");
 

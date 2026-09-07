@@ -1,7 +1,8 @@
 import { useMemo } from 'react';
 import { Download, Clock, BookOpen, AlertTriangle, Camera } from 'lucide-react';
-import html2canvas from 'html2canvas';
-import { jsPDF } from 'jspdf';
+// html2canvas and jsPDF are dynamically imported inside exportTimetableImage /
+// exportTimetablePDF so they are excluded from the main bundle and only
+// downloaded when the user actually clicks an export button.
 
 /* ── Shared constants ─────────────────────────────────────────────────────── */
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -612,6 +613,8 @@ export async function exportTimetableImage(subjects, filename = 'Student_Timetab
     if (document.fonts) {
       await document.fonts.ready;
     }
+    // Dynamic import — only fetches html2canvas (~40 KB) when user clicks export
+    const html2canvas = (await import('html2canvas')).default;
     const canvas = await html2canvas(container, {
       scale: 2.5, // Ultra-sharp 2.5x retina rendering
       useCORS: true,
@@ -645,6 +648,9 @@ export async function exportTimetablePDF(subjects, filename = 'Student_Timetable
     if (document.fonts) {
       await document.fonts.ready;
     }
+    // Dynamic imports — html2canvas (~40 KB) + jsPDF (~80 KB) only when needed
+    const html2canvas = (await import('html2canvas')).default;
+    const { jsPDF } = await import('jspdf');
     const canvas = await html2canvas(container, {
       scale: 2.5, // Ultra-sharp 2.5x retina rendering
       useCORS: true,

@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import * as XLSX from 'xlsx';
+// xlsx (~200 KB) is dynamically imported only inside handleExcelUpload
 import toast from '../context/ToastContext';
 import { GraduationCap, PenTool, FileSpreadsheet, Upload, Clipboard, Check, Trophy, Trash2 } from 'lucide-react';
 import { marksService } from '../services/apiServices';
@@ -108,8 +108,10 @@ export default function GradeEntryForm({ onLeaderboardGenerated }) {
   const handleExcelUpload = (subjectId, file) => {
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
+        // Dynamic import — xlsx (~200 KB) only fetched when user uploads a file
+        const XLSX = await import('xlsx');
         const wb = XLSX.read(e.target.result, { type: 'array' });
         const sheet = wb.Sheets[wb.SheetNames[0]];
         const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
