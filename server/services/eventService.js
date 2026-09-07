@@ -374,21 +374,32 @@ async function detectDuplicates() {
   const duplicates = [];
   const processedEventIds = new Set();
 
-  // Yield the event loop every BATCH_SIZE outer iterations so HTTP requests
-  // and cron ticks can run between chunks instead of being blocked for minutes.
-  const BATCH_SIZE = 20;
-
-  // Helper: pause for one event-loop tick
+  // Yield the event loop on every outer AND every INNER_BATCH_SIZE inner
+  // iteration so HTTP requests and cron ticks are never blocked for more
+  // than a few milliseconds at a time.
+  const INNER_BATCH_SIZE = 50;
   const yieldTick = () => new Promise((resolve) => setImmediate(resolve));
+
+  // Cap description text fed into stringSimilarity to keep CPU cost bounded.
+  const MAX_DESC_CHARS = 500;
+  const truncate = (s) => (s && s.length > MAX_DESC_CHARS ? s.slice(0, MAX_DESC_CHARS) : s);
 
   for (let i = 0; i < recentEvents.length; i++) {
     const eventA = recentEvents[i];
     if (processedEventIds.has(eventA._id.toString())) continue;
 
-    // Yield every BATCH_SIZE outer iterations
-    if (i > 0 && i % BATCH_SIZE === 0) await yieldTick();
+    // Pre-compute stripped description once per outer event
+    const descA = eventA.description
+      ? truncate(stripHtml(eventA.description).toLowerCase())
+      : '';
+
+    // Yield before every outer iteration so the event loop stays free
+    await yieldTick();
 
     for (let j = 0; j < allEvents.length; j++) {
+      // Yield every INNER_BATCH_SIZE inner iterations
+      if (j > 0 && j % INNER_BATCH_SIZE === 0) await yieldTick();
+
       const eventB = allEvents[j];
       // Don't compare an event with itself
       if (eventA._id.toString() === eventB._id.toString()) continue;
@@ -407,12 +418,14 @@ async function detectDuplicates() {
           eventB.title.toLowerCase()
         );
 
+        // Short-circuit: if title similarity is below the lower threshold,
+        // skip the expensive description comparison entirely.
+        if (titleSimilarity < 0.7) continue;
+
         let descSimilarity = 0;
-        if (eventA.description && eventB.description) {
-          descSimilarity = stringSimilarity.compareTwoStrings(
-            stripHtml(eventA.description).toLowerCase(),
-            stripHtml(eventB.description).toLowerCase()
-          );
+        if (descA && eventB.description) {
+          const descB = truncate(stripHtml(eventB.description).toLowerCase());
+          descSimilarity = stringSimilarity.compareTwoStrings(descA, descB);
         }
 
         const dateDiff = Math.abs(
