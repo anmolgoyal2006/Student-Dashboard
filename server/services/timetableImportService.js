@@ -77,26 +77,28 @@ function extractStructuredTableFromPDF(buffer) {
 
 
 const PROMPT = `You extract class timetables from an image of a timetable grid into JSON.
+The image may be a printed document, a digital graphic, or a HANDWRITTEN timetable written on notebook paper, a diary, or a whiteboard.
 
 Return ONLY a JSON object of this exact shape:
 {"subjects":[{"name":"","code":"","instructor":"","credits":null,"schedule":[{"day":"","startTime":"","endTime":"","room":""}]}]}
 
 Field rules — these names are fixed, do not rename or add fields:
-- name: the subject/course title. Required. Clean up section/group markers like (Pr) Gp 1, Gp 2 from the subject name.
-- code: the course code exactly as printed (e.g. "CS201"). "" if absent.
+- name: the subject/course title. Required. Clean up section/group markers like (Pr) Gp 1, Gp 2 from the subject name. If handwritten with abbreviations like "CN", "DBMS", "OS", "SE", "TOC", keep the clear subject name.
+- code: the course code exactly as written or printed (e.g. "CS201", "CSN5003"). "" if absent.
 - instructor: teacher name (e.g. "Dr. Ankit Gupta", "Dr. Sunil k Singh"). "" if absent.
-- credits: a number 1-6, or null if not printed. Never guess.
-- day: one of Sun, Mon, Tue, Wed, Thu, Fri, Sat. Map abbreviations, full names, or cropped margins
-  (Monday/onday -> Mon, Tuesday/esday -> Tue, Wednesday/nesday -> Wed, Thursday/ursday -> Thu, Friday/riday -> Fri, Saturday/urday -> Sat, Sunday/unday -> Sun).
-- startTime / endTime: 24-hour "HH:MM". Preserve exact minutes as printed in column headers (e.g. "08:30" to "09:30", "09:30" to "10:30", "10:30" to "11:30", "13:30" to "14:30", "14:30" to "15:30", "14:30" to "16:30"). NEVER round 09:30 to 09:00 or 14:30 to 14:00.
-- room: room/venue as printed (e.g. "Room No 406", "Room No 206", "Room No 215", "Room No 419"). "" if absent.
+- credits: a number 1-6, or null if not written. Never guess.
+- day: one of Sun, Mon, Tue, Wed, Thu, Fri, Sat. Map abbreviations, full names, or handwritten days
+  (M/Mon/Monday -> Mon, T/Tu/Tue/Tuesday -> Tue, W/Wed/Wednesday -> Wed, Th/Thu/Thursday -> Thu, F/Fri/Friday -> Fri, Sat/Saturday -> Sat, Sun/Sunday -> Sun).
+- startTime / endTime: 24-hour "HH:MM". Preserve exact minutes as indicated in headers or handwritten notes (e.g. "08:30" to "09:30", "09:30" to "10:30", "13:30" to "14:30", "14:30" to "16:30"). Convert informal times like "9-10" to "09:00" and "10:00", "1-2" or "1:30-2:30" to "13:30" and "14:30", "2-4" to "14:00" and "16:00".
+- room: room/venue as written (e.g. "Room No 406", "L21", "Lab 2", "402"). "" if absent.
 
-How to read the grid — this is an IMAGE, use visual position, not text order:
-- The column headers across the top define exact time ranges (e.g. 08:30-09:30, 09:30-10:30, 10:30-11:30, 11:30-12:30, 12:30-13:30, 13:30-14:30, 14:30-15:30, 15:30-16:30). The row labels down the side define days. A cell's time range comes strictly from the column(s) it visually sits under, and its day comes from the row it visually sits in.
-- Dynamic Lunch / Break Times: Lunch breaks vary per institution and timetable. Read the exact time range of the break column (e.g. 13:30-14:30, 12:30-13:30, 12:00-13:00, 13:00-14:00, marked as -X-, LUNCH, BREAK, RECESS) and skip non-teaching cells entirely. Do NOT assume lunch is always 13:00-14:00.
-- A cell's duration is determined strictly by the vertical grid lines separating the columns. A cell spanning several consecutive time columns is ONE slot: use the FIRST spanned column's start time and the LAST spanned column's end time. For example, if a 2-hour Lab cell spans 14:30-15:30 and 15:30-16:30, it is a single slot from 14:30 to 16:30.
+How to read the grid / image (Printed, Digital, or Handwritten):
+- The column headers across the top define time ranges, and the row labels down the side define days (or vice versa). Map each class to its respective day and start/end times based on its grid position.
+- Handwritten & Hand-drawn Grids: Hand-drawn lines may be uneven or informal. Follow the visual alignment of rows and columns to connect subjects to their intended days and time slots.
+- List / Schedule Format: If the handwritten note is formatted as a daily list (e.g. "Monday: 9-10 Math, 10-12 Physics Lab"), extract all entries into their corresponding day slots.
+- Deciphering Handwriting: Carefully distinguish ambiguous handwriting (e.g., 0 vs O, 1 vs l/I, 5 vs S, 8 vs B, 4 vs 9).
+- Dynamic Lunch / Break Times: Skip break/lunch slots (-X-, LUNCH, BREAK, RECESS) entirely.
 - Parallel Lab / Group Rows: A day row may be divided into sub-rows for different practical groups (Gp 1, Gp 2, Gp 3). Extract each parallel group slot with its respective subject, instructor, and room.
-- Skip non-teaching cells (-X-, LUNCH, BREAK, RECESS) and header rows/columns entirely.
 - Return every subject found. Fold duplicate subjects into single entries with multiple schedule entries.`;
 
 const TEXT_PROMPT = `You extract class timetables from the text of a timetable grid into JSON.
