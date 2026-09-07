@@ -297,7 +297,7 @@ export function buildTimetableExportElement(subjects) {
   });
 
   const legendHtml = subjects.map((s, i) => {
-    const col          = SOLID_COLORS[i % SOLID_COLORS.length];
+    const col          = WEB_PALETTE[i % WEB_PALETTE.length];
     const sessionCount = (s.schedule || []).length;
     return `
       <span style="
