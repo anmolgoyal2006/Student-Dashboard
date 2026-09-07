@@ -352,90 +352,113 @@ async function getRecommendedEvents(userId, limit = 20) {
 
 async function detectDuplicates() {
   console.log('🔍 Checking for duplicate events...');
-  const allEvents = await Event.find().sort({ createdAt: -1 });
-  
+
+  // Only scan events added/updated in the last 7 days as "candidates" to check
+  // against the full pool. This keeps the comparison set small regardless of
+  // how large the total event collection grows, and avoids re-flagging the
+  // same old pairs on every run.
+  const RECENT_WINDOW_DAYS = 7;
+  const since = new Date(Date.now() - RECENT_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+
+  const [recentEvents, allEvents] = await Promise.all([
+    Event.find({ createdAt: { $gte: since } }).sort({ createdAt: -1 }).lean(),
+    Event.find().sort({ createdAt: -1 }).lean(),
+  ]);
+
+  // Nothing recent to check — skip the O(n²) scan entirely.
+  if (!recentEvents.length) {
+    console.log('🔍 No recent events to check for duplicates.');
+    return { duplicatesFound: 0, duplicates: [] };
+  }
+
   const duplicates = [];
   const processedEventIds = new Set();
-  
-  // Check all pairs of events for duplicates
-  for (let i = 0; i < allEvents.length; i++) {
-    const eventA = allEvents[i];
+
+  // Yield the event loop every BATCH_SIZE outer iterations so HTTP requests
+  // and cron ticks can run between chunks instead of being blocked for minutes.
+  const BATCH_SIZE = 20;
+
+  // Helper: pause for one event-loop tick
+  const yieldTick = () => new Promise((resolve) => setImmediate(resolve));
+
+  for (let i = 0; i < recentEvents.length; i++) {
+    const eventA = recentEvents[i];
     if (processedEventIds.has(eventA._id.toString())) continue;
-    
-    for (let j = i + 1; j < allEvents.length; j++) {
+
+    // Yield every BATCH_SIZE outer iterations
+    if (i > 0 && i % BATCH_SIZE === 0) await yieldTick();
+
+    for (let j = 0; j < allEvents.length; j++) {
       const eventB = allEvents[j];
+      // Don't compare an event with itself
+      if (eventA._id.toString() === eventB._id.toString()) continue;
       if (processedEventIds.has(eventB._id.toString())) continue;
-      
-      // Check if they're potential duplicates
+
       let isDuplicate = false;
       let duplicateReason = '';
-      
-      // First check: same source and sourceEventId (exact duplicate)
+
+      // Exact duplicate: same source + sourceEventId
       if (eventA.source === eventB.source && eventA.sourceEventId === eventB.sourceEventId) {
         isDuplicate = true;
         duplicateReason = 'Exact match (same source and sourceEventId)';
       } else {
-        // Check title similarity
         const titleSimilarity = stringSimilarity.compareTwoStrings(
-          eventA.title.toLowerCase(), 
+          eventA.title.toLowerCase(),
           eventB.title.toLowerCase()
         );
-        
-        // Check description similarity if descriptions exist
+
         let descSimilarity = 0;
         if (eventA.description && eventB.description) {
           descSimilarity = stringSimilarity.compareTwoStrings(
-            stripHtml(eventA.description).toLowerCase(), 
+            stripHtml(eventA.description).toLowerCase(),
             stripHtml(eventB.description).toLowerCase()
           );
         }
-        
-        // Check if registration dates are close
+
         const dateDiff = Math.abs(
           new Date(eventA.registrationDeadline) - new Date(eventB.registrationDeadline)
         );
         const daysDiff = dateDiff / (1000 * 60 * 60 * 24);
-        
-        // If titles are very similar (>0.85), or titles and descriptions are both moderately similar (>0.7)
+
         if (
-          titleSimilarity > 0.85 || 
+          titleSimilarity > 0.85 ||
           (titleSimilarity > 0.7 && descSimilarity > 0.7 && daysDiff < 30)
         ) {
           isDuplicate = true;
           duplicateReason = `Fuzzy match (title similarity: ${titleSimilarity.toFixed(2)}${descSimilarity > 0 ? `, description similarity: ${descSimilarity.toFixed(2)}` : ''})`;
         }
       }
-      
+
       if (isDuplicate) {
         duplicates.push({
           eventA: {
             id: eventA._id,
             title: eventA.title,
             source: eventA.source,
-            sourceEventId: eventA.sourceEventId
+            sourceEventId: eventA.sourceEventId,
           },
           eventB: {
             id: eventB._id,
             title: eventB.title,
             source: eventB.source,
-            sourceEventId: eventB.sourceEventId
+            sourceEventId: eventB.sourceEventId,
           },
-          reason: duplicateReason
+          reason: duplicateReason,
         });
-        
+
         processedEventIds.add(eventB._id.toString());
       }
     }
   }
-  
+
   console.log(`🔍 Found ${duplicates.length} potential duplicate(s)!`);
   if (duplicates.length > 0) {
     console.log('📋 Duplicates:', duplicates);
   }
-  
-  return { 
-    duplicatesFound: duplicates.length, 
-    duplicates 
+
+  return {
+    duplicatesFound: duplicates.length,
+    duplicates,
   };
 }
 

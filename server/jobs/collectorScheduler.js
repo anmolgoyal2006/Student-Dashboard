@@ -63,18 +63,30 @@ async function runCollectors() {
 async function refreshAllRecommendations() {
   console.log('\n🔄 Refreshing recommendations for all users...');
   try {
-    const students = await User.find({ role: 'student' });
+    const students = await User.find({ role: 'student' }).select('_id').lean();
     let successCount = 0;
     let failCount = 0;
 
-    for (const student of students) {
-      try {
-        await generateAndCacheRecommendations(student._id);
-        successCount++;
-      } catch (err) {
-        console.error(`[CRON] Failed to refresh recommendations for user ${student._id}:`, err);
-        failCount++;
-      }
+    // Process in small batches, yielding between each so HTTP requests and
+    // cron ticks aren't blocked while we loop over potentially many users.
+    const BATCH_SIZE = 5;
+    const yieldTick = () => new Promise((resolve) => setImmediate(resolve));
+
+    for (let i = 0; i < students.length; i += BATCH_SIZE) {
+      const batch = students.slice(i, i + BATCH_SIZE);
+      await Promise.allSettled(
+        batch.map(async (student) => {
+          try {
+            await generateAndCacheRecommendations(student._id);
+            successCount++;
+          } catch (err) {
+            console.error(`[CRON] Failed to refresh recommendations for user ${student._id}:`, err.message);
+            failCount++;
+          }
+        })
+      );
+      // Yield between batches
+      if (i + BATCH_SIZE < students.length) await yieldTick();
     }
 
     console.log(`✅ Recommendations refreshed: ${successCount} succeeded, ${failCount} failed`);
