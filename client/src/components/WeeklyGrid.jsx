@@ -222,9 +222,23 @@ export function buildTimetableExportElement(subjects) {
   let totalSessions = 0;
   subjects.forEach(s => { totalSessions += (s.schedule || []).length; });
 
-  const CELL_H = 76; // matches .tt-matrix tbody td height in the web component
+  const CELL_H = 76; // matches .tt-matrix tbody td height
 
-  const thsHtml = matrixSlots.map(slot => `<th style="background:rgba(255,255,255,0.04);color:rgba(255,255,255,0.75);border:1px solid rgba(255,255,255,0.10);padding:10px 3px;font-size:10px;font-weight:800;text-align:center;border-radius:8px;text-transform:uppercase;white-space:nowrap;">${slot.label}</th>`).join('');
+  const thsHtml = matrixSlots.map(slot => `
+    <th style="
+      background: rgba(255,255,255,0.04);
+      color: rgba(255,255,255,0.70);
+      border: 1px solid rgba(255,255,255,0.10);
+      padding: 10px 3px;
+      font-size: 10px;
+      font-weight: 800;
+      text-align: center;
+      border-radius: 8px;
+      text-transform: uppercase;
+      white-space: nowrap;
+      letter-spacing: 0;
+    ">${slot.label}</th>
+  `).join('');
 
   let rowsHtml = '';
   displayDays.forEach(day => {
@@ -246,50 +260,59 @@ export function buildTimetableExportElement(subjects) {
         const col = ev.color || WEB_PALETTE[0];
         const formattedCode = ev.code ? ev.code.replace(/\+/g, ' + ') : '';
 
-        // Card mirrors .tt-subject-card + .tt-subject-name/code/room
         cellsHtml += `
-          <td colspan="${span}" style="height:${CELL_H}px;padding:3px;vertical-align:middle;">
+          <td colspan="${span}" style="height: ${CELL_H}px; padding: 3px; vertical-align: middle;">
             <div style="
-              background:${col.bg};
-              border:1px solid ${col.border};
-              box-shadow:0 4px 18px ${col.glow}, inset 0 1px 0 rgba(255,255,255,0.18);
-              border-radius:8px;
-              padding:6px 8px;
-              height:70px;
-              box-sizing:border-box;
-              display:flex;flex-direction:column;justify-content:center;
-              overflow:hidden;
+              background: ${col.bg};
+              border: 1px solid ${col.border};
+              box-shadow: 0 4px 18px ${col.glow};
+              border-radius: 8px;
+              padding: 6px 8px;
+              height: 70px;
+              box-sizing: border-box;
+              display: flex;
+              flex-direction: column;
+              justify-content: center;
+              overflow: hidden;
             ">
-              <div style="font-size:11px;font-weight:800;color:#ffffff;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${ev.name}</div>
-              ${formattedCode ? `<div style="font-size:9.5px;font-weight:600;color:rgba(255,255,255,0.80);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">(${formattedCode})</div>` : ''}
-              ${ev.room ? `<div style="display:inline-block;margin-top:3px;font-size:9px;font-weight:800;color:#ffffff;background:rgba(255,255,255,0.22);border:1px solid rgba(255,255,255,0.35);padding:2px 6px;border-radius:4px;letter-spacing:0.2px;white-space:nowrap;max-width:100%;">Room: ${ev.room}</div>` : ''}
+              <div style="font-size: 11px; font-weight: 800; color: #ffffff; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${ev.name}</div>
+              ${formattedCode ? `<div style="font-size: 9.5px; font-weight: 600; color: rgba(255,255,255,0.75); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">(${formattedCode})</div>` : ''}
+              ${ev.room ? `<div style="display: inline-block; margin-top: 3px; font-size: 9px; font-weight: 800; color: #ffffff; background: rgba(255, 255, 255, 0.22); border: 1px solid rgba(255, 255, 255, 0.35); padding: 2px 6px; border-radius: 4px; letter-spacing: 0.2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; box-sizing: border-box;">Room: ${ev.room}</div>` : ''}
             </div>
           </td>`;
         sIdx += span;
       } else {
         cellsHtml += `
-          <td style="
-            height:${CELL_H}px;
-            background:rgba(255,255,255,0.01);
-            border:1px solid rgba(255,255,255,0.04);
-            padding:4px;text-align:center;vertical-align:middle;border-radius:8px;
-          "></td>`;
+          <td style="height: ${CELL_H}px; padding: 3px; vertical-align: middle;">
+            <div style="
+              height: 70px;
+              box-sizing: border-box;
+              border-radius: 8px;
+              border: 1px solid rgba(255,255,255,0.04);
+              background: rgba(255,255,255,0.01);
+            "></div>
+          </td>`;
         sIdx++;
       }
     }
 
-    // Day label cell mirrors .tt-day-card
     rowsHtml += `
       <tr>
-        <td style="height:${CELL_H}px;padding:0;vertical-align:middle;">
+        <td style="height: ${CELL_H}px; padding: 0; vertical-align: middle;">
           <div style="
-            height:70px;border-radius:8px;
-            background:#0f172a;
-            border:1px solid ${accent.color}44;
-            color:${accent.color};
-            font-size:12px;font-weight:900;letter-spacing:0.02em;
-            display:flex;align-items:center;justify-content:center;
-            text-align:center;box-sizing:border-box;
+            height: 70px;
+            border-radius: 8px;
+            background: #0f172a;
+            border: 1px solid ${accent.color}44;
+            color: ${accent.color};
+            font-size: 12px;
+            font-weight: 900;
+            letter-spacing: 0.02em;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            box-sizing: border-box;
           ">${FULL_DAYS[day]}</div>
         </td>
         ${cellsHtml}
@@ -297,72 +320,83 @@ export function buildTimetableExportElement(subjects) {
   });
 
   const legendHtml = subjects.map((s, i) => {
-    const col          = WEB_PALETTE[i % WEB_PALETTE.length];
-    const sessionCount = (s.schedule || []).length;
+    const col = WEB_PALETTE[i % WEB_PALETTE.length];
     return `
       <span style="
-        display:inline-flex;align-items:center;gap:7px;
-        margin-right:10px;margin-bottom:6px;
-        padding:4px 10px 4px 6px;border-radius:8px;
-        background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);
-        font-size:11.5px;font-weight:600;color:#cbd5e1;
+        display: inline-flex; align-items: center; gap: 7px;
+        padding: 4px 10px 4px 6px; border-radius: 8px;
+        background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07);
+        font-size: 11.5px; font-weight: 600; color: #cbd5e1;
       ">
-        <span style="width:10px;height:10px;border-radius:3px;background:${col.border};display:inline-block;flex-shrink:0;"></span>
-        <span style="color:#f8fafc;font-weight:700;">${s.name}</span>
-        ${s.code ? `<span style="color:#64748b;font-weight:500;">(${s.code})</span>` : ''}
-        <span style="font-size:9px;font-weight:700;color:#818cf8;background:rgba(99,102,241,0.15);padding:1px 6px;border-radius:10px;margin-left:2px;">${sessionCount}×/wk</span>
+        <span style="width: 10px; height: 10px; border-radius: 3px; background: ${col.border}; display: inline-block; flex-shrink: 0;"></span>
+        <span style="color: #f8fafc; font-weight: 700;">${s.name}</span>
+        ${s.code ? `<span style="color: #64748b; font-weight: 500;">(${s.code})</span>` : ''}
       </span>`;
   }).join('');
 
-  const statPill = (text) => `
-    <span style="
-      display:inline-flex;align-items:center;gap:5px;
-      padding:4px 10px;border-radius:20px;
-      font-size:11.5px;font-weight:600;
-      background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);
-      color:#94a3b8;
-    ">${text}</span>`;
+  const exportWidth = Math.max(1420, 110 + matrixSlots.length * 130 + 60);
 
-  const pdfContainer = document.createElement('div');
-  pdfContainer.id = 'pdf-timetable-container';
-  pdfContainer.style.cssText = `
-    width: 1120px;
+  const container = document.createElement('div');
+  container.id = 'timetable-export-container';
+  container.style.cssText = `
+    width: ${exportWidth}px;
     background: #000000;
     color: #f8fafc;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-    padding: 22px 24px 16px;
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    padding: 24px 28px;
     box-sizing: border-box;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   `;
 
-  pdfContainer.innerHTML = `
-    <div style="height:3px;background:linear-gradient(90deg,#6366f1,#a855f7,#ec4899,#6366f1);border-radius:2px;margin-bottom:16px;"></div>
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
-      <div>
-        <div style="font-size:18px;font-weight:900;color:#ffffff;letter-spacing:-0.3px;display:flex;align-items:center;gap:8px;">StudentAI Timetable</div>
-        <div style="font-size:11px;color:#64748b;margin-top:2px;">Weekly Class & Lecture Schedule</div>
-      </div>
-      <div style="display:flex;gap:8px;">
-        ${statPill(`<strong style="color:#e2e8f0;">${subjects.length}</strong>&nbsp;subjects`)}
-        ${statPill(`<strong style="color:#e2e8f0;">${totalSessions}</strong>&nbsp;sessions/wk`)}
-        ${statPill(`<strong style="color:#e2e8f0;">${displayDays.length}</strong>&nbsp;days`)}
+  container.innerHTML = `
+    <!-- Top toolbar — identical to the website -->
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <div style="font-size: 16px; font-weight: 800; color: #ffffff; display: flex; align-items: center; gap: 8px; letter-spacing: -0.2px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#818cf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+          Weekly Schedule
+        </div>
+        <span style="display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 20px; font-size: 11.5px; font-weight: 600; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); color: #94a3b8;">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
+          <strong style="color: #e2e8f0; font-weight: 700;">${subjects.length}</strong>&nbsp;subjects
+        </span>
+        <span style="display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 20px; font-size: 11.5px; font-weight: 600; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); color: #94a3b8;">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+          <strong style="color: #e2e8f0; font-weight: 700;">${totalSessions}</strong>&nbsp;sessions/week
+        </span>
+        <span style="display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 20px; font-size: 11.5px; font-weight: 600; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); color: #94a3b8;">
+          <strong style="color: #e2e8f0; font-weight: 700;">${displayDays.length}</strong>&nbsp;active days
+        </span>
       </div>
     </div>
-    <div style="padding:10px 14px 4px;margin-bottom:14px;border-radius:10px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);display:flex;flex-wrap:wrap;">${legendHtml}</div>
-    <div style="border-radius:12px;background:#000000;border:1px solid rgba(255,255,255,0.10);padding:8px;box-sizing:border-box;">
-      <table style="width:100%;border-collapse:separate;border-spacing:5px;table-layout:fixed;">
-        <colgroup><col style="width:110px;" />${matrixSlots.map(() => '<col />').join('')}</colgroup>
-        <thead><tr><th style="padding:0;border:none;"><div style="height:34px;border-radius:8px;background:#0f172a;border:1px solid rgba(99,102,241,0.3);color:#a5b4fc;font-size:10px;display:flex;align-items:center;justify-content:center;text-transform:uppercase;">DAY</div></th>${thsHtml}</tr></thead>
+
+    <!-- Subject legend — identical to the website -->
+    <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; padding: 12px 14px; border-radius: 12px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06);">
+      ${legendHtml}
+    </div>
+
+    <!-- Grid wrap with rainbow accent top stripe — identical to .tt-grid-wrap -->
+    <div style="border-radius: 16px; background: #000000; border: 1px solid rgba(255,255,255,0.10); box-shadow: 0 0 0 1px rgba(255,255,255,0.04), 0 24px 60px rgba(0,0,0,0.6); padding: 14px; box-sizing: border-box;">
+      <div style="height: 2px; margin: -14px -14px 12px; background: linear-gradient(90deg, #6366f1, #a855f7, #ec4899, #6366f1); border-radius: 16px 16px 0 0;"></div>
+      <table style="width: 100%; border-collapse: separate; border-spacing: 5px; table-layout: fixed;">
+        <colgroup>
+          <col style="width: 110px;" />
+          ${matrixSlots.map(() => '<col />').join('')}
+        </colgroup>
+        <thead>
+          <tr>
+            <th style="padding: 0; border: none;">
+              <div style="height: 34px; padding: 0 8px; border-radius: 8px; background: #0f172a; border: 1px solid rgba(99,102,241,0.30); color: #a5b4fc; font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center; letter-spacing: 0.05em; text-transform: uppercase;">DAY</div>
+            </th>
+            ${thsHtml}
+          </tr>
+        </thead>
         <tbody>${rowsHtml}</tbody>
       </table>
-    </div>
-    <div style="margin-top:12px;display:flex;justify-content:space-between;font-size:8.5px;color:#64748b;font-weight:500;">
-      <span>StudentAI · Academic Schedule Export</span>
-      <span>Generated ${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</span>
     </div>`;
 
-  return pdfContainer;
+  return container;
 }
 
 /* ── Photo Export (PNG image download) ─────────────────────────────────── */
