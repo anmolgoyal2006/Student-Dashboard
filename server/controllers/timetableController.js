@@ -1,6 +1,6 @@
 const Subject = require('../models/Subject');
 const { createSubject } = require('../services/subjectService');
-const { parseTimetablePDF } = require('../services/timetableImportService');
+const { parseTimetablePDF, parseTimetableImage } = require('../services/timetableImportService');
 
 // GET /api/subjects
 exports.getSubjects = async (req, res) => {
@@ -78,11 +78,14 @@ exports.deleteSubject = async (req, res) => {
   }
 };
 
-// POST /api/subjects/import-pdf — parse only, nothing is written yet
+// POST /api/subjects/import-pdf — parse only, supports PDF and images (photos)
 exports.importSubjectsFromPDF = async (req, res) => {
-  if (!req.file) return res.status(400).json({ message: 'No PDF uploaded.' });
+  if (!req.file) return res.status(400).json({ message: 'No timetable file uploaded.' });
   try {
-    const { entries, flagged, conflicts } = await parseTimetablePDF(req.file.buffer);
+    const isImage = req.file.mimetype.startsWith('image/') || /\.(png|jpe?g|webp)$/i.test(req.file.originalname);
+    const { entries, flagged, conflicts } = isImage
+      ? await parseTimetableImage(req.file.buffer, req.file.mimetype || 'image/jpeg')
+      : await parseTimetablePDF(req.file.buffer);
     res.json({ entries, flagged, conflicts: conflicts || 0 });
   } catch (err) {
     // The service marks user-fixable failures with a code; everything else is ours.

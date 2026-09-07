@@ -463,4 +463,41 @@ async function parseTimetablePDF(buffer) {
   };
 }
 
-module.exports = { parseTimetablePDF, flagEntry, mergeDuplicates, detectAndFlagConflicts };
+async function parseTimetableImage(buffer, mimeType = 'image/jpeg') {
+  const parts = [
+    {
+      inlineData: {
+        mimeType: mimeType || 'image/jpeg',
+        data: buffer.toString('base64'),
+      },
+    },
+    { text: PROMPT },
+  ];
+
+  const rawText = await generateContentWithInlineData(parts, {
+    model: LIGHT_MODEL,
+    temperature: 0,
+    maxOutputTokens: 8000,
+    responseMimeType: 'application/json',
+  });
+
+  const parsedJson = extractJSON((rawText || '').trim());
+  const subjects = Array.isArray(parsedJson?.subjects) ? parsedJson.subjects : null;
+
+  if (!subjects || subjects.length === 0) {
+    const e = new Error('Could not find any classes in that timetable photo.');
+    e.code = 'NO_TIMETABLE';
+    e.hint = 'Make sure the image clearly shows day columns, time slots, and subject names.';
+    throw e;
+  }
+
+  const results = mergeDuplicates(subjects).map(flagEntry);
+  const conflicts = detectAndFlagConflicts(results);
+  return {
+    entries: results.map((r, i) => ({ ...r.entry, index: i, issues: r.issues })),
+    flagged: results.reduce((n, r) => n + (r.issues.length > 0 ? 1 : 0), 0),
+    conflicts,
+  };
+}
+
+module.exports = { parseTimetablePDF, parseTimetableImage, flagEntry, mergeDuplicates, detectAndFlagConflicts };

@@ -5,7 +5,7 @@ import WeeklyGrid, { exportTimetablePDF, exportTimetableImage } from '../compone
 import EmptyState from '../components/EmptyState';
 import Skeleton, { CardSkeleton, StatsSkeleton } from '../components/Skeleton';
 import TimetableImportPreview from '../components/TimetableImportPreview';
-import { LayoutGrid, List, Plus, Edit, Trash2, Calendar, Clock, BookOpen, X, ChevronRight, Upload, FileText, Loader2, Download } from 'lucide-react';
+import { LayoutGrid, List, Plus, Edit, Trash2, Calendar, Clock, BookOpen, X, ChevronRight, Upload, FileText, Loader2, Download, Camera } from 'lucide-react';
 
 const DAYS      = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 const EMPTY     = { name: '', code: '', instructor: '', credits: 4, schedule: [] };
@@ -325,14 +325,30 @@ export default function Timetable() {
           <input
             ref={fileInputRef}
             type="file"
-            accept="application/pdf,.pdf"
+            accept="application/pdf,.pdf,image/png,image/jpeg,image/webp,image/jpg"
             onChange={handlePdfSelected}
             style={{ display: 'none' }}
           />
           <button
+            onClick={() => exportTimetableImage(subjects)}
+            disabled={subjects.length === 0}
+            title="Download timetable as a high-resolution photo (PNG)"
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 7,
+              padding: '9px 18px', borderRadius: 10, cursor: subjects.length === 0 ? 'not-allowed' : 'pointer',
+              background: subjects.length === 0 ? 'rgba(16,185,129,0.15)' : 'linear-gradient(135deg, #10b981, #059669)',
+              color: '#fff', fontWeight: 700, fontSize: 13.5, border: 'none',
+              boxShadow: subjects.length === 0 ? 'none' : '0 4px 14px rgba(16,185,129,0.35)',
+              opacity: subjects.length === 0 ? 0.5 : 1,
+              transition: 'transform 0.15s, box-shadow 0.15s',
+            }}
+          >
+            <Camera size={16} /> Download Photo
+          </button>
+          <button
             onClick={() => exportTimetablePDF(subjects)}
             disabled={subjects.length === 0}
-            title="Download a clean white PDF — perfect for printing or viewing in light"
+            title="Download timetable as PDF"
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 7,
               padding: '9px 18px', borderRadius: 10, cursor: subjects.length === 0 ? 'not-allowed' : 'pointer',
@@ -347,7 +363,7 @@ export default function Timetable() {
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={parsing}
-            title="Upload your college timetable PDF — subjects and class times are read automatically"
+            title="Upload your timetable PDF or Photo (PNG, JPG) — subjects and class times are read automatically"
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 7,
               padding: '9px 18px', borderRadius: 10, cursor: parsing ? 'wait' : 'pointer',
@@ -355,7 +371,7 @@ export default function Timetable() {
               border: `1px solid ${C.border2}`, opacity: parsing ? 0.6 : 1,
             }}
           >
-            <Upload size={16} /> {parsing ? 'Reading PDF…' : 'Import PDF'}
+            <Upload size={16} /> {parsing ? 'Reading Timetable…' : 'Import PDF / Photo'}
           </button>
           <button
             onClick={() => { setShowForm(true); setEditing(null); setForm(EMPTY); }}
@@ -374,7 +390,7 @@ export default function Timetable() {
         </div>
       </div>
 
-      {/* ── PDF import: what the button does, and progress while it runs ───── */}
+      {/* ── Timetable import: what the button does, and progress while it runs ───── */}
       {!preview && (
         <div style={{
           display: 'flex', alignItems: 'center', gap: 9,
@@ -389,8 +405,8 @@ export default function Timetable() {
           {parsing
             ? <span style={{ color: C.text }}>Reading your timetable — this can take up to a minute for a full week.</span>
             : <span>
-                Have a timetable PDF?{' '}
-                <strong style={{ color: C.text, fontWeight: 600 }}>Import from PDF</strong>{' '}
+                Have a timetable PDF or Photo?{' '}
+                <strong style={{ color: C.text, fontWeight: 600 }}>Import PDF / Photo</strong>{' '}
                 pulls in every subject and class time at once — you review and edit everything before it saves.
               </span>}
         </div>

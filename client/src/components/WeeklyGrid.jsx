@@ -224,10 +224,6 @@ export function buildTimetableExportElement(subjects) {
 
   const CELL_H = 76; // matches .tt-matrix tbody td height in the web component
 
-  const colorMap = {};
-  subjects.forEach((s, i) => { colorMap[s._id] = WEB_PALETTE[i % WEB_PALETTE.length]; });
-  const eventsByDay = buildEventsByDay(subjects, colorMap);
-
   const thsHtml = matrixSlots.map(slot => `<th style="background:rgba(255,255,255,0.04);color:rgba(255,255,255,0.75);border:1px solid rgba(255,255,255,0.10);padding:10px 3px;font-size:10px;font-weight:800;text-align:center;border-radius:8px;text-transform:uppercase;white-space:nowrap;">${slot.label}</th>`).join('');
 
   let rowsHtml = '';

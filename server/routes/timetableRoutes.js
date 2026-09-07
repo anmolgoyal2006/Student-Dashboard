@@ -17,8 +17,9 @@ const upload = multer({
   fileFilter: (_req, file, cb) => {
     const ok =
       file.mimetype === 'application/pdf' ||
-      /\.pdf$/i.test(file.originalname);
-    cb(ok ? null : new Error('Only PDF files are allowed.'), ok);
+      file.mimetype.startsWith('image/') ||
+      /\.(pdf|png|jpe?g|webp)$/i.test(file.originalname);
+    cb(ok ? null : new Error('Only PDF or image files (PNG, JPG, WEBP) are allowed.'), ok);
   },
 });
 
