@@ -597,55 +597,74 @@ export function buildTimetableExportElement(subjects) {
   return container;
 }
 
+/* ── shared helper: render a DOM element to a canvas without capturing surrounding page ── */
+async function renderElementToCanvas(element, scale = 2.5) {
+  // Wrap in a zero-size clip so html2canvas sees ONLY this element,
+  // not the rest of the page (which caused the blank/duplicate area at top).
+  const wrapper = document.createElement('div');
+  wrapper.style.cssText = [
+    'position:fixed',
+    'top:0',
+    'left:0',
+    'width:0',
+    'height:0',
+    'overflow:hidden',
+    'z-index:-9999',
+    'pointer-events:none',
+  ].join(';');
+
+  // The actual container sits at (0,0) inside the wrapper so its
+  // getBoundingClientRect matches top-left of the viewport — html2canvas
+  // will scroll/clip to exactly this element with no page bleed.
+  element.style.position = 'absolute';
+  element.style.top = '0';
+  element.style.left = '0';
+
+  wrapper.appendChild(element);
+  document.body.appendChild(wrapper);
+
+  try {
+    if (document.fonts) await document.fonts.ready;
+
+    const html2canvas = (await import('html2canvas')).default;
+    const W = element.scrollWidth;
+    const H = element.scrollHeight;
+
+    return await html2canvas(element, {
+      scale,
+      useCORS: true,
+      allowTaint: true,
+      logging: false,
+      backgroundColor: '#000000',
+      // Tell html2canvas the "window" is exactly the element size so it
+      // never captures pixels outside the element boundaries.
+      windowWidth: W,
+      windowHeight: H,
+      scrollX: 0,
+      scrollY: 0,
+      x: 0,
+      y: 0,
+      width: W,
+      height: H,
+    });
+  } finally {
+    if (document.body.contains(wrapper)) {
+      document.body.removeChild(wrapper);
+    }
+  }
+}
+
 /* ── Photo Export (PNG image download) — Maximised High-Res Full Grid ─── */
 export async function exportTimetableImage(subjects, filename = 'Student_Timetable.png') {
   if (!subjects?.length) return;
   const container = buildTimetableExportElement(subjects);
   if (!container) return;
 
-  container.style.position = 'fixed';
-  container.style.top = '-9999px';
-  container.style.left = '0';
-  container.style.zIndex = '-9999';
-  document.body.appendChild(container);
-
-  let dataUrl = null;
-  try {
-    if (document.fonts) {
-      await document.fonts.ready;
-    }
-    // Dynamic import — only fetches html2canvas (~40 KB) when user clicks export
-    const html2canvas = (await import('html2canvas')).default;
-    const canvas = await html2canvas(container, {
-      scale: 2.5, // Ultra-sharp 2.5x retina rendering
-      useCORS: true,
-      allowTaint: true,
-      logging: false,
-      backgroundColor: '#000000',
-      // Constrain capture to exactly the container so html2canvas
-      // doesn't re-render the rest of the page and produce duplicates
-      windowWidth: container.scrollWidth,
-      windowHeight: container.scrollHeight,
-      x: 0,
-      y: 0,
-      width: container.scrollWidth,
-      height: container.scrollHeight,
-    });
-    dataUrl = canvas.toDataURL('image/png');
-  } finally {
-    // Remove the off-screen node BEFORE triggering the download so the
-    // browser doesn't repaint the page a second time and cause duplicates
-    if (document.body.contains(container)) {
-      document.body.removeChild(container);
-    }
-  }
-
-  if (dataUrl) {
-    const link = document.createElement('a');
-    link.download = typeof filename === 'string' ? filename : 'Student_Timetable.png';
-    link.href = dataUrl;
-    link.click();
-  }
+  const canvas = await renderElementToCanvas(container, 2.5);
+  const link = document.createElement('a');
+  link.download = typeof filename === 'string' ? filename : 'Student_Timetable.png';
+  link.href = canvas.toDataURL('image/png');
+  link.click();
 }
 
 /* ── PDF export — matched to timetable aspect ratio (zero empty bars, fully maximised) ── */
@@ -654,44 +673,22 @@ export async function exportTimetablePDF(subjects, filename = 'Student_Timetable
   const container = buildTimetableExportElement(subjects);
   if (!container) return;
 
-  container.style.position = 'fixed';
-  container.style.top = '-9999px';
-  container.style.left = '0';
-  container.style.zIndex = '-9999';
-  document.body.appendChild(container);
+  const canvas = await renderElementToCanvas(container, 2.5);
+  const { jsPDF } = await import('jspdf');
 
-  try {
-    if (document.fonts) {
-      await document.fonts.ready;
-    }
-    // Dynamic imports — html2canvas (~40 KB) + jsPDF (~80 KB) only when needed
-    const html2canvas = (await import('html2canvas')).default;
-    const { jsPDF } = await import('jspdf');
-    const canvas = await html2canvas(container, {
-      scale: 2.5, // Ultra-sharp 2.5x retina rendering
-      useCORS: true,
-      logging: false,
-      backgroundColor: '#000000',
-    });
+  const imgData = canvas.toDataURL('image/jpeg', 0.98);
+  const imgRatio = canvas.width / canvas.height;
+  const pdfWidth = 297; // mm (A4 landscape)
+  const pdfHeight = pdfWidth / imgRatio;
 
-    const imgData = canvas.toDataURL('image/jpeg', 0.98);
-    const imgRatio = canvas.width / canvas.height;
-    const pdfWidth = 297; // mm (A4 landscape)
-    const pdfHeight = pdfWidth / imgRatio; // Exact matching height so timetable fills 100% without letterboxing
+  const pdf = new jsPDF({
+    orientation: 'landscape',
+    unit: 'mm',
+    format: [pdfWidth, pdfHeight],
+  });
 
-    const pdf = new jsPDF({
-      orientation: 'landscape',
-      unit: 'mm',
-      format: [pdfWidth, pdfHeight],
-    });
-
-    pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
-    pdf.save(typeof filename === 'string' ? filename : 'Student_Timetable.pdf');
-  } finally {
-    if (document.body.contains(container)) {
-      document.body.removeChild(container);
-    }
-  }
+  pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+  pdf.save(typeof filename === 'string' ? filename : 'Student_Timetable.pdf');
 }
 
 /* ── Web component — black canvas, vibrant grid ──────────────────────────── */
