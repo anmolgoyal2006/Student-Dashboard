@@ -249,9 +249,9 @@ export function buildTimetableExportElement(subjects) {
   const thsHtml = matrixSlots.map(slot => `
     <th style="
       width: ${SLOT_COL_W}px;
-      background: rgba(255,255,255,0.05);
-      color: rgba(255,255,255,0.85);
-      border: 1px solid rgba(255,255,255,0.35);
+      background: rgba(255,255,255,0.04);
+      color: rgba(255,255,255,0.75);
+      border: 1px solid rgba(255,255,255,0.10);
       padding: 0 4px;
       height: ${HEADER_H}px;
       font-size: 11px;
@@ -397,7 +397,7 @@ export function buildTimetableExportElement(subjects) {
               height: ${CELL_H - SPACING}px;
               width: 100%;
               border-radius: 8px;
-              border: 1px solid rgba(255,255,255,0.22);
+              border: 1px solid rgba(255,255,255,0.04);
               background: #080d18;
               box-sizing: border-box;
             "></div>
@@ -419,7 +419,7 @@ export function buildTimetableExportElement(subjects) {
             width: ${DAY_COL_W}px;
             border-radius: 8px;
             background: #0c1322;
-            border: 1px solid rgba(255,255,255,0.30);
+            border: 1px solid rgba(255,255,255,0.08);
             color: ${accent.color};
             font-size: 13px;
             font-weight: 800;
@@ -528,8 +528,8 @@ export function buildTimetableExportElement(subjects) {
     <div style="
       border-radius: 16px;
       background: #080d1a;
-      border: 1px solid rgba(255,255,255,0.22);
-      box-shadow: 0 0 0 1px rgba(255,255,255,0.08), 0 24px 60px rgba(0,0,0,0.6);
+      border: 1px solid rgba(255,255,255,0.10);
+      box-shadow: 0 0 0 1px rgba(255,255,255,0.04), 0 24px 60px rgba(0,0,0,0.6);
       padding: 14px;
       box-sizing: border-box;
       width: 100%;
@@ -564,7 +564,7 @@ export function buildTimetableExportElement(subjects) {
                 padding: 0 8px;
                 border-radius: 8px;
                 background: #0f172a;
-                border: 1px solid rgba(99,102,241,0.55);
+                border: 1px solid rgba(99,102,241,0.35);
                 color: #a5b4fc;
                 font-size: 12px;
                 font-weight: 800;
@@ -846,8 +846,8 @@ export default function WeeklyGrid({ subjects }) {
         .tt-grid-wrap {
           overflow-x: auto; border-radius: 16px;
           background: var(--tt-surface);
-          border: 1px solid rgba(255,255,255,0.22);
-          box-shadow: 0 0 0 1px rgba(255,255,255,0.08), 0 20px 50px rgba(0,0,0,0.55);
+          border: 1px solid rgba(255,255,255,0.1);
+          box-shadow: 0 0 0 1px rgba(255,255,255,0.04), 0 20px 50px rgba(0,0,0,0.55);
           padding: 14px;
           -webkit-overflow-scrolling: touch;
           scrollbar-width: thin;
@@ -871,13 +871,13 @@ export default function WeeklyGrid({ subjects }) {
           padding: 9px 4px; font-size: 10.5px; font-weight: 800;
           text-align: center; border-radius: 8px;
           white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-          background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.28);
+          background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
           color: rgba(255,255,255,0.75); text-transform: uppercase; letter-spacing: 0.2px;
         }
         .tt-matrix thead th.tt-th-day { padding: 0; border: none; }
         .tt-day-header-card {
           height: 36px; padding: 0 8px; border-radius: 8px;
-          background: #0f172a; border: 1px solid rgba(99,102,241,0.55);
+          background: #0f172a; border: 1px solid rgba(99,102,241,0.35);
           color: #a5b4fc; font-size: 11px; font-weight: 800;
           display: flex; align-items: center; justify-content: center;
           letter-spacing: 0.05em; text-transform: uppercase;
@@ -889,7 +889,7 @@ export default function WeeklyGrid({ subjects }) {
           height: 100%; min-height: 96px; border-radius: 10px; text-align: center;
           font-size: 12px; font-weight: 800; letter-spacing: 0.03em;
           display: flex; align-items: center; justify-content: center;
-          background: #0c1322; border: 1px solid rgba(255,255,255,0.28);
+          background: #0c1322; border: 1px solid rgba(255,255,255,0.09);
           box-sizing: border-box;
         }
 
@@ -900,7 +900,7 @@ export default function WeeklyGrid({ subjects }) {
         .tt-cell-empty  { padding: 3px; vertical-align: top; }
         .tt-cell-empty-inner {
           min-height: 96px; width: 100%; box-sizing: border-box;
-          border-radius: 10px; border: 1px solid rgba(255,255,255,0.18);
+          border-radius: 10px; border: 1px solid rgba(255,255,255,0.04);
           background: rgba(255,255,255,0.015);
         }
 
