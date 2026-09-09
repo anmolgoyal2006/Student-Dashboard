@@ -614,12 +614,13 @@ async function renderElementToCanvas(element, scale = 2.5) {
   wrapper.style.cssText = [
     'position:fixed',
     'top:0',
-    'left:0',
-    // Give the wrapper the same explicit width so the browser lays out the
-    // child at full width instead of collapsing it to viewport width.
+    // Push far off-screen horizontally so it's invisible to the user,
+    // but NOT clipped to zero height — that would collapse the child
+    // and cause html2canvas to tile (duplicate image on mobile).
+    'left:-99999px',
     `width:${explicitWidth}px`,
-    'height:0',
-    'overflow:hidden',
+    'height:auto',
+    'overflow:visible',
     'z-index:-9999',
     'pointer-events:none',
   ].join(';');
@@ -637,12 +638,13 @@ async function renderElementToCanvas(element, scale = 2.5) {
   try {
     if (document.fonts) await document.fonts.ready;
 
-    // One rAF to let the browser finish laying out at the forced width
+    // Two rAFs: first lets layout flush, second ensures paint is settled
+    await new Promise(resolve => requestAnimationFrame(resolve));
     await new Promise(resolve => requestAnimationFrame(resolve));
 
     const html2canvas = (await import('html2canvas')).default;
-    const W = element.scrollWidth;
-    const H = element.scrollHeight;
+    const W = element.offsetWidth  || element.scrollWidth;
+    const H = element.offsetHeight || element.scrollHeight;
 
     return await html2canvas(element, {
       scale,
@@ -650,8 +652,8 @@ async function renderElementToCanvas(element, scale = 2.5) {
       allowTaint: true,
       logging: false,
       backgroundColor: '#000000',
-      // Tell html2canvas the "window" is exactly the element size so it
-      // never captures pixels outside the element boundaries.
+      // windowWidth/Height must match the element exactly — if windowHeight
+      // is smaller than H, html2canvas tiles the render (duplicate image bug).
       windowWidth: W,
       windowHeight: H,
       scrollX: 0,
