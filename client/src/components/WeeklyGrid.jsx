@@ -599,6 +599,15 @@ export function buildTimetableExportElement(subjects) {
 
 /* ── shared helper: render a DOM element to a canvas without capturing surrounding page ── */
 async function renderElementToCanvas(element, scale = 2.5) {
+  // Force the element to lay out at its full intrinsic desktop width BEFORE
+  // measuring. On mobile the viewport is ~390px so scrollWidth would be tiny,
+  // causing the grid columns to wrap/merge. We read the explicit inline width
+  // set by buildTimetableExportElement (exportWidth px) and use that as the
+  // forced render width — it's always the full grid size regardless of screen.
+  const explicitWidth = parseInt(element.style.width, 10) || 1400;
+  element.style.minWidth = `${explicitWidth}px`;
+  element.style.width = `${explicitWidth}px`;
+
   // Wrap in a zero-size clip so html2canvas sees ONLY this element,
   // not the rest of the page (which caused the blank/duplicate area at top).
   const wrapper = document.createElement('div');
@@ -606,7 +615,9 @@ async function renderElementToCanvas(element, scale = 2.5) {
     'position:fixed',
     'top:0',
     'left:0',
-    'width:0',
+    // Give the wrapper the same explicit width so the browser lays out the
+    // child at full width instead of collapsing it to viewport width.
+    `width:${explicitWidth}px`,
     'height:0',
     'overflow:hidden',
     'z-index:-9999',
@@ -625,6 +636,9 @@ async function renderElementToCanvas(element, scale = 2.5) {
 
   try {
     if (document.fonts) await document.fonts.ready;
+
+    // One rAF to let the browser finish laying out at the forced width
+    await new Promise(resolve => requestAnimationFrame(resolve));
 
     const html2canvas = (await import('html2canvas')).default;
     const W = element.scrollWidth;
