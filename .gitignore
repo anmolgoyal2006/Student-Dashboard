@@ -17,3 +17,13 @@ test_ocr_debug.py
 
 # Jest coverage output — generated locally, not source
 server/coverage/
+
+# Local OCR / grade extraction — heavy, keep local only
+server/scripts/extractGradeCells.py
+server/scripts/table_detector.py
+server/scripts/__pycache__/
+server/requirements-ocr-local.txt
+LOCAL_TROCR_SETUP.md
+grades.json
+stderr.txt
+*.pdf
