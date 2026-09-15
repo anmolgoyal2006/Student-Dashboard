@@ -1,0 +1,13 @@
+# Local-only OCR dependencies for TrOCR handwritten recognition
+# These are NOT installed on Render production.
+# Install with: pip install -r server/requirements-ocr-local.txt
+# OR in your local Python environment.
+
+# Core dependencies for TrOCR
+torch>=2.0.0
+transformers>=4.30.0
+pillow>=9.0.0
+
+# Optional: if you want GPU support, install the appropriate torch version
+# For CPU-only: pip install torch --index-url https://download.pytorch.org/whl/cpu
+# For CUDA: follow PyTorch instructions for your CUDA version.

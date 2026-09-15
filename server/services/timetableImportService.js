@@ -372,7 +372,9 @@ async function parseTimetablePDF(buffer) {
 
   // 2. Fallback to raw plain-text parsing if structured grid parsing didn't return subjects
   let text = plumberLayoutText || '';
-  const hasParsedSubjects = parsedJson?.subjects && parsedJson.subjects.length > 0;
+  // Helper: extract subjects array from either {"subjects":[...]} or a bare [...]
+  const getSubjects = (j) => Array.isArray(j) ? j : (Array.isArray(j?.subjects) ? j.subjects : null);
+  const hasParsedSubjects = getSubjects(parsedJson)?.length > 0;
   if (!hasParsedSubjects) {
     if (!text) {
       try {
@@ -400,12 +402,12 @@ async function parseTimetablePDF(buffer) {
   }
 
   // 3. Fallback to visual parsing if still no subjects, or if we got an 8:00 class (likely alignment shift)
-  const hasEightAmClass = parsedJson?.subjects?.some(s => 
+  const hasEightAmClass = getSubjects(parsedJson)?.some(s =>
     s.schedule?.some(slot => slot.startTime === '08:00' || slot.startTime === '08:30')
   );
 
-  const shouldFallbackToVision = !parsedJson?.subjects || 
-                                 parsedJson.subjects.length === 0 || 
+  const shouldFallbackToVision = !getSubjects(parsedJson) ||
+                                 getSubjects(parsedJson).length === 0 ||
                                  (hasEightAmClass && process.env.NODE_ENV !== 'test');
 
   if (shouldFallbackToVision) {
@@ -444,7 +446,7 @@ async function parseTimetablePDF(buffer) {
     parsedJson = extractJSON((rawText || '').trim());
   }
 
-  const subjects = Array.isArray(parsedJson?.subjects) ? parsedJson.subjects : null;
+  const subjects = getSubjects(parsedJson);
 
   if (!subjects || subjects.length === 0) {
     const e = new Error('Could not find any classes in that PDF.');
@@ -476,17 +478,32 @@ async function parseTimetableImage(buffer, mimeType = 'image/jpeg') {
     { text: PROMPT },
   ];
 
-  const rawText = await generateContentWithInlineData(parts, {
-    model: LIGHT_MODEL,
-    temperature: 0,
-    maxOutputTokens: 8000,
-    responseMimeType: 'application/json',
-  });
+  let rawText;
+  try {
+    rawText = await generateContentWithInlineData(parts, {
+      model: LIGHT_MODEL,
+      temperature: 0,
+      maxOutputTokens: 8000,
+      responseMimeType: 'application/json',
+    });
+  } catch (err) {
+    // Some models / keys reject the responseMimeType constraint — retry without it
+    console.warn('[Timetable Import] Image parse with JSON mime failed, retrying without mime constraint:', err.message);
+    rawText = await generateContentWithInlineData(parts, {
+      model: LIGHT_MODEL,
+      temperature: 0,
+      maxOutputTokens: 8000,
+    });
+  }
 
   const parsedJson = extractJSON((rawText || '').trim());
-  const subjects = Array.isArray(parsedJson?.subjects) ? parsedJson.subjects : null;
+  // Gemini sometimes returns a bare array instead of {"subjects":[...]}
+  const subjects = Array.isArray(parsedJson)
+    ? parsedJson
+    : Array.isArray(parsedJson?.subjects) ? parsedJson.subjects : null;
 
   if (!subjects || subjects.length === 0) {
+    console.error('[Timetable Import] Image parse returned no subjects. Raw Gemini response (first 500 chars):', (rawText || '').slice(0, 500));
     const e = new Error('Could not find any classes in that timetable photo.');
     e.code = 'NO_TIMETABLE';
     e.hint = 'Make sure the image clearly shows day columns, time slots, and subject names.';

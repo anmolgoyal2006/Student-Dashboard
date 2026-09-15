@@ -12,7 +12,7 @@ import re
 import sys
 import tempfile
 
-# ── Windows: ensure poppler is on PATH ───────────────────────────────────
+# ── Windows: ensure poppler is on PATH # ---# ---───
 if sys.platform == 'win32':
     winget_root = os.path.expanduser(r'~\AppData\Local\Microsoft\WinGet\Packages')
     if os.path.isdir(winget_root):
@@ -25,8 +25,44 @@ import cv2
 import numpy as np
 import pytesseract
 from pdf2image import convert_from_path
+from table_detector import detect_table_structure, is_tatr_available
 
-# ── Windows: find tesseract binary ───────────────────────────────────────
+# ── TrOCR optional engine # ---# ---# ---─
+try:
+    import torch
+    from transformers import TrOCRProcessor, VisionEncoderDecoderModel
+    from PIL import Image
+    TROCR_AVAILABLE = True
+except ImportError:
+    torch = None
+    TrOCRProcessor = None
+    VisionEncoderDecoderModel = None
+    Image = None
+    TROCR_AVAILABLE = False
+    sys.stderr.write("[TrOCR] Dependencies not installed. TrOCR disabled.\n")
+
+ENABLE_TROCR_LOCAL = os.environ.get('ENABLE_TROCR_LOCAL', 'false').lower() == 'true'
+ENABLE_TATR_LOCAL = os.environ.get('ENABLE_TATR_LOCAL', 'false').lower() == 'true'
+_trocr_model = None
+_trocr_processor = None
+
+def load_trocr():
+    global _trocr_model, _trocr_processor
+    if not ENABLE_TROCR_LOCAL or not TROCR_AVAILABLE:
+        return None, None
+    if _trocr_model is None:
+        try:
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+            _trocr_processor = TrOCRProcessor.from_pretrained("microsoft/trocr-base-handwritten")
+            _trocr_model = VisionEncoderDecoderModel.from_pretrained("microsoft/trocr-base-handwritten").to(device)
+            sys.stderr.write("[TrOCR] Model loaded on {}\n".format(device))
+        except Exception as e:
+            sys.stderr.write("[TrOCR] Failed to load model: {}\n".format(e))
+            _trocr_model = None
+            _trocr_processor = None
+    return _trocr_model, _trocr_processor
+
+# ── Windows: find tesseract binary # ---# ---───────
 if sys.platform == 'win32':
     for p in [
         r'C:\Program Files\Tesseract-OCR\tesseract.exe',
@@ -41,7 +77,7 @@ os.makedirs(DEBUG_DIR, exist_ok=True)
 
 VALID_GRADES = {'A+', 'A', 'B+', 'B', 'C+', 'C', 'D', 'F', 'F(UMC)'}
 
-# ── Grade normalization ───────────────────────────────────────────────────
+# ── Grade normalization # ---# ---# ---───
 
 EXPLICIT_MAP = {
     'R': 'B', '8': 'B', '2': 'B', '6': 'B',
@@ -129,7 +165,96 @@ def clean_name(raw):
     return ' '.join(words)
 
 
-# ── OCR helpers ───────────────────────────────────────────────────────────
+# ── OCR helpers # ---# ---───────────
+
+def identify_columns(cells, page_gray):
+    """
+    Identify which columns correspond to SID, Name, Grade using OCR on the header row.
+    cells: list of cell bounding boxes (x1,y1,x2,y2) from TATR.
+    page_gray: grayscale image of the page.
+    Returns dict with keys 'sid', 'name', 'grade' mapping to column indices (0-based within row),
+    or None if identification fails.
+    """
+    if not cells:
+        return None
+    # Group cells into rows by y-coordinate (using a threshold)
+    # Sort cells by y1
+    cells_sorted = sorted(cells, key=lambda b: b[1])
+    # Estimate row height as median cell height
+    heights = [b[3]-b[1] for b in cells_sorted]
+    if not heights:
+        return None
+    median_height = sorted(heights)[len(heights)//2]
+    row_threshold = median_height * 0.5
+    rows = []
+    current_row = []
+    current_y = cells_sorted[0][1]
+    for cell in cells_sorted:
+        if abs(cell[1] - current_y) < row_threshold:
+            current_row.append(cell)
+        else:
+            if current_row:
+                rows.append(sorted(current_row, key=lambda b: b[0]))
+            current_row = [cell]
+            current_y = cell[1]
+    if current_row:
+        rows.append(sorted(current_row, key=lambda b: b[0]))
+    if not rows:
+        return None
+    # Assume first row is header
+    header_row = rows[0]
+    # OCR each header cell
+    header_texts = []
+    for (x1,y1,x2,y2) in header_row:
+        # Crop region with some padding
+        pad = 2
+        y1_crop = max(0, y1 - pad)
+        y2_crop = min(page_gray.shape[0], y2 + pad)
+        x1_crop = max(0, x1 - pad)
+        x2_crop = min(page_gray.shape[1], x2 + pad)
+        cell_img = page_gray[y1_crop:y2_crop, x1_crop:x2_crop]
+        if cell_img.size == 0:
+            header_texts.append('')
+            continue
+        # Prepare for OCR
+        prepared = prepare_cell(cell_img, scale_to_height=30)
+        if prepared is not None:
+            text = ocr_text(prepared, psm=7, whitelist='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz')
+        else:
+            text = ''
+        header_texts.append(text.strip().upper())
+    # Map to column indices
+    sid_keywords = ['SID', 'ROLL', 'ID', 'STUDENT ID']
+    name_keywords = ['NAME', 'STUDENT NAME', 'FULL NAME']
+    grade_keywords = ['GRADE', 'MARK', 'GRADE POINTS', 'GP']
+    sid_idx = None
+    name_idx = None
+    grade_idx = None
+    for idx, text in enumerate(header_texts):
+        if any(kw in text for kw in sid_keywords):
+            sid_idx = idx
+        elif any(kw in text for kw in name_keywords):
+            name_idx = idx
+        elif any(kw in text for kw in grade_keywords):
+            grade_idx = idx
+    if sid_idx is None or name_idx is None or grade_idx is None:
+        # Fallback: use positional assumption based on common layout
+        # In the given PDF, columns are: Sr. No., SID, Name, Units, Grade
+        # So SID at index 1, Name at 2, Grade at 4 (0-based)
+        if len(header_row) >= 5:
+            sid_idx = 1
+            name_idx = 2
+            grade_idx = 4
+        else:
+            # Try to guess: often first is index, second is SID, third is name, last is grade
+            if len(header_row) >= 4:
+                sid_idx = 1
+                name_idx = 2
+                grade_idx = 3
+            else:
+                return None
+    return {'sid': sid_idx, 'name': name_idx, 'grade': grade_idx}
+# ---
 
 def prepare_cell(gray_cell, scale_to_height=80):
     """Upscale, denoise, binarize a cell image for best OCR."""
@@ -196,20 +321,15 @@ def read_name(gray_cell):
     return clean_name(raw)
 
 
-def read_grade(gray_cell, debug_path=None):
-    """Try multiple strategies to read a handwritten grade."""
+def read_grade_tesseract(gray_cell, debug_path=None):
+    """Original Tesseract-based grade reading."""
     cell = prepare_cell(gray_cell, scale_to_height=80)
     if cell is None:
         return ''
-
     cell = remove_horizontal_lines(cell)
-
     if debug_path:
         cv2.imwrite(debug_path, cell)
-
     whitelist = 'ABCDFabcdf+()'
-
-    # Try each PSM mode
     for psm in [8, 7, 13, 6]:
         raw = ocr_text(cell, psm=psm, whitelist=whitelist)
         if 'UMC' in raw.upper():
@@ -217,21 +337,47 @@ def read_grade(gray_cell, debug_path=None):
         grade = normalize_grade(raw)
         if grade:
             return grade
-
-    # Last resort: no whitelist
     for psm in [8, 7]:
         raw = ocr_text(cell, psm=psm, whitelist='')
         grade = normalize_grade(raw)
         if grade:
             return grade
-
     sys.stderr.write(f'[Grade] Failed all strategies. '
                      f'Raw PSM8={ocr_text(cell, 8, whitelist)!r} '
                      f'PSM7={ocr_text(cell, 7, whitelist)!r}\n')
     return ''
 
+def read_grade_trocr(gray_cell, model, processor):
+    """Use TrOCR to read a handwritten grade cell."""
+    cell = prepare_cell(gray_cell, scale_to_height=80)
+    if cell is None:
+        return ''
+    cell = remove_horizontal_lines(cell)
+    # Convert to PIL Image (TrOCR expects RGB)
+    pil_img = Image.fromarray(cv2.cvtColor(cell, cv2.COLOR_GRAY2RGB))
+    pixel_values = processor(images=pil_img, return_tensors="pt").pixel_values.to(model.device)
+    generated_ids = model.generate(pixel_values, max_length=4, num_beams=4)
+    generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
+    grade = normalize_grade(generated_text)
+    if grade:
+        sys.stderr.write("[TrOCR] Recognized: '{}' -> '{}'\n".format(generated_text, grade))
+    else:
+        sys.stderr.write("[TrOCR] Failed to recognize: '{}'\n".format(generated_text))
+    return grade
 
-# ── Table grid detection ──────────────────────────────────────────────────
+def read_grade(gray_cell, debug_path=None):
+    """Try TrOCR if enabled, else fallback to Tesseract."""
+    if ENABLE_TROCR_LOCAL and TROCR_AVAILABLE:
+        model, processor = load_trocr()
+        if model is not None:
+            grade = read_grade_trocr(gray_cell, model, processor)
+            if grade:
+                return grade
+    # Fallback to Tesseract
+    return read_grade_tesseract(gray_cell, debug_path)
+
+
+# ── Table grid detection ───────────────────────────────────────────────────
 
 def detect_horizontal_lines(gray):
     """Find Y coordinates of horizontal table grid lines."""
@@ -261,21 +407,12 @@ def detect_horizontal_lines(gray):
 
     return lines
 
-
-# FIX 1: Corrected column percentages to match actual document layout.
-# Previously grade col started at 80% — grade is written in the last ~15%
-# of the page. SID occupies roughly 8–26%, name 26–72%, grade 82–99%.
-# Extended grade region right edge to 100% and added extra padding below
-# to catch the cursive "+" which often extends below the cell boundary.
 def map_columns(vert_lines, page_w):
     return {
         'sid':   (int(page_w * 0.08), int(page_w * 0.26)),
         'name':  (int(page_w * 0.26), int(page_w * 0.72)),
         'grade': (int(page_w * 0.82), int(page_w * 1.00)),
     }
-
-
-# ── Text-projection row fallback ─────────────────────────────────────────
 
 def detect_rows_by_projection(gray):
     """Detect data row Y bands using horizontal text projection."""
@@ -304,11 +441,6 @@ def detect_rows_by_projection(gray):
 
     return bands
 
-
-# FIX 2: Merge nearby row bands that belong to the same data row.
-# Handwritten text sometimes breaks into two projection bands (e.g. the
-# ascender of a letter separated from its body). Merging bands < 8px apart
-# prevents double-counting and missed cells.
 def merge_nearby_bands(bands, gap=8):
     if not bands:
         return []
@@ -320,7 +452,6 @@ def merge_nearby_bands(bands, gap=8):
             merged.append([y1, y2])
     return [tuple(b) for b in merged]
 
-
 # ── Per-page extraction ───────────────────────────────────────────────────
 
 def extract_page(pil_image, page_num):
@@ -329,6 +460,64 @@ def extract_page(pil_image, page_num):
     gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
     h, w = gray.shape
 
+    # 1. Try TATR if enabled
+    if ENABLE_TATR_LOCAL and is_tatr_available():
+        rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
+        structure = detect_table_structure(rgb)
+        if structure['table_detected'] and structure['cells']:
+            col_map = identify_columns(structure['cells'], gray)
+            if col_map is not None:
+                cells = structure['cells']
+                cells_sorted = sorted(cells, key=lambda b: b[1])
+                heights = [b[3]-b[1] for b in cells_sorted]
+                if heights:
+                    median_height = sorted(heights)[len(heights)//2]
+                    row_threshold = median_height * 0.5
+                    rows = []
+                    current_row = []
+                    current_y = cells_sorted[0][1]
+                    for cell in cells_sorted:
+                        if abs(cell[1] - current_y) < row_threshold:
+                            current_row.append(cell)
+                        else:
+                            if current_row:
+                                rows.append(sorted(current_row, key=lambda b: b[0]))
+                            current_row = [cell]
+                            current_y = cell[1]
+                    if current_row:
+                        rows.append(sorted(current_row, key=lambda b: b[0]))
+                    if len(rows) > 1:
+                        data_rows = rows[1:]
+                        seen_sids = set()
+                        result_rows = []
+                        for row_idx, row_cells in enumerate(data_rows):
+                            if len(row_cells) <= max(col_map.values()):
+                                continue
+                            sid_cell = row_cells[col_map['sid']]
+                            name_cell = row_cells[col_map['name']]
+                            grade_cell = row_cells[col_map['grade']]
+                            pad = 5
+                            sx1, sy1, sx2, sy2 = sid_cell
+                            sid_crop = gray[max(0, sy1-pad):min(h, sy2+pad), max(0, sx1-pad):min(w, sx2+pad)]
+                            sid = read_sid(sid_crop)
+                            if len(sid) < 5:
+                                continue
+                            if sid in seen_sids:
+                                continue
+                            nx1, ny1, nx2, ny2 = name_cell
+                            name_crop = gray[max(0, ny1-pad):min(h, ny2+pad), max(0, nx1-pad):min(w, nx2+pad)]
+                            name = read_name(name_crop)
+                            gx1, gy1, gx2, gy2 = grade_cell
+                            grade_crop = gray[max(0, gy1-pad):min(h, gy2+pad), max(0, gx1-pad):min(w, gx2+pad)]
+                            debug_path = os.path.join(DEBUG_DIR, f'p{page_num}_r{row_idx}_grade.png')
+                            grade = read_grade(grade_crop, debug_path=debug_path)
+                            seen_sids.add(sid)
+                            result_rows.append({'sid': sid, 'name': name, 'grade': grade})
+                        if result_rows:
+                            sys.stderr.write(f'[Python] Page {page_num}: {len(result_rows)} rows from TATR\n')
+                            return result_rows
+
+    # 2. Grid detection (original logic)
     horiz_lines = detect_horizontal_lines(gray)
     sys.stderr.write(f'[Python] Page {page_num}: {len(horiz_lines)} horizontal lines detected\n')
 
@@ -345,7 +534,7 @@ def extract_page(pil_image, page_num):
                 row_bands.append((y1, y2))
     else:
         raw_bands = detect_rows_by_projection(gray)
-        row_bands = merge_nearby_bands(raw_bands, gap=8)   # FIX 2 applied here
+        row_bands = merge_nearby_bands(raw_bands, gap=8)
         sys.stderr.write(f'[Python] Page {page_num}: using text projection, {len(row_bands)} bands\n')
 
     sys.stderr.write(f'[Python] Page {page_num}: {len(row_bands)} data row bands\n')
@@ -355,19 +544,14 @@ def extract_page(pil_image, page_num):
 
     for row_idx, (y1, y2) in enumerate(row_bands):
         row_h = y2 - y1
-
         pad = max(2, int(row_h * 0.05))
         gy1 = max(0, y1 + pad)
         gy2 = min(h, y2 - pad)
 
-        # SID cell
         sx1, sx2 = col_map['sid']
         sid_crop = gray[gy1:gy2, max(0, sx1 + 4):min(w, sx2 - 4)]
         sid = read_sid(sid_crop)
 
-        # FIX 3: Accept SIDs of length >= 5 (not 6). Your 2022/2023 batch
-        # SIDs are 8 digits (e.g. 22103049) but OCR noise can drop one digit.
-        # Rejecting anything < 5 still filters out header/signature rows.
         if len(sid) < 5:
             sys.stderr.write(f'[Python] Page {page_num} row {row_idx}: rejected sid={sid!r}\n')
             continue
@@ -375,14 +559,10 @@ def extract_page(pil_image, page_num):
         if sid in seen_sids:
             continue
 
-        # Name cell
         nx1, nx2 = col_map['name']
         name_crop = gray[gy1:gy2, max(0, nx1 + 4):min(w, nx2 - 4)]
         name = read_name(name_crop)
 
-        # FIX 4: Grade cell — extended vertical padding significantly.
-        # Cursive A+/B+ strokes often extend 30–40% above/below the row band.
-        # Previously only 15% padding was used; bumped to 30% above and 40% below.
         gx1, gx2 = col_map['grade']
         grade_y1 = max(0, y1 - int(row_h * 0.30))
         grade_y2 = min(h, y2 + int(row_h * 0.40))
@@ -398,10 +578,15 @@ def extract_page(pil_image, page_num):
             'grade': grade,
         })
 
-    return rows
+    if rows:
+        return rows
+
+    # 3. Full-page OCR fallback
+    sys.stderr.write(f'[Python] Page {page_num}: grid detection yielded no rows, trying full-page OCR\n')
+    return extract_page_fullpage_ocr(pil_image, page_num)
 
 
-# ── Full-page OCR fallback ────────────────────────────────────────────────
+# ── Full-page OCR fallback # ---# ---# ---
 
 def extract_page_fullpage_ocr(pil_image, page_num):
     """
@@ -459,7 +644,7 @@ def extract_page_fullpage_ocr(pil_image, page_num):
     return rows
 
 
-# ── Main ─────────────────────────────────────────────────────────────────
+# ── Main # ---# ---# ---# ---─
 
 def main():
     if len(sys.argv) < 2:

@@ -21,11 +21,11 @@ const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_API_KEY_BACKUP = process.env.GEMINI_API_KEY_BACKUP || null;
 
 // Heavy model: used for quality-critical analysis (resume, predictions)
-const HEAVY_MODEL = sanitizeModel(process.env.GEMINI_HEAVY_MODEL, 'gemini-3.8-flash');
+const HEAVY_MODEL = sanitizeModel(process.env.GEMINI_HEAVY_MODEL, 'gemini-3.6-flash');
 // Light model: used for general AI tasks (chat, DSA coach, timetable, etc.)
-const LIGHT_MODEL = sanitizeModel(process.env.GEMINI_LIGHT_MODEL, 'gemini-3.8-flash');
+const LIGHT_MODEL = sanitizeModel(process.env.GEMINI_LIGHT_MODEL, 'gemini-3.6-flash');
 // Nano model: used for small fast tasks (transcription, study planner)
-const NANO_MODEL = sanitizeModel(process.env.GEMINI_NANO_MODEL, 'gemini-3.8-flash');
+const NANO_MODEL = sanitizeModel(process.env.GEMINI_NANO_MODEL, 'gemini-3.6-flash');
 // GEMINI_MODEL kept for backward compat — any code importing it gets the light model
 const GEMINI_MODEL = LIGHT_MODEL;
 // Embedding model: used for RAG (semantic search over uploaded notes)
@@ -96,9 +96,10 @@ async function geminiFetch(path, body, model = LIGHT_MODEL) {
     return await geminiBreaker.exec(primaryCall);
   } catch (err) {
     if (shouldTryBackupKey(err)) {
-      console.warn(`[AI Service] Primary key failed (${err.statusCode}) — retrying with backup key...`);
-      // Bypass the breaker for the backup attempt so a tripped primary breaker
-      // doesn't also block the backup key.
+      console.warn(`[AI Service] Primary key failed (${err.statusCode}) — retrying with backup key after delay...`);
+      // Wait 2s before backup attempt — gives the rate-limit window a chance
+      // to clear, and avoids hammering if both keys share the same project quota.
+      await new Promise(r => setTimeout(r, 2000));
       return geminiFetchRaw(path, body, model, GEMINI_API_KEY_BACKUP);
     }
     throw err;
@@ -153,9 +154,9 @@ function buildGeminiContents(messages) {
 
 async function generateContent(contents, options = {}) {
   const model = options.model || LIGHT_MODEL;
-  const modelCascade = [model, 'gemini-3.8-flash', 'gemini-3.1-flash-lite', 'gemini-2.5-flash'];
+  const modelCascade = [model, 'gemini-3.6-flash', 'gemini-3.1-flash-lite', 'gemini-2.5-flash'];
   return withRetry(async (attempt) => {
-    const targetModel = modelCascade[attempt] || 'gemini-3.8-flash';
+    const targetModel = modelCascade[attempt] || 'gemini-3.6-flash';
     const body = { contents };
 
     if (options.systemInstruction) {
@@ -231,9 +232,9 @@ async function transcribeAudio(audioBuffer, mimetype) {
 
 async function generateContentWithInlineData(parts, options = {}) {
   const model = options.model || LIGHT_MODEL;
-  const modelCascade = [model, 'gemini-3.8-flash', 'gemini-3.1-flash-lite', 'gemini-2.5-flash'];
+  const modelCascade = [model, 'gemini-3.6-flash', 'gemini-3.1-flash-lite', 'gemini-2.5-flash'];
   return withRetry(async (attempt) => {
-    const targetModel = modelCascade[attempt] || 'gemini-3.8-flash';
+    const targetModel = modelCascade[attempt] || 'gemini-3.6-flash';
     const body = {
       contents: [{ role: 'user', parts }],
     };
