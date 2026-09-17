@@ -20,7 +20,7 @@ const Task                = require('../models/Task');
 const ClassroomCourse     = require('../models/ClassroomCourse');
 const ClassroomAssignment = require('../models/ClassroomAssignment');
 
-const DEMO_EMAIL    = 'demo@studentai.app';
+const DEMO_EMAIL    = 'anmolgoyal1974@gmail.com';
 const DEMO_PASSWORD = 'Demo@123';
 
 const DAY_MS = 24 * 60 * 60 * 1000;

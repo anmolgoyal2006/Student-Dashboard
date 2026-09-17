@@ -6,7 +6,7 @@ import { useAuth } from '../../context/AuthContext';
 import { authService } from '../../services/apiServices';
 import toast from '../../context/ToastContext';
 
-const DEMO_CREDENTIALS = { email: 'demo@studentai.app', password: 'Demo@123' };
+const DEMO_CREDENTIALS = { email: 'anmolgoyal1974@gmail.com', password: 'Demo@123' };
 
 export default function Demo() {
   const { login } = useAuth();
