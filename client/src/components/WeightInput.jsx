@@ -24,8 +24,15 @@ export default function WeightInput({ columns = [], selectedColumns = [], weight
   }, 0);
 
   const handleChange = (name, raw) => {
-    const val = raw === '' ? '' : Math.max(0, Number(raw));
-    onChange({ ...weights, [name]: val });
+    // Allow empty string while typing so the field can be cleared
+    if (raw === '') {
+      onChange({ ...weights, [name]: '' });
+      return;
+    }
+    const num = Number(raw);
+    // Allow 0 and any positive number; reject NaN
+    if (isNaN(num)) return;
+    onChange({ ...weights, [name]: num < 0 ? 0 : num });
   };
 
   const resetAll = () => {
@@ -131,6 +138,13 @@ export default function WeightInput({ columns = [], selectedColumns = [], weight
                 step="0.5"
                 value={currentWeight}
                 onChange={e => handleChange(col.name, e.target.value)}
+                onFocus={e => e.target.select()}
+                onBlur={e => {
+                  // If left empty or invalid on blur, revert to original max
+                  if (e.target.value === '' || isNaN(Number(e.target.value))) {
+                    handleChange(col.name, col.max);
+                  }
+                }}
                 className="form-input"
                 style={{
                   width       : 72,

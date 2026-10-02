@@ -20,8 +20,14 @@ const Task                = require('../models/Task');
 const ClassroomCourse     = require('../models/ClassroomCourse');
 const ClassroomAssignment = require('../models/ClassroomAssignment');
 
-const DEMO_EMAIL    = 'anmolgoyal1974@gmail.com';
+const DEMO_EMAIL    = 'demo@studentai.app';
 const DEMO_PASSWORD = 'Demo@123';
+
+// This script wipes and re-creates EVERYTHING scoped to the target user
+// (subjects/timetable, attendance, marks, semesters, tasks, classroom,
+// career progress). It must therefore ONLY ever run against a dedicated
+// throwaway demo account — never a real person's account.
+const ALLOWED_DEMO_EMAILS = new Set(['demo@studentai.app']);
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -377,7 +383,24 @@ async function main() {
   await mongoose.connect(process.env.MONGO_URI);
   console.log('[seed:demo] Connected to MongoDB');
 
+  const email = DEMO_EMAIL.toLowerCase();
+  if (!ALLOWED_DEMO_EMAILS.has(email)) {
+    console.error(`[seed:demo] REFUSING to run: '${DEMO_EMAIL}' is not an allowed demo account.`);
+    console.error('[seed:demo] This script WIPES the target user\'s subjects, attendance, marks,');
+    console.error('[seed:demo] semesters, tasks, classroom data and career progress, then seeds fake');
+    console.error('[seed:demo] data. Only a dedicated throwaway demo account may be used.');
+    await mongoose.disconnect();
+    process.exit(1);
+  }
+
   let user = await User.findOne({ email: DEMO_EMAIL });
+
+  if (user && (user.googleId || (user.avatar && !user.avatar.includes('demo')))) {
+    console.error(`[seed:demo] REFUSING to run: '${DEMO_EMAIL}' is linked to a Google account (googleId=${user.googleId || 'set'}).`);
+    console.error('[seed:demo] Refusing to wipe a real, Google-authenticated user. Create a separate demo account instead.');
+    await mongoose.disconnect();
+    process.exit(1);
+  }
   const hashed = await bcrypt.hash(DEMO_PASSWORD, 12);
 
   if (user) {
