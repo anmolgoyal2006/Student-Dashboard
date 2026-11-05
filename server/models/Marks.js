@@ -23,4 +23,7 @@ marksSchema.pre('save', function (next) {
   next();
 });
 
+marksSchema.index({ userId: 1, examType: 1 });
+marksSchema.index({ userId: 1, examDate: -1 });
+
 module.exports = mongoose.model('Marks', marksSchema);

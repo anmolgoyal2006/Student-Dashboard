@@ -165,12 +165,6 @@ exports.chat = async (req, res) => {
 exports.getNotes = async (req, res) => {
   try {
     const userId = new mongoose.Types.ObjectId(req.user.id);
-    console.log('[getNotes] searching for userId:', userId.toString());
-
-    // First check raw count
-    const totalChunks = await NoteChunk.countDocuments({ user: userId });
-    console.log('[getNotes] total chunks for user:', totalChunks);
-
     const notes = await NoteChunk.aggregate([
       { $match: { user: userId } },
       { $group: {
@@ -180,8 +174,6 @@ exports.getNotes = async (req, res) => {
       }},
       { $sort: { updatedAt: -1 } },
     ]);
-
-    console.log('[getNotes] aggregated notes:', JSON.stringify(notes));
 
     // Prevent browser caching
     res.set('Cache-Control', 'no-store');

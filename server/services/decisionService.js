@@ -9,8 +9,8 @@ const ClassroomAssignment = require('../models/ClassroomAssignment');
 const getAttendanceScore = async (userId) => {
   const Subject = require('../models/Subject');
   const [subjectsList, records] = await Promise.all([
-    Subject.find({ userId }).lean(),
-    Attendance.find({ userId }).populate('subjectId', 'name').lean()
+    Subject.find({ userId }).select('name initialTotal initialPresent').lean(),
+    Attendance.find({ userId }, { subjectId: 1, status: 1 }).lean()
   ]);
 
   const map = {};
@@ -20,8 +20,8 @@ const getAttendanceScore = async (userId) => {
 
   for (const r of records) {
     if (!r.subjectId) continue;
-    const key = r.subjectId._id.toString();
-    if (!map[key]) map[key] = { name: r.subjectId.name, total: 0, present: 0 };
+    const key = (r.subjectId?._id || r.subjectId).toString();
+    if (!map[key]) continue;
     if (r.status !== 'cancelled') {
       map[key].total++;
       if (r.status === 'present') map[key].present++;
@@ -42,7 +42,10 @@ const getAttendanceScore = async (userId) => {
 };
 
 const getCGPA = async (userId) => {
-  const marks = await Marks.find({ userId, examType: 'final' }).populate('subjectId', 'credits');
+  const marks = await Marks.find({ userId, examType: 'final' })
+    .select('gradePoint subjectId')
+    .populate('subjectId', 'credits')
+    .lean();
   if (!marks.length) return 0;
   let totalWt = 0, totalCr = 0;
   for (const m of marks) {
@@ -54,7 +57,9 @@ const getCGPA = async (userId) => {
 };
 
 const getCareerData = async (userId) => {
-  const career = await CareerProgress.findOne({ userId });
+  const career = await CareerProgress.findOne({ userId })
+    .select('problemsSolved readiness targetCompany leetcodeSync leetcodeUsername')
+    .lean();
   if (!career) return { problemsSolved: 0, readiness: 'Beginner', targetCompany: 'Other', lcEasy: 0, lcMedium: 0, lcHard: 0, lcLinked: false };
   const lc = career.leetcodeSync || {};
   return {
@@ -69,7 +74,11 @@ const getCareerData = async (userId) => {
 };
 
 const getClassroomAssignments = async (userId) => {
-  const assignments = await ClassroomAssignment.find({ userId, status: { $ne: 'submitted' } }).sort({ dueDate: 1 }).limit(5);
+  const assignments = await ClassroomAssignment.find({ userId, status: { $ne: 'submitted' } })
+    .select('title courseName dueDate status priority')
+    .sort({ dueDate: 1 })
+    .limit(5)
+    .lean();
   return assignments.map(a => ({
     title: a.title,
     course: a.courseName,

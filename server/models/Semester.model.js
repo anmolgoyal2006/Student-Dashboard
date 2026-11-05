@@ -63,6 +63,8 @@ const SemesterSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+SemesterSchema.index({ student: 1, semesterNumber: 1 });
+
 // Auto-compute SGPA before saving
 SemesterSchema.pre('save', function (next) {
   if (this.isManual && this.directSGPA !== null) {

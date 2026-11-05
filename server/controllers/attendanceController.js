@@ -137,10 +137,9 @@ exports.getAttendanceSummary = async (req, res) => {
     if (cached) return res.json(cached);
 
     const [subjects, records] = await Promise.all([
-      Subject.find({ userId }).lean(),
+      Subject.find({ userId }).select('name code credits initialTotal initialPresent').lean(),
       Attendance
-        .find({ userId })
-        .populate('subjectId', 'name code credits')
+        .find({ userId }, { subjectId: 1, status: 1, date: 1 })
         .sort({ date: 1 })
         .lean()
     ]);
@@ -164,20 +163,8 @@ exports.getAttendanceSummary = async (req, res) => {
     for (const r of records) {
       if (!r.subjectId) continue;
 
-      const key = r.subjectId._id.toString();
-
-      if (!map[key]) {
-        map[key] = {
-          subject       : r.subjectId.name,
-          code          : r.subjectId.code,
-          credits       : r.subjectId.credits ?? null,
-          total         : 0,
-          present       : 0,
-          absent        : 0,
-          currentStreak : 0,
-          lastStatuses  : [],
-        };
-      }
+      const key = (r.subjectId?._id || r.subjectId).toString();
+      if (!map[key]) continue;
 
       if (r.status === 'cancelled') continue; // cancelled does not count
 
@@ -321,11 +308,14 @@ exports.getMonthlyTrends = async (req, res) => {
     since.setMonth(since.getMonth() - monthsBack);
     since.setDate(1); // start from first of that month
 
-    const records = await Attendance.find({
-      userId,
-      date  : { $gte: since },
-      status: { $ne: 'cancelled' }, // [CHANGED] filter at DB level instead of in JS
-    });
+    const records = await Attendance.find(
+      {
+        userId,
+        date  : { $gte: since },
+        status: { $ne: 'cancelled' }, // [CHANGED] filter at DB level instead of in JS
+      },
+      { date: 1, status: 1 }
+    ).lean();
 
     // [CHANGED] Use YYYY-MM key so months sort correctly
     const trendMap = {};

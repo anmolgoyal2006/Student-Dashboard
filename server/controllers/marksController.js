@@ -23,7 +23,8 @@ exports.getAllMarks = async (req, res) => {
   try {
     const marks = await Marks.find({ userId: req.user.id })
       .populate('subjectId', 'name code credits')
-      .sort({ examDate: -1 });
+      .sort({ examDate: -1 })
+      .lean();
     res.json({ marks });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -36,7 +37,9 @@ exports.getCGPA = async (req, res) => {
     const marks = await Marks.find({
       userId:   req.user.id,
       examType: 'final',
-    }).populate('subjectId', 'name code credits');
+    })
+      .populate('subjectId', 'name code credits')
+      .lean();
 
     if (!marks.length)
       return res.json({ cgpa: 0, breakdown: [], message: 'No final exam marks found yet.' });
@@ -87,7 +90,9 @@ exports.getGradeOptions = (req, res) => {
 // GET /api/marks/semesters
 exports.getSemesters = async (req, res) => {
   try {
-    const semesters = await Semester.find({ student: req.user.id }).sort({ semesterNumber: 1 });
+    const semesters = await Semester.find({ student: req.user.id })
+      .sort({ semesterNumber: 1 })
+      .lean();
     res.json({ semesters });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -103,7 +108,9 @@ exports.getCGPAbySemester = async (req, res) => {
     const cached = cgpaCache.get(cacheKey);
     if (cached) return res.json(cached);
 
-    const semesters = await Semester.find({ student: userId }).sort({ semesterNumber: 1 });
+    const semesters = await Semester.find({ student: userId })
+      .sort({ semesterNumber: 1 })
+      .lean();
 
     const { calculateSGPA } = require('../utils/gradeUtils');
 

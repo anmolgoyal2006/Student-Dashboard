@@ -12,15 +12,17 @@ router.get('/', protect, async (req, res) => {
     const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
     await Notification.deleteMany({ userId: req.user._id, createdAt: { $lt: cutoff } });
 
-    const notifications = await Notification.find({ userId: req.user._id })
-      .sort({ createdAt: -1 })
-      .limit(6)   // only last 6 in the Dashboard panel
-      .lean();
-
-    const unreadCount = await Notification.countDocuments({
-      userId: req.user._id,
-      read:   false,
-    });
+    // Fetch latest notifications and unread count concurrently
+    const [notifications, unreadCount] = await Promise.all([
+      Notification.find({ userId: req.user._id })
+        .sort({ createdAt: -1 })
+        .limit(6)   // only last 6 in the Dashboard panel
+        .lean(),
+      Notification.countDocuments({
+        userId: req.user._id,
+        read:   false,
+      }),
+    ]);
 
     res.json({ notifications, unreadCount });
   } catch (err) {

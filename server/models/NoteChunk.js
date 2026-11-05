@@ -8,4 +8,7 @@ const noteChunkSchema = new mongoose.Schema({
   embedding: { type: [Number], default: [] },
 }, { timestamps: true });
 
+noteChunkSchema.index({ user: 1, filename: 1 });
+noteChunkSchema.index({ user: 1 });
+
 module.exports = mongoose.model('NoteChunk', noteChunkSchema);

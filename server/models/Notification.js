@@ -65,6 +65,8 @@ const notificationSchema = new mongoose.Schema(
 
 // For fast lookup/dedup queries
 notificationSchema.index({ userId: 1, type: 1, title: 1, body: 1, createdAt: -1 });
+notificationSchema.index({ userId: 1, createdAt: -1 });
+notificationSchema.index({ userId: 1, read: 1 });
 
 // Primary dedup index — one document per (user, dedupKey).
 // dedupKey encodes: type + entity-id + date (UTC or IST day depending on type), making it unique per

@@ -69,7 +69,9 @@ async function storeNoteEmbeddings(userId, filename, text) {
 
 async function retrieveRelevantChunks(userId, query, topK = 4) {
   const userObjectId = new mongoose.Types.ObjectId(userId);
-  const allChunks    = await NoteChunk.find({ user: userObjectId });
+  const allChunks    = await NoteChunk.find({ user: userObjectId })
+    .select('text filename embedding')
+    .lean();
 
   console.log('[RAG] Total chunks for user:', allChunks.length);
   if (!allChunks.length) return [];

@@ -1,0 +1,319 @@
+﻿diff --git a/server/controllers/aiChatController.js b/server/controllers/aiChatController.js
+index 4ab411e..5b1ea61 100644
+--- a/server/controllers/aiChatController.js
++++ b/server/controllers/aiChatController.js
+@@ -165,12 +165,6 @@ exports.chat = async (req, res) => {
+ exports.getNotes = async (req, res) => {
+   try {
+     const userId = new mongoose.Types.ObjectId(req.user.id);
+-    console.log('[getNotes] searching for userId:', userId.toString());
+-
+-    // First check raw count
+-    const totalChunks = await NoteChunk.countDocuments({ user: userId });
+-    console.log('[getNotes] total chunks for user:', totalChunks);
+-
+     const notes = await NoteChunk.aggregate([
+       { $match: { user: userId } },
+       { $group: {
+@@ -181,8 +175,6 @@ exports.getNotes = async (req, res) => {
+       { $sort: { updatedAt: -1 } },
+     ]);
+ 
+-    console.log('[getNotes] aggregated notes:', JSON.stringify(notes));
+-
+     // Prevent browser caching
+     res.set('Cache-Control', 'no-store');
+     res.json({ notes });
+diff --git a/server/controllers/attendanceController.js b/server/controllers/attendanceController.js
+index e2e90e6..c89c36d 100644
+--- a/server/controllers/attendanceController.js
++++ b/server/controllers/attendanceController.js
+@@ -137,10 +137,9 @@ exports.getAttendanceSummary = async (req, res) => {
+     if (cached) return res.json(cached);
+ 
+     const [subjects, records] = await Promise.all([
+-      Subject.find({ userId }).lean(),
++      Subject.find({ userId }).select('name code credits initialTotal initialPresent').lean(),
+       Attendance
+-        .find({ userId })
+-        .populate('subjectId', 'name code credits')
++        .find({ userId }, { subjectId: 1, status: 1, date: 1 })
+         .sort({ date: 1 })
+         .lean()
+     ]);
+@@ -164,20 +163,8 @@ exports.getAttendanceSummary = async (req, res) => {
+     for (const r of records) {
+       if (!r.subjectId) continue;
+ 
+-      const key = r.subjectId._id.toString();
+-
+-      if (!map[key]) {
+-        map[key] = {
+-          subject       : r.subjectId.name,
+-          code          : r.subjectId.code,
+-          credits       : r.subjectId.credits ?? null,
+-          total         : 0,
+-          present       : 0,
+-          absent        : 0,
+-          currentStreak : 0,
+-          lastStatuses  : [],
+-        };
+-      }
++      const key = (r.subjectId?._id || r.subjectId).toString();
++      if (!map[key]) continue;
+ 
+       if (r.status === 'cancelled') continue; // cancelled does not count
+ 
+@@ -321,11 +308,14 @@ exports.getMonthlyTrends = async (req, res) => {
+     since.setMonth(since.getMonth() - monthsBack);
+     since.setDate(1); // start from first of that month
+ 
+-    const records = await Attendance.find({
+-      userId,
+-      date  : { $gte: since },
+-      status: { $ne: 'cancelled' }, // [CHANGED] filter at DB level instead of in JS
+-    });
++    const records = await Attendance.find(
++      {
++        userId,
++        date  : { $gte: since },
++        status: { $ne: 'cancelled' }, // [CHANGED] filter at DB level instead of in JS
++      },
++      { date: 1, status: 1 }
++    ).lean();
+ 
+     // [CHANGED] Use YYYY-MM key so months sort correctly
+     const trendMap = {};
+diff --git a/server/controllers/marksController.js b/server/controllers/marksController.js
+index 0c3bb9e..1283717 100644
+--- a/server/controllers/marksController.js
++++ b/server/controllers/marksController.js
+@@ -23,7 +23,8 @@ exports.getAllMarks = async (req, res) => {
+   try {
+     const marks = await Marks.find({ userId: req.user.id })
+       .populate('subjectId', 'name code credits')
+-      .sort({ examDate: -1 });
++      .sort({ examDate: -1 })
++      .lean();
+     res.json({ marks });
+   } catch (err) {
+     res.status(500).json({ message: err.message });
+@@ -36,7 +37,9 @@ exports.getCGPA = async (req, res) => {
+     const marks = await Marks.find({
+       userId:   req.user.id,
+       examType: 'final',
+-    }).populate('subjectId', 'name code credits');
++    })
++      .populate('subjectId', 'name code credits')
++      .lean();
+ 
+     if (!marks.length)
+       return res.json({ cgpa: 0, breakdown: [], message: 'No final exam marks found yet.' });
+@@ -87,7 +90,9 @@ exports.getGradeOptions = (req, res) => {
+ // GET /api/marks/semesters
+ exports.getSemesters = async (req, res) => {
+   try {
+-    const semesters = await Semester.find({ student: req.user.id }).sort({ semesterNumber: 1 });
++    const semesters = await Semester.find({ student: req.user.id })
++      .sort({ semesterNumber: 1 })
++      .lean();
+     res.json({ semesters });
+   } catch (err) {
+     res.status(500).json({ message: err.message });
+@@ -103,7 +108,9 @@ exports.getCGPAbySemester = async (req, res) => {
+     const cached = cgpaCache.get(cacheKey);
+     if (cached) return res.json(cached);
+ 
+-    const semesters = await Semester.find({ student: userId }).sort({ semesterNumber: 1 });
++    const semesters = await Semester.find({ student: userId })
++      .sort({ semesterNumber: 1 })
++      .lean();
+ 
+     const { calculateSGPA } = require('../utils/gradeUtils');
+ 
+diff --git a/server/controllers/timetableController.js b/server/controllers/timetableController.js
+index e596583..40f56c8 100644
+--- a/server/controllers/timetableController.js
++++ b/server/controllers/timetableController.js
+@@ -5,7 +5,9 @@ const { parseTimetablePDF, parseTimetableImage } = require('../services/timetabl
+ // GET /api/subjects
+ exports.getSubjects = async (req, res) => {
+   try {
+-    const subjects = await Subject.find({ userId: req.user.id }).sort({ name: 1 });
++    const subjects = await Subject.find({ userId: req.user.id })
++      .sort({ name: 1 })
++      .lean();
+     res.json({ subjects });
+   } catch (err) {
+     res.status(500).json({ message: err.message });
+diff --git a/server/models/ClassroomAssignment.js b/server/models/ClassroomAssignment.js
+index e2cf7e8..69de0dc 100644
+--- a/server/models/ClassroomAssignment.js
++++ b/server/models/ClassroomAssignment.js
+@@ -22,5 +22,7 @@ const classroomAssignmentSchema = new mongoose.Schema({
+ classroomAssignmentSchema.index({ userId: 1, courseId: 1, assignmentId: 1 }, { unique: true });
+ // Cron queries: filter by status + dueDate across all users every hour
+ classroomAssignmentSchema.index({ status: 1, dueDate: 1 });
++// User dashboard query: ESR order (Equality: userId, Sort: dueDate, Range: status)
++classroomAssignmentSchema.index({ userId: 1, dueDate: 1, status: 1 });
+ 
+ module.exports = mongoose.model('ClassroomAssignment', classroomAssignmentSchema);
+diff --git a/server/models/Marks.js b/server/models/Marks.js
+index 51307ae..dfe856e 100644
+--- a/server/models/Marks.js
++++ b/server/models/Marks.js
+@@ -23,4 +23,7 @@ marksSchema.pre('save', function (next) {
+   next();
+ });
+ 
++marksSchema.index({ userId: 1, examType: 1 });
++marksSchema.index({ userId: 1, examDate: -1 });
++
+ module.exports = mongoose.model('Marks', marksSchema);
+diff --git a/server/models/NoteChunk.js b/server/models/NoteChunk.js
+index 7d2c0e3..eda2971 100644
+--- a/server/models/NoteChunk.js
++++ b/server/models/NoteChunk.js
+@@ -8,4 +8,7 @@ const noteChunkSchema = new mongoose.Schema({
+   embedding: { type: [Number], default: [] },
+ }, { timestamps: true });
+ 
++noteChunkSchema.index({ user: 1, filename: 1 });
++noteChunkSchema.index({ user: 1 });
++
+ module.exports = mongoose.model('NoteChunk', noteChunkSchema);
+\ No newline at end of file
+diff --git a/server/models/Notification.js b/server/models/Notification.js
+index 579b15c..d1564b5 100644
+--- a/server/models/Notification.js
++++ b/server/models/Notification.js
+@@ -65,6 +65,8 @@ const notificationSchema = new mongoose.Schema(
+ 
+ // For fast lookup/dedup queries
+ notificationSchema.index({ userId: 1, type: 1, title: 1, body: 1, createdAt: -1 });
++notificationSchema.index({ userId: 1, createdAt: -1 });
++notificationSchema.index({ userId: 1, read: 1 });
+ 
+ // Primary dedup index ΓÇö one document per (user, dedupKey).
+ // dedupKey encodes: type + entity-id + date (UTC or IST day depending on type), making it unique per
+diff --git a/server/models/Semester.model.js b/server/models/Semester.model.js
+index e5c2cb6..28df655 100644
+--- a/server/models/Semester.model.js
++++ b/server/models/Semester.model.js
+@@ -63,6 +63,8 @@ const SemesterSchema = new mongoose.Schema(
+   { timestamps: true }
+ );
+ 
++SemesterSchema.index({ student: 1, semesterNumber: 1 });
++
+ // Auto-compute SGPA before saving
+ SemesterSchema.pre('save', function (next) {
+   if (this.isManual && this.directSGPA !== null) {
+diff --git a/server/routes/notificationRoutes.js b/server/routes/notificationRoutes.js
+index ebe895c..6989570 100644
+--- a/server/routes/notificationRoutes.js
++++ b/server/routes/notificationRoutes.js
+@@ -12,15 +12,17 @@ router.get('/', protect, async (req, res) => {
+     const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+     await Notification.deleteMany({ userId: req.user._id, createdAt: { $lt: cutoff } });
+ 
+-    const notifications = await Notification.find({ userId: req.user._id })
+-      .sort({ createdAt: -1 })
+-      .limit(6)   // only last 6 in the Dashboard panel
+-      .lean();
+-
+-    const unreadCount = await Notification.countDocuments({
+-      userId: req.user._id,
+-      read:   false,
+-    });
++    // Fetch latest notifications and unread count concurrently
++    const [notifications, unreadCount] = await Promise.all([
++      Notification.find({ userId: req.user._id })
++        .sort({ createdAt: -1 })
++        .limit(6)   // only last 6 in the Dashboard panel
++        .lean(),
++      Notification.countDocuments({
++        userId: req.user._id,
++        read:   false,
++      }),
++    ]);
+ 
+     res.json({ notifications, unreadCount });
+   } catch (err) {
+diff --git a/server/services/decisionService.js b/server/services/decisionService.js
+index 761abaf..0b95bc2 100644
+--- a/server/services/decisionService.js
++++ b/server/services/decisionService.js
+@@ -9,8 +9,8 @@ const ClassroomAssignment = require('../models/ClassroomAssignment');
+ const getAttendanceScore = async (userId) => {
+   const Subject = require('../models/Subject');
+   const [subjectsList, records] = await Promise.all([
+-    Subject.find({ userId }).lean(),
+-    Attendance.find({ userId }).populate('subjectId', 'name').lean()
++    Subject.find({ userId }).select('name initialTotal initialPresent').lean(),
++    Attendance.find({ userId }, { subjectId: 1, status: 1 }).lean()
+   ]);
+ 
+   const map = {};
+@@ -20,8 +20,8 @@ const getAttendanceScore = async (userId) => {
+ 
+   for (const r of records) {
+     if (!r.subjectId) continue;
+-    const key = r.subjectId._id.toString();
+-    if (!map[key]) map[key] = { name: r.subjectId.name, total: 0, present: 0 };
++    const key = (r.subjectId?._id || r.subjectId).toString();
++    if (!map[key]) continue;
+     if (r.status !== 'cancelled') {
+       map[key].total++;
+       if (r.status === 'present') map[key].present++;
+@@ -42,7 +42,10 @@ const getAttendanceScore = async (userId) => {
+ };
+ 
+ const getCGPA = async (userId) => {
+-  const marks = await Marks.find({ userId, examType: 'final' }).populate('subjectId', 'credits');
++  const marks = await Marks.find({ userId, examType: 'final' })
++    .select('gradePoint subjectId')
++    .populate('subjectId', 'credits')
++    .lean();
+   if (!marks.length) return 0;
+   let totalWt = 0, totalCr = 0;
+   for (const m of marks) {
+@@ -54,7 +57,9 @@ const getCGPA = async (userId) => {
+ };
+ 
+ const getCareerData = async (userId) => {
+-  const career = await CareerProgress.findOne({ userId });
++  const career = await CareerProgress.findOne({ userId })
++    .select('problemsSolved readiness targetCompany leetcodeSync leetcodeUsername')
++    .lean();
+   if (!career) return { problemsSolved: 0, readiness: 'Beginner', targetCompany: 'Other', lcEasy: 0, lcMedium: 0, lcHard: 0, lcLinked: false };
+   const lc = career.leetcodeSync || {};
+   return {
+@@ -69,7 +74,11 @@ const getCareerData = async (userId) => {
+ };
+ 
+ const getClassroomAssignments = async (userId) => {
+-  const assignments = await ClassroomAssignment.find({ userId, status: { $ne: 'submitted' } }).sort({ dueDate: 1 }).limit(5);
++  const assignments = await ClassroomAssignment.find({ userId, status: { $ne: 'submitted' } })
++    .select('title courseName dueDate status priority')
++    .sort({ dueDate: 1 })
++    .limit(5)
++    .lean();
+   return assignments.map(a => ({
+     title: a.title,
+     course: a.courseName,
+diff --git a/server/services/ragService.js b/server/services/ragService.js
+index 2b3bcd8..b1e40fc 100644
+--- a/server/services/ragService.js
++++ b/server/services/ragService.js
+@@ -69,7 +69,9 @@ async function storeNoteEmbeddings(userId, filename, text) {
+ 
+ async function retrieveRelevantChunks(userId, query, topK = 4) {
+   const userObjectId = new mongoose.Types.ObjectId(userId);
+-  const allChunks    = await NoteChunk.find({ user: userObjectId });
++  const allChunks    = await NoteChunk.find({ user: userObjectId })
++    .select('text filename embedding')
++    .lean();
+ 
+   console.log('[RAG] Total chunks for user:', allChunks.length);
+   if (!allChunks.length) return [];

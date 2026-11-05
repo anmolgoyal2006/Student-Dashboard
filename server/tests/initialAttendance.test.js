@@ -80,10 +80,17 @@ describe('Manual Attendance Balance & Retroactive Marking', () => {
       subject.initialPresent = 12;
       await subject.save();
 
+      // Use dates within the last 90 days so getStudentBySid's 90-day
+      // lookback window always includes them regardless of when the test runs.
+      const recent1 = new Date();
+      recent1.setDate(recent1.getDate() - 10);
+      const recent2 = new Date();
+      recent2.setDate(recent2.getDate() - 5);
+
       // Mark 1 present and 1 absent in database records
       await Attendance.create([
-        { userId: user._id, subjectId: subject._id, date: new Date('2026-07-20'), status: 'present', slot: 'slot_0' },
-        { userId: user._id, subjectId: subject._id, date: new Date('2026-07-27'), status: 'absent', slot: 'slot_0' }
+        { userId: user._id, subjectId: subject._id, date: recent1, status: 'present', slot: 'slot_0' },
+        { userId: user._id, subjectId: subject._id, date: recent2, status: 'absent', slot: 'slot_0' }
       ]);
     });
 

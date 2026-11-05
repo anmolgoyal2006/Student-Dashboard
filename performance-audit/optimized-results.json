@@ -1,0 +1,460 @@
+{
+  "timestamp": "2026-11-05T19:13:46.022Z",
+  "mode": "optimized",
+  "nodeVersion": "v24.19.0",
+  "platform": "win32",
+  "concurrencyLevels": [
+    1,
+    10,
+    25,
+    50
+  ],
+  "durationSecs": 5,
+  "warmupSecs": 2,
+  "endpoints": {
+    "Student Dashboard": {
+      "path": "/api/decision/today-plan",
+      "description": "Personalized intelligence plan aggregating Attendance, Marks, Career, Classroom",
+      "concurrency": {
+        "1": {
+          "connections": 1,
+          "requestsPerSec": 152,
+          "totalRequests": 759,
+          "latency": {
+            "averageMs": 6.07,
+            "p50Ms": 5,
+            "p90Ms": 9,
+            "p95Ms": 13,
+            "p99Ms": 18,
+            "minMs": 3,
+            "maxMs": 27
+          },
+          "throughputBytesPerSec": 205376,
+          "errors": 0,
+          "errorRatePct": 0
+        },
+        "10": {
+          "connections": 10,
+          "requestsPerSec": 304,
+          "totalRequests": 1520,
+          "latency": {
+            "averageMs": 32.36,
+            "p50Ms": 30,
+            "p90Ms": 40,
+            "p95Ms": 54,
+            "p99Ms": 60,
+            "minMs": 25,
+            "maxMs": 107
+          },
+          "throughputBytesPerSec": 411366,
+          "errors": 0,
+          "errorRatePct": 0
+        },
+        "25": {
+          "connections": 25,
+          "requestsPerSec": 297,
+          "totalRequests": 1485,
+          "latency": {
+            "averageMs": 83.83,
+            "p50Ms": 82,
+            "p90Ms": 98,
+            "p95Ms": 116,
+            "p99Ms": 136,
+            "minMs": 58,
+            "maxMs": 154
+          },
+          "throughputBytesPerSec": 401843,
+          "errors": 0,
+          "errorRatePct": 0
+        },
+        "50": {
+          "connections": 50,
+          "requestsPerSec": 269,
+          "totalRequests": 1347,
+          "latency": {
+            "averageMs": 183.69,
+            "p50Ms": 178,
+            "p90Ms": 216,
+            "p95Ms": 263,
+            "p99Ms": 276,
+            "minMs": 131,
+            "maxMs": 315
+          },
+          "throughputBytesPerSec": 364518,
+          "errors": 0,
+          "errorRatePct": 0
+        }
+      }
+    },
+    "Attendance Retrieval": {
+      "path": "/api/attendance/summary",
+      "description": "Attendance statistics, current streaks, shortage calculations, miss predictions",
+      "concurrency": {
+        "1": {
+          "connections": 1,
+          "requestsPerSec": 1186,
+          "totalRequests": 5931,
+          "latency": {
+            "averageMs": 0.27,
+            "p50Ms": 0,
+            "p90Ms": 1,
+            "p95Ms": 2,
+            "p99Ms": 3,
+            "minMs": 1,
+            "maxMs": 13
+          },
+          "throughputBytesPerSec": 2930586,
+          "errors": 0,
+          "errorRatePct": 0
+        },
+        "10": {
+          "connections": 10,
+          "requestsPerSec": 1152,
+          "totalRequests": 5760,
+          "latency": {
+            "averageMs": 8.18,
+            "p50Ms": 8,
+            "p90Ms": 11,
+            "p95Ms": 15,
+            "p99Ms": 21,
+            "minMs": 5,
+            "maxMs": 40
+          },
+          "throughputBytesPerSec": 2845286,
+          "errors": 0,
+          "errorRatePct": 0
+        },
+        "25": {
+          "connections": 25,
+          "requestsPerSec": 1210,
+          "totalRequests": 6050,
+          "latency": {
+            "averageMs": 20.25,
+            "p50Ms": 19,
+            "p90Ms": 26,
+            "p95Ms": 31,
+            "p99Ms": 33,
+            "minMs": 14,
+            "maxMs": 44
+          },
+          "throughputBytesPerSec": 2989056,
+          "errors": 0,
+          "errorRatePct": 0
+        },
+        "50": {
+          "connections": 50,
+          "requestsPerSec": 1220,
+          "totalRequests": 6100,
+          "latency": {
+            "averageMs": 40.77,
+            "p50Ms": 39,
+            "p90Ms": 49,
+            "p95Ms": 59,
+            "p99Ms": 63,
+            "minMs": 28,
+            "maxMs": 76
+          },
+          "throughputBytesPerSec": 3012813,
+          "errors": 0,
+          "errorRatePct": 0
+        }
+      }
+    },
+    "Attendance Trends": {
+      "path": "/api/attendance/trends",
+      "description": "Monthly historical attendance trends and period analysis",
+      "concurrency": {
+        "1": {
+          "connections": 1,
+          "requestsPerSec": 41,
+          "totalRequests": 207,
+          "latency": {
+            "averageMs": 23.76,
+            "p50Ms": 18,
+            "p90Ms": 36,
+            "p95Ms": 93,
+            "p99Ms": 107,
+            "minMs": 12,
+            "maxMs": 180
+          },
+          "throughputBytesPerSec": 52502,
+          "errors": 0,
+          "errorRatePct": 0
+        },
+        "10": {
+          "connections": 10,
+          "requestsPerSec": 63,
+          "totalRequests": 315,
+          "latency": {
+            "averageMs": 163.97,
+            "p50Ms": 144,
+            "p90Ms": 261,
+            "p95Ms": 303,
+            "p99Ms": 303,
+            "minMs": 121,
+            "maxMs": 320
+          },
+          "throughputBytesPerSec": 79894,
+          "errors": 0,
+          "errorRatePct": 0
+        },
+        "25": {
+          "connections": 25,
+          "requestsPerSec": 65,
+          "totalRequests": 325,
+          "latency": {
+            "averageMs": 406.27,
+            "p50Ms": 373,
+            "p90Ms": 519,
+            "p95Ms": 567,
+            "p99Ms": 567,
+            "minMs": 322,
+            "maxMs": 567
+          },
+          "throughputBytesPerSec": 82403,
+          "errors": 0,
+          "errorRatePct": 0
+        },
+        "50": {
+          "connections": 50,
+          "requestsPerSec": 80,
+          "totalRequests": 400,
+          "latency": {
+            "averageMs": 776.17,
+            "p50Ms": 758,
+            "p90Ms": 872,
+            "p95Ms": 883,
+            "p99Ms": 894,
+            "minMs": 641,
+            "maxMs": 894
+          },
+          "throughputBytesPerSec": 101453,
+          "errors": 0,
+          "errorRatePct": 0
+        }
+      }
+    },
+    "Marks Retrieval": {
+      "path": "/api/marks/cgpa-semester",
+      "description": "Multi-semester SGPA breakdown and weighted cumulative CGPA",
+      "concurrency": {
+        "1": {
+          "connections": 1,
+          "requestsPerSec": 1442,
+          "totalRequests": 7211,
+          "latency": {
+            "averageMs": 0.13,
+            "p50Ms": 0,
+            "p90Ms": 0,
+            "p95Ms": 1,
+            "p99Ms": 3,
+            "minMs": 1,
+            "maxMs": 15
+          },
+          "throughputBytesPerSec": 1629901,
+          "errors": 0,
+          "errorRatePct": 0
+        },
+        "10": {
+          "connections": 10,
+          "requestsPerSec": 1512,
+          "totalRequests": 7560,
+          "latency": {
+            "averageMs": 6.14,
+            "p50Ms": 5,
+            "p90Ms": 9,
+            "p95Ms": 12,
+            "p99Ms": 17,
+            "minMs": 3,
+            "maxMs": 80
+          },
+          "throughputBytesPerSec": 1708544,
+          "errors": 0,
+          "errorRatePct": 0
+        },
+        "25": {
+          "connections": 25,
+          "requestsPerSec": 1580,
+          "totalRequests": 7900,
+          "latency": {
+            "averageMs": 15.39,
+            "p50Ms": 15,
+            "p90Ms": 20,
+            "p95Ms": 27,
+            "p99Ms": 31,
+            "minMs": 10,
+            "maxMs": 36
+          },
+          "throughputBytesPerSec": 1785549,
+          "errors": 0,
+          "errorRatePct": 0
+        },
+        "50": {
+          "connections": 50,
+          "requestsPerSec": 1530,
+          "totalRequests": 7650,
+          "latency": {
+            "averageMs": 32.28,
+            "p50Ms": 30,
+            "p90Ms": 41,
+            "p95Ms": 53,
+            "p99Ms": 60,
+            "minMs": 22,
+            "maxMs": 160
+          },
+          "throughputBytesPerSec": 1729024,
+          "errors": 0,
+          "errorRatePct": 0
+        }
+      }
+    },
+    "Timetable Retrieval": {
+      "path": "/api/timetable",
+      "description": "Student course schedule, credits, instructors, and meeting slots",
+      "concurrency": {
+        "1": {
+          "connections": 1,
+          "requestsPerSec": 214,
+          "totalRequests": 1072,
+          "latency": {
+            "averageMs": 4.17,
+            "p50Ms": 2,
+            "p90Ms": 5,
+            "p95Ms": 24,
+            "p99Ms": 48,
+            "minMs": 1,
+            "maxMs": 117
+          },
+          "throughputBytesPerSec": 988800,
+          "errors": 0,
+          "errorRatePct": 0
+        },
+        "10": {
+          "connections": 10,
+          "requestsPerSec": 592,
+          "totalRequests": 2961,
+          "latency": {
+            "averageMs": 16.08,
+            "p50Ms": 9,
+            "p90Ms": 23,
+            "p95Ms": 109,
+            "p99Ms": 210,
+            "minMs": 1,
+            "maxMs": 544
+          },
+          "throughputBytesPerSec": 2731110,
+          "errors": 0,
+          "errorRatePct": 0
+        },
+        "25": {
+          "connections": 25,
+          "requestsPerSec": 728,
+          "totalRequests": 3639,
+          "latency": {
+            "averageMs": 34.48,
+            "p50Ms": 30,
+            "p90Ms": 40,
+            "p95Ms": 50,
+            "p99Ms": 131,
+            "minMs": 22,
+            "maxMs": 1737
+          },
+          "throughputBytesPerSec": 3356467,
+          "errors": 0,
+          "errorRatePct": 0
+        },
+        "50": {
+          "connections": 50,
+          "requestsPerSec": 746,
+          "totalRequests": 3730,
+          "latency": {
+            "averageMs": 66.95,
+            "p50Ms": 62,
+            "p90Ms": 81,
+            "p95Ms": 100,
+            "p99Ms": 112,
+            "minMs": 54,
+            "maxMs": 438
+          },
+          "throughputBytesPerSec": 3440435,
+          "errors": 0,
+          "errorRatePct": 0
+        }
+      }
+    },
+    "AI Notes Retrieval": {
+      "path": "/api/ai/notes",
+      "description": "RAG note documents aggregation, chunk counts, and timestamps",
+      "concurrency": {
+        "1": {
+          "connections": 1,
+          "requestsPerSec": 120,
+          "totalRequests": 600,
+          "latency": {
+            "averageMs": 7.9,
+            "p50Ms": 4,
+            "p90Ms": 10,
+            "p95Ms": 46,
+            "p99Ms": 94,
+            "minMs": 2,
+            "maxMs": 138
+          },
+          "throughputBytesPerSec": 182525,
+          "errors": 0,
+          "errorRatePct": 0
+        },
+        "10": {
+          "connections": 10,
+          "requestsPerSec": 227,
+          "totalRequests": 1137,
+          "latency": {
+            "averageMs": 43.35,
+            "p50Ms": 17,
+            "p90Ms": 132,
+            "p95Ms": 208,
+            "p99Ms": 271,
+            "minMs": 2,
+            "maxMs": 454
+          },
+          "throughputBytesPerSec": 345882,
+          "errors": 0,
+          "errorRatePct": 0
+        },
+        "25": {
+          "connections": 25,
+          "requestsPerSec": 368,
+          "totalRequests": 1840,
+          "latency": {
+            "averageMs": 66.99,
+            "p50Ms": 25,
+            "p90Ms": 186,
+            "p95Ms": 297,
+            "p99Ms": 411,
+            "minMs": 2,
+            "maxMs": 1628
+          },
+          "throughputBytesPerSec": 559642,
+          "errors": 0,
+          "errorRatePct": 0
+        },
+        "50": {
+          "connections": 50,
+          "requestsPerSec": 779,
+          "totalRequests": 3893,
+          "latency": {
+            "averageMs": 63.68,
+            "p50Ms": 59,
+            "p90Ms": 67,
+            "p95Ms": 77,
+            "p99Ms": 129,
+            "minMs": 51,
+            "maxMs": 1000
+          },
+          "throughputBytesPerSec": 1184256,
+          "errors": 0,
+          "errorRatePct": 0
+        }
+      }
+    }
+  }
+}
